@@ -1,0 +1,69 @@
+import { KodaChatClient, type SseTransport } from "../src/llm/KodaChatClient";
+import type { ChatMessage } from "../src/core/agent/types";
+
+const cfg = { endpoint: "http://127.0.0.1:1234", apiKey: "", model: "m", suppressThinking: true };
+const msgs: ChatMessage[] = [{ role: "user", content: "Hi" }];
+const fakeClock = { now: () => 0, setTimeout: () => 1, clearTimeout: () => {} };
+
+function transportOf(chunks: string[], status = 200): SseTransport {
+  return {
+    async postStream(_u, _b, _h, onChunk) {
+      for (const c of chunks) onChunk(c);
+      return status;
+    },
+  };
+}
+
+const line = (obj: unknown): string => `data: ${JSON.stringify(obj)}\n`;
+
+describe("KodaChatClient.complete", () => {
+  it("streamt content-Token und liefert das Akkumulat", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { content: "Hal" } }] }),
+      line({ choices: [{ delta: { content: "lo" } }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const tokens: string[] = [];
+    const r = await client.complete(cfg, msgs, [], (t) => tokens.push(t), () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: true, content: "Hallo", toolCalls: [] });
+    expect(tokens.join("")).toBe("Hallo");
+  });
+
+  it("assembliert tool_calls ueber mehrere Chunks", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "read_note", arguments: '{"path":' } }] } }] }),
+      line({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '"A.md"}' } }] }, }] }) +
+        line({ choices: [{ delta: {}, finish_reason: "tool_calls" }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({
+      ok: true,
+      finishReason: "tool_calls",
+      toolCalls: [{ id: "c1", name: "read_note", arguments: '{"path":"A.md"}' }],
+    });
+  });
+
+  it("routet inline <think> in den reasoning-Kanal statt in den content", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { content: "<think>weil</think>Antwort" } }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const reasoning: string[] = [];
+    const r = await client.complete(cfg, msgs, [], () => {}, (t) => reasoning.push(t), new AbortController().signal);
+    expect(r).toMatchObject({ ok: true, content: "Antwort" });
+    expect(reasoning.join("")).toBe("weil");
+  });
+
+  it("uebersetzt HTTP-Fehlerstatus in kind http mit chatErrorMessage-Detail", async () => {
+    const client = new KodaChatClient(transportOf(['{"detail":"Not authenticated"}'], 401), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: false, kind: "http" });
+    if (!r.ok) expect(r.detail).toMatch(/Schlüssel/);
+  });
+
+  it("bereits abgebrochenes Signal startet den Transport gar nicht", async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const client = new KodaChatClient(transportOf([]), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, ctrl.signal);
+    expect(r).toMatchObject({ ok: false, kind: "aborted" });
+  });
+});
