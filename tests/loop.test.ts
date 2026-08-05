@@ -58,6 +58,52 @@ describe("runAgent", () => {
     expect(out[1].content).toBe("ERROR: Pfad geblockt");
   });
 
+  it("werfendes Tool geht als ERROR-Result zurueck ans Modell, kein Crash", async () => {
+    const throwing: ToolRunner = {
+      run: async () => {
+        throw new Error("kaputt");
+      },
+    };
+    const out = await runAgent(
+      {
+        llm: scripted([
+          { ok: true, content: "", toolCalls: [{ id: "c1", name: "read_note", arguments: "{}" }] },
+          { ok: true, content: "Verstanden", toolCalls: [] },
+        ]),
+        tools: throwing, maxRounds: 8, textFallback: false,
+      },
+      user, () => {}, () => {}, () => {}, sig(),
+    );
+    expect(out[1].content).toBe("ERROR: kaputt");
+    expect(out.map((m) => m.role)).toEqual(["assistant", "tool", "assistant"]);
+    expect(out[2]).toEqual({ role: "assistant", content: "Verstanden" });
+  });
+
+  it("eine Tool-Runde mit zwei nativen Tool-Calls: beide Tool-Nachrichten in Reihenfolge", async () => {
+    const events: string[] = [];
+    const out = await runAgent(
+      {
+        llm: scripted([
+          {
+            ok: true,
+            content: "",
+            toolCalls: [
+              { id: "c1", name: "search_notes", arguments: '{"query":"x"}' },
+              { id: "c2", name: "read_note", arguments: '{"path":"y"}' },
+            ],
+          },
+          { ok: true, content: "Fertig", toolCalls: [] },
+        ]),
+        tools: okTools, maxRounds: 8, textFallback: false,
+      },
+      user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
+    );
+    expect(events).toEqual(["tool-start", "tool-end", "tool-start", "tool-end", "final"]);
+    expect(out.map((m) => m.role)).toEqual(["assistant", "tool", "tool", "assistant"]);
+    expect(out[1]).toMatchObject({ role: "tool", toolCallId: "c1", content: "ergebnis von search_notes" });
+    expect(out[2]).toMatchObject({ role: "tool", toolCallId: "c2", content: "ergebnis von read_note" });
+  });
+
   it("ungueltiges Argument-JSON wird zum Tool-Fehler, nicht zur Exception", async () => {
     const out = await runAgent(
       {
