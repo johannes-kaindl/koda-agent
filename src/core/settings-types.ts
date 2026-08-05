@@ -2,6 +2,10 @@ import { mergeSettings } from "../vendor/kit/settings";
 import { clampInt } from "../vendor/kit/num";
 import { migrateEndpointList, type EndpointConfig } from "../vendor/kit/endpoint_config";
 
+/** Obergrenze für `maxRounds` — einzige Quelle, gegen die sowohl `mergeKodaSettings`
+ *  klemmt als auch der Settings-Slider (`src/obsidian/settings.ts`) seine Limits setzt. */
+export const MAX_ROUNDS_LIMIT = 16;
+
 export interface KodaSettings {
   endpoints: EndpointConfig[];
   model: string;
@@ -32,6 +36,6 @@ export function mergeKodaSettings(raw: unknown): KodaSettings {
     endpoints: Array.isArray(rawEndpoints)
       ? migrateEndpointList(undefined, rawEndpoints as (string | EndpointConfig)[])
       : merged.endpoints,
-    maxRounds: clampInt(merged.maxRounds, 1, 16, DEFAULT_SETTINGS.maxRounds),
+    maxRounds: clampInt(merged.maxRounds, 1, MAX_ROUNDS_LIMIT, DEFAULT_SETTINGS.maxRounds),
   };
 }
