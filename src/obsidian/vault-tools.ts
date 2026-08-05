@@ -84,17 +84,21 @@ export class VaultTools implements ToolRunner {
     if (mode === "create" && exists) return { ok: false, error: `existiert schon: "${norm}" — nutze append oder replace` };
     if (mode !== "create" && !exists) return { ok: false, error: `nicht gefunden: "${norm}" — nutze create` };
 
+    // Effektiver Inhalt, EINMAL berechnet: append ergaenzt ggf. einen fuehrenden
+    // Zeilenumbruch. Vorschau (ConfirmWritePort.newText) und der tatsaechliche
+    // Schreib-Call unten verwenden exakt denselben Wert — sonst zeigt das Modal
+    // etwas anderes an, als am Ende landet (Spec-Invariante: approved == written).
+    const effective = mode === "append" && !content.startsWith("\n") ? `\n${content}` : content;
+
     if (writePolicy(norm, this.opts.kodaFolder()) === "confirm") {
       const oldText = exists ? await this.vault.read(norm) : "";
-      const approved = await this.confirm({ path: norm, mode, oldText, newText: content });
-      // Die Freigabe gilt genau fuer DIESEN Inhalt — der Schreibpfad unten
-      // verwendet dieselbe content-Variable, nichts dazwischen darf sie aendern.
+      const approved = await this.confirm({ path: norm, mode, oldText, newText: effective });
       if (!approved) return { ok: false, error: "vom Nutzer abgelehnt" };
     }
 
-    if (mode === "create") await this.vault.create(norm, content);
-    else if (mode === "append") await this.vault.append(norm, content.startsWith("\n") ? content : `\n${content}`);
-    else await this.vault.overwrite(norm, content);
+    if (mode === "create") await this.vault.create(norm, effective);
+    else if (mode === "append") await this.vault.append(norm, effective);
+    else await this.vault.overwrite(norm, effective);
     return { ok: true, content: `geschrieben: ${norm} (${mode})` };
   }
 

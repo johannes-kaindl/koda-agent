@@ -1,4 +1,4 @@
-import { Modal, Setting, type App } from "obsidian";
+import { ButtonComponent, Modal, type App } from "obsidian";
 import { applyDestructive } from "../vendor/kit-obsidian/confirm";
 import { diffLines } from "../core/diff";
 import { t } from "../vendor/kit/i18n";
@@ -23,12 +23,18 @@ export function confirmWrite(app: App, req: WriteRequest): Promise<boolean> {
         } else {
           box.createEl("pre", { text: req.newText });
         }
-        new Setting(this.contentEl)
-          .addButton((b) => b.setButtonText(t("confirm.cancel")).onClick(() => { done(false); this.close(); }))
-          .addButton((b) => {
-            applyDestructive(b.setButtonText(t("confirm.write")).setCta());
-            b.onClick(() => { done(true); this.close(); });
-          });
+        // Button-Reihenfolge und -Container folgen UI-STANDARD §2 (verbindlich): Cancel links,
+        // Bestaetigen rechts, beide im nativen modal-button-container — wie im vendorten
+        // kit-obsidian/confirm.ts. mod-cta und destructive schliessen sich gegenseitig aus
+        // (Kit-Konvention): replace ist destruktiv (ueberschreibt bestehenden Inhalt),
+        // create/append sind additiv und bekommen nur die CTA-Hervorhebung.
+        const btns = this.contentEl.createDiv({ cls: "modal-button-container" });
+        new ButtonComponent(btns).setButtonText(t("confirm.cancel")).onClick(() => { done(false); this.close(); });
+        const writeBtn = new ButtonComponent(btns)
+          .setButtonText(t("confirm.write"))
+          .onClick(() => { done(true); this.close(); });
+        if (req.mode === "replace") applyDestructive(writeBtn);
+        else writeBtn.setCta();
       }
       onClose(): void {
         done(false);

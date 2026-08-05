@@ -1,4 +1,15 @@
-import { VaultTools, type VaultPort } from "../src/obsidian/vault-tools";
+import { VaultTools, type VaultPort, type WriteRequest } from "../src/obsidian/vault-tools";
+
+function capturingConfirm(): { calls: WriteRequest[]; confirm: (req: WriteRequest) => Promise<boolean> } {
+  const calls: WriteRequest[] = [];
+  return {
+    calls,
+    confirm: async (req) => {
+      calls.push(req);
+      return true;
+    },
+  };
+}
 
 function fakeVault(files: Record<string, string>): VaultPort & { files: Record<string, string> } {
   return {
@@ -50,6 +61,29 @@ describe("VaultTools", () => {
     const r = await tools.run("write_note", { path: "Plan.md", content: "neu", mode: "replace" });
     expect(r).toEqual({ ok: false, error: "vom Nutzer abgelehnt" });
     expect(vault.files["Plan.md"]).toBe("alt");
+  });
+  it("write_note ausserhalb mit Zustimmung (replace) schreibt exakt den bestaetigten Inhalt", async () => {
+    const vault = fakeVault({ "Plan.md": "alt" });
+    const cap = capturingConfirm();
+    const tools = new VaultTools(vault, cap.confirm, opts);
+    const r = await tools.run("write_note", { path: "Plan.md", content: "neu", mode: "replace" });
+    expect(r.ok).toBe(true);
+    expect(cap.calls).toHaveLength(1);
+    expect(vault.files["Plan.md"]).toBe(cap.calls[0].newText);
+    expect(vault.files["Plan.md"]).toBe("neu");
+  });
+  it("write_note ausserhalb mit Zustimmung (append) schreibt exakt die Vorschau (inkl. fuehrendem Zeilenumbruch)", async () => {
+    const vault = fakeVault({ "Plan.md": "alt" });
+    const cap = capturingConfirm();
+    const tools = new VaultTools(vault, cap.confirm, opts);
+    const r = await tools.run("write_note", { path: "Plan.md", content: "neu", mode: "append" });
+    expect(r.ok).toBe(true);
+    expect(cap.calls).toHaveLength(1);
+    const previewed = cap.calls[0].newText;
+    // Die Vorschau MUSS der tatsaechlich angehaengte Effektiv-Inhalt sein — sonst
+    // zeigt das Confirm-Modal etwas anderes, als am Ende geschrieben wird.
+    expect(vault.files["Plan.md"]).toBe("alt" + previewed);
+    expect(previewed).toBe("\nneu");
   });
   it("create auf existierende Datei ist ein Fehler-Result (kein Ueberschreiben)", async () => {
     const tools = new VaultTools(fakeVault({ "Koda/x.md": "da" }), yes, opts);
