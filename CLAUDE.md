@@ -2,13 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: Greenfield (Stand 2026-08-05)
+## Status: Design steht, Code noch nicht (Stand 2026-08-05)
 
-Koda ist ein **geplantes** agentisches Obsidian-Plugin („Freund/Begleiter im Vault",
-Lakota) — es gibt noch keinen Code, kein Build-Setup, keine Tests. Ideen-Quelle:
-`10_Pallas/00_Inbox/Koda Agent Plugin Recherche.md` (Pallas-Vault). Der Scope ist
-noch **nicht entschieden** — vor jeder Implementierung gehört eine
-Brainstorming-/Design-Session an den Anfang.
+Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
+Chat-Sidebar + Vault-Tools + Markdown-Memory. Es gibt noch keinen Code und kein
+Build-Setup. **Der MVP-Scope ist entschieden und spezifiziert:**
+`docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md` — dort stehen alle
+Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Ordner frei,
+Rest bestätigt", Agent-Kern im Plugin, Roadmap-Stufen). Ideen-Quelle:
+`10_Pallas/00_Inbox/Koda Agent Plugin Recherche.md` (Pallas-Vault).
 
 ## Verbindlicher Rahmen
 
@@ -18,18 +20,16 @@ UI-Arbeit, eigenständiges Git-Repo mit eigenem Release-Takt (PROF-OBS-09),
 Release-Infra über Skill `plugin-release-setup`, Test-Setup über Skill
 `obsidian-plugin-test-pattern` (vitest + Obsidian-Mock aus `obsidian-kit/testing`).
 
-## Scope-Frage (offen)
+## Scope-Entscheidung (2026-08-05, Details in der Spec)
 
-Die Recherche-Notiz mischt drei Ausbaustufen, die getrennt gehören:
-
-1. **Vault-Agent-Plugin** — Chat-Sidebar + Obsidian-API als Tools + Session-Memory.
-   Das ist Plugin-Territorium und der plausible MVP.
-2. **Multi-Channel-Gateway** (Telegram, STT-Kanäle) — das ist das Territorium von
-   OpenClaw (läuft bereits lokal beim User, siehe Skill `openclaw`). Nicht neu
-   bauen; das Plugin kann später ein Kanal/Consumer davon werden.
-3. **„Jarvis"** (STT/TTS, Docker-Container, Full System Access) — separates
-   System-Projekt, kein Plugin-Scope. Full System Access / Terminal-Ausführung
-   wäre zudem ein Community-Store-Review-Problem.
+1. **Stufe 1 (MVP, jetzt):** Vault-Q&A mit Aktion — Chat-Sidebar, vier Tools
+   (`search_notes`/`read_note`/`write_note`/`save_memory`), Memory-Notiz,
+   Sessions als JSONL.
+2. **Stufe 2:** Markdown-Skill-System (inkl. Selbst-Autorschaft mit
+   Bestätigung), Compaction, Aufräum-Assistent.
+3. **Stufe 3:** Synthese-Workflows, MCP-Anbindung (vault-rag als Tool), Voice
+   (STT/TTS gehört zu Koda, NICHT zu vault-rag), optional OpenClaw-Gateway.
+4. **Nie:** Full System Access / Terminal-Ausführung (Store + Sicherheit).
 
 ## Wiederverwendung (Kit-first-Anker aus REGISTRY.md)
 
