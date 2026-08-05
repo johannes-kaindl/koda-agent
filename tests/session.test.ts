@@ -45,3 +45,41 @@ describe("SessionStore", () => {
     expect(sink.files.get("sessions/archive.jsonl")).toContain("Hallo");
   });
 });
+
+describe("SessionStore Fehlerpfade (swallow vs. propagate)", () => {
+  it("appendMessages schluckt einen Append-Fehler (Telemetrie darf den Run nicht kippen)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const sink: SessionSink = {
+        read: async () => null,
+        write: async () => {},
+        append: async () => { throw new Error("disk full"); },
+      };
+      const store = new SessionStore(sink, "sessions");
+      await expect(store.appendMessages([msg])).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("startNew wirft weiter, wenn das Archivieren fehlschlaegt (Datenverlust-Gefahr)", async () => {
+    const sink: SessionSink = {
+      read: async () => serializeLine(msg),
+      write: async () => {},
+      append: async () => { throw new Error("archive append failed"); },
+    };
+    const store = new SessionStore(sink, "sessions");
+    await expect(store.startNew()).rejects.toThrow("archive append failed");
+  });
+
+  it("startNew wirft weiter, wenn das Leeren von current fehlschlaegt", async () => {
+    const sink: SessionSink = {
+      read: async () => serializeLine(msg),
+      write: async () => { throw new Error("write failed"); },
+      append: async () => {},
+    };
+    const store = new SessionStore(sink, "sessions");
+    await expect(store.startNew()).rejects.toThrow("write failed");
+  });
+});
