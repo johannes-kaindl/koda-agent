@@ -141,6 +141,42 @@ describe("runAgent", () => {
     expect(out).toEqual([{ role: "assistant", content: "Teil" }]);
   });
 
+  it("Abort zwischen Tool-Calls: naechster Call laeuft nicht mehr, Loop stoppt sauber", async () => {
+    const ctrl = new AbortController();
+    let secondRan = false;
+    const abortingTools: ToolRunner = {
+      run: async (name): Promise<ToolOutcome> => {
+        if (name === "search_notes") {
+          ctrl.abort();
+          return { ok: true, content: "ergebnis von search_notes" };
+        }
+        secondRan = true;
+        return { ok: true, content: "sollte nie laufen" };
+      },
+    };
+    const events: string[] = [];
+    const out = await runAgent(
+      {
+        llm: scripted([
+          {
+            ok: true,
+            content: "",
+            toolCalls: [
+              { id: "c1", name: "search_notes", arguments: "{}" },
+              { id: "c2", name: "read_note", arguments: "{}" },
+            ],
+          },
+          { ok: true, content: "Fertig", toolCalls: [] },
+        ]),
+        tools: abortingTools, maxRounds: 8, textFallback: false,
+      },
+      user, () => {}, () => {}, (e) => events.push(e.kind), ctrl.signal,
+    );
+    expect(secondRan).toBe(false);
+    expect(out.map((m) => m.role)).toEqual(["assistant", "tool"]);
+    expect(events).toEqual(["tool-start", "tool-end", "error"]);
+  });
+
   it("textFallback: erkennt JSON-Tool-Call im content, wenn keine nativen toolCalls kamen", async () => {
     const out = await runAgent(
       {

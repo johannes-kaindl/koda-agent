@@ -93,6 +93,7 @@ export default class KodaPlugin extends Plugin {
   }
 
   async newChat(): Promise<void> {
+    if (this.busy) return;
     await this.store.startNew();
     this.chatLog = [];
     this.lastNotice = null;

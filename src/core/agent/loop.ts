@@ -64,6 +64,10 @@ export async function runAgent(
 
     appended.push({ role: "assistant", content: r.content, toolCalls: calls });
     for (const call of calls) {
+      if (signal.aborted) {
+        onEvent({ kind: "error", message: "", partial: "", errorKind: "aborted" });
+        return appended;
+      }
       onEvent({ kind: "tool-start", call });
       const outcome = await runOne(deps.tools, call);
       onEvent({ kind: "tool-end", call, outcome });
