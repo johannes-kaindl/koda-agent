@@ -15,6 +15,14 @@ stehen die Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Or
 frei, Rest bestätigt", Agent-Kern im Plugin, Roadmap-Stufen). Ideen-Quelle:
 `10_Pallas/00_Inbox/Koda Agent Plugin Recherche.md` (Pallas-Vault).
 
+## Nächster Schritt (geseedet 2026-08-06)
+
+QoL-Ausbau — Verbindungstest je Endpoint, Modell-Dropdown, Failover, Presets.
+Vollständiger Seed mit Registry-Ankern und offenen Design-Punkten:
+`docs/NEXT-SESSION.md`. Parallel offen: GUI-Smoke durch Jay (Handover-Note im
+Pallas-Cockpit), danach REGISTRY-Einträge im Dach, `gui-smoke-setup`,
+`plugin-release-setup`.
+
 ## Verbindlicher Rahmen
 
 Es gilt das Dach-`AGENTS.md` (`../AGENTS.md`, wird automatisch geladen):
