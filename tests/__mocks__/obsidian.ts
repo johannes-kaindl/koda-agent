@@ -1,1 +1,1 @@
-export class Plugin {}
+export * from "../vendor/kit/obsidian-mock";
