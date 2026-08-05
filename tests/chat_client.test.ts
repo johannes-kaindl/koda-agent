@@ -66,4 +66,50 @@ describe("KodaChatClient.complete", () => {
     const r = await client.complete(cfg, msgs, [], () => {}, () => {}, ctrl.signal);
     expect(r).toMatchObject({ ok: false, kind: "aborted" });
   });
+
+  it("behaelt Teil-Content wenn der Stream mitten im Fluss abgebrochen wird", async () => {
+    const t: SseTransport = {
+      async postStream(_u, _b, _h, onChunk) {
+        onChunk(line({ choices: [{ delta: { content: "halb" } }] }));
+        const err = new Error("aborted");
+        err.name = "AbortError";
+        throw err;
+      },
+    };
+    const client = new KodaChatClient(t, 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: false, kind: "aborted", partial: "halb" });
+  });
+
+  it("klassifiziert einen generischen Transport-Fehler als network", async () => {
+    const t: SseTransport = { async postStream() { throw new Error("connection refused"); } };
+    const client = new KodaChatClient(t, 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: false, kind: "network" });
+    if (!r.ok) expect(r.detail).toMatch(/nicht erreichbar/);
+  });
+
+  it("meldet timeout wenn der Transport nie zurueckkehrt und die Clock feuert", async () => {
+    let onTimeout: (() => void) | undefined;
+    const timeoutClock = {
+      now: () => 0,
+      setTimeout: (fn: () => void) => { onTimeout = fn; return 1; },
+      clearTimeout: () => {},
+    };
+    const t: SseTransport = {
+      postStream(_u, _b, _h, _c, signal) {
+        return new Promise<number>((_resolve, reject) => {
+          signal.addEventListener("abort", () => {
+            const err = new Error("aborted");
+            err.name = "AbortError";
+            reject(err);
+          }, { once: true });
+          onTimeout?.();
+        });
+      },
+    };
+    const client = new KodaChatClient(t, 20, timeoutClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: false, kind: "timeout" });
+  });
 });
