@@ -105,81 +105,87 @@ export default class KodaPlugin extends Plugin {
     await this.store.appendMessages([userMsg]);
     for (const v of this.views()) v.renderLog();
 
-    const s = this.settings;
-    const endpoint = s.endpoints[0] ?? { url: "" };
-    const memory = await this.readMemory();
-    const lang = s.language === "auto" ? pickLang(safeGetLanguage()) : s.language;
-    const system: ChatMessage = {
-      role: "system",
-      content: buildSystemPrompt({ lang, memory, kodaFolder: s.kodaFolder }),
-    };
+    try {
+      const s = this.settings;
+      const endpoint = s.endpoints[0] ?? { url: "" };
+      const memory = await this.readMemory();
+      const lang = s.language === "auto" ? pickLang(safeGetLanguage()) : s.language;
+      const system: ChatMessage = {
+        role: "system",
+        content: buildSystemPrompt({ lang, memory, kodaFolder: s.kodaFolder }),
+      };
 
-    const llm: LoopLlm = {
-      complete: (messages, onToken, onReasoning, signal) =>
-        this.client.complete(
-          {
-            endpoint: endpoint.url,
-            apiKey: endpoint.apiKey ?? "",
-            model: effectiveModel(endpoint, s.model),
-            suppressThinking: s.suppressThinking,
-          },
-          messages, TOOL_DEFS, onToken, onReasoning, signal,
-        ),
-    };
-    const vaultPort: VaultPort = {
-      listMarkdownPaths: () => this.app.vault.getMarkdownFiles().map((f) => f.path),
-      read: async (p) => {
-        const f = this.app.vault.getFileByPath(p);
-        if (f === null) throw new Error(`nicht gefunden: ${p}`);
-        return this.app.vault.cachedRead(f);
-      },
-      exists: async (p) => this.app.vault.getFileByPath(p) !== null,
-      create: async (p, c) => {
-        await this.ensureParents(p);
-        await this.app.vault.create(p, c);
-      },
-      append: async (p, c) => {
-        const f = this.app.vault.getFileByPath(p);
-        if (f === null) throw new Error(`nicht gefunden: ${p}`);
-        await this.app.vault.append(f, c);
-      },
-      overwrite: async (p, c) => {
-        const f = this.app.vault.getFileByPath(p);
-        if (f === null) {
+      const llm: LoopLlm = {
+        complete: (messages, onToken, onReasoning, signal) =>
+          this.client.complete(
+            {
+              endpoint: endpoint.url,
+              apiKey: endpoint.apiKey ?? "",
+              model: effectiveModel(endpoint, s.model),
+              suppressThinking: s.suppressThinking,
+            },
+            messages, TOOL_DEFS, onToken, onReasoning, signal,
+          ),
+      };
+      const vaultPort: VaultPort = {
+        listMarkdownPaths: () => this.app.vault.getMarkdownFiles().map((f) => f.path),
+        read: async (p) => {
+          const f = this.app.vault.getFileByPath(p);
+          if (f === null) throw new Error(`nicht gefunden: ${p}`);
+          return this.app.vault.cachedRead(f);
+        },
+        exists: async (p) => this.app.vault.getFileByPath(p) !== null,
+        create: async (p, c) => {
           await this.ensureParents(p);
           await this.app.vault.create(p, c);
-        } else {
-          await this.app.vault.modify(f, c);
-        }
-      },
-    };
-    const tools = new VaultTools(vaultPort, (req) => confirmWrite(this.app, req), {
-      kodaFolder: () => this.settings.kodaFolder,
-      today: () => new Date().toISOString().slice(0, 10),
-    });
+        },
+        append: async (p, c) => {
+          const f = this.app.vault.getFileByPath(p);
+          if (f === null) throw new Error(`nicht gefunden: ${p}`);
+          await this.app.vault.append(f, c);
+        },
+        overwrite: async (p, c) => {
+          const f = this.app.vault.getFileByPath(p);
+          if (f === null) {
+            await this.ensureParents(p);
+            await this.app.vault.create(p, c);
+          } else {
+            await this.app.vault.modify(f, c);
+          }
+        },
+      };
+      const tools = new VaultTools(vaultPort, (req) => confirmWrite(this.app, req), {
+        kodaFolder: () => this.settings.kodaFolder,
+        today: () => new Date().toISOString().slice(0, 10),
+      });
 
-    const appended = await runAgent(
-      { llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback },
-      [system, ...this.chatLog],
-      (tok) => { for (const v of this.views()) v.streamToken(tok); },
-      (r) => { for (const v of this.views()) v.streamReasoning(r); },
-      (e) => {
-        if (e.kind === "tool-start") for (const v of this.views()) v.toolStep(`⚙ ${e.call.name}`, e.call.arguments);
-        if (e.kind === "tool-end") for (const v of this.views()) v.toolStep(
-          `${e.outcome.ok ? "✓" : "✗"} ${e.call.name}`,
-          e.outcome.ok ? e.outcome.content.slice(0, 400) : e.outcome.error,
-        );
-        if (e.kind === "error") for (const v of this.views()) v.showNotice(t("err.generic", e.message));
-        if (e.kind === "round-limit") for (const v of this.views()) v.showNotice(t("view.roundLimit", s.maxRounds));
-      },
-      this.abort.signal,
-    );
+      const appended = await runAgent(
+        { llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback },
+        [system, ...this.chatLog],
+        (tok) => { for (const v of this.views()) v.streamToken(tok); },
+        (r) => { for (const v of this.views()) v.streamReasoning(r); },
+        (e) => {
+          if (e.kind === "tool-start") for (const v of this.views()) v.toolStep(`⚙ ${e.call.name}`, e.call.arguments);
+          if (e.kind === "tool-end") for (const v of this.views()) v.toolStep(
+            `${e.outcome.ok ? "✓" : "✗"} ${e.call.name}`,
+            e.outcome.ok ? e.outcome.content.slice(0, 400) : e.outcome.error,
+          );
+          if (e.kind === "error") for (const v of this.views()) v.showNotice(t("err.generic", e.message));
+          if (e.kind === "round-limit") for (const v of this.views()) v.showNotice(t("view.roundLimit", s.maxRounds));
+        },
+        this.abort.signal,
+      );
 
-    this.chatLog.push(...appended);
-    await this.store.appendMessages(appended);
-    this.busy = false;
-    this.abort = null;
-    for (const v of this.views()) v.renderLog();
+      this.chatLog.push(...appended);
+      await this.store.appendMessages(appended);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "unknown error";
+      for (const v of this.views()) v.showNotice(t("err.generic", message));
+    } finally {
+      this.busy = false;
+      this.abort = null;
+      for (const v of this.views()) v.renderLog();
+    }
   }
 
   private async ensureParents(path: string): Promise<void> {
