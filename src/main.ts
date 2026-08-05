@@ -20,6 +20,9 @@ export default class KodaPlugin extends Plugin {
   settings: KodaSettings = DEFAULT_SETTINGS;
   chatLog: ChatMessage[] = [];
   busy = false;
+  /** Transiente Notiz (Fehler/Abbruch/Rundenlimit) als Plugin-State statt DOM-Append —
+   *  renderLog() zeichnet sie am Ende neu; ein Voll-Redraw kann sie sonst sofort wieder loeschen. */
+  lastNotice: { text: string; kind: "error" | "neutral" } | null = null;
   private abort: AbortController | null = null;
   private client = new KodaChatClient(new XhrSseTransport());
   private store!: SessionStore;
@@ -92,12 +95,14 @@ export default class KodaPlugin extends Plugin {
   async newChat(): Promise<void> {
     await this.store.startNew();
     this.chatLog = [];
+    this.lastNotice = null;
     for (const v of this.views()) v.renderLog();
   }
 
   async ask(question: string): Promise<void> {
     if (this.busy) return;
     this.busy = true;
+    this.lastNotice = null;
     this.abort = new AbortController();
 
     const userMsg: ChatMessage = { role: "user", content: question };
@@ -170,8 +175,12 @@ export default class KodaPlugin extends Plugin {
             `${e.outcome.ok ? "✓" : "✗"} ${e.call.name}`,
             e.outcome.ok ? e.outcome.content.slice(0, 400) : e.outcome.error,
           );
-          if (e.kind === "error") for (const v of this.views()) v.showNotice(t("err.generic", e.message));
-          if (e.kind === "round-limit") for (const v of this.views()) v.showNotice(t("view.roundLimit", s.maxRounds));
+          if (e.kind === "error") {
+            this.lastNotice = e.errorKind === "aborted"
+              ? { text: t("view.stopped"), kind: "neutral" }
+              : { text: t("err.generic", e.message), kind: "error" };
+          }
+          if (e.kind === "round-limit") this.lastNotice = { text: t("view.roundLimit", s.maxRounds), kind: "error" };
         },
         this.abort.signal,
       );
@@ -180,7 +189,7 @@ export default class KodaPlugin extends Plugin {
       await this.store.appendMessages(appended);
     } catch (e) {
       const message = e instanceof Error ? e.message : "unknown error";
-      for (const v of this.views()) v.showNotice(t("err.generic", message));
+      this.lastNotice = { text: t("err.generic", message), kind: "error" };
     } finally {
       this.busy = false;
       this.abort = null;

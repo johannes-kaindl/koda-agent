@@ -137,7 +137,7 @@ describe("runAgent", () => {
       { llm: scripted([{ ok: false, kind: "timeout", detail: "zu langsam", partial: "Teil" }]), tools: okTools, maxRounds: 8, textFallback: false },
       user, () => {}, () => {}, (e) => events.push(e as never), sig(),
     );
-    expect(events[0]).toMatchObject({ kind: "error", partial: "Teil" });
+    expect(events[0]).toMatchObject({ kind: "error", partial: "Teil", errorKind: "timeout" });
     expect(out).toEqual([{ role: "assistant", content: "Teil" }]);
   });
 

@@ -15,7 +15,7 @@ export type AgentEvent =
   | { kind: "tool-start"; call: ToolCall }
   | { kind: "tool-end"; call: ToolCall; outcome: ToolOutcome }
   | { kind: "final"; text: string }
-  | { kind: "error"; message: string; partial: string }
+  | { kind: "error"; message: string; partial: string; errorKind: "aborted" | "http" | "network" | "timeout" }
   | { kind: "round-limit" };
 
 export interface AgentDeps {
@@ -46,7 +46,7 @@ export async function runAgent(
 
     if (!r.ok) {
       if (r.partial !== "") appended.push({ role: "assistant", content: r.partial });
-      onEvent({ kind: "error", message: r.detail, partial: r.partial });
+      onEvent({ kind: "error", message: r.detail, partial: r.partial, errorKind: r.kind });
       return appended;
     }
 

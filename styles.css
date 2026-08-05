@@ -4,6 +4,8 @@
 .koda-user { background: var(--background-secondary); }
 .koda-assistant { background: var(--background-primary-alt); }
 .koda-error { color: var(--text-error); }
+.koda-notice { color: var(--text-muted); }
+.koda-placeholder { color: var(--text-muted); font-style: italic; }
 .koda-tool, .koda-reasoning { margin-bottom: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .koda-tool pre, .koda-reasoning pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
 .koda-input-bar { border-top: 1px solid var(--background-modifier-border); padding: var(--size-4-2); }

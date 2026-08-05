@@ -50,15 +50,29 @@ export class KodaView extends ItemView {
     this.logEl.empty();
     this.streamEl = null;
     this.reasonEl = null;
+    let toolNames = new Map<string, string>();
     for (const m of this.plugin.chatLog) {
-      if (m.role === "user") this.logEl.createDiv({ cls: "koda-msg koda-user", text: m.content });
-      else if (m.role === "assistant" && (!m.toolCalls || m.toolCalls.length === 0) && m.content !== "") {
-        this.logEl.createDiv({ cls: "koda-msg koda-assistant", text: m.content });
+      if (m.role === "user") {
+        this.logEl.createDiv({ cls: "koda-msg koda-user", text: m.content });
+      } else if (m.role === "assistant") {
+        if (m.toolCalls && m.toolCalls.length > 0) {
+          toolNames = new Map(m.toolCalls.map((c) => [c.id, c.name]));
+          if (m.content !== "") this.logEl.createDiv({ cls: "koda-msg koda-assistant", text: m.content });
+        } else if (m.content !== "") {
+          this.logEl.createDiv({ cls: "koda-msg koda-assistant", text: m.content });
+        } else {
+          this.logEl.createDiv({ cls: "koda-msg koda-assistant koda-placeholder", text: t("view.thoughtOnly") });
+        }
       } else if (m.role === "tool") {
+        const name = toolNames.get(m.toolCallId ?? "") ?? m.toolCallId ?? "tool";
         const d = this.logEl.createEl("details", { cls: "koda-tool" });
-        d.createEl("summary", { text: t("view.toolStep", m.toolCallId ?? "tool", m.content.slice(0, 60)) });
+        d.createEl("summary", { text: t("view.toolStep", name, m.content.slice(0, 60)) });
         d.createEl("pre", { text: m.content });
       }
+    }
+    if (this.plugin.lastNotice !== null) {
+      const cls = this.plugin.lastNotice.kind === "error" ? "koda-msg koda-error" : "koda-msg koda-notice";
+      this.logEl.createDiv({ cls, text: this.plugin.lastNotice.text });
     }
     this.logEl.scrollTo({ top: this.logEl.scrollHeight });
   }
@@ -82,8 +96,5 @@ export class KodaView extends ItemView {
     const d = this.logEl.createEl("details", { cls: "koda-tool" });
     d.createEl("summary", { text: label });
     d.createEl("pre", { text: detail });
-  }
-  showNotice(text: string): void {
-    this.logEl.createDiv({ cls: "koda-msg koda-error", text });
   }
 }
