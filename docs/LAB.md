@@ -9,6 +9,10 @@
 
 Gemessen mit `npm run lab:tools -- --model <id>` (jeweils Einzel-Lauf, um LM-Studio-JIT-Loads pro Modell kontrolliert zu halten). Ollama (`:11434`) hatte zum Messzeitpunkt nur ein Embedding-Modell (`nomic-embed-text-v1.5`) geladen — nicht tool-fähig, daher nicht gemessen.
 
+### Scope
+
+Gemessen wurden 2 von 7 unter `http://127.0.0.1:1234/v1/models` verfügbaren Nicht-Embedding-Modellen (`qwen/qwen3.6-27b`, `google/gemma-4-26b-a4b-qat`) — eine bewusste Reduktion gegenüber dem im Plan vorgesehenen vollen `npm run lab:tools`-Sweep über alle Modelle. Grund: LM Studio lädt jedes Modell JIT beim ersten Request nach, was bei 27–31B-Modellen mehrere Minuten pro Modell kostet; ein voller Sweep über alle 7 wäre unverhältnismäßig teuer für den Befund gewesen. Der `textFallback`-Default (siehe Entscheidung unten) stützt sich ausschließlich auf diese zwei Modelle. Nicht gemessen: `google/gemma-4-31b`, `google/gemma-4-31b-qat`, `qwen/qwen3.6-35b-a3b`, `google/gemma-4-e4b`, `google/gemma-4-e2b` — können bei Bedarf (z. B. wenn ein schwächeres Modell in der Praxis auffällig wird) einzeln mit `npm run lab:tools -- --model <id>` nachgemessen werden.
+
 ### Entscheidung
 
 Beide gemessenen Modelle liefern natives Tool-Calling **zuverlässig** über alle drei Testfälle (Suche, Lesen, Kein-Tool-Fall ohne falsch-positiven Aufruf). Nach der Entscheidungsregel aus dem Plan (native zuverlässig → `textFallback` bleibt `false`) bleibt der Default in Task 9 also:
