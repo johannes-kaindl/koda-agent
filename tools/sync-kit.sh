@@ -20,7 +20,7 @@ for m in think-splitter reasoning endpoint endpoint_config endpoint_diagnostics 
   echo "vendored obsidian-kit@$VER/pure/$m.ts"
 done
 
-for m in clock confirm folder-suggest; do
+for m in clock confirm folder-suggest settings_walker; do
   cp "$KIT/src/obsidian/$m.ts" "src/vendor/kit-obsidian/$m.ts"
   stamp "src/vendor/kit-obsidian/$m.ts" "src/obsidian/$m.ts"
   echo "vendored obsidian-kit@$VER/obsidian/$m.ts"
@@ -43,7 +43,7 @@ cat > src/vendor/kit-obsidian/VENDOR.json <<JSON
   "source": "obsidian-kit",
   "version": "$VER",
   "sha": "$SHA",
-  "vendored": "clock.ts, confirm.ts, folder-suggest.ts",
+  "vendored": "clock.ts, confirm.ts, folder-suggest.ts, settings_walker.ts",
   "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh."
 }
 JSON

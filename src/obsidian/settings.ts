@@ -21,11 +21,10 @@ import {
   setIcon,
   setTooltip,
   type App,
-  type SettingControl,
   type SettingDefinitionItem,
 } from "obsidian";
 import { t } from "../vendor/kit/i18n";
-import { FolderSuggest } from "../vendor/kit-obsidian/folder-suggest";
+import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
 import { applyEndpointEdit, moveEndpointToFront, type EndpointConfig } from "../vendor/kit/endpoint_config";
 import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
@@ -79,11 +78,7 @@ export class KodaSettingsTab extends PluginSettingTab {
       {
         name: t("settings.folder"),
         desc: t("settings.folder.desc"),
-        // `text`, nicht `folder`: der native ≥1.13-Renderer bekommt nur das Textfeld,
-        // ohne Ordner-Autocomplete. FolderSuggest haengt sich nur im display()-Fallback
-        // dran (renderControl unten) — bewusst akzeptierter Trade-off, wie kuros
-        // Collapsibles (siehe Task-14-Brief).
-        control: { type: "text", key: "kodaFolder" },
+        control: { type: "folder", key: "kodaFolder" },
       },
       {
         name: t("settings.rounds"),
@@ -136,95 +131,21 @@ export class KodaSettingsTab extends PluginSettingTab {
     await this.plugin.saveSettings();
   }
 
-  // ── Imperativer Fallback (Obsidian < 1.13) ───────────────────────────────
+  // ── Rendering (deklarativ ab 1.13, gleiche Struktur im <1.13-Fallback) ───
+  private cleanupPrevious: () => void = () => {};
+
   display(): void {
+    this.cleanupPrevious();
     this.containerEl.empty();
-    for (const item of this.getSettingDefinitions()) {
-      this.renderDefinitionItem(this.containerEl, item);
-    }
+    this.cleanupPrevious = renderSettingDefinitions(this.containerEl, this.getSettingDefinitions(), this, this.app);
   }
 
-  /** Re-Render des Tabs nach einer Endpunkt-Mutation. Ab 1.13 exponiert das
-   *  deklarative Framework `update()`; auf dem <1.13-Fallback existiert die Methode
-   *  nicht → `display()` erneut laufen. Der Cast nimmt `obsidianmd/no-unsupported-api`
-   *  die Sicht auf die 1.13-only-Methode. */
+  /** Re-Render des Tabs nach einer Endpunkt-Mutation. */
   private refreshUi(): void {
-    const self = this as unknown as { update?: () => void };
-    if (typeof self.update === "function") self.update();
-    else this.display();
-  }
-
-  private renderDefinitionItem(containerEl: HTMLElement, item: SettingDefinitionItem): void {
-    if ((item as { type?: string }).type === "group" || (item as { type?: string }).type === "list") {
-      const group = item as { heading?: string; items?: SettingDefinitionItem[] };
-      if (group.heading) new Setting(containerEl).setName(group.heading).setHeading();
-      for (const sub of group.items ?? []) this.renderDefinitionItem(containerEl, sub);
-      return;
-    }
-
-    const def = item as {
-      name?: string;
-      desc?: string;
-      control?: SettingControl;
-      render?: (setting: Setting) => void | (() => void);
-    };
-    const setting = new Setting(containerEl);
-    if (def.name) setting.setName(def.name);
-    if (typeof def.desc === "string") setting.setDesc(def.desc);
-    if (typeof def.render === "function") {
-      def.render(setting);
-      return;
-    }
-    if (def.control) this.renderControl(setting, def.control);
-  }
-
-  private renderControl(setting: Setting, control: SettingControl): void {
-    const current = this.getControlValue(control.key);
-    const save = (value: unknown): void => {
-      void this.setControlValue(control.key, value);
-    };
-
-    switch (control.type) {
-      case "toggle":
-        setting.addToggle((toggle) => toggle.setValue(current as boolean).onChange(save));
-        break;
-      case "dropdown":
-        setting.addDropdown((dropdown) => {
-          for (const [key, label] of Object.entries(control.options)) dropdown.addOption(key, label);
-          dropdown.setValue(String(current)).onChange(save);
-        });
-        break;
-      case "slider":
-        setting.addSlider((slider) =>
-          // Der Wert wird seit neuerem Obsidian automatisch inline neben dem Slider gezeigt.
-          slider
-            .setLimits(control.min, control.max, control.step)
-            .setValue(current as number)
-            .onChange(save),
-        );
-        break;
-      default:
-        setting.addText((text) => {
-          text.setValue(String(current)).onChange(save);
-          // Nur im Fallback: der native ≥1.13-Renderer sieht diesen Zweig nie, weil er
-          // getSettingDefinitions() direkt konsumiert statt renderControl() aufzurufen.
-          if (control.key === "kodaFolder") new FolderSuggest(this.app, text.inputEl);
-        });
-        break;
-    }
+    refreshSettingsTab(this, () => this.display());
   }
 
   // ── Endpunkt-Liste (render-Hatch) ────────────────────────────────────────
-
-  /** Zeichnet die Setting-Row zu einem neutralen Block-Container um: die Endpunkt-Liste
-   *  zeichnet mehrere eigene `Setting`-Zeilen und darf nicht in die Zwei-Spalten-
-   *  `.setting-item` der uebergebenen Zeile gequetscht werden. Achtung: leert settingEl —
-   *  Name/Desc der Kopfzeile werden deshalb hier separat neu gesetzt. */
-  private hostFor(setting: Setting): HTMLElement {
-    setting.settingEl.empty();
-    setting.settingEl.removeClass("setting-item");
-    return setting.settingEl;
-  }
 
   /** render-Hatch: eine `Setting`-Zeile pro Endpunkt (URL · API-Schluessel · Modell-
    *  Override · "nach oben" · Entfernen) plus eine Adder-Zeile darunter. Jede Aenderung
@@ -234,7 +155,7 @@ export class KodaSettingsTab extends PluginSettingTab {
    *  Tippen zu unterbrechen). Committet deshalb bei `blur`, nicht bei jedem Tastendruck —
    *  sonst haengte das Adder-Feld jeden Zwischenstand (h, ht, htt, …) als eigenen Eintrag an. */
   private renderEndpointList(setting: Setting): void {
-    const host = this.hostFor(setting);
+    const host = settingBodyHost(setting);
     new Setting(host).setName(t("settings.endpoints")).setDesc(t("settings.endpoints.desc"));
 
     const commit = (index: number, field: "url" | "apiKey" | "model", value: string, isAdder: boolean): void => {
@@ -367,7 +288,7 @@ export class KodaSettingsTab extends PluginSettingTab {
   private modelGeneration = 0;
 
   private renderModelPicker(setting: Setting): void {
-    const host = this.hostFor(setting);
+    const host = settingBodyHost(setting);
     const row = new Setting(host).setName(t("settings.model")).setDesc(t("settings.model.desc"));
     const hintEl = row.descEl.createDiv({ cls: "koda-model-hint" });
 
