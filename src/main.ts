@@ -7,6 +7,7 @@ import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
 import { KodaChatClient } from "./llm/KodaChatClient";
 import { probeEndpoint, probeModels } from "./core/llm/probe";
+import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm } from "./core/agent/loop";
@@ -29,6 +30,14 @@ export default class KodaPlugin extends Plugin {
   lastNotice: { text: string; kind: "error" | "neutral" } | null = null;
   private abort: AbortController | null = null;
   private readonly transport = new XhrSseTransport();
+
+  /** Loest "erster erreichbarer Endpunkt" auf und merkt sich das Ergebnis fuer die Sitzung.
+   *  Liest `this.settings` bei jedem Durchlauf frisch — eine im Editor geaenderte Liste
+   *  wirkt dadurch ohne Neustart, sobald `saveSettings()` den Zwischenstand verwirft. */
+  private readonly resolver = new EndpointResolver(
+    () => this.settings.endpoints,
+    async (ep) => (await this.probe(ep)).reachable,
+  );
 
   /** Erreichbarkeits-Probe einer Endpunkt-Zeile (Settings-Testknopf). Liegt am Plugin,
    *  weil der Failover sie spaeter ebenfalls braucht. */
@@ -86,6 +95,8 @@ export default class KodaPlugin extends Plugin {
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
     this.applyLanguage();
+    // Eine geaenderte Liste macht den gemerkten Endpunkt zu einer Aussage ueber die alte.
+    this.resolver.invalidate();
   }
 
   async activateView(): Promise<void> {
@@ -128,7 +139,6 @@ export default class KodaPlugin extends Plugin {
 
     try {
       const s = this.settings;
-      const endpoint = s.endpoints[0] ?? { url: "" };
       const memory = await this.readMemory();
       const lang = s.language === "auto" ? pickLang(safeGetLanguage()) : s.language;
       const system: ChatMessage = {
@@ -141,14 +151,24 @@ export default class KodaPlugin extends Plugin {
       const client = new KodaChatClient(this.transport, s.timeoutSec * 1000);
       const llm: LoopLlm = {
         complete: (messages, onToken, onReasoning, signal) =>
-          client.complete(
-            {
-              endpoint: endpoint.url,
-              apiKey: endpoint.apiKey ?? "",
-              model: effectiveModel(endpoint, s.model),
-              suppressThinking: s.suppressThinking,
-            },
-            messages, TOOL_DEFS, onToken, onReasoning, signal,
+          withFailover(
+            this.resolver,
+            (ep) =>
+              client.complete(
+                {
+                  endpoint: ep.url,
+                  apiKey: ep.apiKey ?? "",
+                  model: effectiveModel(ep, s.model),
+                  suppressThinking: s.suppressThinking,
+                },
+                messages, TOOL_DEFS, onToken, onReasoning, signal,
+              ),
+            // Erneut versuchen NUR, wenn der Endpunkt gar nicht geantwortet hat und noch
+            // KEIN Token beim Nutzer war: nach einem angefangenen Stream stuende die halbe
+            // Antwort sonst ein zweites Mal in der Blase. Ein HTTP-Fehler wird nicht
+            // wiederholt (der Server antwortet ja), ein Abbruch schon gar nicht.
+            (r) => !r.ok && r.kind === "network" && r.partial === "",
+            () => ({ ok: false, kind: "network", detail: t("error.noEndpoint"), partial: "" }),
           ),
       };
       const vaultPort: VaultPort = {
