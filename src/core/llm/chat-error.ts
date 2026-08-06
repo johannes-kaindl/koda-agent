@@ -1,3 +1,4 @@
+// uebernommen aus vault-rag/src/chat_error.ts, 2026-08-05
 /** Pure Übersetzung eines Chat-Transportfehlers in deutschen Klartext.
  *  Kein Transport, kein obsidian-Import — nur Fehler-Shape → Anzeigetext.
  *

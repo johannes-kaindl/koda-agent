@@ -1,3 +1,4 @@
+// uebernommen aus image-to-markdown/src/diff.ts, 2026-08-05
 // Reiner Zeilen-Diff (LCS) — obsidian-frei, in Node testbar (PROF-OBS-03/04).
 export type DiffLine = { kind: "ctx" | "add" | "del"; text: string };
 
