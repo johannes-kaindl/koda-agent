@@ -26,6 +26,7 @@ import { t } from "../vendor/kit/i18n";
 import { FolderSuggest } from "../vendor/kit-obsidian/folder-suggest";
 import { applyEndpointEdit, moveEndpointToFront, type EndpointConfig } from "../vendor/kit/endpoint_config";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
+import { resolveModelChoice, type ModelOption } from "../core/llm/model-choice";
 import {
   mergeKodaSettings,
   MAX_ROUNDS_LIMIT,
@@ -60,9 +61,11 @@ export class KodaSettingsTab extends PluginSettingTab {
         render: (setting) => this.renderEndpointList(setting),
       },
       {
+        // Hatch statt `control: text`: die Auswahl haengt davon ab, was der Endpunkt
+        // gerade hergibt — das kann eine synchrone Definition nicht wissen.
         name: t("settings.model"),
         desc: t("settings.model.desc"),
-        control: { type: "text", key: "model" },
+        render: (setting) => this.renderModelPicker(setting),
       },
       {
         name: t("settings.suppress"),
@@ -314,6 +317,91 @@ export class KodaSettingsTab extends PluginSettingTab {
         );
       }
     });
+  }
+
+  // ── Modellauswahl ─────────────────────────────────────────────────────────
+  //
+  // Drei Zustaende, weil der Endpunkt drei Antworten geben kann: eine Liste (Auswahl),
+  // keine Liste trotz Erreichbarkeit (Freitext — manche gehosteten Anbieter sperren
+  // /v1/models) und Schweigen (gesperrt, gespeicherter Name bleibt stehen). Ein vierter
+  // Zustand liegt davor: noch nie abgerufen. Der zeigt bewusst ein Textfeld statt einer
+  // leeren Auswahl — sonst waere das Feld nach frischer Installation unbedienbar, bis
+  // jemand einen Knopf findet.
+
+  private modelCache: { url: string; models: string[]; reachable: boolean } | null = null;
+  /** Gegen verspaetete Antworten: ein zweiter Abruf entwertet den ersten. */
+  private modelGeneration = 0;
+
+  private renderModelPicker(setting: Setting): void {
+    const host = this.hostFor(setting);
+    const row = new Setting(host).setName(t("settings.model")).setDesc(t("settings.model.desc"));
+    const hintEl = row.descEl.createDiv({ cls: "koda-model-hint" });
+
+    const ep = this.plugin.settings.endpoints[0];
+    const url = ep?.url ?? "";
+    const cache = this.modelCache !== null && this.modelCache.url === url ? this.modelCache : null;
+
+    const save = (value: string): void => {
+      this.plugin.settings = mergeKodaSettings({ ...this.plugin.settings, model: value });
+      void this.plugin.saveSettings();
+    };
+
+    if (cache === null) {
+      row.addText((tx) => {
+        // Kein Platzhalter mit Beispiel-Modellnamen: der Store-Linter liest ihn als
+        // UI-Text und verlangt Satzform. Die Beschreibung der Zeile sagt es ohnehin.
+        tx.setValue(this.plugin.settings.model);
+        tx.inputEl.addEventListener("blur", () => save(tx.getValue()));
+      });
+      hintEl.setText(t("settings.model.notLoaded"));
+    } else {
+      const choice = resolveModelChoice({
+        reachable: cache.reachable,
+        models: cache.models,
+        current: this.plugin.settings.model,
+      });
+      const label = (o: ModelOption): string =>
+        o.suffix === "saved" ? t("settings.model.saved", o.label) : o.label;
+
+      if (choice.mode === "freetext") {
+        row.addText((tx) => {
+          tx.setValue(choice.value);
+          tx.inputEl.addEventListener("blur", () => save(tx.getValue()));
+        });
+      } else {
+        row.addDropdown((dd) => {
+          for (const o of choice.options) dd.addOption(o.value, label(o));
+          dd.setValue(choice.value);
+          dd.onChange((v) => save(v));
+          // "locked" heisst: der gespeicherte Name bleibt sichtbar, aber es gibt nichts
+          // zu waehlen, solange der Endpunkt schweigt.
+          if (choice.mode === "locked") dd.selectEl.disabled = true;
+        });
+      }
+      if (choice.hintKey !== "") hintEl.setText(t(`settings.model.hint.${choice.hintKey}`));
+    }
+
+    row.addButton((b) =>
+      b
+        .setButtonText(t("settings.model.fetch"))
+        .onClick(() => {
+          if (ep === undefined) return;
+          const gen = ++this.modelGeneration;
+          b.setDisabled(true).setButtonText(t("settings.model.fetching"));
+          void this.plugin
+            .probeModels(ep)
+            .then(({ status, models }) => {
+              if (gen !== this.modelGeneration) return; // ein neuerer Abruf gilt
+              this.modelCache = { url, models, reachable: status.reachable };
+              this.refreshUi();
+            })
+            .catch(() => {
+              if (gen !== this.modelGeneration) return;
+              this.modelCache = { url, models: [], reachable: false };
+              this.refreshUi();
+            });
+        }),
+    );
   }
 }
 

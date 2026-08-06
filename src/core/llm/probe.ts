@@ -28,6 +28,18 @@ export async function probeEndpoint(
   clock: ClockPort,
   timeoutMs: number = PROBE_TIMEOUT_MS,
 ): Promise<EndpointStatus> {
+  return (await probeModels(ep, http, clock, timeoutMs)).status;
+}
+
+/** Dieselbe Probe, aber mit der Modell-Liste aus derselben Antwort. `/v1/models` liefert
+ *  beides in einem Aufruf — die Erreichbarkeit UND die Namen. Zwei getrennte Anfragen
+ *  dafür wären eine Anfrage zu viel. */
+export async function probeModels(
+  ep: EndpointConfig,
+  http: HttpProbe,
+  clock: ClockPort,
+  timeoutMs: number = PROBE_TIMEOUT_MS,
+): Promise<{ status: EndpointStatus; models: string[] }> {
   const url = `${normalizeEndpoint(ep.url)}/v1/models`;
   const headers = authHeaders(ep.apiKey === "" || ep.apiKey === undefined ? undefined : ep.apiKey);
 
@@ -41,8 +53,26 @@ export async function probeEndpoint(
   );
 
   try {
-    return classifyEndpointStatus(await Promise.race([attempt, timeout]));
+    const input = await Promise.race([attempt, timeout]);
+    const status = classifyEndpointStatus(input);
+    const models = input.kind === "response" ? extractModelIds(input.body) : [];
+    return { status, models };
   } finally {
     if (timer !== undefined) clock.clearTimeout(timer);
   }
+}
+
+/** Pure Auswertung einer `GET /v1/models`-Antwort.
+ *  Übernommen aus `vim-dojo/src/llm/modelList.ts` (dort das erste Exemplar; vault-rag hat
+ *  dieselbe Logik inline). Mit Koda ist das n=3 — Kit-Kandidat. */
+export function extractModelIds(body: unknown): string[] {
+  const data = (body as { data?: unknown } | null | undefined)?.data;
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((m) =>
+      m !== null && typeof m === "object" && typeof (m as { id?: unknown }).id === "string"
+        ? (m as { id: string }).id
+        : null,
+    )
+    .filter((id): id is string => id !== null);
 }

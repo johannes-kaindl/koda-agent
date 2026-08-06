@@ -6,7 +6,7 @@ import { effectiveModel, type EndpointConfig } from "./vendor/kit/endpoint_confi
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
 import { KodaChatClient } from "./llm/KodaChatClient";
-import { probeEndpoint } from "./core/llm/probe";
+import { probeEndpoint, probeModels } from "./core/llm/probe";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm } from "./core/agent/loop";
@@ -34,6 +34,11 @@ export default class KodaPlugin extends Plugin {
    *  weil der Failover sie spaeter ebenfalls braucht. */
   probe(ep: EndpointConfig): Promise<EndpointStatus> {
     return probeEndpoint(ep, requestUrlProbe, realClock);
+  }
+
+  /** Erreichbarkeit UND Modell-Liste aus einem Aufruf (Settings-Modellauswahl). */
+  probeModels(ep: EndpointConfig): Promise<{ status: EndpointStatus; models: string[] }> {
+    return probeModels(ep, requestUrlProbe, realClock);
   }
   private store!: SessionStore;
 
