@@ -1,6 +1,14 @@
 .koda-root { display: flex; flex-direction: column; height: 100%; }
 .koda-log { flex: 1; overflow-y: auto; padding: var(--size-4-2); }
-.koda-msg { margin-bottom: var(--size-4-2); padding: var(--size-4-2); border-radius: var(--radius-m); white-space: pre-wrap; }
+.koda-msg { margin-bottom: var(--size-4-2); padding: var(--size-4-2); border-radius: var(--radius-m); }
+/* pre-wrap gilt nur fuer die Plaintext-Blasen. Kodas fertige Antworten laufen durch
+   MarkdownRenderer und bringen echte Block-Elemente mit — dort wuerde pre-wrap die
+   Quelltext-Umbrueche ZUSAETZLICH zu den Absaetzen anzeigen (doppelte Leerzeilen). */
+.koda-user, .koda-streaming, .koda-placeholder, .koda-notice, .koda-error { white-space: pre-wrap; }
+/* Gerendertes Markdown in der Blase: aeussere Blockabstaende gehoeren der Blase. */
+.koda-assistant > :first-child { margin-top: 0; }
+.koda-assistant > :last-child { margin-bottom: 0; }
+.koda-assistant ul, .koda-assistant ol { margin: var(--size-4-1) 0; padding-inline-start: var(--size-4-4); }
 .koda-user { background: var(--background-secondary); }
 .koda-assistant { background: var(--background-primary-alt); }
 .koda-error { color: var(--text-error); }

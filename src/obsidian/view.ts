@@ -1,4 +1,4 @@
-import { ItemView, type WorkspaceLeaf } from "obsidian";
+import { Component, ItemView, MarkdownRenderer, type WorkspaceLeaf } from "obsidian";
 import { t } from "../vendor/kit/i18n";
 import type KodaPlugin from "../main";
 
@@ -11,6 +11,10 @@ export class KodaView extends ItemView {
   private inputEl!: HTMLTextAreaElement;
   private streamEl: HTMLElement | null = null;
   private reasonEl: HTMLElement | null = null;
+  /** Lebensdauer-Anker fuer alles, was MarkdownRenderer im Log anlegt (Embeds, Hover-
+   *  Handler). Wird bei jedem Voll-Redraw ausgetauscht, sonst wachsen die Kind-Komponenten
+   *  mit jeder Antwort weiter an. */
+  private mdComp: Component | null = null;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: KodaPlugin) {
     super(leaf);
@@ -25,6 +29,9 @@ export class KodaView extends ItemView {
     root.empty();
     root.addClass("koda-root");
     this.logEl = root.createDiv({ cls: "koda-log" });
+    // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
+    // registriert, damit jeder spaetere Redraw automatisch mitgedeckt ist.
+    this.logEl.addEventListener("click", (e) => this.onLogClick(e));
     const bar = root.createDiv({ cls: "koda-input-bar" });
     this.inputEl = bar.createEl("textarea", { cls: "koda-input", attr: { placeholder: t("view.placeholder"), rows: "2" } });
     this.inputEl.addEventListener("keydown", (e) => {
@@ -36,6 +43,27 @@ export class KodaView extends ItemView {
     buttons.createEl("button", { text: t("view.newChat") }).addEventListener("click", () => void this.plugin.newChat());
     this.renderLog();
     return Promise.resolve();
+  }
+
+  private onLogClick(e: MouseEvent): void {
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    const link = target.closest("a.internal-link");
+    if (link === null) return;
+    const href = link.getAttribute("data-href") ?? link.getAttribute("href") ?? "";
+    if (href === "") return;
+    e.preventDefault();
+    void this.app.workspace.openLinkText(href, "", e.ctrlKey || e.metaKey);
+  }
+
+  /** Assistenten-Text als Markdown rendern — dadurch sind `[[Wikilinks]]` klickbar und
+   *  Listen/Fettung erscheinen als das, was sie sind, statt als Rohtext. Nutzertext bleibt
+   *  bewusst Plaintext: was jemand eingetippt hat, soll nicht nachtraeglich zu einer
+   *  Ueberschrift werden. */
+  private renderMarkdownInto(el: HTMLElement, markdown: string): Promise<void> {
+    const comp = this.mdComp;
+    if (comp === null) return Promise.resolve();
+    return MarkdownRenderer.render(this.app, markdown, el, "", comp);
   }
 
   private send(): void {
@@ -50,6 +78,13 @@ export class KodaView extends ItemView {
     this.logEl.empty();
     this.streamEl = null;
     this.reasonEl = null;
+    if (this.mdComp !== null) this.removeChild(this.mdComp);
+    this.mdComp = this.addChild(new Component());
+    const pending: Promise<void>[] = [];
+    const assistantBubble = (content: string): void => {
+      const el = this.logEl.createDiv({ cls: "koda-msg koda-assistant" });
+      pending.push(this.renderMarkdownInto(el, content));
+    };
     let toolNames = new Map<string, string>();
     for (const m of this.plugin.chatLog) {
       if (m.role === "user") {
@@ -57,9 +92,9 @@ export class KodaView extends ItemView {
       } else if (m.role === "assistant") {
         if (m.toolCalls && m.toolCalls.length > 0) {
           toolNames = new Map(m.toolCalls.map((c) => [c.id, c.name]));
-          if (m.content !== "") this.logEl.createDiv({ cls: "koda-msg koda-assistant", text: m.content });
+          if (m.content !== "") assistantBubble(m.content);
         } else if (m.content !== "") {
-          this.logEl.createDiv({ cls: "koda-msg koda-assistant", text: m.content });
+          assistantBubble(m.content);
         } else {
           this.logEl.createDiv({ cls: "koda-msg koda-assistant koda-placeholder", text: t("view.thoughtOnly") });
         }
@@ -75,6 +110,8 @@ export class KodaView extends ItemView {
       this.logEl.createDiv({ cls, text: this.plugin.lastNotice.text });
     }
     this.logEl.scrollTo({ top: this.logEl.scrollHeight });
+    // Markdown-Rendering ist asynchron: erst danach steht die endgueltige Hoehe fest.
+    void Promise.all(pending).then(() => this.logEl.scrollTo({ top: this.logEl.scrollHeight }));
   }
 
   // — Streaming-Hooks, vom Plugin gerufen —
