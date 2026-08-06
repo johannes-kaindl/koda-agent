@@ -6,6 +6,7 @@
  *   npm run lab:tools -- --endpoint http://127.0.0.1:11434 --model qwen3:8b
  */
 import { KodaChatClient, type SseTransport } from "../src/llm/KodaChatClient";
+import { extractModelIds } from "../src/vendor/kit/endpoint_diagnostics";
 import { TOOL_DEFS } from "../src/core/tools/defs";
 import { parseTextToolCall } from "../src/core/agent/text-fallback";
 import type { ChatMessage } from "../src/core/agent/types";
@@ -51,8 +52,7 @@ function flag(name: string): string | null {
 
 async function listModels(endpoint: string): Promise<string[]> {
   const res = await fetch(`${endpoint}/v1/models`);
-  const json = (await res.json()) as { data?: { id?: string }[] };
-  return (json.data ?? []).map((m) => m.id ?? "").filter((id) => id !== "" && !id.includes("embed"));
+  return extractModelIds(await res.json()).filter((id) => !id.includes("embed"));
 }
 
 async function main(): Promise<void> {
