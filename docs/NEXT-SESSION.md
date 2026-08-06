@@ -63,7 +63,7 @@ laufendes Obsidian fahren") — vor dem Schreiben lesen, sie kosten sonst je ein
 - **Store-Einreichung** — Developer Dashboard auf `community.obsidian.md`, danach **Rescan
   manuell anstoßen** (läuft nicht von selbst an; Dach-`AGENTS.md`).
 - **Stufe 2** — Markdown-Skill-System, Compaction, Aufräum-Assistent (Spec).
-- **Modell-Matrix im Parcours** (`/Users/Shared/50_Testground/tool-calling-parcour`) — gehört
+- **Modell-Matrix im Parcours** (`<workspace>/50_Testground/tool-calling-parcour`) — gehört
   der dortigen Session; braucht den Endpunkt **exklusiv**.
 
 ## Erledigt in dieser Session (2026-08-06)
@@ -78,7 +78,7 @@ laufendes Obsidian fahren") — vor dem Schreiben lesen, sie kosten sonst je ein
 - **Alle vier QoL-Bausteine:** `b462854` Verbindungstest · `5693a8c` Modell-Auswahl ·
   `b02f15e` Failover · `8928238` Presets. Gate 108/108.
 - REGISTRY im Dach (`4353f0c`): vier neue Einträge, zwei auf n=3 gehoben.
-- Nebenprodukt: `/Users/Shared/50_Testground/tool-calling-parcour` (Messwerkzeug für
+- Nebenprodukt: `<workspace>/50_Testground/tool-calling-parcour` (Messwerkzeug für
   Tool-Calling-Fähigkeit und Tempo lokaler Endpunkte).
 
 ## Zwei Dinge, die man wissen muss, bevor man Zahlen zitiert

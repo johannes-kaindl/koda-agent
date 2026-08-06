@@ -11,7 +11,13 @@
    Status; den geben wir weiter. */
 import { normalizeEndpoint } from "../../vendor/kit/endpoint";
 import { authHeaders, type EndpointConfig } from "../../vendor/kit/endpoint_config";
-import { classifyEndpointStatus, type EndpointStatus, type ProbeInput } from "../../vendor/kit/endpoint_diagnostics";
+import {
+  classifyEndpointStatus,
+  extractModelIds,
+  type EndpointStatus,
+  type ProbeInput,
+} from "../../vendor/kit/endpoint_diagnostics";
+import { withTimeout } from "../../vendor/kit/timeout";
 import type { ClockPort } from "../../vendor/kit-obsidian/clock";
 
 export interface HttpProbe {
@@ -43,36 +49,14 @@ export async function probeModels(
   const url = `${normalizeEndpoint(ep.url)}/v1/models`;
   const headers = authHeaders(ep.apiKey === "" || ep.apiKey === undefined ? undefined : ep.apiKey);
 
-  let timer: number | undefined;
-  const timeout = new Promise<ProbeInput>((resolve) => {
-    timer = clock.setTimeout(() => resolve({ kind: "timeout" }), timeoutMs);
-  });
   const attempt = http.getJson(url, headers).then(
     (r): ProbeInput => ({ kind: "response", status: r.status, body: r.json }),
     (e: unknown): ProbeInput => ({ kind: "error", message: e instanceof Error ? e.message : String(e) }),
   );
 
-  try {
-    const input = await Promise.race([attempt, timeout]);
-    const status = classifyEndpointStatus(input);
-    const models = input.kind === "response" ? extractModelIds(input.body) : [];
-    return { status, models };
-  } finally {
-    if (timer !== undefined) clock.clearTimeout(timer);
-  }
-}
-
-/** Pure Auswertung einer `GET /v1/models`-Antwort.
- *  Übernommen aus `vim-dojo/src/llm/modelList.ts` (dort das erste Exemplar; vault-rag hat
- *  dieselbe Logik inline). Mit Koda ist das n=3 — Kit-Kandidat. */
-export function extractModelIds(body: unknown): string[] {
-  const data = (body as { data?: unknown } | null | undefined)?.data;
-  if (!Array.isArray(data)) return [];
-  return data
-    .map((m) =>
-      m !== null && typeof m === "object" && typeof (m as { id?: unknown }).id === "string"
-        ? (m as { id: string }).id
-        : null,
-    )
-    .filter((id): id is string => id !== null);
+  const raced = await withTimeout(attempt, timeoutMs, clock);
+  const input: ProbeInput = raced.timedOut ? { kind: "timeout" } : raced.value;
+  const status = classifyEndpointStatus(input);
+  const models = input.kind === "response" ? extractModelIds(input.body) : [];
+  return { status, models };
 }
