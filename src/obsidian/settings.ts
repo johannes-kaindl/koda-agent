@@ -18,6 +18,8 @@
 import {
   PluginSettingTab,
   Setting,
+  setIcon,
+  setTooltip,
   type App,
   type SettingControl,
   type SettingDefinitionItem,
@@ -27,6 +29,7 @@ import { FolderSuggest } from "../vendor/kit-obsidian/folder-suggest";
 import { applyEndpointEdit, moveEndpointToFront, type EndpointConfig } from "../vendor/kit/endpoint_config";
 import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
+import { endpointStatusView } from "../core/llm/endpoint-status-view";
 import { resolveModelChoice, type ModelOption } from "../core/llm/model-choice";
 import {
   mergeKodaSettings,
@@ -309,7 +312,22 @@ export class KodaSettingsTab extends PluginSettingTab {
         // Neuaufbau des Tabs: ein Redraw waehrend des Tippens nimmt den Fokus aus dem Feld.
         // Er ueberlebt bewusst keinen Redraw — ein alter Status neben einer inzwischen
         // geaenderten URL waere eine Behauptung ueber etwas Ungetestetes.
-        const statusEl = row.descEl.createSpan({ cls: "koda-endpoint-status" });
+        //
+        // Der Punkt sitzt in der Steuerspalte (`controlEl`) und ist ein Icon mit Tooltip,
+        // NICHT Text im `descEl`: die Beschreibungsspalte gehoert seit dem eigenen
+        // Settings-Fenster (Obsidian 1.13) dem Host. Ein `setText` darauf hat den Renderer
+        // beim Klick auf „Testen" in eine Endlosschleife geschickt (2026-08-06, 100 % CPU,
+        // beide Fenster tot). Form uebernommen aus `vault-rag/src/settings.ts`.
+        const statusEl = row.controlEl.createSpan({ cls: "koda-endpoint-status" });
+        /** Setzt den Status als Icon + Tooltip. `null` = Pruefung laeuft. */
+        const showStatus = (s: EndpointStatus | null): void => {
+          const view = endpointStatusView(s);
+          statusEl.empty();
+          setIcon(statusEl, view.icon);
+          statusEl.toggleClass("is-ok", view.ok === true);
+          statusEl.toggleClass("is-bad", view.ok === false);
+          setTooltip(statusEl, view.tooltip);
+        };
         row.addButton((b) =>
           b
             .setButtonText(t("settings.probe"))
@@ -317,16 +335,18 @@ export class KodaSettingsTab extends PluginSettingTab {
             .onClick(() => {
               const current = this.plugin.settings.endpoints[i];
               if (current === undefined) return;
-              b.setDisabled(true);
-              statusEl.className = "koda-endpoint-status is-pending";
-              statusEl.setText(t("settings.probe.testing"));
+              // `b.buttonEl.disabled` statt `b.setDisabled()`: die Component-Methode hat den
+              // Renderer in Obsidian 1.13.5 in eine Endlosschleife geschickt (100 % CPU, beide
+              // Fenster tot). Gemessen am 2026-08-06 durch Ausschluss — derselbe Ablauf mit
+              // direktem DOM-Zugriff laeuft sauber, mit `setDisabled()` friert er ein.
+              b.buttonEl.disabled = true;
+              showStatus(null);
               void this.plugin
                 .probe(current)
-                .then((st) => {
-                  statusEl.className = `koda-endpoint-status ${st.reachable ? "is-ok" : "is-bad"}`;
-                  statusEl.setText(statusLabel(st));
-                })
-                .finally(() => b.setDisabled(false));
+                .then(showStatus)
+                .finally(() => {
+                  b.buttonEl.disabled = false;
+                });
             }),
         );
       }
@@ -422,8 +442,3 @@ export class KodaSettingsTab extends PluginSettingTab {
 /** Kit-Status → Oberflaechentext. Bewusst ueber `kind` statt ueber das mitgelieferte
  *  `klartext`-Feld: das Kit formuliert nur auf Deutsch, Koda spricht beide Sprachen.
  *  Nur `unknown` traegt eine rohe Serverzeile, die durchgereicht wird. */
-function statusLabel(s: EndpointStatus): string {
-  return s.kind === "unknown"
-    ? t("settings.probe.unknown", s.raw ?? "")
-    : t(`settings.probe.${s.kind}`);
-}
