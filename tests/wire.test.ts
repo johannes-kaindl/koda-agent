@@ -16,4 +16,15 @@ describe("toWireMessages", () => {
   it("laesst Nachrichten ohne toolCalls unangetastet", () => {
     expect(toWireMessages([{ role: "user", content: "Hi" }])).toEqual([{ role: "user", content: "Hi" }]);
   });
+  it("ersetzt leere oder kaputte tool_call-Argumente durch {} — sonst vergiftet ein einziger "
+    + "abgeschnittener Tool-Call die ganze Session", () => {
+    const wire = toWireMessages([
+      { role: "assistant", content: "", toolCalls: [
+        { id: "c1", name: "write_note", arguments: "" },
+        { id: "c2", name: "write_note", arguments: "   " },
+        { id: "c3", name: "write_note", arguments: '{"path":' },
+      ] },
+    ]) as { tool_calls: { function: { arguments: string } }[] }[];
+    expect(wire[0].tool_calls.map((c) => c.function.arguments)).toEqual(["{}", "{}", "{}"]);
+  });
 });

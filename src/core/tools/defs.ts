@@ -36,7 +36,12 @@ export const TOOL_DEFS: ToolDef[] = [
       properties: {
         path: { type: "string", description: "Vault-relative path ending in .md" },
         content: { type: "string", description: "Markdown content to write" },
-        mode: { type: "string", enum: ["create", "append", "replace"] },
+        mode: {
+          type: "string",
+          enum: ["create", "append", "replace"],
+          description:
+            "Required. 'create' for a new note (fails if it exists), 'append' to add to the end of an existing note, 'replace' to overwrite it entirely. Prefer 'append' when adding to an existing note — 'replace' discards everything else in the file.",
+        },
       },
       required: ["path", "content", "mode"],
     },

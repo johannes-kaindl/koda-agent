@@ -85,8 +85,14 @@ export async function runAgent(
 
 async function runOne(tools: ToolRunner, call: ToolCall): Promise<ToolOutcome> {
   let args: unknown;
+  // Ein leerer Argument-String heisst nicht "keine Argumente noetig", sondern "der Aufruf
+  // wurde abgeschnitten". Wuerde er als {} durchgereicht, meldete das Tool den Ausfall des
+  // ersten Pflichtfelds — und das Modell korrigierte am falschen Ende (Befund 2026-08-06).
+  if (call.arguments.trim() === "") {
+    return { ok: false, error: `${call.name} wurde ohne Argumente aufgerufen — den Aufruf mit allen Pflichtfeldern wiederholen` };
+  }
   try {
-    args = call.arguments === "" ? {} : JSON.parse(call.arguments);
+    args = JSON.parse(call.arguments);
   } catch {
     return { ok: false, error: `ungültige Tool-Argumente (kein JSON): ${call.arguments.slice(0, 120)}` };
   }

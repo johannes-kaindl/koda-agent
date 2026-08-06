@@ -190,4 +190,21 @@ describe("runAgent", () => {
     );
     expect(out.map((m) => m.role)).toEqual(["assistant", "tool", "assistant"]);
   });
+  it("meldet einen Tool-Call ohne Argumente als solchen, statt am ersten Pflichtfeld zu scheitern", async () => {
+    const out = await runAgent(
+      {
+        llm: scripted([
+          { ok: true, content: "", toolCalls: [{ id: "c1", name: "write_note", arguments: "" }] },
+          { ok: true, content: "ok", toolCalls: [] },
+        ]),
+        tools: okTools, maxRounds: 8, textFallback: false,
+      },
+      user, () => {}, () => {}, () => {}, sig(),
+    );
+    const toolMsg = out.find((m) => m.role === "tool");
+    // Ein abgeschnittener Tool-Call ist etwas anderes als ein falsch befuelltes Feld — die
+    // Rueckmeldung ans Modell muss das sagen, sonst korrigiert es am falschen Ende.
+    expect(toolMsg?.content).toMatch(/ohne Argumente/i);
+    expect(toolMsg?.content).toContain("write_note");
+  });
 });
