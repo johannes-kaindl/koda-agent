@@ -2,6 +2,6 @@
   "source": "obsidian-kit",
   "version": "0.23.0",
   "sha": "e650ede",
-  "vendored": "think-splitter.ts, reasoning.ts, endpoint.ts, endpoint_config.ts, settings.ts, i18n.ts, num.ts",
+  "vendored": "think-splitter.ts, reasoning.ts, endpoint.ts, endpoint_config.ts, endpoint_diagnostics.ts, settings.ts, i18n.ts, num.ts",
   "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. kit-obsidian/ und tests/vendor/kit/ siehe deren VENDOR.json."
 }

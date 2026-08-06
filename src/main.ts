@@ -2,8 +2,12 @@ import { Plugin, WorkspaceLeaf, normalizePath } from "obsidian";
 import "./i18n/strings";
 import { getLanguage } from "obsidian";
 import { pickLang, setLang, t } from "./vendor/kit/i18n";
-import { effectiveModel } from "./vendor/kit/endpoint_config";
+import { effectiveModel, type EndpointConfig } from "./vendor/kit/endpoint_config";
+import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
+import { realClock } from "./vendor/kit-obsidian/clock";
 import { KodaChatClient } from "./llm/KodaChatClient";
+import { probeEndpoint } from "./core/llm/probe";
+import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm } from "./core/agent/loop";
 import type { ChatMessage } from "./core/agent/types";
@@ -25,6 +29,12 @@ export default class KodaPlugin extends Plugin {
   lastNotice: { text: string; kind: "error" | "neutral" } | null = null;
   private abort: AbortController | null = null;
   private readonly transport = new XhrSseTransport();
+
+  /** Erreichbarkeits-Probe einer Endpunkt-Zeile (Settings-Testknopf). Liegt am Plugin,
+   *  weil der Failover sie spaeter ebenfalls braucht. */
+  probe(ep: EndpointConfig): Promise<EndpointStatus> {
+    return probeEndpoint(ep, requestUrlProbe, realClock);
+  }
   private store!: SessionStore;
 
   async onload(): Promise<void> {

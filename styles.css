@@ -24,3 +24,10 @@
 .koda-diff-add { background: rgba(var(--color-green-rgb), 0.15); }
 .koda-diff-del { background: rgba(var(--color-red-rgb), 0.15); text-decoration: line-through; }
 .koda-diff-ctx { color: var(--text-muted); }
+
+/* Ergebnis der Endpunkt-Probe. Farbe nur als Zugabe zum Text — die Aussage steht im
+   Klartext, nicht im Farbton (Rot/Grün allein trägt sie für Farbenblinde nicht). */
+.koda-endpoint-status { font-size: var(--font-ui-smaller); }
+.koda-endpoint-status.is-pending { color: var(--text-muted); }
+.koda-endpoint-status.is-ok { color: var(--text-success); }
+.koda-endpoint-status.is-bad { color: var(--text-error); }

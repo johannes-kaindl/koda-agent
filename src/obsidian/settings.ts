@@ -25,6 +25,7 @@ import {
 import { t } from "../vendor/kit/i18n";
 import { FolderSuggest } from "../vendor/kit-obsidian/folder-suggest";
 import { applyEndpointEdit, moveEndpointToFront, type EndpointConfig } from "../vendor/kit/endpoint_config";
+import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import {
   mergeKodaSettings,
   MAX_ROUNDS_LIMIT,
@@ -286,7 +287,41 @@ export class KodaSettingsTab extends PluginSettingTab {
             .setTooltip(t("settings.remove"))
             .onClick(() => commit(i, "url", "", false)),
         );
+
+        // Der Status wird direkt in sein eigenes Element geschrieben statt ueber einen
+        // Neuaufbau des Tabs: ein Redraw waehrend des Tippens nimmt den Fokus aus dem Feld.
+        // Er ueberlebt bewusst keinen Redraw — ein alter Status neben einer inzwischen
+        // geaenderten URL waere eine Behauptung ueber etwas Ungetestetes.
+        const statusEl = row.descEl.createSpan({ cls: "koda-endpoint-status" });
+        row.addButton((b) =>
+          b
+            .setButtonText(t("settings.probe"))
+            .setTooltip(t("settings.probe.tooltip"))
+            .onClick(() => {
+              const current = this.plugin.settings.endpoints[i];
+              if (current === undefined) return;
+              b.setDisabled(true);
+              statusEl.className = "koda-endpoint-status is-pending";
+              statusEl.setText(t("settings.probe.testing"));
+              void this.plugin
+                .probe(current)
+                .then((st) => {
+                  statusEl.className = `koda-endpoint-status ${st.reachable ? "is-ok" : "is-bad"}`;
+                  statusEl.setText(statusLabel(st));
+                })
+                .finally(() => b.setDisabled(false));
+            }),
+        );
       }
     });
   }
+}
+
+/** Kit-Status → Oberflaechentext. Bewusst ueber `kind` statt ueber das mitgelieferte
+ *  `klartext`-Feld: das Kit formuliert nur auf Deutsch, Koda spricht beide Sprachen.
+ *  Nur `unknown` traegt eine rohe Serverzeile, die durchgereicht wird. */
+function statusLabel(s: EndpointStatus): string {
+  return s.kind === "unknown"
+    ? t("settings.probe.unknown", s.raw ?? "")
+    : t(`settings.probe.${s.kind}`);
 }
