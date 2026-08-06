@@ -112,4 +112,27 @@ describe("KodaChatClient.complete", () => {
     const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
     expect(r).toMatchObject({ ok: false, kind: "timeout" });
   });
+  it("zieht den Idle-Timeout bei jedem Chunk neu auf — ein langer Stream laeuft nicht hinein", async () => {
+    const set: number[] = [];
+    const cleared: number[] = [];
+    let next = 0;
+    const countingClock = {
+      now: () => 0,
+      setTimeout: (): number => { next += 1; set.push(next); return next; },
+      clearTimeout: (h: number): void => { cleared.push(h); },
+    };
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { content: "a" } }] }),
+      line({ choices: [{ delta: { content: "b" } }] }),
+      line({ choices: [{ delta: { content: "c" } }] }) + "data: [DONE]\n",
+    ]), 1000, countingClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: true, content: "abc" });
+    // initialer Timer + je ein Nachziehen pro Chunk; jeder abgeloeste Timer wird gecleart,
+    // der letzte im finally. Ohne das Nachziehen bliebe es bei einem einzigen setTimeout —
+    // und ein Modell, das laenger als timeoutMs am Stueck schreibt, wuerde mitten im Satz
+    // abgebrochen (GUI-Smoke-Befund 2026-08-06).
+    expect(set).toHaveLength(4);
+    expect(cleared).toEqual([1, 2, 3, 4]);
+  });
 });

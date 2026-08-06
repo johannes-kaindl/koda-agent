@@ -32,7 +32,7 @@ export type LlmResult =
   | { ok: false; kind: "aborted" | "http" | "network" | "timeout"; detail: string; partial: string };
 
 const ERROR_BODY_CAP = 2048;
-const DEFAULT_TIMEOUT_MS = 120_000;
+export const DEFAULT_TIMEOUT_MS = 120_000;
 
 export function effectiveSuppress(model: string, wanted: boolean): boolean {
   return wanted && !isAlwaysOnThinker(model);
@@ -71,7 +71,19 @@ export class KodaChatClient {
     let timedOut = false;
     const onCallerAbort = (): void => ctrl.abort();
     signal.addEventListener("abort", onCallerAbort, { once: true });
-    const timer = this.clock.setTimeout(() => { timedOut = true; ctrl.abort(); }, this.timeoutMs);
+
+    /* Der Timeout ist ein IDLE-Timeout, kein Gesamt-Timeout: er misst die Stille seit dem
+       letzten Byte, nicht die Dauer der Antwort. Ein lokales Modell, das zwei Minuten am
+       Stueck schreibt, ist gesund — ein Endpoint, der zwei Minuten schweigt, ist es nicht.
+       (Als Gesamt-Timeout brach er eine laufende Antwort mitten im Satz ab; GUI-Smoke
+       2026-08-06.) Fuer den Abbruch einer gesunden, aber unerwuenschten Antwort ist der
+       Stopp-Knopf zustaendig, nicht die Uhr. */
+    const fire = (): void => { timedOut = true; ctrl.abort(); };
+    let timer = this.clock.setTimeout(fire, this.timeoutMs);
+    const bumpIdleTimer = (): void => {
+      this.clock.clearTimeout(timer);
+      timer = this.clock.setTimeout(fire, this.timeoutMs);
+    };
 
     const splitter = new ThinkSplitter();
     const assembler = new ToolCallAssembler();
@@ -89,6 +101,7 @@ export class KodaChatClient {
       emit(tail.content, tail.reasoning);
     };
     const consume = (raw: string): void => {
+      bumpIdleTimer();
       if (rawBody.length < ERROR_BODY_CAP) rawBody += raw;
       const p = parseAgentSSE(rest + raw);
       rest = p.rest;
@@ -106,7 +119,7 @@ export class KodaChatClient {
       drainSplitter();
       if (err.name === "AbortError") {
         return timedOut
-          ? { ok: false, kind: "timeout", detail: `no answer within ${this.timeoutMs / 1000}s`, partial: content }
+          ? { ok: false, kind: "timeout", detail: `keine Antwort seit ${this.timeoutMs / 1000}s`, partial: content }
           : { ok: false, kind: "aborted", detail: "stream aborted", partial: content };
       }
       return { ok: false, kind: "network", detail: chatErrorMessage(err), partial: content };

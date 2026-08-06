@@ -25,7 +25,14 @@ import {
 import { t } from "../vendor/kit/i18n";
 import { FolderSuggest } from "../vendor/kit-obsidian/folder-suggest";
 import { applyEndpointEdit, moveEndpointToFront, type EndpointConfig } from "../vendor/kit/endpoint_config";
-import { mergeKodaSettings, MAX_ROUNDS_LIMIT, type KodaSettings } from "../core/settings-types";
+import {
+  mergeKodaSettings,
+  MAX_ROUNDS_LIMIT,
+  TIMEOUT_SEC_MIN,
+  TIMEOUT_SEC_MAX,
+  TIMEOUT_SEC_STEP,
+  type KodaSettings,
+} from "../core/settings-types";
 import type KodaPlugin from "../main";
 
 export class KodaSettingsTab extends PluginSettingTab {
@@ -74,6 +81,17 @@ export class KodaSettingsTab extends PluginSettingTab {
         name: t("settings.rounds"),
         desc: t("settings.rounds.desc"),
         control: { type: "slider", key: "maxRounds", min: 1, max: MAX_ROUNDS_LIMIT, step: 1 },
+      },
+      {
+        name: t("settings.timeout"),
+        desc: t("settings.timeout.desc"),
+        control: {
+          type: "slider",
+          key: "timeoutSec",
+          min: TIMEOUT_SEC_MIN,
+          max: TIMEOUT_SEC_MAX,
+          step: TIMEOUT_SEC_STEP,
+        },
       },
       {
         name: t("settings.fallback"),

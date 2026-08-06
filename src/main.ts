@@ -24,7 +24,7 @@ export default class KodaPlugin extends Plugin {
    *  renderLog() zeichnet sie am Ende neu; ein Voll-Redraw kann sie sonst sofort wieder loeschen. */
   lastNotice: { text: string; kind: "error" | "neutral" } | null = null;
   private abort: AbortController | null = null;
-  private client = new KodaChatClient(new XhrSseTransport());
+  private readonly transport = new XhrSseTransport();
   private store!: SessionStore;
 
   async onload(): Promise<void> {
@@ -121,9 +121,12 @@ export default class KodaPlugin extends Plugin {
         content: buildSystemPrompt({ lang, memory, kodaFolder: s.kodaFolder }),
       };
 
+      // Client pro Lauf: der Idle-Timeout ist eine Einstellung und darf ohne
+      // Plugin-Neustart wirken.
+      const client = new KodaChatClient(this.transport, s.timeoutSec * 1000);
       const llm: LoopLlm = {
         complete: (messages, onToken, onReasoning, signal) =>
-          this.client.complete(
+          client.complete(
             {
               endpoint: endpoint.url,
               apiKey: endpoint.apiKey ?? "",
