@@ -25,6 +25,7 @@ import {
 import { t } from "../vendor/kit/i18n";
 import { FolderSuggest } from "../vendor/kit-obsidian/folder-suggest";
 import { applyEndpointEdit, moveEndpointToFront, type EndpointConfig } from "../vendor/kit/endpoint_config";
+import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { resolveModelChoice, type ModelOption } from "../core/llm/model-choice";
 import {
@@ -251,6 +252,19 @@ export class KodaSettingsTab extends PluginSettingTab {
         tx.setPlaceholder(isAdder ? t("settings.addEndpoint") : "http://127.0.0.1:1234").setValue(cfg.url);
         tx.inputEl.addEventListener("blur", () => commit(i, "url", tx.getValue(), isAdder));
       });
+
+      // Schnellauswahl nur an der leeren Zeile am Ende: dort entsteht eine neue Adresse.
+      // An bestehenden Zeilen waere ein Preset-Knopf ein Ueberschreib-Knopf.
+      if (isAdder) {
+        for (const preset of ENDPOINT_PRESETS) {
+          row.addExtraButton((b) =>
+            b
+              .setIcon("plus-circle")
+              .setTooltip(t("settings.endpoints.preset", preset.label))
+              .onClick(() => commit(i, "url", preset.url, true)),
+          );
+        }
+      }
 
       // Schluessel + Modell nur an bestehenden Zeilen — am leeren Adder gaebe es nichts zu tragen.
       if (!isAdder) {
