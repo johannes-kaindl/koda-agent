@@ -7,8 +7,8 @@ configure (a local server such as [LM Studio](https://lmstudio.ai), or a hosted
 provider if you add an API key) and keeps its own memory in a plain Markdown note you
 can read and edit yourself.
 
-*Status: MVP, pre-release — no Community Store listing yet, no signed builds. See
-`CLAUDE.md` for the current scope and design decisions.*
+*Status: MVP, 0.1.0 — listed in the Obsidian Community Plugin store, no signed builds.
+See `CLAUDE.md` for the current scope and design decisions.*
 
 ## Features (MVP)
 
@@ -47,34 +47,33 @@ entry in the MVP.
 
 ## Skills
 
-Ein Skill ist eine Markdown-Notiz in `<Koda-Ordner>/Skills/`, die Kodas Verhalten
-steuert. Du schreibst sie selbst — oder lässt Koda sie schreiben, was immer eine
-Bestätigung erfordert.
+A skill is a Markdown note in `<Koda folder>/Skills/` that steers Koda's behavior.
+You write it yourself — or let Koda write it, which always requires confirmation.
 
 ```markdown
 ---
-description: Antworte immer mit einem Ausrufezeichen am Ende
+description: Always answer with an exclamation mark at the end
 enabled: true
 ---
 
-Hänge an jede Antwort ein "!" an.
+Append a "!" to every answer.
 ```
 
-- Der **Name ist der Dateiname** ohne `.md`.
-- `description` ist Pflicht — sie erklärt in einem Satz, was anders läuft, und ist
-  das, was du im Bestätigungs-Modal zu sehen bekommst.
-- `enabled: false` schaltet einen Skill ab, ohne ihn zu löschen.
-- Unterordner werden nicht gelesen.
+- The **name is the filename** without `.md`.
+- `description` is required — it explains in one sentence what changes, and it's
+  what you see in the confirmation modal.
+- `enabled: false` turns a skill off without deleting it.
+- Subfolders are not read.
 
-Beim Gesprächsstart wandern alle aktiven Skills in Kodas System-Prompt. Wie viel
-Text dabei höchstens hineingeht, steuert **Skill-Budget** in den Einstellungen
-(Default 6000 Zeichen); was nicht mehr hineinpasst, erscheint nur mit seiner
-Beschreibung — Koda weiß dann, dass es den Skill gibt, kann ihm aber nicht folgen.
-Welche Skills gerade wirken, steht am Kopf des Gesprächs.
+At the start of a conversation, all active skills go into Koda's system prompt. How
+much text that can hold at most is controlled by **Skill budget** in settings
+(default 6000 characters); anything that no longer fits shows up with only its
+description — Koda then knows the skill exists but can't follow it. Which skills are
+currently in effect is shown at the top of the conversation.
 
-**Skills sind immer bestätigungspflichtig**, auch wenn sie im Koda-Ordner liegen, in
-dem Koda sonst frei schreiben darf. Der Grund: ein Skill ist kein Entwurf, er ändert,
-was Koda künftig tut.
+**Skills always require confirmation**, even inside the Koda folder where Koda can
+otherwise write freely. The reason: a skill isn't a draft — it changes what Koda does
+going forward.
 
 ## Install
 
