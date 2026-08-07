@@ -2,6 +2,8 @@ import type { ToolOutcome, ToolRunner } from "../core/agent/types";
 import { resolveNotePath } from "../core/tools/path-guard";
 import { writePolicy } from "../core/tools/write-policy";
 import { appendMemoryLine } from "../core/memory/memory";
+import { serializeFrontmatter } from "../vendor/kit/frontmatter";
+import { sanitizeSkillName, skillPath } from "../core/skills/path";
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
@@ -17,6 +19,9 @@ export interface WriteRequest {
   mode: "create" | "append" | "replace";
   oldText: string;
   newText: string;
+  /** Klartext, was sich kuenftig aendert — nur bei Skills gesetzt. Additiv: das Modal
+   *  zeigt ihn ZUSAETZLICH zur vollstaendigen Vorschau, nie an ihrer Stelle. */
+  effect?: string;
 }
 
 export type ConfirmWritePort = (req: WriteRequest) => Promise<boolean>;
@@ -38,6 +43,8 @@ export class VaultTools implements ToolRunner {
         case "search_notes": return await this.search(str(a.query), num(a.max_results, SEARCH_CAP));
         case "read_note": return await this.read(str(a.path));
         case "write_note": return await this.write(str(a.path), str(a.content), str(a.mode));
+        case "write_skill":
+          return await this.writeSkill(str(a.name), str(a.description), str(a.body), str(a.mode));
         case "save_memory": return await this.saveMemory(str(a.text));
         default: return { ok: false, error: `unbekanntes Tool: ${name}` };
       }
@@ -100,6 +107,38 @@ export class VaultTools implements ToolRunner {
     else if (mode === "append") await this.vault.append(norm, effective);
     else await this.vault.overwrite(norm, effective);
     return { ok: true, content: `geschrieben: ${norm} (${mode})` };
+  }
+
+  /** Skills schreibt das Plugin, nicht das Modell: Pfad und Frontmatter entstehen hier,
+   *  damit sie strukturell nicht kaputt sein koennen. Kein append — an Verhaltens-
+   *  anweisungen anzuhaengen produziert Widerspruchsmengen statt Skills. */
+  private async writeSkill(name: string, description: string, body: string, mode: string): Promise<ToolOutcome> {
+    if (mode !== "create" && mode !== "replace") {
+      return { ok: false, error: `mode muss create|replace sein, war: "${mode}"` };
+    }
+    const clean = sanitizeSkillName(name);
+    if (clean === "") return { ok: false, error: "name fehlt oder besteht nur aus unerlaubten Zeichen" };
+    const desc = description.trim().replace(/\s*\n\s*/g, " ");
+    if (desc === "") return { ok: false, error: "description fehlt — sie erklaert dem Nutzer, was sich kuenftig aendert" };
+
+    const path = skillPath(this.opts.kodaFolder(), clean);
+    const exists = await this.vault.exists(path);
+    if (mode === "create" && exists) return { ok: false, error: `Skill existiert schon: "${clean}" — nutze replace` };
+    if (mode === "replace" && !exists) return { ok: false, error: `Skill nicht gefunden: "${clean}" — nutze create` };
+
+    const content = `${serializeFrontmatter({ description: desc, enabled: "true" }, ["description", "enabled"])}\n${body.trim()}\n`;
+
+    // Die Policy wird gefragt, obwohl die Antwort hier feststeht: die Grenze gehoert
+    // an EINE Stelle, und diese Zeile bricht auffaellig, wenn sie dort je wegfaellt.
+    if (writePolicy(path, this.opts.kodaFolder()) === "confirm") {
+      const oldText = exists ? await this.vault.read(path) : "";
+      const approved = await this.confirm({ path, mode, oldText, newText: content, effect: desc });
+      if (!approved) return { ok: false, error: "vom Nutzer abgelehnt" };
+    }
+
+    if (mode === "create") await this.vault.create(path, content);
+    else await this.vault.overwrite(path, content);
+    return { ok: true, content: `Skill geschrieben: ${path}` };
   }
 
   private async saveMemory(text: string): Promise<ToolOutcome> {

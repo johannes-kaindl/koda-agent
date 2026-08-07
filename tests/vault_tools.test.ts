@@ -102,3 +102,91 @@ describe("VaultTools", () => {
     expect((await tools.run("gibt_es_nicht", {})).ok).toBe(false);
   });
 });
+
+describe("write_skill", () => {
+  it("schreibt einen Skill mit wohlgeformtem Frontmatter nach Skills/", async () => {
+    const vault = fakeVault({});
+    const cap = capturingConfirm();
+    const tools = new VaultTools(vault, cap.confirm, opts);
+    const r = await tools.run("write_skill", {
+      name: "Projektnotizen",
+      description: "Zuerst die Hub-Notiz lesen",
+      body: "Projekte liegen unter 25_Coding/.",
+      mode: "create",
+    });
+    expect(r.ok).toBe(true);
+    const written = vault.files["Koda/Skills/Projektnotizen.md"] ?? "";
+    // "true" wird von serializeFrontmatter (vendorter Code, nie handeditiert) als
+    // Boolean-Look-alike gequotet — FmValue kennt keinen echten Boolean-Typ. Der Brief
+    // erwartete hier ein unquotiertes "enabled: true"; das ist mit der gegebenen,
+    // unveraenderlichen Serialisierer-Signatur nicht erreichbar (siehe Report/Concerns).
+    expect(written.startsWith('---\ndescription: Zuerst die Hub-Notiz lesen\nenabled: "true"\n---\n')).toBe(true);
+    expect(written).toContain("Projekte liegen unter 25_Coding/.");
+    expect(cap.calls.length).toBe(1);
+  });
+
+  it("fragt IMMER nach, obwohl der Pfad im Koda-Ordner liegt", async () => {
+    const vault = fakeVault({});
+    const cap = capturingConfirm();
+    const tools = new VaultTools(vault, cap.confirm, opts);
+    await tools.run("write_skill", { name: "X", description: "d", body: "b", mode: "create" });
+    expect(cap.calls.length).toBe(1);
+    expect(cap.calls[0].path).toBe("Koda/Skills/X.md");
+  });
+
+  it("reicht die description als effect ans Modal durch", async () => {
+    const vault = fakeVault({});
+    const cap = capturingConfirm();
+    const tools = new VaultTools(vault, cap.confirm, opts);
+    await tools.run("write_skill", { name: "X", description: "Antworte kurz", body: "b", mode: "create" });
+    expect(cap.calls[0].effect).toBe("Antworte kurz");
+  });
+
+  it("Ablehnung schreibt nichts und meldet es zurueck", async () => {
+    const vault = fakeVault({});
+    const tools = new VaultTools(vault, no, opts);
+    const r = await tools.run("write_skill", { name: "X", description: "d", body: "b", mode: "create" });
+    expect(r.ok).toBe(false);
+    expect("Koda/Skills/X.md" in vault.files).toBe(false);
+  });
+
+  it("leerer Name nach Sanitizing ist ein Fehler", async () => {
+    const tools = new VaultTools(fakeVault({}), yes, opts);
+    const r = await tools.run("write_skill", { name: "///", description: "d", body: "b", mode: "create" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("fehlende description ist ein Fehler", async () => {
+    const tools = new VaultTools(fakeVault({}), yes, opts);
+    const r = await tools.run("write_skill", { name: "X", description: "  ", body: "b", mode: "create" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("append gibt es nicht", async () => {
+    const tools = new VaultTools(fakeVault({}), yes, opts);
+    const r = await tools.run("write_skill", { name: "X", description: "d", body: "b", mode: "append" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("create auf einen bestehenden Skill schlaegt fehl", async () => {
+    const vault = fakeVault({ "Koda/Skills/X.md": "alt" });
+    const tools = new VaultTools(vault, yes, opts);
+    const r = await tools.run("write_skill", { name: "X", description: "d", body: "b", mode: "create" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("replace auf einen fehlenden Skill schlaegt fehl", async () => {
+    const tools = new VaultTools(fakeVault({}), yes, opts);
+    const r = await tools.run("write_skill", { name: "X", description: "d", body: "b", mode: "replace" });
+    expect(r.ok).toBe(false);
+  });
+
+  // Die Invariante aus der MVP-Spec gilt unveraendert auch hier.
+  it("Vorschau ist byte-genau der geschriebene Inhalt", async () => {
+    const vault = fakeVault({});
+    const cap = capturingConfirm();
+    const tools = new VaultTools(vault, cap.confirm, opts);
+    await tools.run("write_skill", { name: "X", description: "d", body: "b", mode: "create" });
+    expect(cap.calls[0].newText).toBe(vault.files["Koda/Skills/X.md"]);
+  });
+});

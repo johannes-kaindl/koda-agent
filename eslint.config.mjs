@@ -34,4 +34,13 @@ export default [
       "@typescript-eslint/no-deprecated": "off",
     },
   },
+  {
+    // sanitizeSkillName ist die einzige Traversal-/Steuerzeichen-Schutzschicht fuer
+    // write_skill (der Pfad laeuft NICHT durch resolveNotePath) — der Steuerzeichen-
+    // Bereich in FORBIDDEN ist bewusst und muss bleiben.
+    files: ["src/core/skills/path.ts"],
+    rules: {
+      "no-control-regex": "off",
+    },
+  },
 ];

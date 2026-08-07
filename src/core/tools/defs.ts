@@ -56,6 +56,28 @@ export const TOOL_DEFS: ToolDef[] = [
       required: ["text"],
     },
   },
+  {
+    name: "write_skill",
+    description:
+      "Create or replace one of your own skills — a named Markdown instruction that changes how you behave in future conversations. Always requires the user's approval, even though skills live in the Koda folder. Use this when the user teaches you a rule that should keep applying; use save_memory for facts instead.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Short skill name, becomes the file name" },
+        description: {
+          type: "string",
+          description: "One sentence describing what will be different from now on. Shown to the user for approval.",
+        },
+        body: { type: "string", description: "The instruction itself, in Markdown" },
+        mode: {
+          type: "string",
+          enum: ["create", "replace"],
+          description: "Required. 'create' for a new skill (fails if it exists), 'replace' to overwrite an existing one entirely.",
+        },
+      },
+      required: ["name", "description", "body", "mode"],
+    },
+  },
 ];
 
 export function toWireTools(defs: ToolDef[]): unknown[] {
