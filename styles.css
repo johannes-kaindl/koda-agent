@@ -20,6 +20,7 @@
 .koda-input-bar { border-top: 1px solid var(--background-modifier-border); padding: var(--size-4-2); }
 .koda-input { width: 100%; resize: vertical; }
 .koda-buttons { display: flex; gap: var(--size-4-1); margin-top: var(--size-4-1); }
+.koda-effect { background: var(--background-modifier-hover); border-left: 3px solid var(--interactive-accent); border-radius: var(--radius-s); padding: var(--size-4-2); margin-bottom: var(--size-4-2); }
 .koda-preview { max-height: 40vh; overflow-y: auto; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: var(--size-4-2); margin-bottom: var(--size-4-2); }
 .koda-preview pre { white-space: pre-wrap; margin: 0; }
 .koda-diff-add { background: rgba(var(--color-green-rgb), 0.15); }

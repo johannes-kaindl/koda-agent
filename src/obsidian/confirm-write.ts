@@ -15,6 +15,13 @@ export function confirmWrite(app: App, req: WriteRequest): Promise<boolean> {
     const modal = new (class extends Modal {
       onOpen(): void {
         this.titleEl.setText(t("confirm.title", req.mode, req.path));
+        // Additiv, nie ersetzend: die vollstaendige Vorschau darunter bleibt die
+        // Grundlage der Freigabe (Invariante "Vorschau == geschriebener Inhalt").
+        if (req.effect !== undefined && req.effect !== "") {
+          const eff = this.contentEl.createDiv({ cls: "koda-effect" });
+          eff.createEl("strong", { text: t("confirm.effect") });
+          eff.createSpan({ text: ` ${req.effect}` });
+        }
         const box = this.contentEl.createDiv({ cls: "koda-preview" });
         if (req.mode === "replace") {
           for (const lineItem of diffLines(req.oldText, req.newText)) {
