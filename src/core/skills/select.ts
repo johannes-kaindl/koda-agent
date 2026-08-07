@@ -5,7 +5,10 @@ export interface Selection {
   loaded: Skill[];
   /** Budget erschoepft — nur die description im Prompt */
   descriptionOnly: Skill[];
-  /** enabled: false — erscheint NIRGENDS im Prompt, nur in der Meldung */
+  /** enabled: false — bewusst abgeschaltete Skills. Erscheinen weder im Prompt noch in
+   *  der Chat-Meldung: ein selbst gesetztes enabled: false braucht keine Rueckmeldung,
+   *  die Datei liegt ja sichtbar im Vault. Das Feld existiert trotzdem, fuer Aufrufer,
+   *  die den Unterschied zwischen "nicht gefunden" und "gefunden, aber aus" brauchen. */
   disabled: string[];
 }
 
