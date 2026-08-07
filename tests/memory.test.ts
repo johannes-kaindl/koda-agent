@@ -23,4 +23,39 @@ describe("buildSystemPrompt", () => {
   it("ohne Memory kein leerer Memory-Block", () => {
     expect(buildSystemPrompt({ lang: "en", memory: "", kodaFolder: "Koda" })).not.toContain("## Memory");
   });
+
+  const sel = (loaded: string[], descOnly: string[] = []) => ({
+    loaded: loaded.map((n) => ({ name: n, description: `desc-${n}`, enabled: true, body: `body-${n}` })),
+    descriptionOnly: descOnly.map((n) => ({ name: n, description: `desc-${n}`, enabled: true, body: `body-${n}` })),
+    disabled: [],
+  });
+
+  it("geladene Skills stehen mit Name, Beschreibung und Body im Prompt", () => {
+    const p = buildSystemPrompt({ lang: "de", memory: "", kodaFolder: "Koda", skills: sel(["Alpha"]) });
+    expect(p).toContain("## Skills");
+    expect(p).toContain("Alpha");
+    expect(p).toContain("desc-Alpha");
+    expect(p).toContain("body-Alpha");
+  });
+
+  it("Budget-Skills stehen nur mit Beschreibung, ohne Body", () => {
+    const p = buildSystemPrompt({ lang: "de", memory: "", kodaFolder: "Koda", skills: sel([], ["Beta"]) });
+    expect(p).toContain("desc-Beta");
+    expect(p).not.toContain("body-Beta");
+  });
+
+  it("ohne Skills kein leerer Skills-Block", () => {
+    const p = buildSystemPrompt({ lang: "de", memory: "", kodaFolder: "Koda", skills: sel([]) });
+    expect(p).not.toContain("## Skills");
+  });
+
+  it("Memory steht vor den Skills", () => {
+    const p = buildSystemPrompt({ lang: "de", memory: "- Fakt", kodaFolder: "Koda", skills: sel(["Alpha"]) });
+    expect(p.indexOf("## Memory")).toBeLessThan(p.indexOf("## Skills"));
+  });
+
+  it("weist auf Widersprueche hin, statt sie still aufzuloesen", () => {
+    const p = buildSystemPrompt({ lang: "de", memory: "", kodaFolder: "Koda" });
+    expect(p.toLowerCase()).toContain("conflict");
+  });
 });
