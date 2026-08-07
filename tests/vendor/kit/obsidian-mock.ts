@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.24.0, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.25.0, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // Self-contained Obsidian test double for obsidian-kit.
 // - Zero external imports (NOT from "obsidian", NOT from "vitest").
 // - Consumed via vitest `resolve.alias` as a drop-in for `import ... from "obsidian"`,
@@ -163,6 +163,9 @@ export class TextComponent {
   inputEl: any = makeFakeEl();
   protected _value = "";
   onChangeCB: ((v: string) => any) | null = null;
+  constructor() {
+    this.inputEl.__component = this;
+  }
   getValue(): string { return this._value; }
   setValue(v: string): this { this._value = String(v ?? ""); return this; }
   setPlaceholder(_p: string): this { return this; }
@@ -177,6 +180,9 @@ export class ToggleComponent {
   toggleEl: any = makeFakeEl();
   protected _value = false;
   onChangeCB: ((v: boolean) => any) | null = null;
+  constructor() {
+    this.toggleEl.__component = this;
+  }
   getValue(): boolean { return this._value; }
   setValue(v: boolean): this { this._value = Boolean(v); return this; }
   setDisabled(_d: boolean): this { return this; }
@@ -188,6 +194,9 @@ export class DropdownComponent {
   options: Record<string, string> = {};
   protected _value = "";
   onChangeCB: ((v: string) => any) | null = null;
+  constructor() {
+    this.selectEl.__component = this;
+  }
   addOption(value: string, display: string): this { this.options[value] = display; return this; }
   addOptions(options: Record<string, string>): this { Object.assign(this.options, options); return this; }
   getValue(): string { return this._value; }
@@ -200,6 +209,9 @@ export class SliderComponent {
   protected _value = 0;
   limits: [number, number, number] = [0, 100, 1];
   onChangeCB: ((v: number) => any) | null = null;
+  constructor() {
+    this.sliderEl.__component = this;
+  }
   setLimits(min: number, max: number, step: number): this { this.limits = [min, max, step]; return this; }
   getValue(): number { return this._value; }
   setValue(v: number): this { this._value = Number(v); return this; }
@@ -353,7 +365,11 @@ export class Setting {
   descValue = "";
   constructor(public containerEl: any) {
     this.settingEl = containerEl?.createDiv ? containerEl.createDiv({ cls: "setting-item" }) : makeFakeEl();
+    this.settingEl.__setting = this;
     Setting.__last = this;
+  }
+  private attach(el: any): void {
+    if (el?.appendChild && this.settingEl?.appendChild) this.settingEl.appendChild(el);
   }
   setName(name: any): this { this.nameValue = String(name ?? ""); return this; }
   setDesc(desc: any): this { this.descValue = String(desc ?? ""); return this; }
@@ -361,15 +377,15 @@ export class Setting {
   setClass(_c: string): this { return this; }
   setTooltip(_t: string): this { return this; }
   setDisabled(_d: boolean): this { return this; }
-  addText(cb: (c: TextComponent) => any): this { const c = new TextComponent(); this.components.push(c); cb(c); return this; }
-  addTextArea(cb: (c: TextAreaComponent) => any): this { const c = new TextAreaComponent(); this.components.push(c); cb(c); return this; }
-  addSearch(cb: (c: SearchComponent) => any): this { const c = new SearchComponent(); this.components.push(c); cb(c); return this; }
-  addToggle(cb: (c: ToggleComponent) => any): this { const c = new ToggleComponent(); this.components.push(c); cb(c); return this; }
-  addDropdown(cb: (c: DropdownComponent) => any): this { const c = new DropdownComponent(); this.components.push(c); cb(c); return this; }
-  addSlider(cb: (c: SliderComponent) => any): this { const c = new SliderComponent(); this.components.push(c); cb(c); return this; }
-  addButton(cb: (c: ButtonComponent) => any): this { const c = new ButtonComponent(); this.components.push(c); cb(c); return this; }
-  addExtraButton(cb: (c: ExtraButtonComponent) => any): this { const c = new ExtraButtonComponent(); this.components.push(c); cb(c); return this; }
-  addMomentFormat(cb: (c: TextComponent) => any): this { const c = new TextComponent(); this.components.push(c); cb(c); return this; }
+  addText(cb: (c: TextComponent) => any): this { const c = new TextComponent(); this.components.push(c); this.attach(c.inputEl); cb(c); return this; }
+  addTextArea(cb: (c: TextAreaComponent) => any): this { const c = new TextAreaComponent(); this.components.push(c); this.attach(c.inputEl); cb(c); return this; }
+  addSearch(cb: (c: SearchComponent) => any): this { const c = new SearchComponent(); this.components.push(c); this.attach(c.inputEl); cb(c); return this; }
+  addToggle(cb: (c: ToggleComponent) => any): this { const c = new ToggleComponent(); this.components.push(c); this.attach(c.toggleEl); cb(c); return this; }
+  addDropdown(cb: (c: DropdownComponent) => any): this { const c = new DropdownComponent(); this.components.push(c); this.attach(c.selectEl); cb(c); return this; }
+  addSlider(cb: (c: SliderComponent) => any): this { const c = new SliderComponent(); this.components.push(c); this.attach(c.sliderEl); cb(c); return this; }
+  addButton(cb: (c: ButtonComponent) => any): this { const c = new ButtonComponent(); this.components.push(c); this.attach(c.buttonEl); cb(c); return this; }
+  addExtraButton(cb: (c: ExtraButtonComponent) => any): this { const c = new ExtraButtonComponent(); this.components.push(c); this.attach(c.extraSettingsEl); cb(c); return this; }
+  addMomentFormat(cb: (c: TextComponent) => any): this { const c = new TextComponent(); this.components.push(c); this.attach(c.inputEl); cb(c); return this; }
 }
 
 // ---------------------------------------------------------------------------
@@ -452,7 +468,9 @@ export class WorkspaceLeaf {
 // vault-rag extensions.
 // ---------------------------------------------------------------------------
 export abstract class AbstractInputSuggest<T> {
-  constructor(protected app: any, protected inputEl: any) {}
+  constructor(protected app: any, protected inputEl: any) {
+    if (this.inputEl) this.inputEl.__folderSuggestAttached = true;
+  }
   abstract getSuggestions(query: string): T[] | Promise<T[]>;
   abstract renderSuggestion(value: T, el: any): void;
   selectSuggestion(_value: T, _evt?: any): void { this.close(); }
@@ -589,6 +607,7 @@ export function makeFakeApp(): any {
       getAbstractFileByPath: fn().mockReturnValue(null),
       getFiles: fn().mockReturnValue([]),
       getMarkdownFiles: fn().mockReturnValue([]),
+      getAllFolders: fn().mockReturnValue([]),
       read: fn().mockResolvedValue(""),
       cachedRead: fn().mockResolvedValue(""),
       create: fn().mockResolvedValue(new TFile()),
@@ -620,10 +639,24 @@ export function makeFakeApp(): any {
   };
 }
 
+/** Konstruierbares App-Double (`new App()`), z.B. fuer Consumer-Tests, die eine
+ *  echte App-Instanz statt eines rohen `makeFakeApp()`-Objekts erwarten (etwa
+ *  Signaturen, die `App` als Klassentyp durchreichen). Traegt dieselbe Form
+ *  wie `makeFakeApp()` -- keine zweite Wahrheit, nur eine konstruierbare Huelle. */
+export class App {
+  vault: any;
+  workspace: any;
+  metadataCache: any;
+  fileManager: any;
+  keymap: any;
+  constructor() {
+    Object.assign(this, makeFakeApp());
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Type-only exports (no runtime stub; not part of MockStubs).
 // ---------------------------------------------------------------------------
-export type App = any;
 export interface PluginManifest {
   id: string;
   name: string;
@@ -652,6 +685,7 @@ export const defaultStubs = {
   Setting,
   TFile,
   setIcon,
+  App,
   // common (3/5)
   ItemView,
   Modal,
