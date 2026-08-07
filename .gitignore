@@ -2,3 +2,4 @@ node_modules/
 main.js
 coverage/
 .lab-tools.mjs
+.gui-smoke.mjs
