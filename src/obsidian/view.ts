@@ -80,6 +80,9 @@ export class KodaView extends ItemView {
     this.reasonEl = null;
     if (this.mdComp !== null) this.removeChild(this.mdComp);
     this.mdComp = this.addChild(new Component());
+    if (this.plugin.skillNotice !== null) {
+      this.logEl.createDiv({ cls: "koda-msg koda-notice koda-skills", text: this.plugin.skillNotice });
+    }
     const pending: Promise<void>[] = [];
     const assistantBubble = (content: string): void => {
       const el = this.logEl.createDiv({ cls: "koda-msg koda-assistant" });

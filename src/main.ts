@@ -15,6 +15,8 @@ import type { ChatMessage } from "./core/agent/types";
 import { TOOL_DEFS } from "./core/tools/defs";
 import { buildSystemPrompt } from "./core/memory/memory";
 import { SessionStore } from "./core/memory/session";
+import { parseSkill, type Skill } from "./core/skills/skill";
+import { selectSkills, type Selection } from "./core/skills/select";
 import { DEFAULT_SETTINGS, mergeKodaSettings, type KodaSettings } from "./core/settings-types";
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { confirmWrite } from "./obsidian/confirm-write";
@@ -28,6 +30,10 @@ export default class KodaPlugin extends Plugin {
   /** Transiente Notiz (Fehler/Abbruch/Rundenlimit) als Plugin-State statt DOM-Append —
    *  renderLog() zeichnet sie am Ende neu; ein Voll-Redraw kann sie sonst sofort wieder loeschen. */
   lastNotice: { text: string; kind: "error" | "neutral" } | null = null;
+  /** Ladezustand der Skills — eigener Slot NEBEN lastNotice und oberhalb des Verlaufs
+   *  gezeichnet. Ueber lastNotice zu laufen hiesse, dass jeder Fehler im selben Turn
+   *  die Zeile ueberschreibt: sie waere genau dann weg, wenn etwas schiefgeht. */
+  skillNotice: string | null = null;
   private abort: AbortController | null = null;
   private readonly transport = new XhrSseTransport();
 
@@ -123,6 +129,7 @@ export default class KodaPlugin extends Plugin {
     await this.store.startNew();
     this.chatLog = [];
     this.lastNotice = null;
+    this.skillNotice = null;
     for (const v of this.views()) v.renderLog();
   }
 
@@ -140,10 +147,12 @@ export default class KodaPlugin extends Plugin {
     try {
       const s = this.settings;
       const memory = await this.readMemory();
+      const { selection, failed } = await this.readSkills();
+      this.skillNotice = this.skillStatusText(selection, failed);
       const lang = s.language === "auto" ? pickLang(safeGetLanguage()) : s.language;
       const system: ChatMessage = {
         role: "system",
-        content: buildSystemPrompt({ lang, memory, kodaFolder: s.kodaFolder }),
+        content: buildSystemPrompt({ lang, memory, kodaFolder: s.kodaFolder, skills: selection }),
       };
 
       // Client pro Lauf: der Idle-Timeout ist eine Einstellung und darf ohne
@@ -251,6 +260,38 @@ export default class KodaPlugin extends Plugin {
     const path = `${this.settings.kodaFolder.replace(/\/+$/, "")}/Memory.md`;
     const f = this.app.vault.getFileByPath(path);
     return f === null ? "" : this.app.vault.cachedRead(f);
+  }
+
+  /** Liest <Koda-Ordner>/Skills/*.md — flach, Unterordner werden ignoriert.
+   *  Der Vergleich ist case-insensitiv wie in `writePolicy`, damit ein Ordner
+   *  "koda/skills" dieselbe Wirkung hat wie "Koda/Skills". */
+  private async readSkills(): Promise<{ selection: Selection; failed: string[] }> {
+    const dir = `${this.settings.kodaFolder.replace(/\/+$/, "")}/Skills`;
+    const prefix = `${dir.toLowerCase()}/`;
+    const skills: Skill[] = [];
+    const failed: string[] = [];
+    for (const f of this.app.vault.getMarkdownFiles()) {
+      if (!f.path.toLowerCase().startsWith(prefix)) continue;
+      const rel = f.path.slice(dir.length + 1);
+      if (rel.includes("/")) continue; // flach: keine Unterordner
+      const name = rel.replace(/\.md$/i, "");
+      const raw = await this.app.vault.cachedRead(f).catch(() => null);
+      if (raw === null) { failed.push(name); continue; }
+      const r = parseSkill(name, raw);
+      if (r.ok) skills.push(r.skill);
+      else failed.push(r.name);
+    }
+    return { selection: selectSkills(skills, this.settings.skillBudgetChars), failed };
+  }
+
+  private skillStatusText(sel: Selection, failed: string[]): string | null {
+    const lines: string[] = [];
+    if (sel.loaded.length > 0) lines.push(t("skills.active", sel.loaded.map((s) => s.name).join(", ")));
+    if (sel.descriptionOnly.length > 0) {
+      lines.push(t("skills.budget", sel.descriptionOnly.map((s) => s.name).join(", ")));
+    }
+    if (failed.length > 0) lines.push(t("skills.failed", failed.join(", ")));
+    return lines.length === 0 ? null : lines.join("\n");
   }
 }
 
