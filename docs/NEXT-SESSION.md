@@ -18,6 +18,12 @@ Stufe 2 bewusst **nicht** ausdesigned; sie nennt nur die drei Bausteine.
 Empfohlener Zuschnitt: **einen** der drei Bausteine pro Session, nicht alle drei. Die
 Reihenfolge unten ist eine Empfehlung, keine Vorgabe.
 
+**Modell & Effort: Opus, Effort hoch.** Nicht wegen Umfang — die Arbeit hängt an einer
+einzigen Entscheidung (§ Baustein A: taugt die räumliche Schreibregel für Skills?), und
+die trägt jede spätere Session mit. Implementierungs-Tasks, die *nach* dem Design
+abfallen, sind an Sonnet delegierbar; die Controller-Rolle — Design entscheiden, Reviews
+adjudizieren — bleibt bei Opus. Startort: dieses Repo, nicht das Dach.
+
 ## Drei Lücken zwischen Spec-Behauptung und Code — vor dem Design prüfen
 
 Beim Seeden am 2026-08-07 gegen den Code gemessen. Die Spec klingt an drei Stellen so, als
