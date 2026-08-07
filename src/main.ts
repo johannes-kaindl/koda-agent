@@ -13,6 +13,7 @@ import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm } from "./core/agent/loop";
 import type { ChatMessage } from "./core/agent/types";
 import { TOOL_DEFS } from "./core/tools/defs";
+import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/memory/memory";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
@@ -22,6 +23,14 @@ import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { confirmWrite } from "./obsidian/confirm-write";
 import { KodaView, VIEW_TYPE_KODA } from "./obsidian/view";
 import { KodaSettingsTab } from "./obsidian/settings";
+
+/** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
+ *  "read-error" (Datei liess sich nicht lesen) und "no-description" (Frontmatter ohne
+ *  description) brauchen unterschiedliche Meldungen, siehe `skillStatusText`. */
+interface SkillFailure {
+  name: string;
+  reason: "read-error" | "no-description";
+}
 
 export default class KodaPlugin extends Plugin {
   settings: KodaSettings = DEFAULT_SETTINGS;
@@ -264,33 +273,44 @@ export default class KodaPlugin extends Plugin {
 
   /** Liest <Koda-Ordner>/Skills/*.md — flach, Unterordner werden ignoriert.
    *  Der Vergleich ist case-insensitiv wie in `writePolicy`, damit ein Ordner
-   *  "koda/skills" dieselbe Wirkung hat wie "Koda/Skills". */
-  private async readSkills(): Promise<{ selection: Selection; failed: string[] }> {
-    const dir = `${this.settings.kodaFolder.replace(/\/+$/, "")}/Skills`;
+   *  "koda/skills" dieselbe Wirkung hat wie "Koda/Skills".
+   *
+   *  Der Unterordner-Name kommt zwingend aus `SKILLS_SUBFOLDER` (derselben Konstante,
+   *  die `writePolicy` fuer die Bestaetigungspflicht auswertet) und nicht aus einem
+   *  eigenen Literal: liefen die beiden je auseinander, laese diese Methode weiterhin
+   *  aus dem alten Ordner in den System-Prompt, waehrend `writePolicy` ihn nicht mehr
+   *  als bestaetigungspflichtig erkennt — ein stiller Bestaetigungs-Bypass. */
+  private async readSkills(): Promise<{ selection: Selection; failed: SkillFailure[] }> {
+    const dir = `${this.settings.kodaFolder.replace(/\/+$/, "")}/${SKILLS_SUBFOLDER}`;
     const prefix = `${dir.toLowerCase()}/`;
     const skills: Skill[] = [];
-    const failed: string[] = [];
+    const failed: SkillFailure[] = [];
     for (const f of this.app.vault.getMarkdownFiles()) {
       if (!f.path.toLowerCase().startsWith(prefix)) continue;
       const rel = f.path.slice(dir.length + 1);
       if (rel.includes("/")) continue; // flach: keine Unterordner
       const name = rel.replace(/\.md$/i, "");
       const raw = await this.app.vault.cachedRead(f).catch(() => null);
-      if (raw === null) { failed.push(name); continue; }
+      if (raw === null) { failed.push({ name, reason: "read-error" }); continue; }
       const r = parseSkill(name, raw);
       if (r.ok) skills.push(r.skill);
-      else failed.push(r.name);
+      else failed.push({ name: r.name, reason: "no-description" });
     }
     return { selection: selectSkills(skills, this.settings.skillBudgetChars), failed };
   }
 
-  private skillStatusText(sel: Selection, failed: string[]): string | null {
+  private skillStatusText(sel: Selection, failed: SkillFailure[]): string | null {
     const lines: string[] = [];
     if (sel.loaded.length > 0) lines.push(t("skills.active", sel.loaded.map((s) => s.name).join(", ")));
     if (sel.descriptionOnly.length > 0) {
       lines.push(t("skills.budget", sel.descriptionOnly.map((s) => s.name).join(", ")));
     }
-    if (failed.length > 0) lines.push(t("skills.failed", failed.join(", ")));
+    // Zwei verschiedene Ursachen, zwei verschiedene Meldungen: ein Lesefehler ist
+    // kein fehlendes Frontmatter-Feld, und "keine description" waere hier schlicht falsch.
+    const readErrors = failed.filter((f) => f.reason === "read-error").map((f) => f.name);
+    const noDescription = failed.filter((f) => f.reason === "no-description").map((f) => f.name);
+    if (readErrors.length > 0) lines.push(t("skills.readFailed", readErrors.join(", ")));
+    if (noDescription.length > 0) lines.push(t("skills.failed", noDescription.join(", ")));
     return lines.length === 0 ? null : lines.join("\n");
   }
 }
