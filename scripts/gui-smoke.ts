@@ -24,6 +24,9 @@
  * Der Pruefpunkt bleibt drin, weil er billig ist und einen haengenden Renderer als
  * Zeitueberschreitung sehen wuerde — aber er hat noch nie rot geleuchtet, und was nie rot
  * war, ist unbewiesen. Wer den Freeze erneut sieht: die Bedingungen hier nachtragen.
+ * Die Klaerung ist am 2026-08-07 bewusst **geparkt** worden (Entscheidung Johannes,
+ * TaskNote `Freeze-Gegenprobe klaeren` im Cockpit): nicht aktiv weiterjagen, sondern beim
+ * naechsten Smoke mitbeobachten — erst ein erneutes Auftreten holt sie zurueck.
  * Gegenprobe-validiert ist dagegen Pruefpunkt 6 (Handler ausgebaut → genau dieser Punkt rot).
  *
  * ## Was er bewusst NICHT prueft
