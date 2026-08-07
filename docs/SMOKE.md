@@ -12,6 +12,8 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
 8. Obsidian neu starten → Verlauf ist wieder da; "Neues Gespräch" leert ihn.
 9. Falschen Endpoint eintragen → Klartext-Fehler (kein roher Stacktrace).
 10. Reasoning-Modell ohne Suppress → "Denkt nach…"-Block einklappbar, Antwort sauber getrennt.
+11. Skill von Hand anlegen → `⚙ Skills aktiv` erscheint beim nächsten Gesprächsstart, Antwort folgt der Anweisung.
+12. Koda einen Skill schreiben lassen → Modal zeigt `Künftig:` plus vollständigen Inhalt; Ablehnung schreibt nichts.
 
 ## Automatisierter Teil: `npm run smoke:gui`
 

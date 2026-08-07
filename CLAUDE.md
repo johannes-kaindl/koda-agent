@@ -11,21 +11,26 @@ Agent-Loop, vier Tools (`search_notes`/`read_note`/`write_note`/`save_memory`),
 Schreibregel mit Bestätigungs-Modal, Memory-Notiz, Sessions als JSONL, Settings-Tab,
 i18n DE/EN, dazu die QoL-Schicht (Verbindungstest, Modell-Auswahl, Failover, Presets)
 und ein automatisierter GUI-Smoke (`scripts/gui-smoke.ts`, CDP gegen ein laufendes
-Obsidian). Gate ist grün (113/113), `main.js` baut. Details zu
+Obsidian). Gate ist grün (160/160), `main.js` baut. Details zu
 Nutzung/Setup: `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`.
 Spezifiziert in `docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md` — dort
 stehen die Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Ordner
 frei, Rest bestätigt", Agent-Kern im Plugin, Roadmap-Stufen). Ideen-Quelle:
 `10_Pallas/00_Inbox/Koda Agent Plugin Recherche.md` (Pallas-Vault).
 
-## Nächster Schritt (geseedet 2026-08-07)
+## Nächster Schritt (geseedet 2026-08-07, Baustein A geseedet+erledigt 2026-08-07)
 
-**Stufe 2** — Markdown-Skill-System, Compaction, Aufräum-Assistent. Beginnt mit
-`superpowers:brainstorming`, nicht mit Code: beides sind Schnitte, keine Features.
-Vollständiger Seed mit offenen Design-Punkten, Kit-Ankern und **drei gemessenen
-Lücken zwischen Spec-Behauptung und Code**: `docs/NEXT-SESSION.md`. Erledigt und
-nicht mehr offen: QoL-Ausbau, GUI-Smoke-Automatisierung, Release-Infra,
-Store-Einreichung (0.1.0 ist gelistet). Geparkt: Freeze-Gegenprobe.
+**Stufe 2** — Markdown-Skill-System, Compaction, Aufräum-Assistent. **Baustein A
+(Markdown-Skill-System) ist implementiert** (Branch `feat/skill-system`, 160/160
+Tests grün): Frontmatter-`description`/`enabled`, Budget-Auswahl beim
+Gesprächsstart, Selbst-Autorschaft über `write_skill` — immer bestätigungspflichtig,
+auch im Koda-Ordner. Offen bleiben Baustein B (Compaction — braucht Lücke 2+3 aus
+`docs/NEXT-SESSION.md`, Kontext-Overflow-Erkennung + Runden-Datenmodell) und
+Baustein C (Aufräum-Assistent). Beide beginnen mit `superpowers:brainstorming`,
+nicht mit Code: beides sind Schnitte, keine Features. Voller Seed mit offenen
+Design-Punkten und Kit-Ankern: `docs/NEXT-SESSION.md`. Erledigt und nicht mehr
+offen: QoL-Ausbau, GUI-Smoke-Automatisierung, Release-Infra, Store-Einreichung
+(0.1.0 ist gelistet). Geparkt: Freeze-Gegenprobe.
 
 ## Verbindlicher Rahmen
 
@@ -56,7 +61,7 @@ Die gesamte LLM-Klempnerei existiert im Ökosystem bereits — **nicht neu bauen
 - **Kompletter Chat-Client:** `kuro-gamification/src/llm/KuroChatClient.ts`
   (n=4, Kit-Extraktion steht an — Koda wäre der 5. Consumer und damit Anlass,
   die Extraktion zu ziehen statt zu kopieren)
-- **Endpoint-Handling:** Kit `endpoint_config` (@0.23.0, API-Key je Endpunkt) +
+- **Endpoint-Handling:** Kit `endpoint_config` (@0.25.0, API-Key je Endpunkt) +
   `classifyEndpointStatus`/`ENDPOINT_PRESETS`; Settings-Zeilen-Editor nach
   Vorlage `vault-crews` (n=3, guter Schnitt)
 - **Vault-Tools mit Pfad-Guard (security-reviewed):** `vault-rag/src/mcp/`
@@ -78,7 +83,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (78/78 bei MVP-Abschluss).
+- `npm test` — `check-no-abs-paths` + vitest (160/160).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run build` — Typecheck + Production-esbuild (`main.js`).
@@ -87,8 +92,10 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 
 - `src/core/` — rein (kein Obsidian-Import, `check:pure` erzwingt das): Agent-Loop,
   Tool-Policy/-Defs, Memory, Sessions, Diff.
+- `src/core/skills/` — Skill-Parser, Budget-Auswahl, Pfad-Bau (obsidian-frei wie der
+  Rest von `core/`).
 - `src/llm/` — `KodaChatClient` + `XhrSseTransport` (Streaming-Chat-Client).
 - `src/obsidian/` — View, Vault-Tools-Adapter, Bestätigungs-Modal, Settings-Tab.
 - `src/vendor/kit` + `src/vendor/kit-obsidian/` — verbatim vendorter `../obsidian-kit`
-  (0.23.0), Re-Sync über `tools/sync-kit.sh` — nie von Hand editieren.
+  (0.25.0), Re-Sync über `tools/sync-kit.sh` — nie von Hand editieren.
 - `src/i18n/` — DE/EN-Strings.

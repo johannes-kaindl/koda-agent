@@ -15,8 +15,9 @@ can read and edit yourself.
 - **Chat sidebar** (ribbon icon + command) with streaming answers, a collapsible
   "thinking" block for reasoning models, and a Stop button that leaves the partial
   answer in place.
-- **Four tools:** `search_notes`, `read_note`, `write_note`, `save_memory` — the model
-  calls these itself while answering, with each step shown inline in the chat.
+- **Five tools:** `search_notes`, `read_note`, `write_note`, `save_memory`,
+  `write_skill` — the model calls these itself while answering, with each step
+  shown inline in the chat.
 - **A durable, transparent memory** — `save_memory` appends dated lines to
   `<Koda folder>/Memory.md`, which is also fed back into the system prompt on every
   question. Nothing is stored anywhere you can't open and edit.
@@ -43,6 +44,37 @@ The endpoint list in settings is a priority list, not a failover chain: **the fi
 entry is always the one used.** Reorder the list (the "move to top" button on each row)
 to switch which server Koda talks to — there is no automatic fallback to the next
 entry in the MVP.
+
+## Skills
+
+Ein Skill ist eine Markdown-Notiz in `<Koda-Ordner>/Skills/`, die Kodas Verhalten
+steuert. Du schreibst sie selbst — oder lässt Koda sie schreiben, was immer eine
+Bestätigung erfordert.
+
+```markdown
+---
+description: Antworte immer mit einem Ausrufezeichen am Ende
+enabled: true
+---
+
+Hänge an jede Antwort ein "!" an.
+```
+
+- Der **Name ist der Dateiname** ohne `.md`.
+- `description` ist Pflicht — sie erklärt in einem Satz, was anders läuft, und ist
+  das, was du im Bestätigungs-Modal zu sehen bekommst.
+- `enabled: false` schaltet einen Skill ab, ohne ihn zu löschen.
+- Unterordner werden nicht gelesen.
+
+Beim Gesprächsstart wandern alle aktiven Skills in Kodas System-Prompt. Wie viel
+Text dabei höchstens hineingeht, steuert **Skill-Budget** in den Einstellungen
+(Default 6000 Zeichen); was nicht mehr hineinpasst, erscheint nur mit seiner
+Beschreibung — Koda weiß dann, dass es den Skill gibt, kann ihm aber nicht folgen.
+Welche Skills gerade wirken, steht am Kopf des Gesprächs.
+
+**Skills sind immer bestätigungspflichtig**, auch wenn sie im Koda-Ordner liegen, in
+dem Koda sonst frei schreiben darf. Der Grund: ein Skill ist kein Entwurf, er ändert,
+was Koda künftig tut.
 
 ## Install
 
@@ -93,8 +125,8 @@ release.
 ## Constraints (deliberate, not yet, or never)
 
 - No terminal/full-system access — out of scope permanently (store policy + safety).
-- No Markdown-skill system, compaction, or synthesis workflows yet — planned for later
-  stages, see `CLAUDE.md`.
+- No compaction or synthesis workflows yet — planned for later stages, see
+  `CLAUDE.md`.
 - No heartbeat, no scheduled background work — Koda acts only when you ask it to.
 
 ## License
