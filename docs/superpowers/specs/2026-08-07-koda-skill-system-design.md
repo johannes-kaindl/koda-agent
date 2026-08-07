@@ -52,8 +52,16 @@ Ordner. Lies sie, bevor du in Einzelnotizen suchst.
 
 ### Fehlerbehandlung
 
-Kaputtes Frontmatter oder fehlende `description` → der Skill wird **übersprungen und im Chat
-gemeldet**, nicht still verworfen. Stille Fehlfunktion ist im Repo eine bekannte Fehlerklasse
+Fehlende oder leere `description` → der Skill wird **übersprungen und im Chat gemeldet**,
+nicht still verworfen. Es gibt daneben *keinen* Fehlerfall „kaputtes Frontmatter": der
+Kit-Parser ist tolerant und wirft nie — fehlt der `---`-Block oder ist er unlesbar, kommt
+`{ data: {}, body: <ganzer Text> }` zurück, und das landet über die fehlende `description`
+im selben Zweig. Ein zweiter Grund wäre eine Unterscheidung ohne Unterschied.
+
+Zwei Fallen aus der Kit-Typ-Asymmetrie (im Modul-Kopf dokumentiert), die der Parser
+abfangen muss: `parseFrontmatter` liefert **immer Strings** (`enabled: false` kommt als
+`"false"` an, nicht als Boolean), und `FmValue` kann auch `string[]` sein — eine
+`description`, die als Liste geschrieben wurde, ist keine gültige Beschreibung. Stille Fehlfunktion ist im Repo eine bekannte Fehlerklasse
 (Lesson „Eine Anzeige, die einen Laufzeit-Zustand behauptet, ist ein Schnappschuss").
 
 ## 2. Loader — `src/core/skills/` (pure)
@@ -65,7 +73,7 @@ export interface Skill { name: string; description: string; enabled: boolean; bo
 
 export type ParseResult =
   | { ok: true; skill: Skill }
-  | { ok: false; name: string; reason: "frontmatter" | "no-description" };
+  | { ok: false; name: string; reason: "no-description" };
 
 export function parseSkill(name: string, raw: string): ParseResult;
 
@@ -157,13 +165,16 @@ Plus eine Zeile in den Basis-Anweisungen: *widersprechen sich zwei Anweisungen �
 oder ein Skill und das Memory — sag es, statt still eine zu wählen.* Kein Prioritätsfeld, keine
 Auflösungsregel im Code.
 
-**Chat-Zeile einmal pro Gespräch**, nicht pro Turn (das wäre Rauschen): `⚙ 2 Skills aktiv: …`.
-„Einmal pro Gespräch" heißt: beim ersten `ask()` nach `newChat()` bzw. nach einem Plugin-Start
-— technisch ein Flag, das `newChat()` zurücksetzt.
-Zusätzlich und auch mitten im Gespräch erscheint eine Meldung, wenn das Budget gegriffen hat
-(„N Skills nur als Beschreibung geladen — Budget erschöpft") oder ein Skill wegen kaputtem
-Frontmatter übersprungen wurde. Umgesetzt über den bestehenden `lastNotice`-Mechanismus
-(`main.ts`, `kind: "neutral"`), nicht über einen neuen UI-Kanal.
+**Eine ortsfeste Zeile am Kopf des Gesprächs** statt einer Meldung pro Turn:
+`⚙ 2 Skills aktiv: …`, darunter bei Bedarf „N Skills nur als Beschreibung (Budget erschöpft)"
+und „N Skills ohne description übersprungen: …".
+
+Umgesetzt als **eigener Slot** `skillNotice` neben dem bestehenden `lastNotice`, gezeichnet
+**oberhalb** des Verlaufs statt darunter. Der Grund ist nicht Kosmetik: `lastNotice` ist ein
+einziger Slot, den jeder Fehler im selben Turn überschreibt — die Skill-Zeile wäre damit genau
+dann unsichtbar, wenn etwas schiefgeht. Ortsfest oben gelöst, braucht es außerdem kein
+„schon angekündigt"-Flag: der Slot wird bei jedem Turn neu berechnet, steht aber nur an einer
+Stelle und erzeugt deshalb kein Rauschen.
 
 ## Phasen
 
