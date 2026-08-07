@@ -1,7 +1,7 @@
 {
   "source": "obsidian-kit",
-  "version": "0.24.0",
-  "sha": "e8c6b3e",
-  "vendored": "think-splitter.ts, reasoning.ts, endpoint.ts, endpoint_config.ts, endpoint_diagnostics.ts, settings.ts, i18n.ts, num.ts, timeout.ts",
+  "version": "0.25.0",
+  "sha": "1ca3861",
+  "vendored": "think-splitter.ts, reasoning.ts, endpoint.ts, endpoint_config.ts, endpoint_diagnostics.ts, settings.ts, i18n.ts, num.ts, timeout.ts, frontmatter.ts",
   "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. kit-obsidian/ und tests/vendor/kit/ siehe deren VENDOR.json."
 }
