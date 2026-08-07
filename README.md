@@ -44,6 +44,13 @@ entry is always the one used.** Reorder the list (the "move to top" button on ea
 to switch which server Koda talks to — there is no automatic fallback to the next
 entry in the MVP.
 
+## Install
+
+Koda is in the Obsidian community plugin store: **Settings → Community plugins →
+Browse → "Koda" → Install → Enable**. Alternatively, drop `main.js`, `manifest.json`
+and `styles.css` from a [release](https://github.com/johannes-kaindl/koda-agent/releases)
+into `<vault>/.obsidian/plugins/koda-agent/`.
+
 ## Setup
 
 1. Start an OpenAI-compatible LLM server with a tool-calling-capable model (e.g. LM
@@ -88,5 +95,8 @@ release.
 - No terminal/full-system access — out of scope permanently (store policy + safety).
 - No Markdown-skill system, compaction, or synthesis workflows yet — planned for later
   stages, see `CLAUDE.md`.
-- No endpoint failover, no per-row connection test — the first endpoint always wins in
-  the MVP.
+- No heartbeat, no scheduled background work — Koda acts only when you ask it to.
+
+## License
+
+[AGPL-3.0-or-later](LICENSE) — © 2026 Jay.
