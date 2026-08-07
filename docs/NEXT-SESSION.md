@@ -113,3 +113,72 @@ vierzig. Eine Stapel-Bestätigung ist ein neues UI-Konzept — nicht nebenbei mi
 - **Dach-Arbeit** — Template-Drift `release.yml` bei vault-crews/yijing-oracle, Badge-Zeile
   im README (CORE-META-02). Gehört ins Dach-CWD, nicht hierher.
 - **Stufe 3** (MCP/vault-rag als Tool, Voice) — erst nach Stufe 2.
+
+---
+
+## Nachtrag 2026-08-07 abends (nach Baustein A)
+
+**Baustein A ist gebaut und auf `main`** (13 Commits, 162/162, Spec + Plan unter
+`docs/superpowers/`). Offen ist nur der manuelle GUI-Smoke — Handover-Note im Cockpit
+(`10_Pallas/25_Coding/koda-agent/Handover.md`, SMOKE-Punkte 11/12). Die Abschnitte oben zu
+Baustein A sind damit erledigt; B (Compaction) und C (Aufräum-Assistent) stehen unverändert.
+
+### Neu: Endpunkt-UI an den Ökosystem-Standard angleichen
+
+Aufgekommen am 2026-08-07 aus einem echten Fehlersuch-Fall (Johannes, Vault `80_Arbeit`):
+ein Endpunkt „funktionierte nicht", ohne dass Koda etwas meldete. Ursache war ein
+kaputter API-Schlüssel (ein URL-Fragment statt des JWT) — der Endpunkt antwortete
+sauber mit 401. Gemessen: ohne Key 401, mit Kodas Feldinhalt 401, mit dem Schlüssel aus
+`vault-rag` 200 und neun Modelle.
+
+**Kodas Klassifikation ist korrekt** (`classifyEndpointStatus`: 401 → `reachable: false`,
+`kind: "unauthorized"`, rotes Icon mit Tooltip). Der Mangel liegt davor: die Zeile ist
+**passiv** — sie zeigt nichts, bis jemand auf „Testen" klickt. `vault-rag` lädt beim
+Öffnen der Einstellungen die Modell-Liste je Zeile; bei kaputtem Schlüssel bleibt das
+Dropdown leer und der Fehler ist ohne Klick sichtbar. Genau dieser Fall steht dort als
+Code-Kommentar: „Ohne Schlüssel lieferte der Endpunkt vermutlich 401 → leere Liste".
+
+Gemessene Abweichungen Koda ↔ vault-rag in der Endpunkt-Zeile:
+
+| | vault-rag | Koda |
+|---|---|---|
+| Modell pro Endpunkt | Dropdown aus `/v1/models` | Freitext-Feld |
+| Wann geprüft wird | beim Öffnen, automatisch | erst auf Klick |
+| Drittanbieter-Icon bei gesetztem Key | ja | nein |
+| aria-labels an den Feldern | ja | nein |
+| Status-Icon · „Zuerst verwenden" · Mülleimer · Presets | ja | ja (gleich) |
+
+Herkunft der Abweichung: dokumentierter MVP-Schnitt in `src/obsidian/settings.ts`
+(„bewusst abgespeckt: kein Erreichbarkeits-Ping, keine Modell-Liste, kein Test-Button").
+Der QoL-Ausbau hat Status-Icon und Test-Knopf nachgezogen, die Modell-Liste nicht — es ist
+also ein halb eingeholter Rückstand, keine Entscheidung gegen den Standard.
+
+**Zwei trennbare Schnitte, in dieser Reihenfolge:**
+
+1. **Automatisch prüfen beim Öffnen** — klein, macht genau den Fehler oben sichtbar.
+2. **Modell-Liste pro Zeile statt Freitext** — die eigentliche Angleichung.
+
+**Kit-first:** Die Endpunkt-Zeile steht bei **n=3** (`vault-rag` Erst-Exemplar,
+`vault-crews` Muster, koda-agent abgespeckte Dritt-Instanz). Damit ist die
+Extraktions-Schwelle erreicht — und es liegt jetzt ein gemessener Beleg vor, dass die
+abgespeckte Variante realen Fehlersuch-Aufwand erzeugt. Einstieg über
+`superpowers:brainstorming`: die **Abstraktionsgrenze** ist die Frage, nicht der Code.
+
+### Offen aus dem Abschluss-Review des Skill-Systems
+
+- **`save_memory` schreibt ohne Bestätigung und ohne Policy** nach `<Koda>/Memory.md`
+  (`vault-tools.ts` → `saveMemory`), und `buildSystemPrompt` speist genau diesen Text
+  ungefiltert in den System-Prompt. Die Begründung, mit der Skills bestätigungspflichtig
+  wurden — „ändert künftiges Verhalten, also Bestätigung" — gilt dafür eins zu eins.
+  Vorbestehende MVP-Entscheidung; eine Änderung ist eine Design-Frage für Johannes,
+  kein Bugfix.
+- **Restrisiko Prompt-Injection:** Ein injizierter Text in einer gelesenen Notiz kann Koda
+  zu `write_skill` bewegen. Die einzige Bremse ist der Bestätigungsklick, und
+  `.koda-preview` hat `max-height: 40vh` — ein langer Body liegt unter dem Falz. Kein
+  Code-Fehler, aber die Angriffsfläche ist Gewöhnung. Beim Aufräum-Assistenten (Baustein C,
+  Stapel-Bestätigung) mitdenken.
+- **Kosmetisch:** `serializeFrontmatter` quotet unbedingt, Koda schreibt deshalb
+  `enabled: "true"`, handgeschriebene Skills tragen `enabled: true`. Round-Trip ist
+  verifiziert korrekt. Das Abschluss-Review rät ausdrücklich davon ab, `enabled` beim
+  Schreiben wegzulassen — die Zeile ist die einzige Stelle, an der der Schalter überhaupt
+  entdeckt wird.
