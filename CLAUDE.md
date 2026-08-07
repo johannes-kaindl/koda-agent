@@ -2,26 +2,30 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: MVP implementiert (feat/mvp, Stand 2026-08-06)
+## Status: 0.1.0 im Community-Store (main, Stand 2026-08-07)
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
-Chat-Sidebar + Vault-Tools + Markdown-Memory. Der MVP-Kern steht: Agent-Loop, vier
-Tools (`search_notes`/`read_note`/`write_note`/`save_memory`), Schreibregel mit
-Bestätigungs-Modal, Memory-Notiz, Sessions als JSONL, Settings-Tab, i18n DE/EN. Gate
-ist grün (Lint/Typecheck/Tests/`check:pure`/Build), `main.js` baut. Details zu
+Chat-Sidebar + Vault-Tools + Markdown-Memory. **0.1.0 ist im Community-Store gelistet**
+(Gate-Scan „passed" beim ersten Anlauf) und über ihn installierbar. Stufe 1 steht:
+Agent-Loop, vier Tools (`search_notes`/`read_note`/`write_note`/`save_memory`),
+Schreibregel mit Bestätigungs-Modal, Memory-Notiz, Sessions als JSONL, Settings-Tab,
+i18n DE/EN, dazu die QoL-Schicht (Verbindungstest, Modell-Auswahl, Failover, Presets)
+und ein automatisierter GUI-Smoke (`scripts/gui-smoke.ts`, CDP gegen ein laufendes
+Obsidian). Gate ist grün (113/113), `main.js` baut. Details zu
 Nutzung/Setup: `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`.
 Spezifiziert in `docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md` — dort
 stehen die Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Ordner
 frei, Rest bestätigt", Agent-Kern im Plugin, Roadmap-Stufen). Ideen-Quelle:
 `10_Pallas/00_Inbox/Koda Agent Plugin Recherche.md` (Pallas-Vault).
 
-## Nächster Schritt (geseedet 2026-08-06)
+## Nächster Schritt (geseedet 2026-08-07)
 
-QoL-Ausbau — Verbindungstest je Endpoint, Modell-Dropdown, Failover, Presets.
-Vollständiger Seed mit Registry-Ankern und offenen Design-Punkten:
-`docs/NEXT-SESSION.md`. Parallel offen: GUI-Smoke durch Jay (Handover-Note im
-Pallas-Cockpit), danach REGISTRY-Einträge im Dach, `gui-smoke-setup`,
-`plugin-release-setup`.
+**Stufe 2** — Markdown-Skill-System, Compaction, Aufräum-Assistent. Beginnt mit
+`superpowers:brainstorming`, nicht mit Code: beides sind Schnitte, keine Features.
+Vollständiger Seed mit offenen Design-Punkten, Kit-Ankern und **drei gemessenen
+Lücken zwischen Spec-Behauptung und Code**: `docs/NEXT-SESSION.md`. Erledigt und
+nicht mehr offen: QoL-Ausbau, GUI-Smoke-Automatisierung, Release-Infra,
+Store-Einreichung (0.1.0 ist gelistet). Geparkt: Freeze-Gegenprobe.
 
 ## Verbindlicher Rahmen
 

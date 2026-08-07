@@ -1,91 +1,109 @@
-# Seed: Nach-Smoke der QoL-Features + `gui-smoke-setup`
+# Seed: Stufe 2 — Skill-System, Compaction, Aufräum-Assistent
 
-Stand: 2026-08-06, Ende einer langen Session. Der vorherige Seed (vier QoL-Bausteine)
-ist **vollständig abgearbeitet** — siehe § Erledigt unten.
+Stand: 2026-08-07, nach dem Store-Release von 0.1.0. Der vorherige Seed (Nach-Smoke der
+QoL-Features + `gui-smoke-setup`) ist **vollständig abgearbeitet**, ebenso
+`plugin-release-setup` und die Store-Einreichung. Das Plugin ist im Community-Store
+gelistet und über ihn installierbar (plattformübergreifend verifiziert: macOS + Windows 11).
 
-## Warum diese beiden Dinge zusammengehören
+## Vorgehen: erst denken, dann bauen
 
-Der Tag hat zweimal gezeigt, dass die teuren Fehler die sind, **die kein Unit-Test sieht**:
-der Gesamt-statt-Idle-Timeout und der Session-Killer durch leere Tool-Argumente waren beide
-unsichtbar für ein grünes Gate — und beide lagen auch außerhalb der zehn Punkte der
-händischen Smoke-Checkliste. Ein automatisierter GUI-Smoke ist damit kein Komfort mehr,
-sondern die Lücke, durch die beides geschlüpft ist.
+**Diese Session beginnt mit `superpowers:brainstorming`, nicht mit Code.** Stufe 2 ist die
+erste Ausbaustufe, in der Koda etwas tut, das man später teuer korrigiert: Compaction
+entscheidet, *was ein Agent vergessen darf*, und das Skill-System lässt ihn Anweisungen an
+sich selbst schreiben. Beides sind Schnitte, keine Features — ein falsch gewähltes Format
+oder eine falsch gezogene Vertrauensgrenze wandert danach durch jede Session, die darauf
+aufsetzt. Die MVP-Spec (`docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md`) hat
+Stufe 2 bewusst **nicht** ausdesigned; sie nennt nur die drei Bausteine.
 
-Deshalb: **erst den händischen Nach-Smoke** der vier neuen Features (~10 Min, Jays Hände),
-**dann sofort `gui-smoke-setup`** — so werden die automatisierten Prüfpunkte aus dem
-frischen Smoke abgeleitet statt aus dem Gedächtnis rekonstruiert.
+Empfohlener Zuschnitt: **einen** der drei Bausteine pro Session, nicht alle drei. Die
+Reihenfolge unten ist eine Empfehlung, keine Vorgabe.
 
-## Schritt 1 — Nach-Smoke, was noch nie im laufenden Obsidian lief
+## Drei Lücken zwischen Spec-Behauptung und Code — vor dem Design prüfen
 
-Alle vier QoL-Features sind gebaut, getestet (108/108) und deployed (ProtoVault + Pallas),
-aber **keines wurde je angeklickt**. Prüfpunkte:
+Beim Seeden am 2026-08-07 gegen den Code gemessen. Die Spec klingt an drei Stellen so, als
+sei schon etwas vorbereitet; das ist es **nicht**. Wer darauf plant, plant auf Sand:
 
-- [ ] **Verbindungstest.** Einstellungen → Endpunkt-Zeile → „Testen" bei `127.0.0.1:1234`
-      → „Verbunden". Dann URL auf `:9999` → „Verbindung abgelehnt". Dann auf
-      `http://nichtda.invalid` → „Hostname unbekannt". (Danach zurückstellen.)
-- [ ] **Modell-Dropdown.** „Modelle abrufen" → Auswahlliste statt Textfeld, der gespeicherte
-      Name bleibt gewählt. Endpunkt abschalten → erneut abrufen → Feld ist gesperrt, Name
-      bleibt sichtbar (nicht verschwunden).
-- [ ] **Presets.** An der leeren Zeile am Ende: „LM Studio hinzufügen" legt eine Zeile an.
-      An bestehenden Zeilen darf es diese Knöpfe NICHT geben.
-- [ ] **Failover.** Zwei Zeilen: oben ein toter Endpunkt (`:9999`), darunter der echte.
-      Eine Frage stellen → Antwort kommt trotzdem (der zweite gewinnt). Danach beide tot
-      → Klartext „Kein Endpunkt erreichbar", kein Stacktrace.
-- [ ] **Idle-Timeout (Regression).** Eine Frage, die eine lange Antwort erzwingt
-      („schreib mir einen ausführlichen Pflanzplan mit zwölf Sorten"). Muss **vollständig**
-      durchlaufen. Vorher starb so etwas nach 120 s mitten im Satz.
-      Belegt: derselbe Fall braucht am Endpunkt real 310–512 s (Parcours, `big-argument`).
-- [ ] **Wikilinks.** In einer Antwort mit `[[Links]]` einen anklicken → Notiz öffnet.
+1. **Es gibt keine Skill-Andockstelle.** Die Spec sagt „`Koda/Skills/` — Loader ist im MVP
+   eine leere Andockstelle". Tatsächlich enthält `src/` **keinen einzigen Treffer** auf
+   `skill` (ohne `vendor/`). Der Loader ist nicht leer, er existiert gar nicht. Das ist
+   keine schlechte Nachricht — es heißt nur, dass der Schnitt frei wählbar ist statt vorgegeben.
+2. **Kontext-Überlauf wird nicht erkannt.** Die Spec sagt, er werde „erkannt
+   (`isContextOverflow`, vault-crews) und klartextlich gemeldet". `src/core/llm/chat-error.ts`
+   ist aber die *verbatim übernommene Fehler-Teilmenge* aus vault-rag — sie enthält
+   `ChatHttpError`/`extractErrorMessage`/`chatErrorMessage`, **nicht** `isContextOverflow`.
+   Ein Überlauf sieht heute aus wie irgendein HTTP-Fehler. Das ist der billigste erste
+   Schritt der Compaction-Arbeit und lohnt sich auch dann, wenn Compaction selbst wartet.
+3. **Das Session-Datenmodell sieht Compaction nicht vor.** Die Spec sagt, der Verlauf sei
+   eine „Liste von Runden, ersetzbar durch Zusammenfassungs-Runde". `src/core/memory/session.ts`
+   führt aber eine flache `ChatMessage[]` (append-only JSONL, eine Message pro Zeile). Eine
+   Runde ist darin nicht adressierbar. Compaction braucht also entweder eine Runden-Klammer
+   im Modell oder eine Heuristik, die sie aus der flachen Liste rekonstruiert — das ist eine
+   **Design-Entscheidung, kein Implementierungsdetail**, und sie gehört ins Brainstorming.
 
-Nicht abgehakte Punkte sind Fixes VOR `gui-smoke-setup`.
+## Baustein A — Markdown-Skill-System (der eigentliche Kern)
 
-## Schritt 2 — `gui-smoke-setup`
+Die Idee aus der Spec: Koda lernt nicht durch Fine-Tuning oder selbstmodifizierenden Code,
+sondern indem er **Markdown-Notizen schreibt, die er später selbst liest**. `Koda/Memory.md`
+ist die MVP-Stufe davon (ein flacher Lernpunkt-Anhang); Skills sind die strukturierte Form.
 
-Skill in `.claude/skills/gui-smoke-setup/`. Vendored den CDP-Treiber, schreibt Prüfpunkte,
-fährt die Gegenprobe. Referenz: `3d-codeblocks/scripts/gui-smoke.ts` (n=1),
-`vault-rag/scripts/gui-smoke.ts` (n=2).
+Offene Design-Punkte, die die Session entscheiden muss:
 
-⚠️ **Fünf CDP-Fallstricke stehen in der REGISTRY** (Dach, Zeile „GUI-Smoke gegen ein
-laufendes Obsidian fahren") — vor dem Schreiben lesen, sie kosten sonst je eine Schleife:
-1. `Page.bringToFront` reicht auf macOS nicht; zusätzlich `osascript … activate`.
-2. Ein Prüfpunkt, dessen Gegenstand fehlen kann, wird grün, wenn er die Abwesenheit nicht
-   selbst als rot behandelt — er ist dann ausgerechnet im Defektfall grün.
-3. `app.changeTheme` schreibt in `.obsidian/appearance.json` — Body-Klassen tauschen.
-4. **Seit Obsidian 1.13 sind die Einstellungen ein eigenes Fenster** (`about:blank`), in dem
-   **kein `app`-Objekt** existiert → zwei CDP-Verbindungen nötig. Ein Filter auf
-   `app://obsidian.md` findet die Settings nie und meldet „keine Zeilen im DOM".
-5. Nach einer Mutation auf die **Wirkung** warten, nicht auf eine Sekundenzahl.
+- **Wann wird ein Skill geladen?** Alle beim Gesprächsstart in den System-Prompt (einfach,
+  skaliert nicht) oder situativ nachgeladen (braucht ein Auswahlkriterium — Frontmatter-
+  `description` wie bei Claude-Code-Skills wäre der naheliegende Anleihe-Punkt)?
+- **Wie sieht die Selbst-Autorschaft aus?** Die Spec verlangt Bestätigung. Aber ein Skill
+  ist eine *Anweisung an das künftige Selbst* — die Bestätigung muss zeigen, was künftig
+  anders laufen wird, nicht nur den Dateiinhalt. Das ist eine andere Modal-Frage als beim
+  `write_note`-Diff und sollte nicht reflexhaft dieselbe Antwort bekommen.
+- **Liegt ein Skill im Koda-Ordner (frei beschreibbar) oder braucht er trotz Lage eine
+  Bestätigung?** Die MVP-Regel „Koda-Ordner frei" war für Entwürfe und Memory gedacht. Ein
+  Skill wirkt auf künftiges Verhalten — die räumliche Regel greift hier vielleicht zu kurz.
+  **Das ist die wichtigste Einzelfrage der Stufe 2.**
+- **Was passiert bei Widerspruch** zwischen zwei Skills oder zwischen Skill und Memory?
 
-## Danach (eigene Sessions)
+## Baustein B — Compaction
 
-- **`plugin-release-setup`** — `github`-Remote + Erst-Release. Account-/Auth-Schritte bleiben
-  bei Jay. Offene TaskNote im Cockpit: „koda-agent hat keine release.yml".
-- **Store-Einreichung** — Developer Dashboard auf `community.obsidian.md`, danach **Rescan
-  manuell anstoßen** (läuft nicht von selbst an; Dach-`AGENTS.md`).
-- **Stufe 2** — Markdown-Skill-System, Compaction, Aufräum-Assistent (Spec).
-- **Modell-Matrix im Parcours** (`<workspace>/50_Testground/tool-calling-parcour`) — gehört
-  der dortigen Session; braucht den Endpunkt **exklusiv**.
+Voraussetzung: Lücke 2 und 3 oben. Danach die eigentliche Frage: **Was wird zusammengefasst
+und was bleibt wörtlich?** Tool-Ergebnisse (oft lang, selten später relevant) verhalten sich
+anders als Nutzer-Aussagen (kurz, oft dauerhaft gültig). Eine Zusammenfassung, die eine
+Nutzer-Korrektur wegkürzt, macht den Agenten schlechter statt schlanker — und der Nutzer
+sieht nicht, dass es passiert ist. Sichtbarkeit gehört deshalb ins Design, nicht in ein
+späteres Polish-Ticket.
 
-## Erledigt in dieser Session (2026-08-06)
+## Baustein C — Aufräum-Assistent
 
-- GUI-Smoke 10/10 grün (händisch, Handover-Note abgehakt).
-- **Zwei Betriebsbefunde**, beide unsichtbar für Tests und Checkliste:
-  `4c56f90` Idle- statt Gesamt-Timeout (+ Einstellung, Default 300 s) ·
-  `479aeba` leere `tool_call`-Argumente vergifteten die ganze Sitzung (LM Studio → HTTP 500
-  auf **jede** Folgeanfrage; am Endpunkt isoliert, Fix am Transport-Rand heilt laufende
-  Sitzungen mit).
-- `9a5cb33` Wikilinks in Antworten klickbar (MarkdownRenderer).
-- **Alle vier QoL-Bausteine:** `b462854` Verbindungstest · `5693a8c` Modell-Auswahl ·
-  `b02f15e` Failover · `8928238` Presets. Gate 108/108.
-- REGISTRY im Dach (`4353f0c`): vier neue Einträge, zwei auf n=3 gehoben.
-- Nebenprodukt: `<workspace>/50_Testground/tool-calling-parcour` (Messwerkzeug für
-  Tool-Calling-Fähigkeit und Tempo lokaler Endpunkte).
+Am wenigsten spezifiziert und bewusst zuletzt: Koda schlägt Vault-Aufräumarbeiten vor
+(verwaiste Notizen, kaputte Links, Dubletten). Der Reiz ist, dass er dafür schon alles hat
+(`search_notes`/`read_note`/`write_note` + Bestätigungs-Modal). Das Risiko ist Massen-
+Schreiberei: die Schreibregel ist auf *einen* Schreibvorgang zugeschnitten, nicht auf
+vierzig. Eine Stapel-Bestätigung ist ein neues UI-Konzept — nicht nebenbei mitmachen.
 
-## Zwei Dinge, die man wissen muss, bevor man Zahlen zitiert
+## Kit-first-Anker (vor dem Bauen prüfen)
 
-1. **`docs/LAB.md` ist widerlegt.** Die Aussage „qwen3.6 ruft Tools zuverlässig" stammt aus
-   **je einem Lauf** pro Fall. Dasselbe Modell lieferte am 2026-08-06 den abgeschnittenen
-   Aufruf, der die Sitzung tötete. Der Parcours misst dasselbe mit Wiederholungen — dort
-   steht qwen3.6-27b bei 8/8 Aufgaben, aber das ist eine andere Aussage als „zuverlässig".
-2. **`textFallback: false` bleibt trotzdem richtig** — natives Tool-Calling funktioniert,
-   der Ausfall war ein Abbruch, kein fehlendes Können. Nicht „vereinfachen".
+- **`isContextOverflow`** — `vault-crews/src/core/chat-response.ts`. Die REGISTRY führt die
+  Fehler-Teilmenge davon bereits als **Kit-Kandidat n=4 (extraktionsreif)**; koda-agent ist
+  das 3. Exemplar der Kette. Wer `isContextOverflow` nachzieht, sollte prüfen, ob das
+  zusammen mit der Kit-Extraktion passiert statt als vierte Kopie.
+- **Skill-Loader-Muster** — vor Neubau die REGISTRY nach Markdown-getriebenen Loadern
+  durchsuchen; der `registry-session-start`-Hook injiziert den Katalog ohnehin.
+- **Diff-/Bestätigungs-UI** — steht (`src/core/diff.ts` + ConfirmModal). Die
+  Invariante „Vorschau == geschriebener Inhalt" ist regression-gepinnt; sie darf durch
+  Skill-Autorschaft oder Stapel-Bestätigung **nicht** aufgeweicht werden.
+
+## Leitplanken (unverändert gültig)
+
+- **Nie:** Full System Access, Terminal-Ausführung. Nicht als Setting, nicht hinter einer Warnung.
+- Kein selbstmodifizierender Code, kein Fine-Tuning — Lernen ist Markdown. Git im Vault ist
+  der Undo-Button.
+- `src/core/` bleibt obsidian-frei (`check:pure` erzwingt es).
+- `npm run gate` vor jedem Commit (aktuell 113/113).
+- `textFallback: false` bleibt richtig — nicht „vereinfachen" (Begründung in `docs/LAB.md`
+  und im Cockpit-§🧭).
+
+## Nicht in diese Session
+
+- **Freeze-Gegenprobe** — geparkt (TaskNote `5_geparkt_📦`). Beim nächsten GUI-Smoke
+  mitbeobachten; nur bei erneutem Auftreten hochholen.
+- **Dach-Arbeit** — Template-Drift `release.yml` bei vault-crews/yijing-oracle, Badge-Zeile
+  im README (CORE-META-02). Gehört ins Dach-CWD, nicht hierher.
+- **Stufe 3** (MCP/vault-rag als Tool, Voice) — erst nach Stufe 2.
