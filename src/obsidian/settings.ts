@@ -36,6 +36,9 @@ import {
   TIMEOUT_SEC_MIN,
   TIMEOUT_SEC_MAX,
   TIMEOUT_SEC_STEP,
+  SKILL_BUDGET_MIN,
+  SKILL_BUDGET_MAX,
+  SKILL_BUDGET_STEP,
   type KodaSettings,
 } from "../core/settings-types";
 import type KodaPlugin from "../main";
@@ -94,6 +97,17 @@ export class KodaSettingsTab extends PluginSettingTab {
           min: TIMEOUT_SEC_MIN,
           max: TIMEOUT_SEC_MAX,
           step: TIMEOUT_SEC_STEP,
+        },
+      },
+      {
+        name: t("settings.skillBudget"),
+        desc: t("settings.skillBudget.desc"),
+        control: {
+          type: "slider",
+          key: "skillBudgetChars",
+          min: SKILL_BUDGET_MIN,
+          max: SKILL_BUDGET_MAX,
+          step: SKILL_BUDGET_STEP,
         },
       },
       {

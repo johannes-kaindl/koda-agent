@@ -13,6 +13,13 @@ export const TIMEOUT_SEC_MIN = 30;
 export const TIMEOUT_SEC_MAX = 900;
 export const TIMEOUT_SEC_STEP = 30;
 
+/** Spanne für `skillBudgetChars` — wie viele Zeichen Skill-Body höchstens in den
+ *  System-Prompt wandern. Bewusst eine Einstellung und keine Konstante: die Grenze soll
+ *  sichtbar sein, weil sie stillschweigend Verhalten weglässt. */
+export const SKILL_BUDGET_MIN = 1000;
+export const SKILL_BUDGET_MAX = 20000;
+export const SKILL_BUDGET_STEP = 500;
+
 export interface KodaSettings {
   endpoints: EndpointConfig[];
   model: string;
@@ -20,6 +27,7 @@ export interface KodaSettings {
   kodaFolder: string;
   maxRounds: number;
   timeoutSec: number;
+  skillBudgetChars: number;
   textFallback: boolean;
   language: "auto" | "de" | "en";
   openOnStartup: boolean;
@@ -32,6 +40,7 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   kodaFolder: "Koda",
   maxRounds: 8,
   timeoutSec: 300,
+  skillBudgetChars: 6000,
   textFallback: false, // Default laut koda-lab-Befund setzen (docs/LAB.md)
   language: "auto",
   openOnStartup: false,
@@ -47,5 +56,8 @@ export function mergeKodaSettings(raw: unknown): KodaSettings {
       : merged.endpoints,
     maxRounds: clampInt(merged.maxRounds, 1, MAX_ROUNDS_LIMIT, DEFAULT_SETTINGS.maxRounds),
     timeoutSec: clampInt(merged.timeoutSec, TIMEOUT_SEC_MIN, TIMEOUT_SEC_MAX, DEFAULT_SETTINGS.timeoutSec),
+    skillBudgetChars: clampInt(
+      merged.skillBudgetChars, SKILL_BUDGET_MIN, SKILL_BUDGET_MAX, DEFAULT_SETTINGS.skillBudgetChars,
+    ),
   };
 }

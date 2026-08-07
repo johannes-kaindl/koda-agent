@@ -1,4 +1,11 @@
-import { DEFAULT_SETTINGS, mergeKodaSettings, TIMEOUT_SEC_MIN, TIMEOUT_SEC_MAX } from "../src/core/settings-types";
+import {
+  DEFAULT_SETTINGS,
+  mergeKodaSettings,
+  TIMEOUT_SEC_MIN,
+  TIMEOUT_SEC_MAX,
+  SKILL_BUDGET_MIN,
+  SKILL_BUDGET_MAX,
+} from "../src/core/settings-types";
 
 describe("mergeKodaSettings", () => {
   it("leerer Input liefert Defaults", () => {
@@ -16,5 +23,20 @@ describe("mergeKodaSettings", () => {
   it("migriert eine alte String-Endpoint-Liste zu EndpointConfig", () => {
     const s = mergeKodaSettings({ endpoints: ["http://a:1234"] });
     expect(s.endpoints).toEqual([{ url: "http://a:1234" }]);
+  });
+});
+
+describe("skillBudgetChars", () => {
+  it("hat einen Default von 6000", () => {
+    expect(mergeKodaSettings({}).skillBudgetChars).toBe(6000);
+  });
+  it("wird nach unten geklemmt", () => {
+    expect(mergeKodaSettings({ skillBudgetChars: 10 }).skillBudgetChars).toBe(SKILL_BUDGET_MIN);
+  });
+  it("wird nach oben geklemmt", () => {
+    expect(mergeKodaSettings({ skillBudgetChars: 999999 }).skillBudgetChars).toBe(SKILL_BUDGET_MAX);
+  });
+  it("Muell faellt auf den Default zurueck", () => {
+    expect(mergeKodaSettings({ skillBudgetChars: "viel" }).skillBudgetChars).toBe(6000);
   });
 });
