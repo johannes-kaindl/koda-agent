@@ -16,6 +16,15 @@ describe("sanitizeSkillName", () => {
   it("ein Name aus lauter verbotenen Zeichen wird leer", () => {
     expect(sanitizeSkillName("///")).toBe("");
   });
+  it("entfernt Steuerzeichen ueber den ganzen C0-Bereich", () => {
+    expect(sanitizeSkillName("a\u0000b\u001fc")).toBe("abc");
+    expect(sanitizeSkillName("Tab\tTrenner")).toBe("TabTrenner");
+    expect(sanitizeSkillName("Zeilen\numbruch")).toBe("Zeilenumbruch");
+  });
+  it("laesst Zeichen ab 0x20 unangetastet, auch ausserhalb der BMP", () => {
+    expect(sanitizeSkillName("Skill \u{1F600} Emoji")).toBe("Skill \u{1F600} Emoji");
+    expect(sanitizeSkillName("Umlaute \u00e4\u00f6\u00fc")).toBe("Umlaute \u00e4\u00f6\u00fc");
+  });
 });
 
 describe("skillPath", () => {
