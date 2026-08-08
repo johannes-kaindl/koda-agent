@@ -206,7 +206,7 @@ Gesprächsstart) kommt zu spät.
 **Gemessen dabei:** Der System-Prompt erwähnt `write_skill` mit **keinem Wort**.
 `save_memory` wird ausdrücklich erklärt, Skills gar nicht. Ob eine Prompt-Zeile die
 Auslassungsrate senkt, ist unbewiesen — messbar wäre es mit `tool-calling-parcour`
-(`/Users/Shared/50_Testground/tool-calling-parcour`, misst Erfolgsraten über Wiederholungen).
+(`50_Testground/tool-calling-parcour` im Shared-Workspace, misst Erfolgsraten über Wiederholungen).
 
 ### Drei Wünsche von Johannes (2026-08-08), alle aus demselben Grund
 
