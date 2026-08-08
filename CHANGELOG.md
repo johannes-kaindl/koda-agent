@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-08
+
 ### Added
 
 - **Markdown skill system.** Notes in `<Koda folder>/Skills/` steer Koda's behaviour.
