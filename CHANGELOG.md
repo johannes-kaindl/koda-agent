@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The community store scan no longer warns about control characters in a regular expression
+  (`no-control-regex`). The skill filename sanitiser now strips the C0 range by code point
+  instead of by regex range. Behaviour is unchanged and pinned by tests; the local ESLint
+  override that had been hiding the warning from us — but never from the store — is gone.
+
 ## [0.2.0] — 2026-08-08
 
 ### Added
