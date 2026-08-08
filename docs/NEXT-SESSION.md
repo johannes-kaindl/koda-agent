@@ -182,3 +182,67 @@ abgespeckte Variante realen Fehlersuch-Aufwand erzeugt. Einstieg über
   verifiziert korrekt. Das Abschluss-Review rät ausdrücklich davon ab, `enabled` beim
   Schreiben wegzulassen — die Zeile ist die einzige Stelle, an der der Schalter überhaupt
   entdeckt wird.
+
+### Nachtrag 2026-08-08 früh — aus dem GUI-Smoke des Skill-Systems
+
+**Der Smoke ist durch, alle Punkte grün** (SMOKE 11/12). Koda hat einen Skill selbst
+geschrieben, das Modal zeigte die `Künftig:`-Zeile, die Ablehnung schrieb nichts, und der
+neue Skill erschien beim nächsten Gesprächsstart in der `⚙ Skills aktiv`-Zeile. Der Kreis
+schließt sich also — Koda liest, was er selbst geschrieben hat. Zwei Beobachtungen am Rand:
+der Obsidian-Linter ergänzt in Skill-Dateien `title`/`created`/`updated` (harmlos,
+`parseSkill` ignoriert sie), und die bekannte `enabled: "true"`-Quoting-Drift ist in der
+Praxis sichtbar.
+
+**Ein Zwischenfall mit Diagnose (kein Bug im Skill-System):** Beim ersten Versuch behauptete
+Koda, den Skill gespeichert zu haben — ohne `write_skill` je aufgerufen zu haben. Reine
+Halluzination, in der Session-JSONL belegt (Assistant-Antwort ohne `toolCalls`). Vier
+Reproduktionsversuche mit Kodas echten Parametern, darunter einer mit dem **echten Verlauf
+aus `archive.jsonl`** (2977 Prompt-Tokens): **4× korrekter Tool-Call.** Also
+Sampling-Varianz, nicht deterministisch — dasselbe Muster wie beim abgeschnittenen
+Tool-Call vom 2026-08-06. Der eigentliche Mangel ist, dass eine Halluzination von einem
+Erfolg nicht unterscheidbar ist; die eingebaute Gegenprobe (die Skills-Zeile beim nächsten
+Gesprächsstart) kommt zu spät.
+
+**Gemessen dabei:** Der System-Prompt erwähnt `write_skill` mit **keinem Wort**.
+`save_memory` wird ausdrücklich erklärt, Skills gar nicht. Ob eine Prompt-Zeile die
+Auslassungsrate senkt, ist unbewiesen — messbar wäre es mit `tool-calling-parcour`
+(`/Users/Shared/50_Testground/tool-calling-parcour`, misst Erfolgsraten über Wiederholungen).
+
+### Drei Wünsche von Johannes (2026-08-08), alle aus demselben Grund
+
+Der gemeinsame Nenner: **er fährt das Qwen3.6-MoE-Modell, nicht das stärkere Dense-Modell**,
+und vermutet, dass schwächere Modelle explizite Hinweise zur Tool-Nutzung brauchen. Das deckt
+sich mit dem Befund oben. Alle drei sind Stellschrauben, die der Nutzer heute nicht erreicht.
+
+1. **System-Prompt in den Einstellungen editierbar.** Die eigentliche Design-Frage: *ersetzen
+   oder ergänzen?* Ein frei überschreibbarer Prompt kann die Tool-Anweisungen killen
+   („Use the provided tools BEFORE answering…") und macht jeden Support-Fall unlesbar. Ein
+   reines Zusatz-Feld ist sicher, aber löst nicht den Fall „diese eine Zeile stört mich".
+   Denkbarer Mittelweg: vollständig editierbar **mit** sichtbarem Zurücksetzen und einer
+   Warnung, wenn die Tool-Zeile fehlt. Gehört ins Brainstorming, nicht in eine Ad-hoc-Lösung.
+2. **Tools in den Einstellungen sichtbar und editierbar.** Achtung beim Zuschnitt: *neue*
+   Tools kann eine Einstellung nicht erfinden — die Implementierung lebt im Plugin. Was
+   wirklich geht und den Wunsch trägt: die Tool-Liste **anzeigen**, einzelne Tools
+   **ab­schaltbar** machen (weniger Tools = höhere Trefferquote bei schwachen Modellen) und
+   die **`description` je Tool editierbar** machen — genau der Hebel, um einem MoE-Modell
+   auf die Sprünge zu helfen.
+   **Konkreter Funktions-Gap, den Johannes dabei fand:** Koda kann suchen, aber *nicht*
+   „zeig mir alles in Ordner X". `search_notes` matcht zwar auch Pfade (`search_notes("_Koda/")`
+   trifft), ist aber auf 10 Treffer gedeckelt und nirgends als Ordner-Listing dokumentiert.
+   Ein eigenes `list_notes(folder)` wäre der ehrliche Schnitt.
+3. **Text in der Sidebar markieren und mit Cmd+C kopieren** — ✅ **erledigt** (`17c4778`):
+   `user-select: text` auf `.koda-log`. Obsidian macht Text in View-Containern nicht von
+   selbst markierbar; vault-rag setzt dieselbe Zeile aus demselben Grund. **Noch nicht im
+   laufenden Obsidian verifiziert** — steht als Punkt 13 in `docs/SMOKE.md`.
+
+### Sidebar-UI ans Ökosystem angleichen (Johannes' Feedback aus der Handover-Note)
+
+Gehört zum Endpunkt-UI-Punkt oben, ist aber ein eigener Schnitt:
+
+- **Thinking sichtbar machen.** Kein Bug — `suppressThinking: true` unterdrückt es absichtlich,
+  und Kodas View hat den ausklappbaren „Denkt nach…"-Block bereits. Der Punkt ist trotzdem
+  richtig: bei einem MoE-Modell wartet man minutenlang vor einem UI, das tot aussieht.
+  Frage fürs Design: Default umdrehen, oder eine „arbeitet…"-Anzeige unabhängig vom Thinking?
+- **Farbiger Senden-Knopf** und die übrigen Sidebar-Details nach vault-rag-Vorbild.
+- **Sidebar-UI ins Kit**, falls dort noch nicht vorhanden — Johannes hält das ausdrücklich für
+  überfällig. Zusammen mit der Endpunkt-Zeile (n=3) ist das ein gemeinsamer Extraktions-Anlass.
