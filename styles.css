@@ -1,5 +1,11 @@
 .koda-root { display: flex; flex-direction: column; height: 100%; }
-.koda-log { flex: 1; overflow-y: auto; padding: var(--size-4-2); }
+.koda-log {
+  flex: 1; overflow-y: auto; padding: var(--size-4-2);
+  /* Obsidian macht Text in View-Containern nicht von selbst markierbar — ohne diese
+     Zeile laesst sich eine Antwort weder auswaehlen noch mit Cmd+C kopieren.
+     Dieselbe Zeile steht aus demselben Grund in vault-rag/styles.css. */
+  user-select: text;
+}
 .koda-msg { margin-bottom: var(--size-4-2); padding: var(--size-4-2); border-radius: var(--radius-m); }
 /* pre-wrap gilt nur fuer die Plaintext-Blasen. Kodas fertige Antworten laufen durch
    MarkdownRenderer und bringen echte Block-Elemente mit — dort wuerde pre-wrap die
