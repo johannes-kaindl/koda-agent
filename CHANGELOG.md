@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-08-08
+
 ### Fixed
 
 - The community store scan no longer warns about control characters in a regular expression
