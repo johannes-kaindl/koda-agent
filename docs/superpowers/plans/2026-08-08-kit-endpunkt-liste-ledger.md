@@ -1,0 +1,26 @@
+# SDD ledger — plan: /Users/Shared/code/obsidian-plugins/koda-agent/docs/superpowers/plans/2026-08-08-kit-endpunkt-liste.md
+Repo: obsidian-kit, Branch: feat/endpoint-list (kein Worktree: Consumer vendoren ueber den relativen Pfad ../obsidian-kit)
+Start: 2026-08-08
+
+Task 1: complete (commits fbad060..7b5d6e2, review clean)
+Task 2: complete (commits 7b5d6e2..1e38530, review clean)
+Task 3: complete (commits 1e38530..6651fc6, review clean)
+Task 3: minor (deferred): hintAs "tooltip"-Zweig in model-picker.ts:89-91 ist ungetestet (nur "desc"-Pfad geprueft)
+Task 3: minor (deferred): ExtraButtonComponent.setTooltip im Mock ist ein No-Op-Stub (obsidian-mock.ts:249) — Tooltip-Text am Refresh-Knopf nicht pruefbar (vorbestehend)
+Controller-Entscheidung vor Task 4: Der Kit-Mock hat weder `Setting.controlEl` noch `Element.querySelectorAll`. buildEndpointList zeichnet aber in `controlEl` und sperrt Zeilen ueber `containerEl.querySelectorAll("input, button, select")`. Ohne beides sind die vier vom Plan geforderten Invarianten nicht belegbar. Der Plan nennt den Mock in den Global Constraints als ausreichend — das ist ein Planfehler, entdeckt beim Pre-Dispatch-Check. Entscheidung: Mock additiv erweitern (controlEl + querySelectorAll), als eigener Vorschritt in Task 4, mit eigenen Mock-Tests. Begruendung: es ist der einzige Weg, den Plan zu erfuellen; die Ergaenzung bringt den Mock naeher an die echte Obsidian-API und nuetzt allen Consumern.
+Task 4: review 1 — spec ❌ (1 Important, plan-mandated): Leer-Option „globales Modell" fehlt im dropdown-Modus, sobald die Zeile ein Override traegt → Override nicht mehr zuruecknehmbar. Ursache: Planvorgabe (Sonderfall 1 im Brief), nicht die Umsetzung. Umzugstreue selbst mechanisch verifiziert: kein Zweig/Guard/Kommentar/Reihenfolge verloren.
+Task 4: Entscheidung Johannes (2026-08-09, 00:0x): `allowEmpty?: boolean` (Default false) kehrt in resolveModelChoice zurueck — Options-Invariante gehoert in die pure Funktion, und es ist die belegt funktionierende vault-rag-Fassung.
+Task 4: minor (deferred): setRowsDisabled ist im Mock ein No-Op (Komponenten-Elemente tragen tagName DIV) — die Sperre ist ueber aria-busy + okit-ep-busy belegt, nicht ueber echtes `disabled`. Folge-Commit: `tagName`/`iconName` am Mock.
+Task 4: minor (deferred): `cache.bump()` in lockRows() ist ungetestet — kein Test mutiert die Liste, waehrend ein load()-Promise offen ist.
+Task 4: fix round 1/5 laeuft (3 Findings: allowEmpty, verschobener Modal-Test, ueberholter Kommentar in model-picker.test.ts)
+Task 4: fix round 1/5 (3 addressed, 0 open — allowEmpty, Modal-Test-Zuordnung, ueberholter Kommentar; commits 0db1922..94a2ffb)
+Task 4: complete (commits 6651fc6..94a2ffb, review clean)
+Task 4: minor (deferred): locked-Modus kennt kein allowEmpty — bei nicht erreichbarem Endpunkt bleibt ein gesetztes Override bis zur naechsten erfolgreichen Probe unwiderrufbar. Identisch zur vault-rag-Vorlage, also kein Umzugsfehler.
+Controller-Entscheidung vor Task 5: Der Plan laesst Task 5 taggen und pushen. Auf einem Feature-Branch waere das falsch — ein Release-Tag gehoert auf main. Task 5 macht daher nur Version + Doku + Commit; Tag und Push folgen nach dem finalen Review und dem Merge (finishing-a-development-branch).
+Task 5: complete (commits 94a2ffb..6a3df7c, review clean)
+KORREKTUR zur deferred-Zeile „locked kennt kein allowEmpty": irrefuehrend formuliert. Im Modus `locked` ist das <select> per setDisabled(true) ohnehin nicht bedienbar — eine Leer-Option waere eine Option, die niemand anklicken kann. „Unwiderrufbar bis zur naechsten erfolgreichen Probe" ist die Definition von `locked`, kein Nebeneffekt von allowEmpty. Identisch zur Vorlage, kein Handlungsbedarf. Nicht als offener Bug nach Schritt 2 mitnehmen.
+Finaler Whole-Branch-Review (opus, fbad060..6a3df7c): Ready to merge = WITH FIXES. Umzugstreue mechanisch bestaetigt (normalisierter Diff gegen die Vorlage enthaelt nur die mandatierten Ersetzungen), CSS vollstaendig, Gate gruen. Was fehlt, ist Vertrag: cache.clear()-Lebenszyklus undokumentiert (vault-rags hide() ruft ihn heute — der Ersatz fehlt), aria-Strings nicht je Liste unterscheidbar, Mock-attach()-Aenderung ist nicht additiv aber als additiv dokumentiert. Dazu zwei fehlende Tests (modelFits, Drittanbieter-Icon) und der Mock-Zweizeiler, der die deferred Punkte 1-3 aufmacht.
+Fix-Welle nach finalem Review laeuft (9 Findings + 4 deferred Punkte in einem Dispatch)
+Fix-Welle nach finalem Review: complete (commits 6a3df7c..6d90e7d, drei Schritte Mock/Tests/Vertraege). Gate 395/395 gruen. Alle 9 Findings + die 4 deferred Punkte adressiert; keine offenen Punkte. Ein nicht beauftragter Zusatz war noetig: `remove()` war im Mock ein No-Op, ohne Elternzeiger war der geforderte Drittanbieter-Icon-Test ("blur mit leerem Wert → verschwunden") nicht schreibbar. Bestandstests unberuehrt (384 → 395, nur neue Faelle). Bericht: final-fix-report.md. Offen bleibt beim Controller: Merge nach main + Tag.
+Fix-Welle: alle Findings ADDRESSED, keine neuen Bruecke (commits 6a3df7c..6d90e7d, 384→395 Tests, kein Bestandstest umgeschrieben)
+ABGESCHLOSSEN 2026-08-09: main gemergt (2a7b5d7), Gate auf dem gemergten Stand gruen (395/395), Tag 0.26.0 (ohne v-Praefix — Repo-Konvention, der Plan sagte faelschlich v0.26.0) auf origin+github, Branch geloescht. REGISTRY.md im Dach nachgezogen (dc96a31).
