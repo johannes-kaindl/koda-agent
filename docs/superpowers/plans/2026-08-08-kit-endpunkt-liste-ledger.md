@@ -1,4 +1,4 @@
-# SDD ledger — plan: /Users/Shared/code/obsidian-plugins/koda-agent/docs/superpowers/plans/2026-08-08-kit-endpunkt-liste.md
+# SDD ledger — plan: docs/superpowers/plans/2026-08-08-kit-endpunkt-liste.md
 Repo: obsidian-kit, Branch: feat/endpoint-list (kein Worktree: Consumer vendoren ueber den relativen Pfad ../obsidian-kit)
 Start: 2026-08-08
 

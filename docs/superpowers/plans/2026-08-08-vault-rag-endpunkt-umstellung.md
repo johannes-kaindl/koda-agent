@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, esbuild, vitest, Obsidian 1.8+.
 
-**Arbeitsverzeichnis für ALLE Tasks:** `/Users/Shared/code/obsidian-plugins/vault-rag`
+**Arbeitsverzeichnis für ALLE Tasks:** `../vault-rag`
 
 **Voraussetzung:** `obsidian-kit@0.26.0` ist getaggt (Plan `2026-08-08-kit-endpunkt-liste.md` vollständig durch).
 

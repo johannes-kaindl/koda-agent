@@ -8,8 +8,8 @@
 
 **Tech Stack:** TypeScript (ESM, kein Bundle), vitest, Kit-eigener Obsidian-Mock (`src/testing/obsidian-mock.ts`), eslint 9 / typescript-eslint.
 
-**Arbeitsverzeichnis für ALLE Tasks dieses Plans:** `/Users/Shared/code/obsidian-plugins/obsidian-kit`
-Die Spec liegt aus historischen Gründen im koda-agent-Repo: `/Users/Shared/code/obsidian-plugins/koda-agent/docs/superpowers/specs/2026-08-08-endpunkt-ui-kit-extraktion-design.md`.
+**Arbeitsverzeichnis für ALLE Tasks dieses Plans:** `../obsidian-kit`
+Die Spec liegt aus historischen Gründen im koda-agent-Repo: `../koda-agent/docs/superpowers/specs/2026-08-08-endpunkt-ui-kit-extraktion-design.md`.
 
 ## Global Constraints
 

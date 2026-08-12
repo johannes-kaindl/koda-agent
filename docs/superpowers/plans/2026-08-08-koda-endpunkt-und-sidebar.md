@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, esbuild, vitest (aktuell 160/160), Obsidian 1.8.7+.
 
-**Arbeitsverzeichnis für ALLE Tasks:** `/Users/Shared/code/obsidian-plugins/koda-agent`
+**Arbeitsverzeichnis für ALLE Tasks:** `obsidian-plugins/koda-agent`
 
 **Voraussetzung:** Plan 1 (`obsidian-kit@0.26.0` getaggt) und Plan 2 (vault-rag umgestellt, Gegenprobe gefahren) sind durch. vault-rag steht vorher, weil sich ein Bruch dort an der Referenz zeigt statt am Neuling.
 
@@ -610,7 +610,7 @@ Expected: alle automatisierten Punkte grün. Die manuellen Punkte aus Step 1 von
 
 `CLAUDE.md`: den Status-Absatz auf 0.3.0 und den erreichten Stand heben. In `docs/NEXT-SESSION.md` die erledigten Abschnitte („Endpunkt-UI angleichen", „Sidebar-UI angleichen") streichen.
 
-Im Dach-Repo (`/Users/Shared/code/obsidian-plugins`): `REGISTRY.md` — Eintrag „Endpunkt-Zeilen-Editor" auf „im Kit (0.26.0), Consumer: vault-rag, koda-agent" setzen. `KIT-MATRIX.md` **nicht** anfassen (generiert).
+Im Dach-Repo (`obsidian-plugins`): `REGISTRY.md` — Eintrag „Endpunkt-Zeilen-Editor" auf „im Kit (0.26.0), Consumer: vault-rag, koda-agent" setzen. `KIT-MATRIX.md` **nicht** anfassen (generiert).
 
 - [ ] **Step 4: Release**
 
