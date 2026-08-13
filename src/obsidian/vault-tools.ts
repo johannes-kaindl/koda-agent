@@ -4,6 +4,10 @@ import { writePolicy } from "../core/tools/write-policy";
 import { appendMemoryLine } from "../core/memory/memory";
 import { serializeFrontmatter } from "../vendor/kit/frontmatter";
 import { sanitizeSkillName, skillPath } from "../core/skills/path";
+import {
+  needsSemantic, formatSearchResult, formatRelatedResult,
+  type RetrievalApi, type TextHit,
+} from "../core/tools/retrieval";
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
@@ -33,7 +37,13 @@ export class VaultTools implements ToolRunner {
   constructor(
     private readonly vault: VaultPort,
     private readonly confirm: ConfirmWritePort,
-    private readonly opts: { kodaFolder(): string; today(): string },
+    private readonly opts: {
+      kodaFolder(): string;
+      today(): string;
+      /** Frisch je Aufruf gelesen — vault-rag kann zur Laufzeit an- oder abgeschaltet
+       *  werden. Fehlt das Feld ganz, verhaelt sich Koda wie vor der Andockung. */
+      retrieval?: () => RetrievalApi | null;
+    },
   ) {}
 
   async run(name: string, args: unknown): Promise<ToolOutcome> {
@@ -42,6 +52,7 @@ export class VaultTools implements ToolRunner {
       switch (name) {
         case "search_notes": return await this.search(str(a.query), num(a.max_results, SEARCH_CAP));
         case "read_note": return await this.read(str(a.path));
+        case "related_notes": return await this.relatedNotes(str(a.path));
         case "write_note": return await this.write(str(a.path), str(a.content), str(a.mode));
         case "write_skill":
           return await this.writeSkill(str(a.name), str(a.description), str(a.body), str(a.mode));
@@ -56,11 +67,11 @@ export class VaultTools implements ToolRunner {
   private async search(query: string, cap: number): Promise<ToolOutcome> {
     if (query.trim() === "") return { ok: false, error: "query fehlt" };
     const q = query.toLowerCase();
-    const hits: string[] = [];
+    const hits: TextHit[] = [];
     for (const path of this.vault.listMarkdownPaths()) {
       if (hits.length >= cap) break;
       if (path.toLowerCase().includes(q)) {
-        hits.push(`${path} (Dateiname)`);
+        hits.push({ path, snippet: "(Dateiname)" });
         continue;
       }
       const text = await this.vault.read(path).catch(() => "");
@@ -68,12 +79,30 @@ export class VaultTools implements ToolRunner {
       if (at !== -1) {
         const from = Math.max(0, at - SNIPPET / 2);
         const snippet = text.slice(from, from + SNIPPET).replace(/\s+/g, " ").trim();
-        hits.push(`${path}: …${snippet}…`);
+        hits.push({ path, snippet: `…${snippet}…` });
       }
     }
-    return hits.length === 0
-      ? { ok: true, content: `Keine Treffer für "${query}".` }
-      : { ok: true, content: hits.join("\n") };
+
+    // Semantik nur, wenn Volltext duenn bleibt (Spec E4): sie kostet je Aufruf eine
+    // Einbettungs-Anfrage. Ein Fehler der Fremd-API darf die Volltextsuche NIE
+    // mitreissen — sie ist der verlaessliche Teil der Antwort.
+    const api = needsSemantic(hits.length) ? this.opts.retrieval?.() ?? null : null;
+    const semantic = api === null ? null : await api.search(query, { k: cap }).catch(() => null);
+
+    return { ok: true, content: formatSearchResult(hits, semantic) };
+  }
+
+  /** Verwandte Notizen aus vault-rags Index. Nutzt denselben Pfad-Guard wie read_note —
+   *  ein ungueltiger Pfad wird oben in run() zu einem Fehler-Result. */
+  private async relatedNotes(path: string): Promise<ToolOutcome> {
+    const api = this.opts.retrieval?.() ?? null;
+    if (api === null) {
+      return { ok: false, error: 'Semantischer Index nicht verfügbar — das Plugin "Vault Retrieval" ist nicht aktiv.' };
+    }
+    const norm = resolveNotePath(path);
+    const r = await api.related(norm).catch(() => null);
+    if (r === null) return { ok: false, error: "Semantischer Index nicht verfügbar — Abfrage fehlgeschlagen." };
+    return { ok: true, content: formatRelatedResult(r, norm) };
   }
 
   private async read(path: string): Promise<ToolOutcome> {
