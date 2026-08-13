@@ -3,8 +3,14 @@ import { clampInt } from "../vendor/kit/num";
 import { migrateEndpointList, type EndpointConfig } from "../vendor/kit/endpoint_config";
 
 /** Obergrenze für `maxRounds` — einzige Quelle, gegen die sowohl `mergeKodaSettings`
- *  klemmt als auch der Settings-Slider (`src/obsidian/settings.ts`) seine Limits setzt. */
-export const MAX_ROUNDS_LIMIT = 16;
+ *  klemmt als auch der Settings-Slider (`src/obsidian/settings.ts`) seine Limits setzt.
+ *
+ *  Die Zahl begrenzt die Bedienbarkeit des Sliders, nicht die Sicherheit: das Runden-Limit
+ *  existiert gegen die Endlosschleife, und dagegen ist 50 so wirksam wie 16. Bis 0.3.0 stand
+ *  hier 16 — ein Wert, der mit dem Settings-Tab entstand und nie inhaltlich begründet wurde;
+ *  er kappte von Hand gesetzte Wünsche (25) beim Laden still weg. Wer ihn erneut verschiebt,
+ *  wiegt Slider-Ergonomie gegen Laufzeit ab, nicht Risiko. */
+export const MAX_ROUNDS_LIMIT = 50;
 
 /** Spanne für `timeoutSec` — der Idle-Timeout des Chat-Clients (Stille seit dem letzten
  *  Byte, NICHT Gesamtdauer der Antwort; siehe `KodaChatClient`). Untergrenze so hoch,
@@ -15,10 +21,17 @@ export const TIMEOUT_SEC_STEP = 30;
 
 /** Spanne für `skillBudgetChars` — wie viele Zeichen Skill-Body höchstens in den
  *  System-Prompt wandern. Bewusst eine Einstellung und keine Konstante: die Grenze soll
- *  sichtbar sein, weil sie stillschweigend Verhalten weglässt. */
+ *  sichtbar sein, weil sie stillschweigend Verhalten weglässt.
+ *
+ *  Das Budget wird SUMMIERT über alle geladenen Skills verbraucht (`selectSkills`), nicht
+ *  je Skill — eine gewachsene Sammlung sprengt die alte Obergrenze 20000 deshalb schnell,
+ *  und zwar lautlos: wer nicht mehr hineinpasst, steht nur noch mit seiner `description`
+ *  im Prompt. Die Obergrenze bemisst sich am Kontextfenster des Endpunkts; 100000 Zeichen
+ *  sind grob 25000–29000 Token und damit auch bei einem 128K-Fenster noch vertretbar.
+ *  Der Step wächst mit: 500er-Schritte über diese Spanne wären 200 Slider-Rasten. */
 export const SKILL_BUDGET_MIN = 1000;
-export const SKILL_BUDGET_MAX = 20000;
-export const SKILL_BUDGET_STEP = 500;
+export const SKILL_BUDGET_MAX = 100000;
+export const SKILL_BUDGET_STEP = 1000;
 
 export interface KodaSettings {
   endpoints: EndpointConfig[];
