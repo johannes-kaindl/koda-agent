@@ -1,5 +1,15 @@
 # Seed: Stufe 2 — Skill-System, Compaction, Aufräum-Assistent
 
+> **Nachtrag 2026-08-13:** Baustein A (Skill-System) ist erledigt, ebenso — außer der
+> Reihe — die **Retrieval-Andockung an vault-rag** (eigene Spec und eigener Plan unter
+> `docs/superpowers/`, Auslöser waren TaskNotes aus dem Arbeitsvault). Lücke 2 unten
+> (`isContextOverflow` fehlt) und Lücke 3 (Runden-Datenmodell) sind **weiterhin offen**
+> und bleiben die Voraussetzung für Baustein B (Compaction). Neu dazugekommen und noch
+> ungeschnitten: ein Schalter für Werkzeuge analog zum Skill-Schalter — Anlass ist, dass
+> die Werkzeugzahl bei lokalen Modellen ein Zuverlässigkeitsfaktor ist und mit jeder
+> Plugin-Andockung wächst. Personas/Tool-Profile gehören ausdrücklich **nicht** hierher,
+> sondern zu vault-crews (`../AGENTS.md` § „Zuständigkeits-Zuschnitt").
+
 Stand: 2026-08-07, nach dem Store-Release von 0.1.0. Der vorherige Seed (Nach-Smoke der
 QoL-Features + `gui-smoke-setup`) ist **vollständig abgearbeitet**, ebenso
 `plugin-release-setup` und die Store-Einreichung. Das Plugin ist im Community-Store

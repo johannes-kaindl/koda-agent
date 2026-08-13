@@ -7,7 +7,7 @@ configure (a local server such as [LM Studio](https://lmstudio.ai), or a hosted
 provider if you add an API key) and keeps its own memory in a plain Markdown note you
 can read and edit yourself.
 
-*Status: MVP, 0.1.0 — listed in the Obsidian Community Plugin store, no signed builds.
+*Status: 0.2.1 — listed in the Obsidian Community Plugin store, no signed builds.
 See `CLAUDE.md` for the current scope and design decisions.*
 
 ## Features (MVP)
@@ -17,7 +17,17 @@ See `CLAUDE.md` for the current scope and design decisions.*
   answer in place.
 - **Five tools:** `search_notes`, `read_note`, `write_note`, `save_memory`,
   `write_skill` — the model calls these itself while answering, with each step
-  shown inline in the chat.
+  shown inline in the chat. A sixth, `related_notes`, appears when semantic
+  retrieval is available (see below).
+- **Semantic retrieval, if you already have it** *(optional)* — if the
+  [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) plugin is installed
+  and has indexed your vault, Koda uses its embedding index: `search_notes` adds
+  meaning-based matches when the literal search comes up thin (fewer than three hits),
+  and a `related_notes` tool answers "what else is about this?" straight from the
+  index — offline, no endpoint required. Literal and semantic hits are shown as
+  **separate, labelled blocks**, never merged into one ranking: a literal hit proves a
+  wording exists, a semantic one does not. Without that plugin Koda behaves exactly as
+  before — nothing to configure, and no dead tool in the prompt.
 - **A durable, transparent memory** — `save_memory` appends dated lines to
   `<Koda folder>/Memory.md`, which is also fed back into the system prompt on every
   question. Nothing is stored anywhere you can't open and edit.
@@ -106,11 +116,11 @@ npm run lab:tools  # scripted tool-calling probe against a live endpoint (see do
 
 ### Structure
 
-- `src/core/` — pure logic: agent loop, tool policy, memory, sessions, diff (no
-  Obsidian imports; enforced by `check:pure`).
+- `src/core/` — pure logic: agent loop, tool policy, memory, sessions, diff,
+  retrieval merging (no Obsidian imports; enforced by `check:pure`).
 - `src/llm/` — `KodaChatClient` + `XhrSseTransport` (streaming chat client).
 - `src/obsidian/` — the view, vault-facing tool adapter, write-confirmation modal,
-  settings tab.
+  settings tab, and the defensive lookup of Vault Retrieval's plugin API.
 - `src/vendor/kit` + `src/vendor/kit-obsidian/` — a verbatim snapshot of
   `../obsidian-kit` (endpoint config, i18n, reasoning/think-splitter, confirm modal,
   folder suggest, …), re-vendored via `tools/sync-kit.sh`. Never hand-edit these files.

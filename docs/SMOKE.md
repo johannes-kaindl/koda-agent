@@ -16,6 +16,25 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
 12. Koda einen Skill schreiben lassen → Modal zeigt `Künftig:` plus vollständigen Inhalt; Ablehnung schreibt nichts.
 13. Eine Antwort in der Sidebar mit der Maus markieren → Text lässt sich auswählen und mit Cmd+C kopieren.
 
+### Semantisches Retrieval (nur mit aktivem „Vault Retrieval")
+
+14. Frage mit einem Begriff, der **nicht wörtlich** im Vault steht, aber inhaltlich passt
+    (dünner Volltext) → Antwort enthält zwei beschriftete Blöcke: „Volltext (wörtlich
+    gefunden)" und „Inhaltlich ähnlich (semantisch/Index, 0–1)". Kein gemischtes Ranking.
+15. Frage mit einem Begriff, der **klar wörtlich** trifft (≥3 Treffer) → **kein**
+    semantischer Block, und im Chat ist kein zusätzlicher Werkzeug-Schritt zu sehen. Das
+    ist der Beleg, dass die Schwelle greift und nicht jede Suche einen Embedding-Aufruf kostet.
+16. „Was hängt mit [[bekannte Notiz]] zusammen?" → ⚙ `related_notes`, Liste mit Score.
+    Gegenprobe: dieselbe Frage zu einer **frisch angelegten** Notiz → Klartext „(noch)
+    nicht im Index", kein Fehler.
+17. Embedding-Endpunkt stoppen (Ollama beenden), dann Punkt 14 wiederholen → Volltext-Treffer
+    plus die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)". **Nicht** stilles
+    Schweigen — das ist der Kern von Spec E6.
+18. **Gegenprobe ohne vault-rag:** „Vault Retrieval" in den Community-Plugins deaktivieren,
+    Koda neu fragen → Suche verhält sich wie vor 0.3.0 (eine Liste, keine Beschriftung, keine
+    Meldung), und `related_notes` taucht in keinem Werkzeug-Schritt mehr auf. Belegt, dass die
+    Kopplung weich ist — der Fall, den jeder Store-Nutzer ohne vault-rag hat.
+
 ## Automatisierter Teil: `npm run smoke:gui`
 
 Sechs dieser Punkte fahren seit 2026-08-07 selbst (`scripts/gui-smoke.ts`, CDP gegen ein
@@ -34,7 +53,7 @@ friert den Renderer nicht ein · toter Endpunkt wird als nicht erreichbar angeze
 tote Endpunkte ergeben Klartext statt Stacktrace · Wikilink in der Antwort öffnet die Notiz.
 
 **Was der Treiber bewusst nicht prüft:** alles, was eine echte Modell-Antwort braucht (die
-Punkte 2, 3, 5, 6, 7, 10 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
+Punkte 2, 3, 5, 6, 7, 10, 14–18 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
 großen Vault **>90 s stumm**, bevor das erste Token kommt — Prüfpunkte darauf wären langsam
 und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (Punkt 5):
 `VaultTools` wird in `ask()` lokal erzeugt und ist am Plugin nicht exponiert.

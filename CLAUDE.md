@@ -2,16 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.1.0 im Community-Store (main, Stand 2026-08-07)
+## Status: 0.2.1 im Community-Store (main, Stand 2026-08-13)
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
-Chat-Sidebar + Vault-Tools + Markdown-Memory. **0.1.0 ist im Community-Store gelistet**
+Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
 (Gate-Scan „passed" beim ersten Anlauf) und über ihn installierbar. Stufe 1 steht:
-Agent-Loop, vier Tools (`search_notes`/`read_note`/`write_note`/`save_memory`),
+Agent-Loop, fünf Tools (`search_notes`/`read_note`/`write_note`/`save_memory`/
+`write_skill`) plus ein optionales sechstes (`related_notes`, nur mit vault-rag),
 Schreibregel mit Bestätigungs-Modal, Memory-Notiz, Sessions als JSONL, Settings-Tab,
 i18n DE/EN, dazu die QoL-Schicht (Verbindungstest, Modell-Auswahl, Failover, Presets)
 und ein automatisierter GUI-Smoke (`scripts/gui-smoke.ts`, CDP gegen ein laufendes
-Obsidian). Gate ist grün (160/160), `main.js` baut. Details zu
+Obsidian). Gate ist grün (198/198), `main.js` baut. Details zu
 Nutzung/Setup: `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`.
 Spezifiziert in `docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md` — dort
 stehen die Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Ordner
@@ -44,12 +45,33 @@ Release-Infra über Skill `plugin-release-setup`, Test-Setup über Skill
 
 1. **Stufe 1 (MVP, implementiert):** Vault-Q&A mit Aktion — Chat-Sidebar, vier Tools
    (`search_notes`/`read_note`/`write_note`/`save_memory`), Memory-Notiz,
-   Sessions als JSONL.
+   Sessions als JSONL. Später ergänzt: `write_skill` (Stufe 2) und `related_notes`
+   (optional, nur mit vault-rag).
 2. **Stufe 2:** Markdown-Skill-System (inkl. Selbst-Autorschaft mit
    Bestätigung), Compaction, Aufräum-Assistent.
-3. **Stufe 3:** Synthese-Workflows, MCP-Anbindung (vault-rag als Tool), Voice
+3. **Stufe 3:** Synthese-Workflows, Voice
    (STT/TTS gehört zu Koda, NICHT zu vault-rag), optional OpenClaw-Gateway.
+   *(Die vault-rag-Anbindung ist seit 2026-08-13 erledigt — über dessen Plugin-API
+   statt über MCP, siehe unten.)*
 4. **Nie:** Full System Access / Terminal-Ausführung (Store + Sicherheit).
+
+## Retrieval-Andockung an vault-rag (2026-08-13)
+
+Koda nutzt vault-rags Embedding-Index über dessen **Plugin-API**
+(`app.plugins.plugins["vault-retrieval"]?.api`, `apiVersion: 1`) — nicht über MCP
+(Koda ist `isDesktopOnly: false`; ein HTTP-Server steht auf Mobile nicht bereit) und
+nicht durch Selbstlesen von `_vaultrag/index.bin` (zwei Kopien, eine veraltet).
+`search_notes` fragt semantisch nur nach, wenn der Volltext **weniger als drei**
+Treffer liefert; Ergebnisse werden **beschriftet statt gemischt**, weil die Scores
+nicht vergleichbar sind. Die Kopplung ist weich: fehlt vault-rag, verhält sich Koda
+wie vorher und `related_notes` erscheint nicht im Prompt.
+
+Spec: `docs/superpowers/specs/2026-08-13-koda-retrieval-andockung-design.md`,
+Plan: `docs/superpowers/plans/2026-08-13-koda-retrieval-andockung.md`.
+Verbindlich vorgelagert ist der **Zuständigkeits-Zuschnitt** im Dach
+(`../AGENTS.md` § „Zuständigkeits-Zuschnitt"): Fähigkeiten wandern zur Quelle —
+Koda baut kein eigenes Retrieval, keine Aufgabenverwaltung und kein Persona-/
+Ablauf-System (das ist vault-crews).
 
 ## Wiederverwendung (Kit-first-Anker aus REGISTRY.md)
 
@@ -94,6 +116,9 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   Tool-Policy/-Defs, Memory, Sessions, Diff.
 - `src/core/skills/` — Skill-Parser, Budget-Auswahl, Pfad-Bau (obsidian-frei wie der
   Rest von `core/`).
+- `src/core/tools/retrieval.ts` — Zusammenführung von Volltext- und Index-Treffern,
+  Schwellenlogik, Ausfall-Meldungen (pure). Gegenstück: `src/obsidian/retrieval.ts`
+  liest vault-rags API defensiv aus `app.plugins`.
 - `src/llm/` — `KodaChatClient` + `XhrSseTransport` (Streaming-Chat-Client).
 - `src/obsidian/` — View, Vault-Tools-Adapter, Bestätigungs-Modal, Settings-Tab.
 - `src/vendor/kit` + `src/vendor/kit-obsidian/` — verbatim vendorter `../obsidian-kit`
