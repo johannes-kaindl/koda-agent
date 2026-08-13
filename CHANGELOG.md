@@ -6,7 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.3.0] — 2026-08-13
+### Changed
+
+- **The round and skill-budget limits now fit real collections.** `maxRounds` can be set up
+  to 50 (was 16) and `skillBudgetChars` up to 100,000 (was 20,000). Neither number ever
+  protected anything: they were the settings sliders' upper ends, written when the settings
+  tab was built and never justified. Against the runaway loop the round limit exists for, 50
+  works as well as 16 did. In practice they cut values down in silence — a `data.json` asking
+  for 25 rounds and an 80,000-character budget quietly ran on 16 and 20,000.
+- The skill budget is spent **across all loaded skills together**, not per skill. A grown
+  collection therefore outruns a small budget quickly, and does so quietly: whatever no longer
+  fits appears in the prompt with its description only. Worth knowing when picking a value.
+
+### Fixed
+
+- **`not-indexed` is no longer reported as if it were temporary when it is permanent.** A note
+  whose body is empty — nothing outside the frontmatter — produces no chunks and will never be
+  indexed. Koda now checks the note itself and says so, instead of pointing at a wait that
+  never ends. This hits Koda's own writes first: a fresh `write_skill` note is frontmatter only,
+  and so is `Memory.md` before its first entry.
+- An empty note is now reported as empty **conditionally** rather than as a final verdict, since
+  the check approximates the indexer's rule rather than reproducing it.
 
 ## [0.3.0] — 2026-08-13
 
