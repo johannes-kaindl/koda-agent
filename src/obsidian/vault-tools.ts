@@ -5,7 +5,7 @@ import { appendMemoryLine } from "../core/memory/memory";
 import { serializeFrontmatter } from "../vendor/kit/frontmatter";
 import { sanitizeSkillName, skillPath } from "../core/skills/path";
 import {
-  needsSemantic, formatSearchResult, formatRelatedResult,
+  needsSemantic, formatSearchResult, formatRelatedResult, hasIndexableText,
   type RetrievalApi, type TextHit,
 } from "../core/tools/retrieval";
 
@@ -102,7 +102,16 @@ export class VaultTools implements ToolRunner {
     const norm = resolveNotePath(path);
     const r = await api.related(norm).catch(() => null);
     if (r === null) return { ok: false, error: "Semantischer Index nicht verfügbar — Abfrage fehlgeschlagen." };
-    return { ok: true, content: formatRelatedResult(r, norm) };
+
+    // Nur im not-indexed-Fall lesen: sonst kostet jede related-Abfrage einen Dateizugriff
+    // fuer eine Auskunft, die niemand braucht. `null` heisst „nicht lesbar" — dann bleibt
+    // die Meldung unbestimmt, statt eine Ursache zu behaupten.
+    let hasText: boolean | null = null;
+    if (!r.ok && r.reason === "not-indexed") {
+      const raw = await this.vault.read(norm).catch(() => null);
+      hasText = raw === null ? null : hasIndexableText(raw);
+    }
+    return { ok: true, content: formatRelatedResult(r, norm, hasText) };
   }
 
   private async read(path: string): Promise<ToolOutcome> {

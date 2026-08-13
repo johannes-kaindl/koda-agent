@@ -127,3 +127,40 @@ describe("related_notes", () => {
     expect(r.ok && r.content).toContain("nicht im Index");
   });
 });
+
+describe("related_notes — not-indexed ist nicht immer voruebergehend", () => {
+  const notIndexed = api({ related: async () => ({ ok: false, reason: "not-indexed", path: "a.md" }) });
+
+  it("raet bei einer Notiz aus reinem Frontmatter vom Wiederholen AB", async () => {
+    const t = new VaultTools(
+      vault({ "a.md": "---\ndescription: x\n---\n" }), async () => true, opts(() => notIndexed),
+    );
+    const r = await t.run("related_notes", { path: "a.md" });
+    expect(r.ok && r.content).toContain("keinen indexierbaren Inhalt");
+    expect(r.ok && r.content).toContain("Nicht erneut versuchen");
+  });
+
+  it("raet bei einer Notiz mit Text ZUM Wiederholen", async () => {
+    const t = new VaultTools(
+      vault({ "a.md": "---\ndescription: x\n---\nEin echter Satz." }), async () => true, opts(() => notIndexed),
+    );
+    const r = await t.run("related_notes", { path: "a.md" });
+    expect(r.ok && r.content).toContain("Gleich noch einmal versuchen");
+  });
+
+  it("bleibt unbestimmt, wenn die Notiz nicht lesbar ist", async () => {
+    const t = new VaultTools(vault({}), async () => true, opts(() => notIndexed));
+    const r = await t.run("related_notes", { path: "a.md" });
+    expect(r.ok && r.content).toContain("nicht im Index");
+    expect(r.ok && r.content).not.toContain("Nicht erneut versuchen");
+  });
+
+  it("liest die Notiz NICHT, wenn die Abfrage normal gelingt", async () => {
+    let reads = 0;
+    const v = vault({ "a.md": "x" });
+    const counting = { ...v, read: async (p: string) => { reads++; return v.read(p); } };
+    const t = new VaultTools(counting, async () => true, opts(() => api()));
+    await t.run("related_notes", { path: "a.md" });
+    expect(reads).toBe(0);
+  });
+});

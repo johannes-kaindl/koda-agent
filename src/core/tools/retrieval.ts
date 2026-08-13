@@ -4,6 +4,8 @@
 // steigt dort `apiVersion` — `readRetrievalApi` (src/obsidian/retrieval.ts) prueft sie
 // und liefert lieber `null` als zu raten.
 
+import { parseFrontmatter } from "../../vendor/kit/frontmatter";
+
 export interface ApiHit {
   path: string;
   /** Roher Cosinus-Wert, ungerundet — gerundet wird erst bei der Anzeige. */
@@ -94,7 +96,24 @@ export function formatSearchResult(text: TextHit[], semantic: ApiResult | null):
   return blocks.join("\n");
 }
 
-export function formatRelatedResult(r: ApiResult, path: string): string {
+/** Hat die Notiz ueberhaupt Text, den ein Index erfassen koennte — also etwas ausser
+ *  Frontmatter? Notizen ohne solchen Text landen **nie** im Index (vault-rag erzeugt
+ *  fuer sie null Chunks), `not-indexed` ist dort also endgueltig statt voruebergehend.
+ *  Das trifft ausgerechnet Kodas eigene Schreibfaelle: eine frische `write_skill`-Notiz
+ *  besteht anfangs nur aus Frontmatter, `Memory.md` vor dem ersten Eintrag auch.
+ *
+ *  Bewusst eine eigene Pruefung statt eines zusaetzlichen API-Grundes: die Frage laesst
+ *  sich hier billig beantworten, und die fremde Vertragsflaeche schmal zu halten ist mehr
+ *  wert. Der Preis ist, dass diese Heuristik vault-rags Chunk-Regel nur annaehert —
+ *  deshalb formuliert die Meldung unten eine Feststellung ueber den INHALT, keine
+ *  Vorhersage ueber den Index. */
+export function hasIndexableText(raw: string): boolean {
+  return parseFrontmatter(raw).body.trim() !== "";
+}
+
+/** `hasText`: `true`/`false` aus `hasIndexableText`, `null` wenn die Notiz nicht gelesen
+ *  werden konnte — dann bleibt die Meldung bewusst unbestimmt statt falsch zuversichtlich. */
+export function formatRelatedResult(r: ApiResult, path: string, hasText: boolean | null = null): string {
   if (!r.ok) {
     switch (r.reason) {
       case "no-index":
@@ -102,7 +121,13 @@ export function formatRelatedResult(r: ApiResult, path: string): string {
       case "offline":
         return "Semantischer Index: Endpunkt nicht erreichbar.";
       case "not-indexed":
-        return `"${r.path}" ist (noch) nicht im Index — verwandte Notizen lassen sich dafür nicht bestimmen.`;
+        if (hasText === false) {
+          return `"${r.path}" hat keinen indexierbaren Inhalt (nur Frontmatter oder leer) und wird deshalb auch später nicht im Index erscheinen. Nicht erneut versuchen — erst Inhalt schreiben.`;
+        }
+        if (hasText === true) {
+          return `"${r.path}" ist noch nicht im Index — der Indexer zieht kurz nach dem Speichern nach. Gleich noch einmal versuchen.`;
+        }
+        return `"${r.path}" ist nicht im Index — verwandte Notizen lassen sich dafür nicht bestimmen.`;
     }
   }
   if (r.hits.length === 0) return `Zu ${path} wurde nichts inhaltlich Verwandtes gefunden.`;

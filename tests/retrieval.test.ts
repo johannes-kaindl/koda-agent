@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  needsSemantic, SEMANTIC_THRESHOLD, formatSearchResult, formatRelatedResult,
+  needsSemantic, SEMANTIC_THRESHOLD, formatSearchResult, formatRelatedResult, hasIndexableText,
 } from "../src/core/tools/retrieval";
 
 describe("Schwelle", () => {
@@ -74,5 +74,51 @@ describe("formatRelatedResult", () => {
 
   it("sagt bei leerer Trefferliste, dass nichts Verwandtes gefunden wurde", () => {
     expect(formatRelatedResult({ ok: true, hits: [] }, "a.md")).toContain("nichts");
+  });
+});
+
+describe("formatRelatedResult — not-indexed unterscheiden", () => {
+  const notIndexed = { ok: false, reason: "not-indexed", path: "a.md" } as const;
+
+  it("sagt bei vorhandenem Text, dass der Index noch nachzieht", () => {
+    const out = formatRelatedResult(notIndexed, "a.md", true);
+    expect(out).toContain("noch nicht");
+    expect(out).not.toContain("keinen indexierbaren");
+  });
+
+  it("sagt bei leerer Notiz, dass es NIE passieren wird — kein Warten auf nichts", () => {
+    const out = formatRelatedResult(notIndexed, "a.md", false);
+    expect(out).toContain("keinen indexierbaren");
+    expect(out).not.toContain("noch nicht");
+  });
+
+  it("bleibt vorsichtig, wenn der Inhalt unbekannt ist", () => {
+    const out = formatRelatedResult(notIndexed, "a.md", null);
+    expect(out).toContain("nicht im Index");
+  });
+
+  it("ignoriert das Textwissen bei jedem anderen Ergebnis", () => {
+    expect(formatRelatedResult({ ok: true, hits: [] }, "a.md", false)).toContain("nichts");
+    expect(formatRelatedResult({ ok: false, reason: "no-index" }, "a.md", false))
+      .toContain("kein Index vorhanden");
+  });
+});
+
+describe("hasIndexableText", () => {
+  it("erkennt eine Notiz aus reinem Frontmatter als leer", () => {
+    expect(hasIndexableText("---\ndescription: x\nenabled: true\n---\n")).toBe(false);
+  });
+
+  it("erkennt eine voellig leere Datei als leer", () => {
+    expect(hasIndexableText("")).toBe(false);
+    expect(hasIndexableText("   \n\n  ")).toBe(false);
+  });
+
+  it("erkennt Text unterhalb des Frontmatters", () => {
+    expect(hasIndexableText("---\ndescription: x\n---\nEin Satz.")).toBe(true);
+  });
+
+  it("erkennt eine Notiz ohne Frontmatter mit Text", () => {
+    expect(hasIndexableText("Nur Fliesstext.")).toBe(true);
   });
 });
