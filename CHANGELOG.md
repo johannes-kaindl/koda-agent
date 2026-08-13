@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-13
+
 ### Changed
 
 - **The round and skill-budget limits now fit real collections.** `maxRounds` can be set up
