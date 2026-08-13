@@ -61,32 +61,51 @@ Live-Indexer. Ein Index, eine Wahrheit.
 
 ### E2 — API-Oberfläche v1
 
-```ts
-getRetrievalApi(version: 1): RetrievalApiV1 | null
+**Diese Form ist nicht mehr Entwurf, sondern gemessener Stand.** Die vault-rag-Seite
+wurde am 2026-08-13 gebaut (`vault-rag/src/plugin_api.ts` + 18 Tests, Gate 877/877
+grün, dazu ein GUI-Smoke-Prüfpunkt, der die API per CDP am echten Plugin-Objekt
+abfragt). Der Abschnitt beschreibt sie, statt ihr etwas vorzuschreiben — wer hier
+etwas ändern will, ändert erst den Code drüben.
 
-interface RetrievalApiV1 {
-  readonly version: 1;
-  search(query: string, opts?: { k?: number; minSim?: number }): Promise<SearchOutcome>;
-  related(path: string, opts?: { k?: number; minSim?: number }): Promise<RelatedOutcome>;
+```ts
+// Zugriff: app.plugins.plugins["vault-retrieval"]?.api — ein FELD, keine Fabrikfunktion
+interface VaultRetrievalApi {
+  readonly apiVersion: number;
+  status(): { apiVersion: number; indexed: boolean; noteCount: number };
+  search(query: string, opts?: { k?: number; minSim?: number }): Promise<ApiResult>;
+  related(path: string, opts?: { k?: number; minSim?: number }): Promise<ApiResult>;
 }
 
-type Hit = { path: string; score: number };
-type SearchOutcome  = { kind: "hits"; hits: Hit[] } | { kind: "no-index" } | { kind: "offline" };
-type RelatedOutcome = { kind: "hits"; hits: Hit[] } | { kind: "no-index" } | { kind: "not-indexed"; path: string };
+type ApiHit = { path: string; score: number };
+type ApiResult =
+  | { ok: true;  hits: ApiHit[] }
+  | { ok: false; reason: "no-index" }
+  | { ok: false; reason: "offline" }
+  | { ok: false; reason: "not-indexed"; path: string };
 ```
 
-Drei bewusste Festlegungen:
+Drei Abweichungen vom ursprünglichen Entwurf, alle zugunsten der gebauten Form
+(Lesson „Bewährtem Fremdcode folgen": Abweichung ist begründungspflichtig, nicht
+Übernahme):
 
-1. **Eigene, entkoppelte Typen** statt Re-Export der internen Facade-Typen. Sonst
-   friert jede interne Umbenennung die öffentliche API ein.
-2. **`related` ist `async`**, obwohl die Facade es synchron beantwortet. Ein
-   späterer Lazy-Load des Index wäre sonst ein Breaking Change.
-3. **`readNote` bleibt draußen.** Koda hat ein eigenes `read_note` mit eigener
-   Pfad- und Schreibzonen-Policy; zwei Lesewege wären genau die Doppelung, die der
-   Zuschnitt ausschließt.
+1. **Feld `api` statt `getRetrievalApi(version)`.** Der Entwurf wollte die Version als
+   Parameter, um später mehrere Fassungen parallel bedienen zu können — YAGNI. Ein
+   Feld mit `apiVersion` zum Auslesen genügt, und der Konsument prüft statt zu fordern.
+2. **`{ok, reason}` statt `{kind}`.** Begründung im Code: ein Fremdplugin kann die
+   internen Unions nicht importieren, also muss der Diskriminator zur *Laufzeit*
+   lesbar sein. `ok` ist anfassbar, `kind` wäre nur eine Zeichenkette unter anderen.
+3. **`status()` kam hinzu** — synchron und netzfrei. Der Entwurf hatte dafür nichts;
+   die Funktion beantwortet aber genau die Frage aus E3 („kann ich Retrieval
+   überhaupt anbieten?"), ohne einen Endpunkt anzufassen.
 
-Die Versionsnummer ist die Sollbruchstelle: ändert sich der Vertrag, steigt sie,
-und ein nicht passender Konsument bekommt `null` statt eines Laufzeitfehlers.
+Unverändert gültig: `readNote` bleibt draußen (Koda hat sein eigenes mit eigener
+Policy), `related` ist nach außen `async` (hält einen späteren Lazy-Load offen), und
+die Rückgabetypen sind eigene statt re-exportierter Facade-Typen.
+
+Ein Detail, das Koda **nicht** umgehen kann und soll: Die API filtert `opts` auf
+`k`/`minSim`. Ein durchgereichtes `exclude` erreicht den Retriever nicht — die
+Ausschlussliste ist eine Nutzergrenze aus vault-rags Einstellungen, kein Tuning-
+Parameter des Aufrufers. Das ist drüben getestet und bestätigt E4b.
 
 ### E3 — Koda erkennt zur Laufzeit, nicht beim Laden
 
@@ -96,8 +115,20 @@ oder deaktiviert werden. Der Aufruf ist ein Objektzugriff, die Kosten sind
 vernachlässigbar.
 
 `TOOL_DEFS` wird von einer Konstante zu einer Funktion. `related` erscheint nur im
-System-Prompt, wenn die API vorhanden ist — Nutzer ohne vault-rag sehen kein totes
-Werkzeug. Das ist die Umsetzung von „keine harte Kopplung" aus dem Zuschnitt: Koda
+System-Prompt, wenn `api.status().indexed === true` — also nicht schon dann, wenn
+vault-rag installiert ist, sondern erst, wenn tatsächlich ein Index existiert. Genau
+dafür ist `status()` synchron und netzfrei: die Prüfung fällt beim Prompt-Bau an, wo
+kein Netzaufruf vertretbar wäre. Nutzer ohne vault-rag oder ohne Index sehen kein
+totes Werkzeug.
+
+**`indexed: true` ist keine Zusage, dass `search` funktioniert.** `status()` macht
+bewusst keinen Netzaufruf und kann deshalb nichts über die Erreichbarkeit des
+Embedding-Endpunkts sagen (bestätigt von der vault-rag-Seite, 2026-08-13). Die beiden
+Prüfungen beantworten verschiedene Fragen: `indexed` entscheidet **einmal** beim
+Prompt-Bau, ob `related_notes` überhaupt angeboten wird; `{ok:false, reason:"offline"}`
+kann danach **bei jedem einzelnen Aufruf** auftreten, auch mitten in einer Sitzung.
+Deshalb ist E6 kein Randfall, sondern der Normalbetrieb bei schlafendem Endpunkt.
+`related` ist davon nicht betroffen — es rechnet offline aus dem Index. Das ist die Umsetzung von „keine harte Kopplung" aus dem Zuschnitt: Koda
 ist Store-Software und muss allein lauffähig bleiben.
 
 **Die Prüfung passiert an zwei Stellen, und das ist Absicht.** Die Werkzeugliste steht
