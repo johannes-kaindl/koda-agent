@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.2.1 im Community-Store (main, Stand 2026-08-13)
+## Status: 0.4.0 im Community-Store (main, Stand 2026-08-13)
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
@@ -12,7 +12,7 @@ Agent-Loop, fünf Tools (`search_notes`/`read_note`/`write_note`/`save_memory`/
 Schreibregel mit Bestätigungs-Modal, Memory-Notiz, Sessions als JSONL, Settings-Tab,
 i18n DE/EN, dazu die QoL-Schicht (Verbindungstest, Modell-Auswahl, Failover, Presets)
 und ein automatisierter GUI-Smoke (`scripts/gui-smoke.ts`, CDP gegen ein laufendes
-Obsidian). Gate ist grün (198/198), `main.js` baut. Details zu
+Obsidian). Gate ist grün (212/212), `main.js` baut. Details zu
 Nutzung/Setup: `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`.
 Spezifiziert in `docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md` — dort
 stehen die Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Ordner
@@ -105,7 +105,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (160/160).
+- `npm test` — `check-no-abs-paths` + vitest (212/212).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run build` — Typecheck + Production-esbuild (`main.js`).
