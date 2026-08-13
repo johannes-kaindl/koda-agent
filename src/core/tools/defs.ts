@@ -83,3 +83,27 @@ export const TOOL_DEFS: ToolDef[] = [
 export function toWireTools(defs: ToolDef[]): unknown[] {
   return defs.map((d) => ({ type: "function", function: d }));
 }
+
+/** Nur verfuegbar, wenn vault-rag einen Index bereitstellt — deshalb kein Teil von
+ *  TOOL_DEFS. Ein Werkzeug im Prompt, das nicht laufen kann, kostet Kontext und
+ *  provoziert Fehlversuche; bei lokalen Modellen ist die Werkzeugzahl ein
+ *  Zuverlaessigkeitsfaktor (Messgrundlage: docs/LAB.md). */
+const RELATED_DEF: ToolDef = {
+  name: "related_notes",
+  description:
+    "Find notes semantically related to a given note, using the vault's embedding index. Use it to explore the context around a note: it surfaces connections that share no literal wording, which search_notes cannot find.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "Vault-relative path of the note to start from" },
+    },
+    required: ["path"],
+  },
+};
+
+/** Die Werkzeugliste haengt am Zustand der Nachbarplugins und wird deshalb je Gespraech
+ *  gebaut statt als Konstante ausgeliefert. Die Kopie ist Absicht: ein Aufrufer soll
+ *  TOOL_DEFS nicht versehentlich veraendern koennen. */
+export function toolDefs(opts: { related: boolean }): ToolDef[] {
+  return opts.related ? [...TOOL_DEFS, RELATED_DEF] : [...TOOL_DEFS];
+}
