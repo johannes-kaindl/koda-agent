@@ -12,7 +12,7 @@ import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm } from "./core/agent/loop";
 import type { ChatMessage } from "./core/agent/types";
-import { TOOL_DEFS } from "./core/tools/defs";
+import { toolDefs } from "./core/tools/defs";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/memory/memory";
 import { SessionStore } from "./core/memory/session";
@@ -20,6 +20,7 @@ import { parseSkill, type Skill } from "./core/skills/skill";
 import { selectSkills, type Selection } from "./core/skills/select";
 import { DEFAULT_SETTINGS, mergeKodaSettings, type KodaSettings } from "./core/settings-types";
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
+import { readRetrievalApi } from "./obsidian/retrieval";
 import { confirmWrite } from "./obsidian/confirm-write";
 import { KodaView, VIEW_TYPE_KODA } from "./obsidian/view";
 import { KodaSettingsTab } from "./obsidian/settings";
@@ -164,6 +165,13 @@ export default class KodaPlugin extends Plugin {
         content: buildSystemPrompt({ lang, memory, kodaFolder: s.kodaFolder, skills: selection }),
       };
 
+      // Werkzeugliste je Lauf: related_notes gibt es nur, wenn vault-rag einen Index
+      // bereitstellt. `status()` ist synchron und netzfrei — deshalb darf die Pruefung
+      // hier stehen, wo ein Netzaufruf nicht vertretbar waere. Achtung: `indexed` sagt
+      // NICHTS ueber die Erreichbarkeit des Embedding-Endpunkts; ein `search` kann
+      // trotzdem jederzeit `offline` liefern (Spec E3/E6).
+      const defs = toolDefs({ related: readRetrievalApi(this.app)?.status().indexed === true });
+
       // Client pro Lauf: der Idle-Timeout ist eine Einstellung und darf ohne
       // Plugin-Neustart wirken.
       const client = new KodaChatClient(this.transport, s.timeoutSec * 1000);
@@ -179,7 +187,7 @@ export default class KodaPlugin extends Plugin {
                   model: effectiveModel(ep, s.model),
                   suppressThinking: s.suppressThinking,
                 },
-                messages, TOOL_DEFS, onToken, onReasoning, signal,
+                messages, defs, onToken, onReasoning, signal,
               ),
             // Erneut versuchen NUR, wenn der Endpunkt gar nicht geantwortet hat und noch
             // KEIN Token beim Nutzer war: nach einem angefangenen Stream stuende die halbe
@@ -219,6 +227,10 @@ export default class KodaPlugin extends Plugin {
       const tools = new VaultTools(vaultPort, (req) => confirmWrite(this.app, req), {
         kodaFolder: () => this.settings.kodaFolder,
         today: () => new Date().toISOString().slice(0, 10),
+        // Bewusst als Callback, nicht als Wert: zwischen Prompt-Bau und Tool-Aufruf
+        // kann vault-rag deaktiviert worden sein. Der Adapter prueft dann erneut und
+        // meldet Klartext, statt zu werfen.
+        retrieval: () => readRetrievalApi(this.app),
       });
 
       const appended = await runAgent(
