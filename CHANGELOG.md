@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-13
+
+### Added
+
+- **Semantic retrieval through Vault Retrieval's plugin API** *(optional)*. If the
+  [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) plugin (0.23.0 or newer)
+  is installed and has indexed your vault, Koda now uses its embedding index:
+  - `search_notes` adds meaning-based matches when the literal search comes up thin —
+    fewer than three hits. Above that threshold nothing changes and no embedding request is
+    made, so a well-worded search costs exactly what it did before.
+  - Literal and semantic hits are shown as **separate, labelled blocks**, never merged into
+    one ranking. Their scores are not comparable, and a literal hit proves a wording exists
+    while a semantic one does not — Koda can tell the two apart when it answers.
+  - A new `related_notes` tool answers "what else is about this?" straight from the index —
+    offline, no embedding endpoint required, and available on mobile. It only appears when
+    an index actually exists, so it never sits unusable in the prompt.
+  - When the semantic side fails — no index, endpoint unreachable, note not indexed — Koda
+    says so in plain words instead of quietly returning a thinner list.
+
+### Notes
+
+- **Nothing to configure, and nothing to lose.** Without Vault Retrieval, Koda behaves
+  exactly as it did in 0.2.1: one result list, no extra tool, no message about a capability
+  you do not have. The coupling is deliberately soft — the API is looked up fresh on every
+  call, checked for version *and* shape, and its absence is a normal state rather than an error.
+
 ## [0.2.1] — 2026-08-08
 
 ### Fixed
