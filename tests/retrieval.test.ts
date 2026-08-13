@@ -88,7 +88,8 @@ describe("formatRelatedResult — not-indexed unterscheiden", () => {
 
   it("sagt bei leerer Notiz, dass es NIE passieren wird — kein Warten auf nichts", () => {
     const out = formatRelatedResult(notIndexed, "a.md", false);
-    expect(out).toContain("keinen indexierbaren");
+    expect(out).toContain("derzeit keinen indexierbaren");
+    expect(out).toContain("solange das so bleibt");
     expect(out).not.toContain("noch nicht");
   });
 

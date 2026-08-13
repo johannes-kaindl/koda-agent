@@ -136,8 +136,10 @@ describe("related_notes — not-indexed ist nicht immer voruebergehend", () => {
       vault({ "a.md": "---\ndescription: x\n---\n" }), async () => true, opts(() => notIndexed),
     );
     const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok && r.content).toContain("keinen indexierbaren Inhalt");
-    expect(r.ok && r.content).toContain("Nicht erneut versuchen");
+    expect(r.ok && r.content).toContain("derzeit keinen indexierbaren Inhalt");
+    // Bedingt, nicht endgueltig: die Notiz ist nicht dauerhaft ausgeschlossen.
+    expect(r.ok && r.content).toContain("solange das so bleibt");
+    expect(r.ok && r.content).toContain("erst Inhalt schreiben");
   });
 
   it("raet bei einer Notiz mit Text ZUM Wiederholen", async () => {
@@ -152,7 +154,7 @@ describe("related_notes — not-indexed ist nicht immer voruebergehend", () => {
     const t = new VaultTools(vault({}), async () => true, opts(() => notIndexed));
     const r = await t.run("related_notes", { path: "a.md" });
     expect(r.ok && r.content).toContain("nicht im Index");
-    expect(r.ok && r.content).not.toContain("Nicht erneut versuchen");
+    expect(r.ok && r.content).not.toContain("derzeit keinen indexierbaren");
   });
 
   it("liest die Notiz NICHT, wenn die Abfrage normal gelingt", async () => {

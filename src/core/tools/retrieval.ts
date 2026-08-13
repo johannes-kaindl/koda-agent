@@ -122,7 +122,10 @@ export function formatRelatedResult(r: ApiResult, path: string, hasText: boolean
         return "Semantischer Index: Endpunkt nicht erreichbar.";
       case "not-indexed":
         if (hasText === false) {
-          return `"${r.path}" hat keinen indexierbaren Inhalt (nur Frontmatter oder leer) und wird deshalb auch später nicht im Index erscheinen. Nicht erneut versuchen — erst Inhalt schreiben.`;
+          // Bedingt formuliert, nicht endgueltig: die Notiz ist nicht dauerhaft
+          // ausgeschlossen, sie hat nur JETZT nichts zu indexieren. Sobald Text darin
+          // steht, greift der Live-Indexer normal.
+          return `"${r.path}" hat derzeit keinen indexierbaren Inhalt (nur Frontmatter oder leer) — solange das so bleibt, erscheint die Notiz nicht im Index. Ein erneuter Versuch ändert daran nichts; erst Inhalt schreiben, dann greift der Indexer von selbst.`;
         }
         if (hasText === true) {
           return `"${r.path}" ist noch nicht im Index — der Indexer zieht kurz nach dem Speichern nach. Gleich noch einmal versuchen.`;
