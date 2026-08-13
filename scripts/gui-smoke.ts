@@ -345,6 +345,49 @@ async function main(): Promise<void> {
     if (!plugin.ok) throw new Error(`Plugin ${PLUGIN_ID} ist nicht aktiv. Erst deployen.`);
     record("1. Plugin ist aktiv", true, `Version ${plugin.version}`);
 
+    // --- 1b. Retrieval-Andockung an vault-rag -------------------------------
+    // Geprueft wird die NAHT, nicht die Suche: liegt vault-rags Vertrag in der Form vor,
+    // gegen die Koda gebaut ist? Das entscheidet, ob `related_notes` ueberhaupt in die
+    // Werkzeugliste kommt (`status().indexed`) — und es ist der Teil, der ohne eine echte
+    // Modell-Antwort pruefbar ist. Der Aufruf laeuft ueber CDP im Renderer, also exakt auf
+    // dem Weg, den Kodas `readRetrievalApi` nimmt.
+    //
+    // Was dieser Punkt NICHT zeigt: dass Koda die API im Gespraech tatsaechlich benutzt.
+    // Dafuer braeuchte es eine Modell-Antwort (>90 s stumm, nicht deterministisch) — das
+    // bleiben die Handpunkte 14–18 in docs/SMOKE.md. Fehlt vault-rag ganz, ist dieser
+    // Punkt kein Defekt: dann meldet er „nicht installiert" und bleibt gruen, weil die
+    // weiche Kopplung genau das vorsieht.
+    const retrieval = await cdp.evaluate<{
+      installed: boolean; version?: unknown; keys?: string[];
+      indexed?: boolean; noteCount?: number; usable?: boolean;
+    }>(`
+      const rag = app.plugins.plugins["vault-retrieval"];
+      if (!rag || !rag.api) return { installed: false };
+      const api = rag.api;
+      const st = api.status();
+      return {
+        installed: true,
+        version: api.apiVersion,
+        keys: Object.keys(api).sort(),
+        indexed: st.indexed,
+        noteCount: st.noteCount,
+        // Genau die Pruefung aus src/obsidian/retrieval.ts — Version UND Form.
+        usable: api.apiVersion === 1
+          && typeof api.status === "function"
+          && typeof api.search === "function"
+          && typeof api.related === "function",
+      };
+    `);
+    if (!retrieval.installed) {
+      record("1b. Retrieval-Andockung", true, "vault-retrieval nicht installiert — Koda laeuft ohne (weiche Kopplung)");
+    } else {
+      record(
+        "1b. Retrieval-Andockung",
+        retrieval.usable === true && retrieval.indexed === true,
+        `apiVersion ${String(retrieval.version)} · ${retrieval.keys?.join(", ") ?? "?"} · indexed=${String(retrieval.indexed)} · ${String(retrieval.noteCount)} Notizen`,
+      );
+    }
+
     // Vorwerte sichern, bevor irgendetwas veraendert wird.
     previous = await cdp.evaluate<Settings>(`
       const s = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings;

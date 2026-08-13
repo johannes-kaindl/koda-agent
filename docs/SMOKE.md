@@ -48,9 +48,18 @@ npm run build && cp main.js <vault>/.obsidian/plugins/koda-agent/
 npm run smoke:gui -- --vault <vault-name>
 ```
 
-Geprüft werden: Plugin aktiv · Sidebar mit Eingabefeld und Knöpfen · Klick auf „Testen“
-friert den Renderer nicht ein · toter Endpunkt wird als nicht erreichbar angezeigt · zwei
-tote Endpunkte ergeben Klartext statt Stacktrace · Wikilink in der Antwort öffnet die Notiz.
+Geprüft werden: Plugin aktiv · **Retrieval-Andockung** (vault-rags Vertrag liegt in der
+Form vor, gegen die Koda gebaut ist) · Sidebar mit Eingabefeld und Knöpfen · Klick auf
+„Testen“ friert den Renderer nicht ein · toter Endpunkt wird als nicht erreichbar angezeigt ·
+zwei tote Endpunkte ergeben Klartext statt Stacktrace · Wikilink in der Antwort öffnet die Notiz.
+
+Prüfpunkt **1b** verdient eine Einordnung, weil er weniger zeigt, als sein Name nahelegt: Er
+prüft die **Naht**, nicht die Suche — `apiVersion`, die Fläche (`Object.keys`), und
+`status().indexed`. Das ist die Vorbedingung dafür, dass `related_notes` überhaupt in die
+Werkzeugliste kommt, und der Teil, der **ohne** eine echte Modell-Antwort entscheidbar ist.
+Dass Koda die API im Gespräch tatsächlich benutzt, zeigt er nicht — das bleiben die
+Handpunkte 14–18. Ist vault-rag gar nicht installiert, meldet er das und bleibt **grün**:
+die weiche Kopplung sieht genau diesen Fall vor.
 
 **Was der Treiber bewusst nicht prüft:** alles, was eine echte Modell-Antwort braucht (die
 Punkte 2, 3, 5, 6, 7, 10, 14–18 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
@@ -59,6 +68,15 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 `VaultTools` wird in `ask()` lokal erzeugt und ist am Plugin nicht exponiert.
 
 ### Durchläufe
+
+- **2026-08-13** — Obsidian 1.13.7, Vault `10_Pallas`, Plugin **0.2.1-Build der
+  Retrieval-Andockung** (HEAD `7e1fc7e`): **7/7 grün**, inklusive des neuen Prüfpunkts 1b
+  (`apiVersion 1` · Fläche `apiVersion, related, search, status` · `indexed=true` ·
+  5935 Notizen) gegen **vault-rag 0.23.0**.
+  **Gegenprobe gefahren und bestanden:** erwartete API-Version im Treiber auf `2` gesetzt →
+  **6/7, genau 1b rot**. Der Punkt kann also rot werden — anders als Prüfpunkt 3, der seit
+  2026-08-07 unbewiesen ist. Die Handpunkte 14–18 (semantisches Retrieval mit echten
+  Modell-Antworten) sind in diesem Durchlauf **nicht** gelaufen und bleiben offen.
 
 - **2026-08-08** — Obsidian 1.13.6, Vault `10_Pallas`, Plugin **0.2.1** (HEAD `2e37683`):
   **6/6 grün**. Prüfpunkt 1 meldet die Version aus dem laufenden Plugin und belegt damit
