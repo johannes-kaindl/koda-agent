@@ -38,14 +38,25 @@ export interface RetrievalApi {
 /** Ein Volltext-Treffer, wie ihn Kodas eigene Suche erzeugt. */
 export interface TextHit { path: string; snippet: string }
 
-/** Ab wie vielen Volltext-Treffern die semantische Suche nicht mehr noetig ist.
- *  Startwert aus der Spec (E4), kein Messergebnis — bewusst eine Konstante an genau
- *  einer Stelle, damit ein Praxisbefund sie ohne Suche korrigieren kann. */
-export const SEMANTIC_THRESHOLD = 3;
-
-export function needsSemantic(textHitCount: number): boolean {
-  return textHitCount < SEMANTIC_THRESHOLD;
-}
+/* Hier stand bis 2026-08-14 eine Schwelle: semantisch nachfragen nur bei < 3
+ * Volltext-Treffern (Spec E4). Sie ist ersatzlos entfallen, und das absichtlich —
+ * wer sie wieder einfuehren will, sollte zuerst den Messfall kennen:
+ *
+ * Die Frage „Welche Notizen behandeln den Einsatz lokaler KI-Modelle?" fand in einem
+ * Vault mit 1.219 indexierten Notizen genau drei woertliche Treffer (zwei davon aus
+ * dem Archiv) — und wurde damit vom semantischen Weg abgeschnitten. Ungenannt blieb
+ * ein ganzer Bereichsordner, dessen Notizen „Ollama" und „Modell-Benchmark" heissen
+ * und die gesuchte Wortfolge nirgends enthalten. Genau dieser Fall ist der Grund fuer
+ * die Anbindung, und die Schwelle verhinderte ihn.
+ *
+ * Die Schwelle zaehlte Treffer, statt sie zu wiegen — drei schlechte schalteten den
+ * zweiten Weg so zuverlaessig ab wie drei gute. Sie zu WIEGEN waere die naheliegende
+ * Reparatur und ist trotzdem keine: eine Heuristik ueber Trefferguete IST Retrieval,
+ * und Retrieval gehoert vault-rag (Dach-AGENTS, § Zustaendigkeits-Zuschnitt). Bleibt,
+ * beide Wege immer zu gehen. Der Preis ist eine Einbettungs-Anfrage je Suche —
+ * gegen eine Tool-Runde beim lokalen Modell (> 90 s) nicht der Rede wert, und die
+ * Volltextsuche liest ohnehin jede Notiz des Vaults.
+ */
 
 const score = (n: number): string => n.toFixed(2);
 

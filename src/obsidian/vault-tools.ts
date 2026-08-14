@@ -5,7 +5,7 @@ import { appendMemoryLine } from "../core/memory/memory";
 import { serializeFrontmatter } from "../vendor/kit/frontmatter";
 import { sanitizeSkillName, skillPath } from "../core/skills/path";
 import {
-  needsSemantic, formatSearchResult, formatRelatedResult, hasIndexableText,
+  formatSearchResult, formatRelatedResult, hasIndexableText,
   type RetrievalApi, type TextHit,
 } from "../core/tools/retrieval";
 import {
@@ -105,10 +105,11 @@ export class VaultTools implements ToolRunner {
       }
     }
 
-    // Semantik nur, wenn Volltext duenn bleibt (Spec E4): sie kostet je Aufruf eine
-    // Einbettungs-Anfrage. Ein Fehler der Fremd-API darf die Volltextsuche NIE
-    // mitreissen — sie ist der verlaessliche Teil der Antwort.
-    const api = needsSemantic(hits.length) ? this.opts.retrieval?.() ?? null : null;
+    // Immer beide Wege — die fruehere Trefferzahl-Schwelle schnitt genau die Fragen ab,
+    // fuer die es den semantischen Weg gibt (Begruendung in core/tools/retrieval.ts).
+    // Ein Fehler der Fremd-API darf die Volltextsuche NIE mitreissen: sie ist der
+    // verlaessliche Teil der Antwort.
+    const api = this.opts.retrieval?.() ?? null;
     const semantic = api === null ? null : await api.search(query, { k: cap }).catch(() => null);
 
     return { ok: true, content: formatSearchResult(hits, semantic) };
