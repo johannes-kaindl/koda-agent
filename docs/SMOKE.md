@@ -21,9 +21,12 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
 14. Frage mit einem Begriff, der **nicht wörtlich** im Vault steht, aber inhaltlich passt
     (dünner Volltext) → Antwort enthält zwei beschriftete Blöcke: „Volltext (wörtlich
     gefunden)" und „Inhaltlich ähnlich (semantisch/Index, 0–1)". Kein gemischtes Ranking.
-15. Frage mit einem Begriff, der **klar wörtlich** trifft (≥3 Treffer) → **kein**
-    semantischer Block, und im Chat ist kein zusätzlicher Werkzeug-Schritt zu sehen. Das
-    ist der Beleg, dass die Schwelle greift und nicht jede Suche einen Embedding-Aufruf kostet.
+15. Frage mit einem Begriff, der **klar wörtlich** trifft (≥3 Treffer) → **trotzdem** ein
+    semantischer Block. Dieser Punkt hat sich am 2026-08-14 **umgedreht**: Bis dahin verlangte
+    er das Gegenteil (kein Block ab drei Treffern) und belegte damit eine Schwelle, die es
+    nicht mehr gibt — sie schnitt genau die thematischen Fragen ab, für die es den semantischen
+    Weg gibt. Der Punkt belegt jetzt, dass beide Wege immer laufen. Wer hier den alten Wortlaut
+    im Kopf hat, misst gegen einen Stand von vor 0.6.0.
 16. „Was hängt mit [[bekannte Notiz]] zusammen?" → ⚙ `related_notes`, Liste mit Score.
     Gegenprobe: dieselbe Frage zu einer **frisch angelegten** Notiz → Klartext „(noch)
     nicht im Index", kein Fehler.
@@ -76,6 +79,15 @@ echten Vaults vor (z. B. `limits`/`fields` in vault-crews-Teams bzw. Schema-Noti
 `formatFieldValue` rendert sie explizit als `{…}` statt sie als Fehler zu werten. Dass Koda
 `list_notes` im Gespräch tatsächlich benutzt und Kappung benennt, zeigt dieser Punkt nicht —
 das bleibt Handpunkt 19.
+
+**Für die Handpunkte gibt es seit 2026-08-14 einen zweiten Treiber:** `npm run gui:ask --
+--vault <name> --ask "<Frage>"` (`scripts/gui-ask.ts`) stellt Koda im laufenden Obsidian eine
+echte Frage und berichtet, **welche Werkzeuge er wählt** — inklusive der ungekürzten
+Tool-Ergebnisse mit `--full`. Er ersetzt die Handpunkte 14–19 nicht (er urteilt nicht, und
+zwei Läufe derselben Frage können verschieden ausfallen), macht sie aber prüfbar, statt sie
+nur zu behaupten: die Messgröße ist der Tool-Aufruf aus `chatLog`, nicht der Antworttext.
+Bei einer Gegenprobe immer `--full` — ohne das belegt ein Treffer nur, *dass* ein Werkzeug
+lief, nicht dass ein genannter Pfad daher stammt.
 
 **Was der Treiber bewusst nicht prüft:** alles, was eine echte Modell-Antwort braucht (die
 Punkte 2, 3, 5, 6, 7, 10, 14–19 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
