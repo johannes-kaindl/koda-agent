@@ -40,9 +40,9 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
 
 ## Automatisierter Teil: `npm run smoke:gui`
 
-Sechs dieser Punkte fahren seit 2026-08-07 selbst (`scripts/gui-smoke.ts`, CDP gegen ein
-laufendes Obsidian — CORE-TEST-02 b). Voraussetzung ist der eine Handgriff, der Handarbeit
-bleibt:
+Acht dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b und 1c erweitert).
+Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
 
 ```bash
 osascript -e 'quit app "Obsidian"'
