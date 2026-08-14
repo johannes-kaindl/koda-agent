@@ -7,10 +7,16 @@ configure (a local server such as [LM Studio](https://lmstudio.ai), or a hosted
 provider if you add an API key) and keeps its own memory in a plain Markdown note you
 can read and edit yourself.
 
-*Status: 0.2.1 — listed in the Obsidian Community Plugin store, no signed builds.
+*Status: 0.4.0 — listed in the Obsidian Community Plugin store, no signed builds.
 See `CLAUDE.md` for the current scope and design decisions.*
 
-## Features (MVP)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/gitea/v/release/jkaindl/koda-agent?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/koda-agent/releases)
+[![Obsidian](https://img.shields.io/badge/obsidian-1.8.7%2B-purple)](https://obsidian.md)
+
+*Auch auf Deutsch verfügbar: [`README.de.md`](README.de.md).*
+
+## Features
 
 - **Chat sidebar** (ribbon icon + command) with streaming answers, a collapsible
   "thinking" block for reasoning models, and a Stop button that leaves the partial
@@ -38,6 +44,92 @@ See `CLAUDE.md` for the current scope and design decisions.*
   rounds per question, suppress-thinking toggle, text-tool-call fallback for models
   without native tool calling, UI language, and an opt-in "open on startup" toggle
   (off by default).
+
+## Requirements
+
+- **Obsidian 1.8.7** or newer. Desktop and mobile — Koda is not desktop-only.
+- **An OpenAI-compatible chat endpoint** with a **tool-calling-capable model**. That
+  can be a local server ([LM Studio](https://lmstudio.ai), Ollama, …) or a hosted
+  provider if you add an API key. Models without native tool calling can still be used
+  via the text-tool-call fallback, less reliably.
+- *Optional:* the [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag)
+  plugin with an indexed vault, which adds semantic search and the `related_notes`
+  tool. Koda works fully without it.
+
+## Install
+
+Koda is in the Obsidian community plugin store: **Settings → Community plugins →
+Browse → "Koda" → Install → Enable**. Alternatively, drop `main.js`, `manifest.json`
+and `styles.css` from a [release](https://github.com/johannes-kaindl/koda-agent/releases)
+into `<vault>/.obsidian/plugins/koda-agent/`.
+
+## Usage
+
+1. Open the sidebar — ribbon dog icon or the **Open Koda** command.
+2. Ask a question. Koda streams its answer; for reasoning models the "thinking" block
+   sits collapsed above it, and **Stop** ends the stream while keeping what arrived.
+3. **Watch the tools work.** Each `search_notes` / `read_note` / `write_note` call
+   appears inline in the chat as it happens, so you can see which notes an answer is
+   built on rather than taking it on trust.
+4. **Approve writes outside the Koda folder.** A modal shows the new text (create and
+   append) or a line diff (replace) before anything is written — see
+   [The write rule](#the-write-rule).
+5. **New chat** starts a fresh session log. Old sessions are restored after an Obsidian
+   restart; they are plain JSONL in the plugin folder.
+
+Ask Koda to remember something and it appends a dated line to
+`<Koda folder>/Memory.md` — an ordinary note you can open, edit or delete.
+
+## Configuration
+
+First-time setup:
+
+1. Start an OpenAI-compatible LLM server with a tool-calling-capable model (e.g. LM
+   Studio, listening on `http://127.0.0.1:1234` by default).
+2. In Obsidian, enable Koda and open **Settings → Koda**.
+3. Add the endpoint URL (and API key, if it needs one). Set the **Model** field to the
+   model id the server reports, unless the endpoint row already has its own override.
+4. Optionally change the **Koda folder** (default `Koda`) — this is where memory and
+   free writes live.
+5. Open the sidebar via the ribbon dog icon or the **Open Koda** command and ask a
+   question.
+
+The full settings list:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Endpoints | `http://127.0.0.1:1234` | URL, optional API key, optional per-endpoint model override. A priority list — see [Endpoints](#endpoints) |
+| Model | *(empty)* | Model id sent to the endpoint, unless that row overrides it |
+| Koda folder | `Koda` | Where memory, skills and free writes live |
+| Max tool rounds | 8 (1–50) | How many tool calls Koda may chain per question before it has to answer |
+| Request timeout | 300 s (30–900) | Hard limit per model call |
+| Skill budget | 6000 chars (1000–100000) | How much skill text fits into the system prompt |
+| Suppress thinking | on | Hides the reasoning block by default |
+| Text tool-call fallback | off | For models without native tool calling |
+| UI language | auto | Follows Obsidian, or force German/English |
+| Open on startup | off | Opt-in; the sidebar stays closed unless you ask for it |
+
+## How it works
+
+A question starts an **agent loop**: Koda sends your message plus a system prompt to
+the endpoint, and the model may answer directly or call one of its tools. A tool call
+is executed against the vault, its result goes back into the conversation, and the
+model gets another turn — up to **Max tool rounds**, after which it has to answer with
+what it has. This is what keeps a stuck model from looping forever on your vault.
+
+The system prompt is assembled fresh for every question from three sources: Koda's own
+instructions, the contents of `Memory.md`, and the active skills that fit into the
+skill budget. All three are plain Markdown in your vault, so what steers Koda is
+readable and editable — there is no hidden state.
+
+Writes never go straight through. `write_note` is checked against the Koda folder
+first; anything outside it is routed through the confirmation modal, and a rejection is
+reported back to the model as a declined write rather than silently swallowed.
+
+Retrieval degrades rather than breaks: Koda looks up Vault Retrieval's plugin API
+defensively at runtime. If it is there, `search_notes` tops up thin literal results
+with semantic ones (kept in a separate, labelled block) and `related_notes` is
+registered as a sixth tool; if it is not, neither appears in the prompt at all.
 
 ## The write rule
 
@@ -84,25 +176,6 @@ currently in effect is shown at the top of the conversation.
 **Skills always require confirmation**, even inside the Koda folder where Koda can
 otherwise write freely. The reason: a skill isn't a draft — it changes what Koda does
 going forward.
-
-## Install
-
-Koda is in the Obsidian community plugin store: **Settings → Community plugins →
-Browse → "Koda" → Install → Enable**. Alternatively, drop `main.js`, `manifest.json`
-and `styles.css` from a [release](https://github.com/johannes-kaindl/koda-agent/releases)
-into `<vault>/.obsidian/plugins/koda-agent/`.
-
-## Setup
-
-1. Start an OpenAI-compatible LLM server with a tool-calling-capable model (e.g. LM
-   Studio, listening on `http://127.0.0.1:1234` by default).
-2. In Obsidian, enable Koda and open **Settings → Koda**.
-3. Add the endpoint URL (and API key, if it needs one). Set the **Model** field to the
-   model id the server reports, unless the endpoint row already has its own override.
-4. Optionally change the **Koda folder** (default `Koda`) — this is where memory and
-   free writes live.
-5. Open the sidebar via the ribbon dog icon or the **Open Koda** command and ask a
-   question.
 
 ## Development
 
