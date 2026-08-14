@@ -34,6 +34,9 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
     Koda neu fragen → Suche verhält sich wie vor 0.3.0 (eine Liste, keine Beschriftung, keine
     Meldung), und `related_notes` taucht in keinem Werkzeug-Schritt mehr auf. Belegt, dass die
     Kopplung weich ist — der Fall, den jeder Store-Nutzer ohne vault-rag hat.
+19. Koda nach allen Aufgaben eines Ordners fragen → die Antwort muss auf einem `list_notes`-Aufruf
+    beruhen (⚙ list_notes sichtbar), und bei gekappter Liste muss Koda die Unvollständigkeit benennen
+    (`⚠ UNVOLLSTÄNDIG …`), statt sie zu verschweigen.
 
 ## Automatisierter Teil: `npm run smoke:gui`
 
@@ -49,9 +52,11 @@ npm run smoke:gui -- --vault <vault-name>
 ```
 
 Geprüft werden: Plugin aktiv · **Retrieval-Andockung** (vault-rags Vertrag liegt in der
-Form vor, gegen die Koda gebaut ist) · Sidebar mit Eingabefeld und Knöpfen · Klick auf
-„Testen“ friert den Renderer nicht ein · toter Endpunkt wird als nicht erreichbar angezeigt ·
-zwei tote Endpunkte ergeben Klartext statt Stacktrace · Wikilink in der Antwort öffnet die Notiz.
+Form vor, gegen die Koda gebaut ist) · **Frontmatter-Naht** (`metadataCache` liefert
+Frontmatter in der Form, gegen die `pickFields` gebaut ist) · Sidebar mit Eingabefeld und
+Knöpfen · Klick auf „Testen“ friert den Renderer nicht ein · toter Endpunkt wird als nicht
+erreichbar angezeigt · zwei tote Endpunkte ergeben Klartext statt Stacktrace · Wikilink in
+der Antwort öffnet die Notiz.
 
 Prüfpunkt **1b** verdient eine Einordnung, weil er weniger zeigt, als sein Name nahelegt: Er
 prüft die **Naht**, nicht die Suche — `apiVersion`, die Fläche (`Object.keys`), und
@@ -61,13 +66,39 @@ Dass Koda die API im Gespräch tatsächlich benutzt, zeigt er nicht — das blei
 Handpunkte 14–18. Ist vault-rag gar nicht installiert, meldet er das und bleibt **grün**:
 die weiche Kopplung sieht genau diesen Fall vor.
 
+Prüfpunkt **1c** gilt dieselbe Einordnung, mit derselben Begründung wie bei 1b: `VaultTools`
+wird in `main.ts` lokal erzeugt und hängt nicht am Plugin-Objekt, `list_notes` selbst ist dem
+Treiber also nicht erreichbar. Geprüft wird die **Naht darunter**: liefert
+`app.metadataCache.getFileCache(f)?.frontmatter` ein über `fm[feld]` indizierbares Objekt
+(`Record<string, unknown>`), wie `pickFields` (`src/core/tools/list.ts`) es erwartet? Bewusst
+NICHT verlangt wird, dass jeder Feldwert flach ist — verschachtelte Objektwerte kommen in
+echten Vaults vor (z. B. `limits`/`fields` in vault-crews-Teams bzw. Schema-Notizen) und
+`formatFieldValue` rendert sie explizit als `{…}` statt sie als Fehler zu werten. Dass Koda
+`list_notes` im Gespräch tatsächlich benutzt und Kappung benennt, zeigt dieser Punkt nicht —
+das bleibt Handpunkt 19.
+
 **Was der Treiber bewusst nicht prüft:** alles, was eine echte Modell-Antwort braucht (die
-Punkte 2, 3, 5, 6, 7, 10, 14–18 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
+Punkte 2, 3, 5, 6, 7, 10, 14–19 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
 großen Vault **>90 s stumm**, bevor das erste Token kommt — Prüfpunkte darauf wären langsam
 und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (Punkt 5):
 `VaultTools` wird in `ask()` lokal erzeugt und ist am Plugin nicht exponiert.
 
 ### Durchläufe
+
+- **2026-08-14** — Obsidian 1.13.7, Vault `10_Pallas`, Plugin **0.3.0-Build von
+  `feat/list-notes`**: **8/8 grün**, inklusive des neuen Prüfpunkts **1c** (`6210 von 6485
+  Notizen mit Frontmatter · Beispielfelder: title, summary, type, tags, thema`).
+  **Gegenprobe gefahren und bestanden:** `frontmatter` im Prüfpunkt auf `frontmatterXX`
+  verfälscht → **7/8, genau 1c rot** (`0 von 6485 Notizen mit Frontmatter`). Zurückgeändert
+  → wieder 8/8. Nebenbefund: die erste Fassung des Prüfpunkts (wörtlich aus dem Task-Brief
+  übernommen) verlangte zusätzlich, dass jeder Frontmatter-*Wert* flach ist — das war auf
+  diesem Vault dauerhaft rot, weil `10_Pallas` legitime verschachtelte Frontmatter-Werte
+  enthält (`limits`/`fields` in vault-crews-Teams bzw. Schema-Notizen unter
+  `80_Archiv/60_Blueprints/shadowvault-types/`), die `formatFieldValue` (`src/core/tools/list.ts`)
+  bewusst als `{…}` rendert statt als Fehler zu werten. Die Flachheits-Pflicht wurde deshalb
+  aus dem Prüfpunkt entfernt; geprüft wird jetzt nur noch, ob `frontmatter` selbst ein über
+  `fm[feld]` indizierbares Objekt ist — das ist die tatsächliche Form, gegen die `pickFields`
+  gebaut ist. Die Handpunkte 14–19 sind in diesem Durchlauf **nicht** gelaufen und bleiben offen.
 
 - **2026-08-13** — Obsidian 1.13.7, Vault `10_Pallas`, Plugin **0.2.1-Build der
   Retrieval-Andockung** (HEAD `7e1fc7e`): **7/7 grün**, inklusive des neuen Prüfpunkts 1b

@@ -388,6 +388,40 @@ async function main(): Promise<void> {
       );
     }
 
+    // --- 1c. Frontmatter-Naht (Grundlage von list_notes) --------------------
+    // Geprueft wird NICHT list_notes selbst (VaultTools haengt nicht am Plugin-Objekt),
+    // sondern die Fremd-API darunter: liefert metadataCache ein Objekt in der Form, gegen
+    // die `pickFields` gebaut ist? Faellt Obsidian hier je auf eine andere Form, faellt
+    // dieser Punkt — und nicht erst der Nutzer im Gespraech.
+    //
+    // Bewusst NICHT geprueft wird, ob jeder Feldwert flach ist (kein verschachteltes
+    // Objekt): am 2026-08-14 gegen 10_Pallas gemessen enthaelt der reale Vault legitime
+    // verschachtelte Frontmatter-Werte (`limits: {...}` in vault-crews-Teams,
+    // `fields: {...}` in `80_Archiv/60_Blueprints/shadowvault-types/*.md`) — und
+    // `formatFieldValue` (list.ts) behandelt das explizit als Erwartungsfall, nicht als
+    // Fehler: jeder Nicht-Array-Objektwert wird zu `{…}` gerendert. Eine Flachheits-Pflicht
+    // wuerde also etwas Strengeres pruefen, als `pickFields` tatsaechlich braucht, und
+    // waere auf diesem Vault dauerhaft rot, ohne dass etwas kaputt ist. Die echte Naht ist:
+    // kommt `frontmatter` ueberhaupt als ueber `fm[feld]` indizierbares Objekt zurueck
+    // (Record<string, unknown>, kein Array, kein Skalar)?
+    const fmSeam = await cdp.evaluate<{ notes: number; withFm: number; sample?: string[]; recordShaped?: boolean }>(`
+      const files = app.vault.getMarkdownFiles();
+      let withFm = 0, sample = null, recordShaped = true;
+      for (const f of files) {
+        const fm = app.metadataCache.getFileCache(f)?.frontmatter;
+        if (!fm) continue;
+        withFm++;
+        if (sample === null) sample = Object.keys(fm).slice(0, 5);
+        if (typeof fm !== "object" || fm === null || Array.isArray(fm)) recordShaped = false;
+      }
+      return { notes: files.length, withFm, sample: sample ?? [], recordShaped };
+    `);
+    record(
+      "1c. Frontmatter-Naht",
+      fmSeam.withFm > 0 && fmSeam.recordShaped === true,
+      `${fmSeam.withFm} von ${fmSeam.notes} Notizen mit Frontmatter · Beispielfelder: ${fmSeam.sample?.join(", ") ?? "—"}`,
+    );
+
     // Vorwerte sichern, bevor irgendetwas veraendert wird.
     previous = await cdp.evaluate<Settings>(`
       const s = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings;
