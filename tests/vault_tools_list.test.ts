@@ -77,4 +77,21 @@ describe("list_notes", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.content).toContain("P/U/A.md");
   });
+  // Regression Befund 2 (Review 2026-08-14): `str(undefined)` ergibt "", was laut Spec
+  // "Vault-Wurzel" bedeutet — ein vergessenes Pflichtfeld wurde dadurch still zum
+  // rekursiven Dump des ganzen Vaults statt einer Fehlermeldung.
+  it("meldet fehlendes folder als Fehler, statt es zur Vault-Wurzel zu machen", async () => {
+    const vault = fakeVault({ "P/A.md": "" });
+    const r = await new VaultTools(vault, async () => true, opts)
+      .run("list_notes", { recursive: true, fields: ["status"] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("folder");
+  });
+  it("die AUSDRUECKLICH uebergebene Wurzel (folder: \"\") funktioniert weiterhin", async () => {
+    const vault = fakeVault({ "P/A.md": "" });
+    const r = await new VaultTools(vault, async () => true, opts)
+      .run("list_notes", { folder: "", recursive: true });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.content).toContain("P/A.md");
+  });
 });

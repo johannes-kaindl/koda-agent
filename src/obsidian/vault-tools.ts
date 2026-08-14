@@ -68,6 +68,12 @@ export class VaultTools implements ToolRunner {
           return await this.writeSkill(str(a.name), str(a.description), str(a.body), str(a.mode));
         case "save_memory": return await this.saveMemory(str(a.text));
         case "list_notes":
+          // `folder` ist Pflicht, aber "" (Vault-Wurzel) ist ein gueltiger, ausdruecklicher
+          // Wert dafuer — `str(undefined)` liefert ebenfalls "" und wuerde ein vergessenes
+          // Feld sonst still zur Wurzel machen (rekursiver Dump statt Fehlermeldung). Beide
+          // Faelle muessen daher VOR dem str()-Aufruf auseinandergehalten werden, analog zu
+          // "query fehlt" bei search_notes und dem gemeldeten Modus bei write_note.
+          if (a.folder === undefined) return { ok: false, error: "folder fehlt" };
           // Bewusst mit await, anders als die Brief-Vorlage: `resolveFolderPath` wirft
           // SYNCHRON innerhalb der async-Methode, was ohne await eine abgelehnte Promise
           // ausserhalb dieses try/catch ergibt (Traversal wuerde nicht als Fehler-Result
