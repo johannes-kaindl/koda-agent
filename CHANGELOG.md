@@ -19,6 +19,8 @@ All notable changes to this project are documented here. The format follows
     "folder is empty" and "folder name is wrong" would otherwise look identical.
   - New setting **"List limit"** (`listNotesMaxRows`, default 150, range 20–1000) — a
     visible cap rather than a silent one, in the same spirit as the skill budget.
+  - A missing `folder` argument is reported as an **error**, not silently treated as
+    the vault root — `folder: ""` still means the root, but only when passed explicitly.
 
 ## [0.4.0] — 2026-08-13
 

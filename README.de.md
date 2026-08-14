@@ -23,10 +23,12 @@ Aktueller Umfang und Entwurfsentscheidungen stehen in `CLAUDE.md`.*
 - **Chat-Seitenleiste** (Ribbon-Icon + Befehl) mit gestreamten Antworten, einem
   einklappbaren „Denken"-Block für Reasoning-Modelle und einer Stopp-Schaltfläche, die
   die Teilantwort stehen lässt.
-- **Fünf Werkzeuge:** `search_notes`, `read_note`, `write_note`, `save_memory`,
-  `write_skill` — das Modell ruft sie beim Antworten selbst auf, jeder Schritt erscheint
-  im Chat. Ein sechstes, `related_notes`, kommt hinzu, wenn semantische Suche verfügbar
-  ist (siehe unten).
+- **Sechs Werkzeuge:** `search_notes`, `read_note`, `write_note`, `save_memory`,
+  `write_skill`, `list_notes` — das Modell ruft sie beim Antworten selbst auf, jeder
+  Schritt erscheint im Chat. `list_notes` liefert alle Notizen unter einem Vault-Ordner,
+  wahlweise rekursiv, samt den angeforderten Frontmatter-Feldern, in einem Aufruf. Ein
+  siebtes, `related_notes`, kommt hinzu, wenn semantische Suche verfügbar ist (siehe
+  unten).
 - **Semantische Suche, falls du sie schon hast** *(optional)* — ist das Plugin
   [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) installiert und dein
   Vault indiziert, nutzt Koda dessen Embedding-Index: `search_notes` ergänzt
@@ -76,8 +78,8 @@ Durchsuchen → „Koda" → Installieren → Aktivieren**. Alternativ `main.js`
    „Denken"-Block eingeklappt darüber, und **Stopp** beendet den Stream, ohne das
    Angekommene zu verwerfen.
 3. **Den Werkzeugen zusehen.** Jeder Aufruf von `search_notes` / `read_note` /
-   `write_note` erscheint im Chat, während er passiert — du siehst also, auf welchen
-   Notizen eine Antwort beruht, statt es glauben zu müssen.
+   `write_note` / `list_notes` erscheint im Chat, während er passiert — du siehst also,
+   auf welchen Notizen eine Antwort beruht, statt es glauben zu müssen.
 4. **Schreibvorgänge außerhalb des Koda-Ordners bestätigen.** Ein Dialog zeigt vorher
    den neuen Text (Anlegen und Anhängen) oder ein Zeilen-Diff (Ersetzen) — siehe
    [Die Schreibregel](#die-schreibregel).
@@ -139,7 +141,7 @@ Modell als abgelehnter Schreibvorgang zurückgemeldet statt stillschweigend gesc
 Die Suche fällt weich zurück statt zu brechen: Koda schlägt die Plugin-API von Vault
 Retrieval zur Laufzeit defensiv nach. Ist sie da, füllt `search_notes` dünne wörtliche
 Ergebnisse mit semantischen auf (in einem eigenen, beschrifteten Block) und
-`related_notes` wird als sechstes Werkzeug registriert; ist sie nicht da, taucht beides
+`related_notes` wird als siebtes Werkzeug registriert; ist sie nicht da, taucht beides
 im Prompt gar nicht erst auf.
 
 ## Die Schreibregel

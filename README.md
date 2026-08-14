@@ -21,10 +21,12 @@ See `CLAUDE.md` for the current scope and design decisions.*
 - **Chat sidebar** (ribbon icon + command) with streaming answers, a collapsible
   "thinking" block for reasoning models, and a Stop button that leaves the partial
   answer in place.
-- **Five tools:** `search_notes`, `read_note`, `write_note`, `save_memory`,
-  `write_skill` — the model calls these itself while answering, with each step
-  shown inline in the chat. A sixth, `related_notes`, appears when semantic
-  retrieval is available (see below).
+- **Six tools:** `search_notes`, `read_note`, `write_note`, `save_memory`,
+  `write_skill`, `list_notes` — the model calls these itself while answering, with each
+  step shown inline in the chat. `list_notes` returns every note under a vault folder,
+  optionally recursive, together with whichever frontmatter fields were asked for, in
+  one call. A seventh, `related_notes`, appears when semantic retrieval is available
+  (see below).
 - **Semantic retrieval, if you already have it** *(optional)* — if the
   [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) plugin is installed
   and has indexed your vault, Koda uses its embedding index: `search_notes` adds
@@ -68,9 +70,9 @@ into `<vault>/.obsidian/plugins/koda-agent/`.
 1. Open the sidebar — ribbon dog icon or the **Open Koda** command.
 2. Ask a question. Koda streams its answer; for reasoning models the "thinking" block
    sits collapsed above it, and **Stop** ends the stream while keeping what arrived.
-3. **Watch the tools work.** Each `search_notes` / `read_note` / `write_note` call
-   appears inline in the chat as it happens, so you can see which notes an answer is
-   built on rather than taking it on trust.
+3. **Watch the tools work.** Each `search_notes` / `read_note` / `write_note` /
+   `list_notes` call appears inline in the chat as it happens, so you can see which
+   notes an answer is built on rather than taking it on trust.
 4. **Approve writes outside the Koda folder.** A modal shows the new text (create and
    append) or a line diff (replace) before anything is written — see
    [The write rule](#the-write-rule).
@@ -129,7 +131,7 @@ reported back to the model as a declined write rather than silently swallowed.
 Retrieval degrades rather than breaks: Koda looks up Vault Retrieval's plugin API
 defensively at runtime. If it is there, `search_notes` tops up thin literal results
 with semantic ones (kept in a separate, labelled block) and `related_notes` is
-registered as a sixth tool; if it is not, neither appears in the prompt at all.
+registered as a seventh tool; if it is not, neither appears in the prompt at all.
 
 ## The write rule
 
