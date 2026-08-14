@@ -3,3 +3,4 @@ main.js
 coverage/
 .lab-tools.mjs
 .gui-smoke.mjs
+.gui-ask.mjs
