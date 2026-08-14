@@ -1,4 +1,4 @@
-import { resolveNotePath } from "../src/core/tools/path-guard";
+import { resolveNotePath, resolveFolderPath } from "../src/core/tools/path-guard";
 
 describe("resolveNotePath", () => {
   it("normalisiert Backslashes und ./-Segmente", () => {
@@ -15,5 +15,22 @@ describe("resolveNotePath", () => {
   });
   it("akzeptiert Gross-Klein-Varianten von .MD", () => {
     expect(resolveNotePath("Note.MD")).toBe("Note.MD");
+  });
+});
+
+describe("resolveFolderPath", () => {
+  it("normalisiert Slashes und schneidet fuehrende/anhaengende ab", () => {
+    expect(resolveFolderPath("/20_Projekte/")).toBe("20_Projekte");
+    expect(resolveFolderPath("a\\b\\")).toBe("a/b");
+  });
+  it("laesst die Vault-Wurzel als leeren String zu", () => {
+    expect(resolveFolderPath("")).toBe("");
+    expect(resolveFolderPath("/")).toBe("");
+  });
+  it("verlangt KEIN .md", () => {
+    expect(resolveFolderPath("Projekt/_Tasks")).toBe("Projekt/_Tasks");
+  });
+  it("wirft bei ..-Traversal", () => {
+    expect(() => resolveFolderPath("a/../../geheim")).toThrow(/verlässt/);
   });
 });
