@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-14
+
 ### Changed
 
 - **Semantic search is no longer gated on the number of full-text hits.** `search_notes`
