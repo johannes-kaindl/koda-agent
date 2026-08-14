@@ -6,6 +6,8 @@ import {
   MAX_ROUNDS_LIMIT,
   SKILL_BUDGET_MIN,
   SKILL_BUDGET_MAX,
+  LIST_ROWS_MIN,
+  LIST_ROWS_MAX,
 } from "../src/core/settings-types";
 
 describe("mergeKodaSettings", () => {
@@ -50,5 +52,18 @@ describe("skillBudgetChars", () => {
   // 80000 deckt eine ganze Skill-Sammlung, nicht nur eine einzelne Datei.
   it("laesst ein Budget fuer eine ganze Skill-Sammlung (80000) durch", () => {
     expect(mergeKodaSettings({ skillBudgetChars: 80000 }).skillBudgetChars).toBe(80000);
+  });
+});
+
+describe("listNotesMaxRows", () => {
+  it("hat 150 als Default", () => {
+    expect(mergeKodaSettings({}).listNotesMaxRows).toBe(150);
+  });
+  it("klemmt nach unten und oben statt zu uebernehmen", () => {
+    expect(mergeKodaSettings({ listNotesMaxRows: 1 }).listNotesMaxRows).toBe(LIST_ROWS_MIN);
+    expect(mergeKodaSettings({ listNotesMaxRows: 99999 }).listNotesMaxRows).toBe(LIST_ROWS_MAX);
+  });
+  it("faellt bei Unsinn auf den Default zurueck", () => {
+    expect(mergeKodaSettings({ listNotesMaxRows: "viele" }).listNotesMaxRows).toBe(150);
   });
 });

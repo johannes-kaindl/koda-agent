@@ -33,6 +33,15 @@ export const SKILL_BUDGET_MIN = 1000;
 export const SKILL_BUDGET_MAX = 100000;
 export const SKILL_BUDGET_STEP = 1000;
 
+/** Spanne für `listNotesMaxRows` — wie viele Zeilen `list_notes` höchstens ausgibt.
+ *  Wie `skillBudgetChars` bewusst eine Einstellung und keine Konstante: die Grenze lässt
+ *  stillschweigend Verhalten weg (hier: Notizen), und solche Grenzen gehören sichtbar.
+ *  Der Default 150 sind bei 40–120 Zeichen je Zeile grob 1.500–4.500 Token. Über der
+ *  Grenze verschwindet nichts heimlich — die Kappung meldet sich in Zeile 1 der Antwort. */
+export const LIST_ROWS_MIN = 20;
+export const LIST_ROWS_MAX = 1000;
+export const LIST_ROWS_STEP = 10;
+
 export interface KodaSettings {
   endpoints: EndpointConfig[];
   model: string;
@@ -41,6 +50,7 @@ export interface KodaSettings {
   maxRounds: number;
   timeoutSec: number;
   skillBudgetChars: number;
+  listNotesMaxRows: number;
   textFallback: boolean;
   language: "auto" | "de" | "en";
   openOnStartup: boolean;
@@ -54,6 +64,7 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   maxRounds: 8,
   timeoutSec: 300,
   skillBudgetChars: 6000,
+  listNotesMaxRows: 150,
   textFallback: false, // Default laut koda-lab-Befund setzen (docs/LAB.md)
   language: "auto",
   openOnStartup: false,
@@ -71,6 +82,9 @@ export function mergeKodaSettings(raw: unknown): KodaSettings {
     timeoutSec: clampInt(merged.timeoutSec, TIMEOUT_SEC_MIN, TIMEOUT_SEC_MAX, DEFAULT_SETTINGS.timeoutSec),
     skillBudgetChars: clampInt(
       merged.skillBudgetChars, SKILL_BUDGET_MIN, SKILL_BUDGET_MAX, DEFAULT_SETTINGS.skillBudgetChars,
+    ),
+    listNotesMaxRows: clampInt(
+      merged.listNotesMaxRows, LIST_ROWS_MIN, LIST_ROWS_MAX, DEFAULT_SETTINGS.listNotesMaxRows,
     ),
   };
 }
