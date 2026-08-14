@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`list_notes` tool.** All notes in a vault folder — with the frontmatter fields you
+  ask for — in one call, instead of opening notes one by one or inferring a list from
+  prose read elsewhere. Frontmatter comes from Obsidian's `metadataCache`, so no note
+  is read from disk just to list it.
+  - A capped result says so in **line 1**, not as a footnote below the list: the error
+    this tool exists to prevent is "incomplete, looks complete", and a warning at the
+    end of a long list reproduces exactly that.
+  - An empty folder is reported as an **error with suggestions**, not an empty list —
+    "folder is empty" and "folder name is wrong" would otherwise look identical.
+  - New setting **"List limit"** (`listNotesMaxRows`, default 150, range 20–1000) — a
+    visible cap rather than a silent one, in the same spirit as the skill budget.
+
 ## [0.4.0] — 2026-08-13
 
 ### Changed

@@ -7,12 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
 (Gate-Scan „passed" beim ersten Anlauf) und über ihn installierbar. Stufe 1 steht:
-Agent-Loop, fünf Tools (`search_notes`/`read_note`/`write_note`/`save_memory`/
-`write_skill`) plus ein optionales sechstes (`related_notes`, nur mit vault-rag),
-Schreibregel mit Bestätigungs-Modal, Memory-Notiz, Sessions als JSONL, Settings-Tab,
-i18n DE/EN, dazu die QoL-Schicht (Verbindungstest, Modell-Auswahl, Failover, Presets)
-und ein automatisierter GUI-Smoke (`scripts/gui-smoke.ts`, CDP gegen ein laufendes
-Obsidian). Gate ist grün (212/212), `main.js` baut. Details zu
+Agent-Loop, sechs Tools (`search_notes`/`read_note`/`write_note`/`save_memory`/
+`write_skill`/`list_notes`) plus ein optionales siebtes (`related_notes`, nur mit
+vault-rag), Schreibregel mit Bestätigungs-Modal, Memory-Notiz, Sessions als JSONL,
+Settings-Tab, i18n DE/EN, dazu die QoL-Schicht (Verbindungstest, Modell-Auswahl,
+Failover, Presets) und ein automatisierter GUI-Smoke (`scripts/gui-smoke.ts`, CDP
+gegen ein laufendes Obsidian). Gate ist grün (257/257), `main.js` baut. Details zu
 Nutzung/Setup: `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`.
 Spezifiziert in `docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md` — dort
 stehen die Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Ordner
@@ -105,7 +105,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (212/212).
+- `npm test` — `check-no-abs-paths` + vitest (257/257).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run build` — Typecheck + Production-esbuild (`main.js`).
@@ -119,6 +119,9 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `src/core/tools/retrieval.ts` — Zusammenführung von Volltext- und Index-Treffern,
   Schwellenlogik, Ausfall-Meldungen (pure). Gegenstück: `src/obsidian/retrieval.ts`
   liest vault-rags API defensiv aus `app.plugins`.
+- `src/core/tools/list.ts` — `list_notes`: Ordnerauswahl (flach/rekursiv), Kappung
+  mit Warnung in Zeile 1, leerer Ordner als Fehler mit Vorschlägen (pure). Frontmatter
+  kommt aus Obsidians `metadataCache`, kein Datei-Lesen je Notiz.
 - `src/llm/` — `KodaChatClient` + `XhrSseTransport` (Streaming-Chat-Client).
 - `src/obsidian/` — View, Vault-Tools-Adapter, Bestätigungs-Modal, Settings-Tab.
 - `src/vendor/kit` + `src/vendor/kit-obsidian/` — verbatim vendorter `../obsidian-kit`
