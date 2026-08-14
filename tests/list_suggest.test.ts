@@ -25,6 +25,14 @@ describe("suggestFolders", () => {
     const many = Array.from({ length: 9 }, (_, i) => `Basis/Ordner${i}/N.md`);
     expect(suggestFolders(many, "Basis/Fehlt")).toHaveLength(5);
   });
+  // Regression Befund 1 (Review 2026-08-14): die Praefix-Schleife startete bei
+  // `parts.length - 1` und lief fuer folder === "" (leere `parts`) kein einziges
+  // Mal — Stufe 2 fiel fuer den Wurzel-Aufruf komplett aus, obwohl Top-Level-Ordner
+  // existieren. Genau das ist der Aufruf, den ein Modell zur Orientierung zuerst waehlt.
+  it("Stufe 2 bei leerem folder: schlaegt die Top-Level-Ordner der Vault-Wurzel vor", () => {
+    const vault = ["10_P/a.md", "10_P/x/b.md", "20_Q/c.md"];
+    expect(suggestFolders(vault, "")).toEqual(["10_P", "20_Q"]);
+  });
 });
 
 describe("formatEmptyFolder", () => {

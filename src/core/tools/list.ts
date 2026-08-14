@@ -103,12 +103,13 @@ function allFolders(allPaths: string[]): string[] {
 }
 
 /** Was koennte gemeint gewesen sein? Dreistufig: aehnliches letztes Segment, sonst die
- *  Unterordner des laengsten existierenden Praefixes — und in einem Vault mit Ordnern
- *  faengt diese Praefix-Schleife bei `base=""` die Top-Level-Ordner ab, liefert also so
- *  gut wie immer noch etwas. Leer bleibt das Ergebnis nur, wenn der Vault selbst flach ist
- *  (keine Unterordner). Der Grund fuer die ganze Funktion: „Ordner leer" und „Ordner
- *  falsch geschrieben" sehen fuer das Modell sonst gleich aus — ein false negative ohne
- *  sichtbaren Fehler, also genau die Fehlerklasse, gegen die dieses Werkzeug antritt. */
+ *  Unterordner des laengsten existierenden Praefixes — die Praefix-Schleife faengt dabei
+ *  auch `base=""` (die Vault-Wurzel) ab und liefert fuer `folder === ""` deren direkte
+ *  Unterordner. Leer bleibt das Ergebnis nur, wenn im ganzen Vault kein einziger Ordner
+ *  liegt (jede Notiz direkt in der Wurzel) — dann gibt es strukturell nichts vorzuschlagen.
+ *  Der Grund fuer die ganze Funktion: „Ordner leer" und „Ordner falsch geschrieben" sehen
+ *  fuer das Modell sonst gleich aus — ein false negative ohne sichtbaren Fehler, also genau
+ *  die Fehlerklasse, gegen die dieses Werkzeug antritt. */
 export function suggestFolders(allPaths: string[], folder: string, max: number = SUGGEST_MAX): string[] {
   const folders = allFolders(allPaths);
   const wanted = (folder.split("/").pop() ?? "").toLowerCase();
@@ -122,8 +123,14 @@ export function suggestFolders(allPaths: string[], folder: string, max: number =
   }
 
   // Laengstes existierendes Praefix des Wunschpfads → dessen direkte Unterordner.
+  // Schleife startet bei i = parts.length (volle Tiefe), nicht bei parts.length - 1:
+  // fuer folder === "" ist `parts` leer, und nur der Start bei der vollen (=nullten)
+  // Tiefe laesst die Schleife dann ueberhaupt einmal mit base === "" laufen — das ist
+  // der Fall, in dem die Kinder der Vault-Wurzel gesucht sind (die Top-Level-Ordner).
+  // Fuer echte Tippfehler aendert das nichts: der volle Pfad existiert nicht, also
+  // greift `continue` und die Schleife faellt wie vorher auf kuerzere Praefixe zurueck.
   const parts = folder.split("/").filter((s) => s !== "");
-  for (let i = parts.length - 1; i >= 0; i--) {
+  for (let i = parts.length; i >= 0; i--) {
     const base = parts.slice(0, i).join("/");
     const prefix = base === "" ? "" : `${base}/`;
     if (base !== "" && !folders.includes(base)) continue;
