@@ -46,4 +46,14 @@ describe("pickFields", () => {
   it("liefert ohne angeforderte Felder ein leeres Objekt", () => {
     expect(pickFields({ status: "offen" }, [])).toEqual({});
   });
+  // Regression Befund 4 (Review 2026-08-14): `fm[f]` ohne Eigentumsprüfung liest auch
+  // geerbte Eigenschaften des Prototyps.
+  it("liest KEINE geerbten Eigenschaften — 'toString' ist ein fehlendes Feld, kein Wert", () => {
+    expect(pickFields({ status: "offen" }, ["toString"])).toEqual({ toString: "—" });
+  });
+  it("laesst eine angeforderte Spalte nicht spurlos verschwinden — auch fuer '__proto__'", () => {
+    const out = pickFields({ status: "offen" }, ["__proto__"]);
+    expect(Object.keys(out)).toEqual(["__proto__"]);
+    expect(out.__proto__).toBe("—");
+  });
 });

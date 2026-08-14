@@ -62,7 +62,19 @@ function clip(s: string): string {
  *  Default-Satz: welche Felder zaehlen, weiss der Vault, nicht das Plugin. */
 export function pickFields(fm: Record<string, unknown> | null, fields: string[]): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const f of fields) out[f] = formatFieldValue(fm === null ? undefined : fm[f]);
+  for (const f of fields) {
+    // hasOwnProperty statt `fm[f]` direkt: sonst liefert `fields: ["toString"]` den
+    // geerbten Object.prototype.toString statt „—". Das behebt aber nur die Halfte des
+    // Befunds — `fields: ["__proto__"]` faellt nicht beim LESEN aus `fm`, sondern beim
+    // SCHREIBEN nach `out`: `out["__proto__"] = "…"` triggert den geerbten __proto__-
+    // Setter, der bei einem String-Wert (statt Objekt/null) ein stiller No-op ist —
+    // keine Ausnahme, kein Own-Property, `Object.entries(out)` sieht die Zeile nie.
+    // Object.defineProperty umgeht den Setter und legt garantiert eine Own-Data-Property
+    // an, unabhaengig vom Feldnamen.
+    const has = fm !== null && Object.prototype.hasOwnProperty.call(fm, f);
+    const value = formatFieldValue(has ? fm[f] : undefined);
+    Object.defineProperty(out, f, { value, enumerable: true, writable: true, configurable: true });
+  }
   return out;
 }
 
