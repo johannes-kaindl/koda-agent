@@ -43,6 +43,10 @@ export function formatFieldValue(v: unknown): string {
     const s = collapse(String(v));
     return s === "" ? "—" : clip(s);
   }
+  // Alles, was kein Skalar und kein Array ist — Objekte ebenso wie Funktionen —, wird zum
+  // Platzhalter `{…}`. Aus `metadataCache` kommt praktisch nie eine Funktion, aber die
+  // Regel ist bewusst am Fall, nicht am Typ: eine Übersichtszeile zeigt Werte, keine
+  // Strukturen, und Funktionsquelltext waere eine Struktur, kein Wert.
   return "{…}";
 }
 
@@ -98,11 +102,13 @@ function allFolders(allPaths: string[]): string[] {
   return [...set].sort();
 }
 
-/** Was koennte gemeint gewesen sein? Dreistufig, und die dritte Stufe ist Absicht:
- *  wo nichts Passendes existiert, wird nicht geraten. Der Grund fuer die ganze Funktion:
- *  „Ordner leer" und „Ordner falsch geschrieben" sehen fuer das Modell sonst gleich aus —
- *  ein false negative ohne sichtbaren Fehler, also genau die Fehlerklasse, gegen die
- *  dieses Werkzeug antritt. */
+/** Was koennte gemeint gewesen sein? Dreistufig: aehnliches letztes Segment, sonst die
+ *  Unterordner des laengsten existierenden Praefixes — und in einem Vault mit Ordnern
+ *  faengt diese Praefix-Schleife bei `base=""` die Top-Level-Ordner ab, liefert also so
+ *  gut wie immer noch etwas. Leer bleibt das Ergebnis nur, wenn der Vault selbst flach ist
+ *  (keine Unterordner). Der Grund fuer die ganze Funktion: „Ordner leer" und „Ordner
+ *  falsch geschrieben" sehen fuer das Modell sonst gleich aus — ein false negative ohne
+ *  sichtbaren Fehler, also genau die Fehlerklasse, gegen die dieses Werkzeug antritt. */
 export function suggestFolders(allPaths: string[], folder: string, max: number = SUGGEST_MAX): string[] {
   const folders = allFolders(allPaths);
   const wanted = (folder.split("/").pop() ?? "").toLowerCase();

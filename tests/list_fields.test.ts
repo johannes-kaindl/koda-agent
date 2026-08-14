@@ -30,6 +30,9 @@ describe("formatFieldValue", () => {
   it("stellt verschachtelte Objekte als Platzhalter dar statt sie auszuschreiben", () => {
     expect(formatFieldValue({ a: 1 })).toBe("{…}");
   });
+  it("stellt auch Funktionen als Platzhalter dar — kein Skalar, kein Array", () => {
+    expect(formatFieldValue(() => 1)).toBe("{…}");
+  });
 });
 
 describe("pickFields", () => {
