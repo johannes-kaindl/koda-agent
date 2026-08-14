@@ -1,5 +1,5 @@
 import type { ToolOutcome, ToolRunner } from "../core/agent/types";
-import { resolveNotePath } from "../core/tools/path-guard";
+import { resolveFolderPath, resolveNotePath } from "../core/tools/path-guard";
 import { writePolicy } from "../core/tools/write-policy";
 import { appendMemoryLine } from "../core/memory/memory";
 import { serializeFrontmatter } from "../vendor/kit/frontmatter";
@@ -8,6 +8,9 @@ import {
   needsSemantic, formatSearchResult, formatRelatedResult, hasIndexableText,
   type RetrievalApi, type TextHit,
 } from "../core/tools/retrieval";
+import {
+  collectFolderNotes, pickFields, formatListResult, suggestFolders, formatEmptyFolder,
+} from "../core/tools/list";
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
@@ -16,6 +19,11 @@ export interface VaultPort {
   create(path: string, content: string): Promise<void>;
   append(path: string, content: string): Promise<void>;
   overwrite(path: string, content: string): Promise<void>;
+  /** Frontmatter aus Obsidians metadataCache — `null`, wenn die Notiz keins hat oder
+   *  nicht im Cache steht. Bewusst synchron und ohne Dateizugriff: `list_notes` fragt
+   *  sonst je Aufruf N Dateien an, und ein Werkzeug gegen teure Pruefschritte darf
+   *  nicht selbst der teuerste Aufruf sein. */
+  frontmatterOf(path: string): Record<string, unknown> | null;
 }
 
 export interface WriteRequest {
@@ -43,6 +51,8 @@ export class VaultTools implements ToolRunner {
       /** Frisch je Aufruf gelesen — vault-rag kann zur Laufzeit an- oder abgeschaltet
        *  werden. Fehlt das Feld ganz, verhaelt sich Koda wie vor der Andockung. */
       retrieval?: () => RetrievalApi | null;
+      /** Frisch je Aufruf gelesen, damit eine Aenderung in den Einstellungen sofort greift. */
+      listMaxRows(): number;
     },
   ) {}
 
@@ -57,6 +67,12 @@ export class VaultTools implements ToolRunner {
         case "write_skill":
           return await this.writeSkill(str(a.name), str(a.description), str(a.body), str(a.mode));
         case "save_memory": return await this.saveMemory(str(a.text));
+        case "list_notes":
+          // Bewusst mit await, anders als die Brief-Vorlage: `resolveFolderPath` wirft
+          // SYNCHRON innerhalb der async-Methode, was ohne await eine abgelehnte Promise
+          // ausserhalb dieses try/catch ergibt (Traversal wuerde nicht als Fehler-Result
+          // gemeldet, sondern als unbehandelte Ablehnung durchschlagen).
+          return await this.listNotes(str(a.folder), bool(a.recursive), strArray(a.fields));
         default: return { ok: false, error: `unbekanntes Tool: ${name}` };
       }
     } catch (e) {
@@ -192,7 +208,32 @@ export class VaultTools implements ToolRunner {
     await this.vault.overwrite(path, appendMemoryLine(existing, clean, this.opts.today()));
     return { ok: true, content: `gemerkt: ${clean}` };
   }
+
+  /** Ordnerinhalt in EINEM Aufruf. Die Kappung liegt vor dem Frontmatter-Holen: gezaehlt
+   *  wird ueber die Pfadliste (billig), geholt nur fuer die Zeilen, die auch erscheinen. */
+  private async listNotes(folder: string, recursive: boolean, fields: string[]): Promise<ToolOutcome> {
+    const norm = resolveFolderPath(folder);
+    const all = this.vault.listMarkdownPaths();
+    const paths = collectFolderNotes(all, norm, recursive);
+    if (paths.length === 0) {
+      return { ok: false, error: formatEmptyFolder(norm, suggestFolders(all, norm)) };
+    }
+    const shown = paths.slice(0, Math.max(1, this.opts.listMaxRows()));
+    const rows = shown.map((p) => ({ path: p, fields: pickFields(this.vault.frontmatterOf(p), fields) }));
+    return { ok: true, content: formatListResult({ folder: norm, recursive, total: paths.length, rows }) };
+  }
 }
 
 function str(v: unknown): string { return typeof v === "string" ? v : ""; }
 function num(v: unknown, fallback: number): number { return typeof v === "number" && v > 0 ? Math.min(v, 25) : fallback; }
+
+/** Modelle liefern Booleans mal als `true`, mal als `"true"`. Tolerant lesen ist hier
+ *  richtig: der strenge Weg wuerde einen gemeinten rekursiven Aufruf still zu einem
+ *  flachen machen — wieder ein Ergebnis, das vollstaendig aussieht und keines ist. */
+function bool(v: unknown): boolean {
+  return typeof v === "boolean" ? v : typeof v === "string" && v.toLowerCase() === "true";
+}
+
+function strArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}

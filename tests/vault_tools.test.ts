@@ -23,10 +23,11 @@ function fakeVault(files: Record<string, string>): VaultPort & { files: Record<s
     create: async (p, c) => void (files[p] = c),
     append: async (p, c) => void (files[p] = (files[p] ?? "") + c),
     overwrite: async (p, c) => void (files[p] = c),
+    frontmatterOf: () => null,
   };
 }
 
-const opts = { kodaFolder: () => "Koda", today: () => "2026-08-05" };
+const opts = { kodaFolder: () => "Koda", today: () => "2026-08-05", listMaxRows: () => 150 };
 const yes = async (): Promise<boolean> => true;
 const no = async (): Promise<boolean> => false;
 

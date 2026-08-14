@@ -223,6 +223,13 @@ export default class KodaPlugin extends Plugin {
             await this.app.vault.modify(f, c);
           }
         },
+        /** Obsidians Cache ist die Wahrheit, an der sich auch Bases und Board-Filter im
+         *  Vault orientieren — wer hier selbst parst, beantwortet eine andere Frage als
+         *  die, die der Nutzer sieht. `getFileCache` ist synchron und ohne Dateizugriff. */
+        frontmatterOf: (p) => {
+          const f = this.app.vault.getFileByPath(p);
+          return f === null ? null : this.app.metadataCache.getFileCache(f)?.frontmatter ?? null;
+        },
       };
       const tools = new VaultTools(vaultPort, (req) => confirmWrite(this.app, req), {
         kodaFolder: () => this.settings.kodaFolder,
@@ -231,6 +238,7 @@ export default class KodaPlugin extends Plugin {
         // kann vault-rag deaktiviert worden sein. Der Adapter prueft dann erneut und
         // meldet Klartext, statt zu werfen.
         retrieval: () => readRetrievalApi(this.app),
+        listMaxRows: () => this.settings.listNotesMaxRows,
       });
 
       const appended = await runAgent(

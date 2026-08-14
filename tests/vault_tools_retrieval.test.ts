@@ -13,6 +13,7 @@ function vault(files: Record<string, string>): VaultPort {
     create: async () => {},
     append: async () => {},
     overwrite: async () => {},
+    frontmatterOf: () => null,
   };
 }
 
@@ -20,6 +21,7 @@ const opts = (retrieval?: () => RetrievalApi | null) => ({
   kodaFolder: () => "Koda",
   today: () => "2026-08-13",
   retrieval,
+  listMaxRows: () => 150,
 });
 
 const api = (over: Partial<RetrievalApi> = {}): RetrievalApi => ({
