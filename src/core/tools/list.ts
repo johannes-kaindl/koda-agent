@@ -78,3 +78,55 @@ export function formatListResult(args: {
     : "Grenze den Ordner ein";
   return `⚠ UNVOLLSTÄNDIG: ${total} Notizen gefunden, ${rows.length} gezeigt. ${hint}, bevor du über Vollständigkeit sprichst.\n\n${body}`;
 }
+
+const SUGGEST_MAX = 5;
+
+/** Alle Ordner, in denen (irgendwo darunter) Notizen liegen. */
+function allFolders(allPaths: string[]): string[] {
+  const set = new Set<string>();
+  for (const p of allPaths) {
+    const parts = p.split("/");
+    for (let i = 1; i < parts.length; i++) set.add(parts.slice(0, i).join("/"));
+  }
+  return [...set].sort();
+}
+
+/** Was koennte gemeint gewesen sein? Dreistufig, und die dritte Stufe ist Absicht:
+ *  wo nichts Passendes existiert, wird nicht geraten. Der Grund fuer die ganze Funktion:
+ *  „Ordner leer" und „Ordner falsch geschrieben" sehen fuer das Modell sonst gleich aus —
+ *  ein false negative ohne sichtbaren Fehler, also genau die Fehlerklasse, gegen die
+ *  dieses Werkzeug antritt. */
+export function suggestFolders(allPaths: string[], folder: string, max: number = SUGGEST_MAX): string[] {
+  const folders = allFolders(allPaths);
+  const wanted = (folder.split("/").pop() ?? "").toLowerCase();
+
+  if (wanted !== "") {
+    const near = folders.filter((f) => {
+      const last = (f.split("/").pop() ?? "").toLowerCase();
+      return last !== "" && (last.includes(wanted) || wanted.includes(last));
+    });
+    if (near.length > 0) return near.slice(0, max);
+  }
+
+  // Laengstes existierendes Praefix des Wunschpfads → dessen direkte Unterordner.
+  const parts = folder.split("/").filter((s) => s !== "");
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const base = parts.slice(0, i).join("/");
+    const prefix = base === "" ? "" : `${base}/`;
+    if (base !== "" && !folders.includes(base)) continue;
+    const children = folders.filter((f) => f.startsWith(prefix) && !f.slice(prefix.length).includes("/") && f !== base);
+    if (children.length > 0) return children.slice(0, max);
+  }
+  return [];
+}
+
+/** Bewusst keine Existenz-Aussage: aus einer Liste von Markdown-Pfaden ist ein leerer
+ *  Ordner von einem falsch geschriebenen nicht unterscheidbar. Festgestellt wird, was
+ *  messbar ist — dass dort keine Notiz liegt. */
+export function formatEmptyFolder(folder: string, suggestions: string[]): string {
+  const where = folder === "" ? "in der Vault-Wurzel" : `unter "${folder}"`;
+  const base = `Dort liegt keine Notiz: ${where} wurde keine Markdown-Datei gefunden.`;
+  return suggestions.length === 0
+    ? base
+    : `${base} Gemeint sein könnte:\n${suggestions.join("\n")}`;
+}
