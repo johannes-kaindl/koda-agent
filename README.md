@@ -25,7 +25,8 @@ See `CLAUDE.md` for the current scope and design decisions.*
   `write_skill`, `list_notes` — the model calls these itself while answering, with each
   step shown inline in the chat. `list_notes` returns every note under a vault folder,
   optionally recursive, together with whichever frontmatter fields were asked for, in
-  one call. A seventh, `related_notes`, appears when semantic retrieval is available
+  one call; a folder note (a note named like its folder) is marked as one, so it is not
+  counted as ordinary content. A seventh, `related_notes`, appears when semantic retrieval is available
   (see below).
 - **Semantic retrieval, if you already have it** *(optional)* — if the
   [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) plugin is installed

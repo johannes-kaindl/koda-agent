@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Semantic search is no longer gated on the number of full-text hits.** `search_notes`
+  used to add semantic results only when full-text returned fewer than 3 — measured on
+  2026-08-13, three incidental literal hits in a 1,219-note vault (two of them archived)
+  cut off the semantic path entirely, hiding a whole area folder whose notes are named
+  "Ollama" and "Modell-Benchmark". The threshold counted hits instead of weighing them;
+  weighing them would be retrieval, which belongs to vault-rag, so both paths now always
+  run. Results stay labelled separately, and the cost is one embedding request per search.
+- **Folder notes are marked as such.** A note named like the folder it sits in
+  (`_Tasks/_Tasks.md`) is flagged inline and counted in the header line — it was
+  previously indistinguishable from a content note, which made a list of 12 tasks read
+  as 13. Structural detection, so it needs no frontmatter or vault convention.
+- **Empty-folder suggestions are ordered by nearness**, not alphabetically: shared path
+  segments first, then name similarity, alphabet last. A typo in a vault with many
+  same-named subfolders used to suggest five *foreign* project folders.
+
+### Fixed
+
+- Paths and field values containing the column separator (` · `) or `=` are now quoted,
+  so a list line cannot be misread as having extra columns.
+- Folder lookup and suggestions normalise Unicode (NFC) before comparing — a correctly
+  spelled folder with an umlaut no longer misses every note because macOS stores the
+  name decomposed.
+- Field values are clipped by code point, so a surrogate pair (emoji) is never cut in half.
+
 ## [0.5.0] — 2026-08-14
 
 ### Added
