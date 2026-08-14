@@ -33,16 +33,19 @@ const api = (over: Partial<RetrievalApi> = {}): RetrievalApi => ({
 });
 
 describe("search_notes — hybrid", () => {
-  it("laesst die semantische Suche AUS, wenn Volltext genug liefert", async () => {
-    const search = vi.fn();
+  // Der Fall, an dem die alte Schwelle (< 3 Volltext-Treffer) gemessen scheiterte:
+  // drei woertliche Zufallstreffer schalteten den semantischen Weg komplett ab.
+  it("fragt AUCH dann semantisch nach, wenn der Volltext reichlich liefert", async () => {
+    const search = vi.fn(async () => ({ ok: true as const, hits: [{ path: "sem.md", score: 0.8 }] }));
     const t = new VaultTools(
       vault({ "a.md": "plan", "b.md": "plan", "c.md": "plan" }),
       async () => true,
       opts(() => api({ search })),
     );
     const r = await t.run("search_notes", { query: "plan" });
-    expect(search).not.toHaveBeenCalled();
-    expect(r.ok && r.content).not.toContain("Inhaltlich ähnlich");
+    expect(search).toHaveBeenCalled();
+    expect(r.ok && r.content).toContain("Inhaltlich ähnlich");
+    expect(r.ok && r.content).toContain("sem.md (0.80)");
   });
 
   it("fragt semantisch nach, wenn Volltext duenn bleibt", async () => {

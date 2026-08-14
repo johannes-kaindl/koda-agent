@@ -1,16 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  needsSemantic, SEMANTIC_THRESHOLD, formatSearchResult, formatRelatedResult, hasIndexableText,
+  formatSearchResult, formatRelatedResult, hasIndexableText,
 } from "../src/core/tools/retrieval";
-
-describe("Schwelle", () => {
-  it("fragt semantisch nur unterhalb der Schwelle", () => {
-    expect(needsSemantic(0)).toBe(true);
-    expect(needsSemantic(SEMANTIC_THRESHOLD - 1)).toBe(true);
-    expect(needsSemantic(SEMANTIC_THRESHOLD)).toBe(false);
-    expect(needsSemantic(10)).toBe(false);
-  });
-});
 
 describe("formatSearchResult", () => {
   const t = [{ path: "a.md", snippet: "…Plan…" }];

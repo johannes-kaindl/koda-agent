@@ -155,6 +155,29 @@ oft das anfällt.
 Die Schwelle 3 ist ein Startwert, kein Messergebnis. Sie steht als Konstante an
 einer Stelle, damit ein späterer Praxisbefund sie ohne Suche korrigieren kann.
 
+> ⚠️ **Revidiert am 2026-08-14 — E4 ist zurückgenommen, die Schwelle ist ersatzlos
+> entfallen.** Der Praxisbefund kam und korrigierte nicht die Zahl, sondern die
+> Größe: Die Frage „Welche Notizen behandeln den Einsatz lokaler KI-Modelle?" fand
+> in einem Vault mit 1.219 indexierten Notizen genau drei wörtliche Treffer — zwei
+> davon aus dem Archiv — und war damit vom semantischen Weg abgeschnitten. Ungenannt
+> blieb ein ganzer Bereichsordner, dessen Notizen „Ollama" und „Modell-Benchmark"
+> heißen. Der Fall, für den die Anbindung gebaut wurde, ist eingetreten, und die
+> Schwelle hat ihn verhindert.
+>
+> Der Denkfehler steckt im Satz „das ist genau der Fall, in dem Volltext versagt":
+> Volltext versagt nicht durch **Schweigen**, sondern durch **falsches Reden**. Drei
+> Zufallstreffer sind in einem gewachsenen Vault der Normalfall, nicht die Ausnahme.
+> Eine Zählung kann das nicht unterscheiden; eine Gewichtung schon — aber die wäre
+> eine Aussage über Trefferqualität und damit Retrieval, das vault-rag gehört
+> (`../AGENTS.md` § Zuständigkeits-Zuschnitt). Also: beide Wege immer.
+>
+> Was von der Begründung bleibt, ist das Kostenargument — und es trägt jetzt in die
+> andere Richtung. Eine Einbettungs-Anfrage je Suche steht gegen eine Tool-Runde beim
+> lokalen Modell (> 90 s); die Volltextsuche liest ohnehin bereits jede Notiz des
+> Vaults. Die Ersparnis war klein, der stille Verlust groß — und ein Fehler, der nicht
+> wie einer aussieht. Belegstelle im Code: der Kommentar an der Stelle, wo die
+> Konstante stand (`src/core/tools/retrieval.ts`).
+
 ### E4b — Trefferzahl und Sichtbarkeit
 
 **`k` setzt Koda selbst**, gebunden an das vorhandene `max_results` (Default 10, Cap

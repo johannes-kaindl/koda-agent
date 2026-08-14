@@ -61,9 +61,12 @@ Koda nutzt vault-rags Embedding-Index über dessen **Plugin-API**
 (`app.plugins.plugins["vault-retrieval"]?.api`, `apiVersion: 1`) — nicht über MCP
 (Koda ist `isDesktopOnly: false`; ein HTTP-Server steht auf Mobile nicht bereit) und
 nicht durch Selbstlesen von `_vaultrag/index.bin` (zwei Kopien, eine veraltet).
-`search_notes` fragt semantisch nur nach, wenn der Volltext **weniger als drei**
-Treffer liefert; Ergebnisse werden **beschriftet statt gemischt**, weil die Scores
-nicht vergleichbar sind. Die Kopplung ist weich: fehlt vault-rag, verhält sich Koda
+`search_notes` fragt **immer beide Wege** ab; Ergebnisse werden **beschriftet statt
+gemischt**, weil die Scores nicht vergleichbar sind. (Bis 0.5.0 gab es eine Schwelle
+— semantisch nur bei weniger als drei Volltext-Treffern. Sie schnitt gemessen genau
+die thematischen Fragen ab, für die es den semantischen Weg gibt; Begründung der
+Rücknahme im Kommentar in `src/core/tools/retrieval.ts` und im Nachtrag zu E4 der
+Spec.) Die Kopplung ist weich: fehlt vault-rag, verhält sich Koda
 wie vorher und `related_notes` erscheint nicht im Prompt.
 
 Spec: `docs/superpowers/specs/2026-08-13-koda-retrieval-andockung-design.md`,
