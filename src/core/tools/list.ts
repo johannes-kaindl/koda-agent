@@ -54,3 +54,27 @@ export function pickFields(fm: Record<string, unknown> | null, fields: string[])
   for (const f of fields) out[f] = formatFieldValue(fm === null ? undefined : fm[f]);
   return out;
 }
+
+export interface NoteRow { path: string; fields: Record<string, string> }
+
+/** Die Kappungswarnung steht in ZEILE 1, nicht als Fussnote unter der Liste. Der
+ *  Fehlertyp, gegen den dieses Werkzeug antritt, ist „unvollstaendig, sieht vollstaendig
+ *  aus" — eine Warnung am Ende einer langen Liste reproduziert ihn. */
+export function formatListResult(args: {
+  folder: string; recursive: boolean; total: number; rows: NoteRow[];
+}): string {
+  const { folder, recursive, total, rows } = args;
+  const where = folder === "" ? "in der Vault-Wurzel" : `in "${folder}"`;
+  const head = `${rows.length} von ${total} Notizen ${where}${recursive ? " (rekursiv)" : ""}`;
+  const lines = rows.map((r) => {
+    const cols = Object.entries(r.fields).map(([k, v]) => `${k}=${v}`);
+    return cols.length === 0 ? r.path : `${r.path} · ${cols.join(" · ")}`;
+  });
+  const body = `${head}\n\n${lines.join("\n")}`;
+  if (rows.length >= total) return body;
+
+  const hint = recursive
+    ? "Grenze den Ordner ein oder setze recursive:false"
+    : "Grenze den Ordner ein";
+  return `⚠ UNVOLLSTÄNDIG: ${total} Notizen gefunden, ${rows.length} gezeigt. ${hint}, bevor du über Vollständigkeit sprichst.\n\n${body}`;
+}
