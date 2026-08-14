@@ -70,4 +70,11 @@ describe("list_notes", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.content).toContain("P/U/A.md");
   });
+  it("nimmt recursive auch als Zahl 1 an — sonst wird ein gemeinter rekursiver Aufruf still flach", async () => {
+    const vault = fakeVault({ "P/U/A.md": "" });
+    const r = await new VaultTools(vault, async () => true, opts)
+      .run("list_notes", { folder: "P", recursive: 1 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.content).toContain("P/U/A.md");
+  });
 });

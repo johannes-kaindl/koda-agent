@@ -8,7 +8,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "search_notes",
     description:
-      "Search the vault by file name and full text. Returns matching note paths with a short snippet. Use before answering questions about the vault.",
+      "Search the vault by file name and full text. Returns matching note paths with a short snippet. Use before answering questions about the vault. Use list_notes instead when you need everything in a folder — search only finds literal matches and cannot tell you what a folder contains.",
     parameters: {
       type: "object",
       properties: {
@@ -25,6 +25,24 @@ export const TOOL_DEFS: ToolDef[] = [
       type: "object",
       properties: { path: { type: "string", description: "Vault-relative path, e.g. Projekte/Plan.md" } },
       required: ["path"],
+    },
+  },
+  {
+    name: "list_notes",
+    description:
+      "List every note in a vault folder in ONE call, with the frontmatter fields you ask for. Use this whenever completeness matters — all tasks in a folder and their status, all notes of a project — instead of opening notes one by one or inferring the list from prose you read elsewhere. If the result is capped, the first line says so.",
+    parameters: {
+      type: "object",
+      properties: {
+        folder: { type: "string", description: "Vault-relative folder, e.g. Projekt/_Tasks. Empty string means the vault root." },
+        recursive: { type: "boolean", description: "Include subfolders. Default false." },
+        fields: {
+          type: "array",
+          items: { type: "string" },
+          description: "Frontmatter field names to show per note, e.g. [\"status\",\"priority\"]. Omit for paths only.",
+        },
+      },
+      required: ["folder"],
     },
   },
   {

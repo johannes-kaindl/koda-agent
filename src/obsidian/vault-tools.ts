@@ -227,11 +227,15 @@ export class VaultTools implements ToolRunner {
 function str(v: unknown): string { return typeof v === "string" ? v : ""; }
 function num(v: unknown, fallback: number): number { return typeof v === "number" && v > 0 ? Math.min(v, 25) : fallback; }
 
-/** Modelle liefern Booleans mal als `true`, mal als `"true"`. Tolerant lesen ist hier
- *  richtig: der strenge Weg wuerde einen gemeinten rekursiven Aufruf still zu einem
- *  flachen machen — wieder ein Ergebnis, das vollstaendig aussieht und keines ist. */
+/** Modelle liefern Booleans mal als `true`, mal als `"true"`, mal als `1`/`0`. Tolerant
+ *  lesen ist hier richtig: der strenge Weg wuerde einen gemeinten rekursiven Aufruf
+ *  still zu einem flachen machen — wieder ein Ergebnis, das vollstaendig aussieht und
+ *  keines ist. */
 function bool(v: unknown): boolean {
-  return typeof v === "boolean" ? v : typeof v === "string" && v.toLowerCase() === "true";
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") return v.toLowerCase() === "true";
+  if (typeof v === "number") return v === 1;
+  return false;
 }
 
 function strArray(v: unknown): string[] {

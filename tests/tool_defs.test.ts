@@ -26,3 +26,18 @@ describe("toolDefs", () => {
     expect(TOOL_DEFS.map((t) => t.name)).not.toContain("x");
   });
 });
+
+describe("list_notes in den Tool-Defs", () => {
+  it("ist Teil der festen Werkzeuge — auch ohne vault-rag", () => {
+    const names = toolDefs({ related: false }).map((d) => d.name);
+    expect(names).toContain("list_notes");
+  });
+  it("verlangt nur den Ordner", () => {
+    const def = toolDefs({ related: false }).find((d) => d.name === "list_notes");
+    expect((def?.parameters as { required: string[] }).required).toEqual(["folder"]);
+  });
+  it("grenzt search_notes gegen list_notes ab, damit die Wahl nicht dem Zufall ueberlassen bleibt", () => {
+    const search = toolDefs({ related: false }).find((d) => d.name === "search_notes");
+    expect(search?.description).toContain("list_notes");
+  });
+});
