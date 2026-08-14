@@ -39,6 +39,9 @@ import {
   SKILL_BUDGET_MIN,
   SKILL_BUDGET_MAX,
   SKILL_BUDGET_STEP,
+  LIST_ROWS_MIN,
+  LIST_ROWS_MAX,
+  LIST_ROWS_STEP,
   type KodaSettings,
 } from "../core/settings-types";
 import type KodaPlugin from "../main";
@@ -108,6 +111,17 @@ export class KodaSettingsTab extends PluginSettingTab {
           min: SKILL_BUDGET_MIN,
           max: SKILL_BUDGET_MAX,
           step: SKILL_BUDGET_STEP,
+        },
+      },
+      {
+        name: t("settings.listRows"),
+        desc: t("settings.listRows.desc"),
+        control: {
+          type: "slider",
+          key: "listNotesMaxRows",
+          min: LIST_ROWS_MIN,
+          max: LIST_ROWS_MAX,
+          step: LIST_ROWS_STEP,
         },
       },
       {
