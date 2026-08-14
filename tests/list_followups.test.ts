@@ -26,6 +26,19 @@ describe("Ordnernotizen sind erkennbar", () => {
     expect(out).not.toContain("_Tasks/Aufgabe.md (Ordnernotiz)");
   });
 
+  it("zaehlt im Kopf die GEZEIGTEN Zeilen, nicht die Gesamtmenge", () => {
+    // Festgeschrieben, weil „davon" bei gekappter Liste zwei Bezuege haben koennte.
+    // Traeger der Information bleibt die Zeilenmarkierung; im Kopf dominiert dann
+    // ohnehin die Unvollstaendigkeits-Warnung.
+    const out = formatListResult({
+      folder: "x", recursive: false, total: 99,
+      rows: [row("x/x.md"), row("x/a.md")],
+    });
+    expect(out).toContain("2 von 99 Notizen");
+    expect(out).toContain("davon 1 Ordnernotiz");
+    expect(out).toContain("⚠ UNVOLLSTÄNDIG");
+  });
+
   it("schweigt im Kopf, wenn keine Ordnernotiz dabei ist", () => {
     const out = formatListResult({ folder: "x", recursive: false, total: 1, rows: [row("x/a.md")] });
     expect(out).not.toContain("Ordnernotiz");
