@@ -112,6 +112,38 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   `fm[feld]` indizierbares Objekt ist — das ist die tatsächliche Form, gegen die `pickFields`
   gebaut ist. Die Handpunkte 14–18 sind in diesem Durchlauf **nicht** gelaufen und bleiben offen.
 
+- **2026-08-14 (abends), Handpunkte 14, 15, 16 + zwei Gegenproben** — Vault `80_Arbeit`,
+  Obsidian 1.13.7, Plugin-Build von `main` nach dem Merge `99b79e5`, Endpunkt
+  `verdigado-think`, vault-rag mit 1.230 indexierten Notizen. Gefahren mit dem neuen Treiber
+  `npm run gui:ask` (durchgehend `--full`, sonst wäre der Beleg abgeschnitten gewesen).
+  - **Handpunkt 14** („Sprachmodelle auf eigener Hardware", dünner Volltext) — **grün**:
+    zwei beschriftete Blöcke, kein gemischtes Ranking. Nebenbefund: Koda suchte dreimal mit
+    verfeinerten Anfragen; die ersten beiden Aufrufe fanden **null** Volltext-Treffer und
+    lieferten nur den semantischen Block — genau der Fall, für den die Anbindung existiert.
+  - **Handpunkt 15** (klar wörtlicher Treffer) — **grün in der ab heute gültigen Fassung**:
+    Der Punkt hat sich umgedreht, weil die Trefferzahl-Schwelle entfallen ist. Beleg aus
+    derselben Messung wie die Gegenprobe unten: vier Volltext-Treffer **und** ein semantischer
+    Block. Nach der alten Fassung wäre das rot gewesen — und genau das war der Fehler.
+  - **Handpunkt 16** (`related_notes`) — **grün**: 20 Treffer mit Score, absteigend, aus
+    demselben Bereichsordner (0.94 bis 0.81). Die Gegenprobe mit einer frisch angelegten
+    Notiz ist **nicht** gelaufen: sie verlangt einen Schreibvorgang, und das
+    Bestätigungs-Modal wartet dabei auf einen Menschen — der Treiber liefe in seine
+    Zeitüberschreitung. Bleibt Handarbeit.
+  - **Gegenprobe zur Schwellenlogik** — dieselbe Frage wie am 13.08. („Welche Notizen
+    behandeln den Einsatz lokaler KI-Modelle im Vault?"). Der Volltext lieferte **vier**
+    Treffer, die alte Schwelle hätte den semantischen Weg also erneut abgeschaltet. Der
+    semantische Block enthielt genau die am 13.08. vermissten Notizen (`Lokale KI.md` 0.71,
+    `Spec Ollama-Testumgebung.md` 0.71, `Betriebseinstellungen ThinkPad.md` 0.69,
+    `Modell gemma4 26b.md` 0.68). Gemessen am **ungekürzten Tool-Ergebnis**, nicht am
+    Antworttext — sonst wäre nicht unterscheidbar, ob die Pfade aus dem Werkzeug kamen.
+  - **Gegenprobe zur Ordnernotiz-Markierung** — derselbe `_Tasks`-Ordner wie in Handpunkt 19.
+    Werkzeug: `13 von 13 Notizen … (davon 1 Ordnernotiz)` und `_Tasks.md (Ordnernotiz)` in
+    der Zeile. Koda antwortete „insgesamt **12 Aufgaben** (die 13. Datei ist die Ordnernotiz
+    `_Tasks.md`)" — die Falschzählung aus Handpunkt 19 ist damit behoben, und zwar ohne
+    jede Skill-Anweisung.
+  - **Nicht gelaufen: 17 und 18.** Beide verlangen einen Eingriff in laufende Dienste
+    (Embedding-Endpunkt stoppen bzw. vault-rag deaktivieren) und bleiben offen.
+
 - **2026-08-14, Handpunkt 19** (`list_notes` im Gespräch) — Vault `80_Arbeit`, Branch-Build,
   Endpunkt `verdigado-think`, `maxRounds: 25`, `listNotesMaxRows: 150`. Gefahren als
   Praxistest über die Debug-Schnittstelle, nicht von Hand: dieselbe Frage wie am 13.08. an
