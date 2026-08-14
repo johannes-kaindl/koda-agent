@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-14
+
 ### Added
 
 - **`list_notes` tool.** All notes in a vault folder — with the frontmatter fields you
