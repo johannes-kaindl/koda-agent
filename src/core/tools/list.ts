@@ -34,9 +34,16 @@ export function formatFieldValue(v: unknown): string {
     const joined = v.map((x) => (typeof x === "object" && x !== null ? "{…}" : String(x))).join(", ");
     return joined.trim() === "" ? "—" : clip(collapse(joined));
   }
-  if (typeof v === "object") return "{…}";
-  const s = collapse(String(v));
-  return s === "" ? "—" : clip(s);
+  // Positive Typprüfungen statt einer Ausschluss-Kette: `typeof v === "object"` würde
+  // `unknown` fürs TS-Narrowing auf `{}` reduzieren statt auf eine String(...)-taugliche
+  // Union — das brächte hier denselben Stringify-Verdacht zurück, den die Prüfung
+  // eigentlich ausschließen soll.
+  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+    || typeof v === "bigint" || typeof v === "symbol") {
+    const s = collapse(String(v));
+    return s === "" ? "—" : clip(s);
+  }
+  return "{…}";
 }
 
 function collapse(s: string): string {
