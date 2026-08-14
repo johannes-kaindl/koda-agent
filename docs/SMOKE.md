@@ -98,7 +98,22 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   bewusst als `{…}` rendert statt als Fehler zu werten. Die Flachheits-Pflicht wurde deshalb
   aus dem Prüfpunkt entfernt; geprüft wird jetzt nur noch, ob `frontmatter` selbst ein über
   `fm[feld]` indizierbares Objekt ist — das ist die tatsächliche Form, gegen die `pickFields`
-  gebaut ist. Die Handpunkte 14–19 sind in diesem Durchlauf **nicht** gelaufen und bleiben offen.
+  gebaut ist. Die Handpunkte 14–18 sind in diesem Durchlauf **nicht** gelaufen und bleiben offen.
+
+- **2026-08-14, Handpunkt 19** (`list_notes` im Gespräch) — Vault `80_Arbeit`, Branch-Build,
+  Endpunkt `verdigado-think`, `maxRounds: 25`, `listNotesMaxRows: 150`. Gefahren als
+  Praxistest über die Debug-Schnittstelle, nicht von Hand: dieselbe Frage wie am 13.08. an
+  den Skill `project-session-start`, der **unverändert** `search_notes` + `read_note`
+  vorschreibt. Koda wählte von selbst
+  `list_notes {"folder":"…/26-001-03 Koda Einrichtung/_Tasks/","fields":["status","priority","frist"]}`
+  und bildete die Aufgabenlage erstmals aus den Dateien statt aus dem Projektlog: 13 gemeldet,
+  13 Dateien ohne Erledigt-Status, die genannten Top-3 in Titel, Priorität und Status korrekt,
+  10 von 25 Runden (13.08.: 3). Das vorgeschriebene sechszeilige Ausgabeformat wurde
+  eingehalten — an ihm waren zuvor zwei Schärfungsrunden des Skill-Textes gescheitert.
+  **Einschränkung:** eine der 13 Dateien ist die Ordner-Notiz `_Tasks.md`; es sind 12 echte
+  Aufgaben. Koda hat `tags` nicht mit abgefragt und konnte deshalb nicht prüfen, ob
+  `tags: aufgabe` gesetzt ist. Der Fall mit **gekappter** Liste (Warnung in Zeile 1 im
+  Gespräch) ist damit **nicht** abgedeckt und bleibt für Handpunkt 19 offen.
 
 - **2026-08-13** — Obsidian 1.13.7, Vault `10_Pallas`, Plugin **0.2.1-Build der
   Retrieval-Andockung** (HEAD `7e1fc7e`): **7/7 grün**, inklusive des neuen Prüfpunkts 1b
