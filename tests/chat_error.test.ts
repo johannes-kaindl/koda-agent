@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ChatHttpError, chatErrorMessage, extractErrorMessage } from "../src/core/llm/chat-error";
+import { ChatHttpError, chatErrorMessage, extractErrorMessage, isContextOverflow } from "../src/core/llm/chat-error";
 
 describe("extractErrorMessage", () => {
   it("zieht error.message aus einem OpenAI-Fehlerbody", () => {
@@ -54,5 +54,18 @@ describe("chatErrorMessage", () => {
     // Regression: die alte Festmeldung riet „(lokal/VPN)" und schickte damit jeden
     // Nutzer eines gehosteten Endpunkts in die falsche Richtung.
     expect(chatErrorMessage(new Error("boom"))).not.toBe("Chat-LLM nicht erreichbar (lokal/VPN).");
+  });
+});
+
+describe("isContextOverflow", () => {
+  it("erkennt LM-Studio-, Ollama- und OpenAI-Formulierungen", () => {
+    expect(isContextOverflow('{"error":"The number of tokens to keep from the initial prompt is greater than the context length"}')).toBe(true);
+    expect(isContextOverflow('{"error":{"message":"This model\'s maximum context length is 8192 tokens. However, your messages resulted in 9000 tokens."}}')).toBe(true);
+    expect(isContextOverflow("context window exceeded")).toBe(true);
+    expect(isContextOverflow("Too many tokens in prompt")).toBe(true);
+  });
+  it("laesst gewoehnliche Fehler durch", () => {
+    expect(isContextOverflow('{"detail":"Not authenticated"}')).toBe(false);
+    expect(isContextOverflow("")).toBe(false);
   });
 });

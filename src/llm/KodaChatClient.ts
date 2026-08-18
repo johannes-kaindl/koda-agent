@@ -8,7 +8,7 @@ import { realClock, type ClockPort } from "../vendor/kit-obsidian/clock";
 import { parseAgentSSE, ToolCallAssembler } from "../core/agent/stream";
 import { toWireMessages, type ChatMessage, type ToolCall } from "../core/agent/types";
 import { toWireTools, type ToolDef } from "../core/tools/defs";
-import { ChatHttpError, chatErrorMessage } from "../core/llm/chat-error";
+import { ChatHttpError, chatErrorMessage, isContextOverflow } from "../core/llm/chat-error";
 
 export interface SseTransport {
   postStream(
@@ -29,7 +29,7 @@ export interface ChatConfig {
 
 export type LlmResult =
   | { ok: true; content: string; toolCalls: ToolCall[]; finishReason?: string }
-  | { ok: false; kind: "aborted" | "http" | "network" | "timeout"; detail: string; partial: string };
+  | { ok: false; kind: "aborted" | "http" | "network" | "timeout" | "overflow"; detail: string; partial: string };
 
 const ERROR_BODY_CAP = 2048;
 export const DEFAULT_TIMEOUT_MS = 120_000;
@@ -131,12 +131,10 @@ export class KodaChatClient {
     drainSplitter();
 
     if (status < 200 || status >= 300) {
-      return {
-        ok: false,
-        kind: "http",
-        detail: chatErrorMessage(new ChatHttpError(status, rawBody.slice(0, ERROR_BODY_CAP))),
-        partial: content,
-      };
+      const detail = chatErrorMessage(new ChatHttpError(status, rawBody.slice(0, ERROR_BODY_CAP)));
+      // Ueberlauf ist ein HTTP-Fehler mit eigener Bedeutung: der Loop kann darauf mit
+      // Verdichtung reagieren, auf einen 401 nicht. Der Server-Text bleibt im detail.
+      return { ok: false, kind: isContextOverflow(rawBody) ? "overflow" : "http", detail, partial: content };
     }
     return { ok: true, content, toolCalls: assembler.finish(), ...(finishReason !== undefined ? { finishReason } : {}) };
   }

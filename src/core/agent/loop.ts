@@ -15,7 +15,7 @@ export type AgentEvent =
   | { kind: "tool-start"; call: ToolCall }
   | { kind: "tool-end"; call: ToolCall; outcome: ToolOutcome }
   | { kind: "final"; text: string }
-  | { kind: "error"; message: string; partial: string; errorKind: "aborted" | "http" | "network" | "timeout" }
+  | { kind: "error"; message: string; partial: string; errorKind: "aborted" | "http" | "network" | "timeout" | "overflow" }
   | { kind: "round-limit" };
 
 export interface AgentDeps {

@@ -255,7 +255,10 @@ export default class KodaPlugin extends Plugin {
           if (e.kind === "error") {
             this.lastNotice = e.errorKind === "aborted"
               ? { text: t("view.stopped"), kind: "neutral" }
-              : { text: t("err.generic", e.message), kind: "error" };
+              : e.errorKind === "overflow"
+                // TODO(Task 8): "?" durch s.contextWindowTokens ersetzen, sobald die Einstellung existiert.
+                ? { text: t("view.overflow", e.message, "?"), kind: "error" }
+                : { text: t("err.generic", e.message), kind: "error" };
           }
           if (e.kind === "round-limit") this.lastNotice = { text: t("view.roundLimit", s.maxRounds), kind: "error" };
         },

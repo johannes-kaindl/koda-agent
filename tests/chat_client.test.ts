@@ -59,6 +59,14 @@ describe("KodaChatClient.complete", () => {
     if (!r.ok) expect(r.detail).toMatch(/Schlüssel/);
   });
 
+  it("klassifiziert einen Kontext-Ueberlauf als kind overflow und behaelt den Server-Text", async () => {
+    const body = '{"error":{"message":"This model\'s maximum context length is 8192 tokens."}}';
+    const client = new KodaChatClient(transportOf([body], 400), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: false, kind: "overflow" });
+    if (!r.ok) expect(r.detail).toMatch(/8192/);
+  });
+
   it("bereits abgebrochenes Signal startet den Transport gar nicht", async () => {
     const ctrl = new AbortController();
     ctrl.abort();

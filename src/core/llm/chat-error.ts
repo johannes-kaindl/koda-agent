@@ -22,6 +22,15 @@ export class ChatHttpError extends Error {
   }
 }
 
+// uebernommen aus vault-crews/src/core/chat-response.ts, 2026-08-18
+const OVERFLOW_RE = /context (length|window)|too many tokens|maximum context length/i;
+
+/** True, wenn ein (Fehler-)Body auf ein überschrittenes Kontextfenster hindeutet.
+ *  Der Server-Text bleibt daneben erhalten — hier wird nur klassifiziert, nicht ersetzt. */
+export function isContextOverflow(body: string): boolean {
+  return OVERFLOW_RE.test(body);
+}
+
 /** Zieht eine einzeilige Fehler-Message aus einem JSON-Fehlerbody.
  *  Reihenfolge: error.message → error (String) → message → detail.
  *  null, wenn kein bekanntes Feld greift (Aufrufer nutzt dann den Rohbody). */
