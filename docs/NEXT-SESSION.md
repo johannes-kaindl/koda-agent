@@ -44,6 +44,24 @@
 >   Abbruch mitten in einer Mehrfach-Tool-Runde persistiert `assistant.tool_calls` ohne alle
 >   `tool`-Ergebnisse (Wire-Vertrag; Stufe 2 fasst es später weg).
 
+> **Nachtrag 2026-08-19 — aus dem Praxistest (Handpunkt 20, `docs/SMOKE.md`).**
+> - **Beobachtung fürs Design von Baustein C:** nach einer Stufe-2-Zusammenfassung holt sich
+>   das Modell die Rohinhalte **einzeln** neu (Spec sagt ihm ja, sie seien wieder abrufbar) —
+>   mit 4 K-Fenster und `maxRounds 8` endete die Folgefrage am Rundenlimit ohne Antwort. Kein
+>   Defekt, aber: ein Auftrag über viele Notizen braucht `maxRounds` mit Luft, und der
+>   Aufräum-Assistent sollte nicht darauf bauen, dass ein einmal gelesener Inhalt „drin"
+>   bleibt. Ggf. Summary-Prompt so schärfen, dass *entschiedene* Fakten (hier: welche Notiz
+>   welche Version nennt) in die Zusammenfassung wandern — dann muss weniger neu gelesen werden.
+> - `scripts/gui-ask.ts`: der Report kennt `compaction`-Einträge nicht (zeigt nur user/
+>   assistant/tool); Marken und Stufe-2-Zusammenfassung sind heute nur per CDP am
+>   `chatLog`/DOM sichtbar. Für den nächsten Praxistest: Records im Report ausweisen
+>   (`kind: "compaction"` → eine Zeile „⇢ Verlauf verdichtet (Stufe n, …)").
+> - `gui:ask`/`smoke:gui` mit mehreren Vault-Fenstern: die Sichtbarkeitsprüfung bricht hart
+>   ab, wenn das Zielfenster auf einem anderen Space liegt; Fenster holen per
+>   `electron.remote.getCurrentWindow().show()/focus()` (Memory `obsidian-fenster-sichtbarkeit-cdp`).
+>   Kandidat für die zentrale Brücke `tools/obsidian-cdp/` (`requireVisible` könnte das selbst
+>   versuchen, bevor es abbricht) — n=1, erst bei zweitem Repo ziehen.
+
 
 Stand: 2026-08-07, nach dem Store-Release von 0.1.0. Der vorherige Seed (Nach-Smoke der
 QoL-Features + `gui-smoke-setup`) ist **vollständig abgearbeitet**, ebenso

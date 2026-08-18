@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.6.0 im Community-Store (main, Stand 2026-08-14)
+## Status: 0.6.0 im Community-Store; 0.7.0 release-fertig auf main (Stand 2026-08-19)
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
@@ -13,10 +13,15 @@ vault-rag), Schreibregel mit Bestätigungs-Modal, Memory-Notiz, Sessions als JSO
 Settings-Tab, i18n DE/EN, dazu die QoL-Schicht (Verbindungstest, Modell-Auswahl,
 Failover, Presets) und ein automatisierter GUI-Smoke (`scripts/gui-smoke.ts`, CDP
 gegen ein laufendes Obsidian) plus ein Praxistest-Treiber gegen ein echtes Modell
-(`scripts/gui-ask.ts`). Auf Branch `feat/compaction` ist **Compaction (Stufe-2-Baustein
-B) implementiert** — Spec `2026-08-18-koda-compaction-design.md` — noch nicht released
-(Version bleibt 0.6.0, kein Tag). Gate ist grün (331/331), `main.js` baut. Details zu
-Nutzung/Setup: `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`.
+(`scripts/gui-ask.ts`). **Compaction (Stufe-2-Baustein B) ist auf `main`** — Spec
+`2026-08-18-koda-compaction-design.md` — und hat am 2026-08-19 den Praxistest gegen ein
+echtes Modell bestanden (`docs/SMOKE.md`, Handpunkt 20: Stufe 1 und 2 sichtbar, kein
+overflow, GUI-Smoke 10/10). Release 0.7.0 steht aus (Push/Tag von Hand, siehe TaskNote
+im Cockpit). Gate ist grün (336/336), `main.js` baut. Details zu Nutzung/Setup:
+`README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`. **Ein lokaler
+LLM-Server braucht CORS** (LM Studio „Enable CORS"/`lms server start --cors`): der Chat
+streamt als XHR aus dem Renderer, die Testen-Probe läuft über `requestUrl` — Koda benennt
+den Widerspruch „Probe grün, Chat rot" seit `3232660` selbst.
 Spezifiziert in `docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md` — dort
 stehen die Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Ordner
 frei, Rest bestätigt", Agent-Kern im Plugin, Roadmap-Stufen). Ideen-Quelle:
@@ -33,9 +38,9 @@ auch im Koda-Ordner. **Baustein B (Compaction) ist implementiert** (Branch
 `feat/compaction`, 331/331 Tests grün): zweistufige Verdichtung (Tool-Stubs, dann
 Modell-Zusammenfassung abgeschlossener Runden), Settings-Gruppe „Kontext &
 Verdichtung", Fenster-Vorbefüllung über die Endpunkt-Probe, GUI-Smoke-Punkte 7/8.
-Der Praxistest gegen ein echtes Modell ist **offen** — `gui:ask` liefert wegen des
-ungeklärten CORS-Verdachts derzeit keine Modell-Antwort (`docs/SMOKE.md`
-2026-08-18). Spec: `docs/superpowers/specs/2026-08-18-koda-compaction-design.md`.
+Der Praxistest gegen ein echtes Modell ist **bestanden** (2026-08-19, `docs/SMOKE.md`);
+der „CORS-Verdacht" bei `gui:ask` war LM Studio ohne CORS, kein Plugin-Defekt. Spec:
+`docs/superpowers/specs/2026-08-18-koda-compaction-design.md`.
 Offen bleibt **Baustein C** (Aufräum-Assistent) — beginnt mit
 `superpowers:brainstorming`, nicht mit Code: das ist ein Schnitt, kein Feature.
 Voller Seed mit offenen Design-Punkten und Kit-Ankern: `docs/NEXT-SESSION.md`.
@@ -117,7 +122,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (331/331).
+- `npm test` — `check-no-abs-paths` + vitest (336/336).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
