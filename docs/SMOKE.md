@@ -97,6 +97,28 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 
 ### Durchläufe
 
+- **2026-08-18, CDP-Bruecken-Migration** — Obsidian 1.13.7, Vault `10_Pallas`, Plugin
+  0.6.0 (HEAD `21babbe`). `scripts/gui-smoke.ts` und `scripts/gui-ask.ts` importieren die
+  CDP-Bruecke jetzt aus dem Dach (`tools/obsidian-cdp/`) statt aus einer eigenen, aelteren
+  Linie (`scripts/lib/cdp.ts`, entfernt). Baseline vor der Migration: **8/8 gruen**. Nach
+  der Migration (Cdp.attach → attachTo, Cdp.attachSettings → attachTo("settings", …),
+  waitFor/waitForAsync → pollUntil mit getrennter Mutation/Wartephase, neu:
+  `clickReal` in der Bruecke fuer Pruefpunkt 3): **8/8 gruen**, identisch bis auf
+  natuerliche Varianz (Klickzeit, welche Notiz als Wikilink-Ziel dient).
+  **Nebenbefund beim `gui:ask`-Praxistest (nicht migrationsbedingt):** eine echte Frage
+  gegen den lokalen LM-Studio-Endpunkt (`http://127.0.0.1:1234`, Modell
+  `qwen/qwen3.6-27b`) blieb ohne Modell-Antwort — `chatLog` bekam nur die Nutzerfrage,
+  `lastNotice` meldete „Chat-LLM nicht erreichbar", obwohl `curl` gegen denselben
+  Endpunkt sofort antwortete und `p.probe()` (Obsidians `requestUrl`, umgeht CORS)
+  `reachable: true` meldete. Gegenprobe mit dem **alten** Treiber (vor der Migration,
+  aus `git show HEAD:scripts/gui-ask.ts` gebaut) reproduzierte denselben Ausgang — keine
+  Regression dieser Migration. Verdacht: `XhrSseTransport` (`src/llm/XhrSseTransport.ts`)
+  nutzt fuer den Streaming-Chat-Call rohes `XMLHttpRequest` statt `requestUrl` und
+  unterliegt damit — anders als die Testen-Probe — der Browser-CORS-Durchsetzung; ein
+  lokaler Server ohne passende CORS-Header waere fuer die Probe erreichbar und fuer den
+  eigentlichen Chat-Call trotzdem blockiert, ununterscheidbar von "Server aus". Nicht
+  weiter verfolgt (ausserhalb des Migrationsauftrags) — offen fuer eine eigene Session.
+
 - **2026-08-14** — Obsidian 1.13.7, Vault `10_Pallas`, Plugin **0.3.0-Build von
   `feat/list-notes`**: **8/8 grün**, inklusive des neuen Prüfpunkts **1c** (`6210 von 6485
   Notizen mit Frontmatter · Beispielfelder: title, summary, type, tags, thema`).
