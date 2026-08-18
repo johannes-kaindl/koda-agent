@@ -64,6 +64,23 @@ async function main(): Promise<void> {
     return;
   }
   const client = new KodaChatClient(transport, 180_000, nodeClock);
+
+  // Alternierungs-Gegenprobe: lehnt ein Modell zwei `user`-Rollen hintereinander ab
+  // (die Annahme hinter `renderMerged` in project.ts)? Ohne Tools, ohne System-Prompt —
+  // reine Rollenfrage.
+  if (flag("alternation") !== null || process.argv.includes("--alternation")) {
+    for (const model of models) {
+      const r = await client.complete(
+        { endpoint, apiKey: flag("apikey") ?? "", model, suppressThinking: true },
+        [{ role: "user", content: "Merke dir: A" }, { role: "user", content: "Was habe ich dir gesagt?" }],
+        [], () => {}, () => {},
+        new AbortController().signal,
+      );
+      console.log(`${model}: ${r.ok ? "OK — zwei user hintereinander akzeptiert" : `${r.kind} — ${r.detail}`}`);
+    }
+    process.exit(0);
+  }
+
   const system: ChatMessage = {
     role: "system",
     content: "You are Koda, a vault assistant. Use the provided tools to search and read notes before answering.",

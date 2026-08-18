@@ -54,6 +54,11 @@ interface Slot {
   parts?: string[];
 }
 
+/** Fasst mehrere `user`-Nachrichten zu einer zusammen — vorsorglich gegen Chat-Templates
+ *  (Gemma), die zwei `user`-Rollen hintereinander ablehnen sollen ("roles must alternate").
+ *  Gegen LM Studio (2026-08-18, docs/LAB.md) hat keines von 8 Modellen (4x Gemma, 4x Qwen)
+ *  das quittiert — die Begründung bleibt also vorsorglich, nicht gemessen bestätigt; das
+ *  Zusammenfassen schadet aber nicht und bleibt deshalb bestehen. */
 function renderMerged(parts: string[]): ChatMessage {
   const body = parts.map((p, i) => `${i + 1}. ${p}`).join("\n");
   return { role: "user", content: `${MERGED_HEADER}\n${body}`, merged: true };
