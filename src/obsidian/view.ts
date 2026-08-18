@@ -1,6 +1,6 @@
 import { Component, ItemView, MarkdownRenderer, type WorkspaceLeaf } from "obsidian";
 import { t } from "../vendor/kit/i18n";
-import { isCompactionRecord } from "../core/agent/types";
+import { isCompactionRecord, type CompactionRecord } from "../core/agent/types";
 import type KodaPlugin from "../main";
 
 export const VIEW_TYPE_KODA = "koda-agent-view";
@@ -74,6 +74,30 @@ export class KodaView extends ItemView {
     void this.plugin.ask(q);
   }
 
+  /** Verdichtungs-Marke: Stufe 1 als Notizzeile, Stufe 2 aufklappbar mit dem Text — lesbar,
+   *  pruefbar, widersprechbar. Der volle Verlauf darueber bleibt stehen: verdichtet wird,
+   *  was das MODELL sieht, nicht, was der Nutzer gesagt und gesehen hat. */
+  private renderCompaction(host: HTMLElement, rec: CompactionRecord): void {
+    const forced = rec.forced === true ? t("view.compaction.forced") : "";
+    if (rec.stage === 1) {
+      // `parseLines` prueft nur, dass `stats` ein Objekt ist — nicht, dass die Felder
+      // Zahlen sind. Defensiv rendern statt einer NaN-Marke im Chat.
+      const kb = ((rec.stats.bytes ?? 0) / 1024).toFixed(1);
+      host.createDiv({ cls: "koda-msg koda-notice koda-compaction", text: t("view.compaction.stage1", rec.stats.stubbed ?? 0, kb) + forced });
+      return;
+    }
+    const d = host.createEl("details", { cls: "koda-compaction koda-compaction-summary" });
+    d.createEl("summary", { text: t("view.compaction.stage2", rec.turns ?? 0) + forced });
+    d.createEl("pre", { text: rec.summary ?? "" });
+  }
+
+  /** Live waehrend eines Laufs (onEvent) — bei einem 90-Sekunden-Loop soll man sehen, dass er lebt. */
+  compactionMark(rec: CompactionRecord): void {
+    this.streamEl = null;
+    this.renderCompaction(this.logEl, rec);
+    this.logEl.scrollTo({ top: this.logEl.scrollHeight });
+  }
+
   /** Voll-Redraw aus plugin.chatLog (Sessionstart, final, Fehler). */
   renderLog(): void {
     this.logEl.empty();
@@ -91,7 +115,7 @@ export class KodaView extends ItemView {
     };
     let toolNames = new Map<string, string>();
     for (const m of this.plugin.chatLog) {
-      if (isCompactionRecord(m)) continue; // Rendering kommt in Task 9
+      if (isCompactionRecord(m)) { this.renderCompaction(this.logEl, m); continue; }
       if (m.role === "user") {
         this.logEl.createDiv({ cls: "koda-msg koda-user", text: m.content });
       } else if (m.role === "assistant") {

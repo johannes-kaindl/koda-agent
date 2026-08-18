@@ -5,14 +5,14 @@ import { pickLang, setLang, t } from "./vendor/kit/i18n";
 import { effectiveModel, type EndpointConfig } from "./vendor/kit/endpoint_config";
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
-import { KodaChatClient } from "./llm/KodaChatClient";
+import { KodaChatClient, type LlmResult } from "./llm/KodaChatClient";
 import { probeEndpoint, probeModels } from "./core/llm/probe";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
-import { runAgent, type LoopLlm } from "./core/agent/loop";
+import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
 import type { ChatMessage, LogEntry } from "./core/agent/types";
-import { toolDefs } from "./core/tools/defs";
+import { toolDefs, toWireTools } from "./core/tools/defs";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/memory/memory";
 import { SessionStore } from "./core/memory/session";
@@ -197,6 +197,36 @@ export default class KodaPlugin extends Plugin {
             () => ({ ok: false, kind: "network", detail: t("error.noEndpoint"), partial: "" }),
           ),
       };
+
+      // Stufe 2 laeuft ueber DENSELBEN Client und Failover, ohne Werkzeuge und mit
+      // unterdruecktem Denken. Fehler und Abbruch werden zu null: der Loop macht dann
+      // ohne Zusammenfassung weiter (Spec: kein Record ist besser als ein leerer).
+      const summarize = async (messages: ChatMessage[]): Promise<string | null> => {
+        // Explizites Typargument: ohne Kontext-Typ (anders als bei `llm.complete`, das
+        // gegen `LoopLlm` typgeprueft wird) waehlt die Inferenz sonst die Objektform von
+        // `onNoEndpoint` statt `LlmResult` — `r.content` wuerde dann nicht existieren.
+        const r = await withFailover<LlmResult>(
+          this.resolver,
+          (ep) =>
+            client.complete(
+              { endpoint: ep.url, apiKey: ep.apiKey ?? "", model: effectiveModel(ep, s.model), suppressThinking: true },
+              messages, [], () => {}, () => {}, this.abort?.signal ?? new AbortController().signal,
+            ),
+          (r) => !r.ok && r.kind === "network" && r.partial === "",
+          () => ({ ok: false, kind: "network", detail: t("error.noEndpoint"), partial: "" }),
+        );
+        return r.ok && r.content.trim() !== "" ? r.content : null;
+      };
+      const compaction: CompactionDeps = {
+        budgetTokens: Math.floor((s.contextWindowTokens * s.compactAtPercent) / 100),
+        keepToolResults: s.keepToolResults,
+        overheadChars: JSON.stringify(toWireTools(defs)).length,
+        summarize: s.summarizeEnabled ? summarize : null,
+        summaryMaxChars: Math.floor((s.contextWindowTokens * 4 * s.summaryPercent) / 100),
+        lang,
+        now: () => new Date().toISOString(),
+      };
+
       const vaultPort: VaultPort = {
         listMarkdownPaths: () => this.app.vault.getMarkdownFiles().map((f) => f.path),
         read: async (p) => {
@@ -242,7 +272,7 @@ export default class KodaPlugin extends Plugin {
       });
 
       const appended = await runAgent(
-        { llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback },
+        { llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback, compaction },
         [system, ...this.chatLog],
         (tok) => { for (const v of this.views()) v.streamToken(tok); },
         (r) => { for (const v of this.views()) v.streamReasoning(r); },
@@ -260,6 +290,7 @@ export default class KodaPlugin extends Plugin {
                 : { text: t("err.generic", e.message), kind: "error" };
           }
           if (e.kind === "round-limit") this.lastNotice = { text: t("view.roundLimit", s.maxRounds), kind: "error" };
+          if (e.kind === "compaction") for (const v of this.views()) v.compactionMark(e.record);
         },
         this.abort.signal,
       );

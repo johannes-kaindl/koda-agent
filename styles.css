@@ -20,6 +20,10 @@
 .koda-error { color: var(--text-error); }
 .koda-notice { color: var(--text-muted); }
 .koda-skills { font-size: var(--font-ui-smaller); border-bottom: 1px solid var(--background-modifier-border); padding-bottom: var(--size-4-1); margin-bottom: var(--size-4-2); }
+/* Verdichtungs-Marke: sichtbar, aber leise — sie sagt, was das Modell ab hier nicht mehr
+   woertlich hat. Der Verlauf darueber bleibt vollstaendig. */
+.koda-compaction { font-size: var(--font-ui-smaller); color: var(--text-muted); border-top: 1px dashed var(--background-modifier-border); padding-top: var(--size-4-1); margin: var(--size-4-2) 0; }
+.koda-compaction-summary pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
 .koda-placeholder { color: var(--text-muted); font-style: italic; }
 .koda-tool, .koda-reasoning { margin-bottom: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .koda-tool pre, .koda-reasoning pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
