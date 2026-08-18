@@ -59,14 +59,27 @@ function renderMerged(parts: string[]): ChatMessage {
   return { role: "user", content: `${MERGED_HEADER}\n${body}`, merged: true };
 }
 
-function applyStage1(slots: Slot[], rec: CompactionRecord, calls: Map<string, { name: string; args: string }>): void {
+/** Indizes der Tool-Nachrichten, die eine Stufe-1-Marke mit diesem K stubben wuerde —
+ *  EINE Regel fuer Marke (planStage1) und Projektion (applyStage1), damit beide nie
+ *  auseinanderlaufen. K zaehlt positionell die K juengsten Tool-Ergebnisse (auch kurze
+ *  oder schon gestubbte); gestubbt wird davon jenseits, was `shouldStub` erlaubt. */
+export function stage1Targets(msgs: ChatMessage[], keep: number): number[] {
+  const targets: number[] = [];
   let seen = 0;
-  for (let i = slots.length - 1; i >= 0; i--) {
-    const m = slots[i].msg;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
     if (m.role !== "tool") continue;
     seen++;
-    if (seen <= rec.keepToolResults) continue;
+    if (seen <= keep) continue;
     if (!shouldStub(m)) continue;
+    targets.push(i);
+  }
+  return targets;
+}
+
+function applyStage1(slots: Slot[], rec: CompactionRecord, calls: Map<string, { name: string; args: string }>): void {
+  for (const i of stage1Targets(slots.map((s) => s.msg), rec.keepToolResults)) {
+    const m = slots[i].msg;
     const c = calls.get(m.toolCallId ?? "");
     slots[i] = {
       msg: {
