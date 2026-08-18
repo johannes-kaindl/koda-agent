@@ -41,11 +41,18 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
     beruhen (⚙ list_notes sichtbar), und bei gekappter Liste muss Koda die Unvollständigkeit benennen
     (`⚠ UNVOLLSTÄNDIG …`), statt sie zu verschweigen.
 
+### Verdichtung (Compaction, braucht echten Modell-Lauf)
+
+20. Fenster auf 4096 setzen, Auftrag „lies die fünf längsten Notizen in `<Ordner>` und fasse
+    jede zusammen" → Marke „Verlauf verdichtet" erscheint während des Laufs; Antwort konsistent
+    (Praxistest `gui:ask --full`).
+
 ## Automatisierter Teil: `npm run smoke:gui`
 
-Acht dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
-laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b und 1c erweitert).
-Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
+Zehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
+2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
+erweitert). Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
 
 ```bash
 osascript -e 'quit app "Obsidian"'
@@ -58,8 +65,18 @@ Geprüft werden: Plugin aktiv · **Retrieval-Andockung** (vault-rags Vertrag lie
 Form vor, gegen die Koda gebaut ist) · **Frontmatter-Naht** (`metadataCache` liefert
 Frontmatter in der Form, gegen die `pickFields` gebaut ist) · Sidebar mit Eingabefeld und
 Knöpfen · Klick auf „Testen“ friert den Renderer nicht ein · toter Endpunkt wird als nicht
-erreichbar angezeigt · zwei tote Endpunkte ergeben Klartext statt Stacktrace · Wikilink in
-der Antwort öffnet die Notiz.
+erreichbar angezeigt · **Settings-Gruppe „Kontext & Verdichtung“** (Überschrift + Zahlenfeld
+„Kontextfenster (Token)“ vorhanden) · zwei tote Endpunkte ergeben Klartext statt Stacktrace ·
+Wikilink in der Antwort öffnet die Notiz · **Verdichtungs-Marken** (Stufe 1, Stufe 2
+aufklappbar mit Text, erzwungener Zusatz „Überlauf“/„overflow“) werden gerendert.
+
+Prüfpunkt **7** und **8** kommen ohne Modell und ohne Persistenz aus: Punkt 7 haengt zwei
+`CompactionRecord`s nur im Speicher an `p.chatLog`, ruft `renderLog()`, prueft die drei
+CSS-Zweige aus `renderCompaction` (`src/obsidian/view.ts`) und entfernt die Records wieder
+(`splice` + Re-Render) — `current.jsonl` bleibt unberuehrt. Punkt 8 nutzt das Einstellungs-
+fenster, das die Punkte 3/4 ohnehin schon offen haben, und prueft nur die Naht zum
+deklarativen Settings-Walker (Ueberschrift + Eingabefeld), nicht die Verdichtungslogik
+selbst — die zeigt erst Handpunkt 20 mit einem echten Modell-Lauf.
 
 Prüfpunkt **1b** verdient eine Einordnung, weil er weniger zeigt, als sein Name nahelegt: Er
 prüft die **Naht**, nicht die Suche — `apiVersion`, die Fläche (`Object.keys`), und
@@ -96,6 +113,30 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 `VaultTools` wird in `ask()` lokal erzeugt und ist am Plugin nicht exponiert.
 
 ### Durchläufe
+
+- **2026-08-18, Verdichtungs-Marken + Settings-Gruppe (neue Prüfpunkte 7/8)** — direkt im
+  Anschluss an die Baseline-Zeile unten, derselbe Obsidian-Lauf, derselbe Plugin-Build
+  (`feat/compaction`, HEAD `58b86e0`). Treiber um Punkt 7 (Verdichtungs-Marken, nach Punkt 6)
+  und Punkt 8 (Settings-Gruppe „Kontext & Verdichtung“, innerhalb des ohnehin offenen
+  Einstellungsfensters aus Punkt 3/4) ergänzt: **10/10 grün**
+  (`{"heading":true,"field":"8192"}` bei Punkt 8;
+  `{"stage1":1,"stage2":1,"forced":1,"summaryText":"SMOKE-ZUSAMMENFASSUNG"}` bei Punkt 7).
+  **Gegenprobe gefahren und bestanden:** `summaryText` in Punkt 7 auf `"GEGENPROBE-FALSCH"`
+  verfälscht → **9/10, genau Punkt 7 rot** (`{"stage1":1,"stage2":1,"forced":1,"summaryText":"GEGENPROBE-FALSCH"}`,
+  alle anderen neun weiterhin grün). Zurückgeändert → wieder **10/10 grün**. Nach jedem Lauf
+  geprüft: `sessions/current.jsonl` im Test-Vault unverändert (0 Byte, wie vor der Task) —
+  die neuen Punkte fassen `chatLog` nur im Speicher an und schreiben nie über den
+  `SessionStore`.
+
+- **2026-08-18, Baseline vor Compaction-Prüfpunkten (Treiber unverändert, Plugin-Build
+  `feat/compaction`)** — Obsidian 1.13.7, Vault `10_Pallas`, Plugin 0.6.0-Build von
+  `feat/compaction` (HEAD `58b86e0`, `npm run build` + `cp main.js styles.css` ins
+  Plugin-Verzeichnis, Reload über `disablePlugin`/`enablePlugin`). Treiber **unverändert**
+  (vor den neuen Verdichtungs-/Settings-Prüfpunkten dieser Task): **8/8 grün**, identisch
+  zum Stand vom 2026-08-18 CDP-Migration. Diese Zeile ist die Vergleichsbasis für den
+  Umbau direkt danach (Lesson 2026-08-18/apple-health: der Smoke ist hier selbst der
+  Prüfling, ein grüner Lauf danach ist ohne diese Baseline nicht von „anders grün" zu
+  unterscheiden).
 
 - **2026-08-18, CDP-Bruecken-Migration** — Obsidian 1.13.7, Vault `10_Pallas`, Plugin
   0.6.0 (HEAD `21babbe`). `scripts/gui-smoke.ts` und `scripts/gui-ask.ts` importieren die
