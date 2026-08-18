@@ -38,6 +38,9 @@ All notable changes to this project are documented here. The format follows
   probe runs through Obsidian's `requestUrl` in the main process and sends no
   `Origin`; the chat streams as XHR from the renderer and always does. README
   documents the requirement.
+- **The stage-2 "Summarizing earlier turns…" hint now disappears as soon as the
+  summary lands** (or the next tool step / token arrives) instead of lingering until
+  the run's final redraw — measured ~100 s too long in the first live compaction run.
 
 ## [0.6.0] — 2026-08-14
 

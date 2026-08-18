@@ -114,12 +114,51 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 
 ### Durchläufe
 
-- **2026-08-18, Praxistest Verdichtung — offen.** Handpunkt „Verdichtung" (Fenster auf 4096,
-  `npm run gui:ask` mit einer Frage, die mehrere lange Notizen liest) ist **nicht gelaufen**:
-  Voraussetzung ist der CORS-Verdacht bei `gui:ask` (Zeile „Nebenbefund" unten,
-  2026-08-18/CDP-Bruecken-Migration; Memory `gui-ask-cors-verdacht`) — solange `chatLog` ohne
-  Modell-Antwort bleibt, gibt es keinen Verlauf, an dem sich eine `compaction`-Marke zeigen
-  könnte. **Weder bestanden noch fehlgeschlagen — offen**, bis die CORS-Ursache geklärt ist.
+- **2026-08-19 (00:00–00:25), Handpunkt 20 (Praxistest Verdichtung) — grün, plus GUI-Smoke
+  10/10 mit dem Release-Build.** Vault `10_Pallas`, Obsidian 1.13.7, LM Studio
+  `qwen/qwen3.6-35b-a3b`, Fenster auf 4096 (`compactAt` 75 %, `keepToolResults` 3, Stufe 2
+  an), Build `main` `3232660`+View-Fix. Frage: „Lies die fünf längsten Notizen im Ordner
+  `25_Coding/koda-agent/_Log` und fasse jede in zwei Sätzen zusammen." (`gui:ask --full`).
+  - **Stufe 1:** das Modell las alle 8 Notizen in **einer** Runde parallel (7 `read_note`
+    nach `list_notes`); vor dem nächsten Modell-Aufruf ein Record `stage 1, stubbed 5,
+    bytes 18042` — exakt die fünf ältesten Tool-Ergebnisse (397+5393+4990+4358+2904),
+    die drei jüngsten blieben verbatim. Antwort nennt fünf Notizen mit je zwei Sätzen,
+    **kein `overflow`**, `lastNotice: null`. Marke im View: „Verlauf verdichtet — 5
+    Tool-Ergebnisse (17.6 KB) gekürzt" (View wurde für die Sichtprüfung nachträglich
+    geöffnet — `gui:ask` ruft `ask()` ohne View; `renderLog` zeichnete die Marke aus dem
+    Log). Session-JSONL trägt den Record.
+  - **Stufe 2** springt mit nur einer Nutzerfrage **nie** an — `splitTurns` zählt Runden ab
+    Nutzer-Nachricht, alles war die laufende Runde (spec-konform, kein Defekt). Deshalb
+    Folgefrage in derselben Session (`--keep-session`, „Welche dieser Notizen erwähnen ein
+    Release? Nenne die Versionsnummern …"), DOM-Watcher alle 2 s: Lebenszeichen „Fasse
+    frühere Runden zusammen…" nach **4 s**, Marke „Verlauf zusammengefasst (1 Runden)" mit
+    1800 Zeichen Zusammenfassung nach **56 s** (Stufe-2-Aufruf ≈ 52 s), danach rollende
+    Stufe-1-Records je Runde (`stubbed 1` × 4). **Nebenbefund Anzeige, behoben:** das
+    Lebenszeichen blieb bis zum finalen `renderLog` stehen (≈ 100 s länger als der Aufruf) —
+    der View entfernt es jetzt bei der nächsten Marke, dem nächsten Werkzeugschritt oder
+    Token. **Nebenbefund Modellverhalten, nicht behoben (kein Defekt):** nach der
+    Zusammenfassung holte sich das Modell die Notizen **einzeln** neu (8 Runden `read_note`/
+    `search_notes`/`list_notes`) und lief in `maxRounds: 8` — „Nach 8 Tool-Runden gestoppt".
+    Mit einem künstlich kleinen 4 K-Fenster ist das erwartbar (die Spec sagt dem Modell,
+    Rohinhalte seien wieder abrufbar); im Normalbetrieb (8 K+, reale Fenster 32 K–256 K)
+    stellt sich die Frage nicht in dieser Schärfe. Beobachtung für den Aufräum-Assistenten:
+    ein Auftrag über viele Notizen braucht `maxRounds` mit Luft.
+  - **CORS-Ursache geklärt (das war der Blocker):** LM Studio lief seit dem 15.08. **ohne
+    CORS** — im Server-Log wurden alle OPTIONS-Preflights als POST-Route beantwortet (400
+    „'messages' field is required" bzw. „No models loaded"), am 14.08. (letzter grüner
+    Praxistest) noch mit `Access-Control-Allow-Origin: *`. Auslöser: `lms server start`
+    ohne `--cors` in Nachbar-Sessions (readme-shots yijing/local-image-generator schalteten
+    CORS für Aufnahmen an und „danach zurück"). Kein Plugin-Defekt. Koda benennt den Fall
+    jetzt (`error.chatBlocked`, `withFailover.onRefusedDespiteProbe`), README nennt die
+    Voraussetzung.
+  - **GUI-Smoke danach mit dem finalen Build: 10/10 grün** (Punkt 7
+    `{"stage1":1,"stage2":1,"forced":1,"summaryText":"SMOKE-ZUSAMMENFASSUNG"}`, Punkt 8
+    `{"heading":true,"field":"8192"}`). Fenster wurde vorher auf 8192 zurückgesetzt.
+    Betriebsnotiz: mit mehreren Vault-Fenstern **eines** Obsidian-Prozesses auf
+    verschiedenen Spaces ist nur das vorderste `visible`; `Page.bringToFront` reicht nicht,
+    `require("electron").remote.getCurrentWindow().show()/focus()` holt das Fenster samt
+    Space-Wechsel, und wenn eine andere App vorne bleiben soll, tut es
+    `setVisibleOnAllWorkspaces(true)` + `setAlwaysOnTop(true)` für die Dauer des Smokes.
 
 - **2026-08-18, Verdichtungs-Marken + Settings-Gruppe (neue Prüfpunkte 7/8)** — direkt im
   Anschluss an die Baseline-Zeile unten, derselbe Obsidian-Lauf, derselbe Plugin-Build
@@ -166,6 +205,9 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   lokaler Server ohne passende CORS-Header waere fuer die Probe erreichbar und fuer den
   eigentlichen Chat-Call trotzdem blockiert, ununterscheidbar von "Server aus". Nicht
   weiter verfolgt (ausserhalb des Migrationsauftrags) — offen fuer eine eigene Session.
+  **Aufgelöst 2026-08-19 (Durchlauf oben):** Verdacht bestätigt, Ursache LM Studio ohne
+  CORS seit dem 15.08.; nach Server-Neustart mit `cors: true` antwortet Koda. Seither
+  benennt Koda den Fall selbst („Probe grün, Chat rot") statt „Server aus" zu raten.
 
 - **2026-08-14** — Obsidian 1.13.7, Vault `10_Pallas`, Plugin **0.3.0-Build von
   `feat/list-notes`**: **8/8 grün**, inklusive des neuen Prüfpunkts **1c** (`6210 von 6485

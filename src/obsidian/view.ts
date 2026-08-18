@@ -11,6 +11,9 @@ export class KodaView extends ItemView {
   private logEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
   private streamEl: HTMLElement | null = null;
+  /** Das transiente Lebenszeichen der Stufe 2 — wird beim naechsten sichtbaren Fortschritt
+   *  (Marke, Werkzeugschritt, Token) entfernt, nicht erst beim Voll-Redraw am Ende. */
+  private summarizingEl: HTMLElement | null = null;
   private reasonEl: HTMLElement | null = null;
   /** Lebensdauer-Anker fuer alles, was MarkdownRenderer im Log anlegt (Embeds, Hover-
    *  Handler). Wird bei jedem Voll-Redraw ausgetauscht, sonst wachsen die Kind-Komponenten
@@ -94,6 +97,7 @@ export class KodaView extends ItemView {
   /** Live waehrend eines Laufs (onEvent) — bei einem 90-Sekunden-Loop soll man sehen, dass er lebt. */
   compactionMark(rec: CompactionRecord): void {
     this.streamEl = null;
+    this.clearSummarizingHint();
     this.renderCompaction(this.logEl, rec);
     this.logEl.scrollTo({ top: this.logEl.scrollHeight });
   }
@@ -102,8 +106,17 @@ export class KodaView extends ItemView {
    *  landet nicht in chatLog, der naechste renderLog() (finally in ask()) laesst sie weg. */
   summarizingHint(): void {
     this.streamEl = null;
-    this.logEl.createDiv({ cls: "koda-msg koda-notice koda-compaction", text: t("view.compaction.summarizing") });
+    this.clearSummarizingHint();
+    this.summarizingEl = this.logEl.createDiv({ cls: "koda-msg koda-notice koda-compaction", text: t("view.compaction.summarizing") });
     this.logEl.scrollTo({ top: this.logEl.scrollHeight });
+  }
+
+  /** Gemessen 2026-08-19 (Praxistest): ohne das stand „Fasse frühere Runden zusammen…" rund
+   *  100 s laenger im Chat als der Aufruf dauerte — bis zum Voll-Redraw am Ende von ask().
+   *  Ein Lebenszeichen, das die Taetigkeit ueberlebt, ist eine falsche Aussage. */
+  private clearSummarizingHint(): void {
+    this.summarizingEl?.remove();
+    this.summarizingEl = null;
   }
 
   /** Voll-Redraw aus plugin.chatLog (Sessionstart, final, Fehler). */
@@ -111,6 +124,7 @@ export class KodaView extends ItemView {
     this.logEl.empty();
     this.streamEl = null;
     this.reasonEl = null;
+    this.summarizingEl = null; // empty() hat ihn schon entfernt — nur den Zeiger loslassen
     if (this.mdComp !== null) this.removeChild(this.mdComp);
     this.mdComp = this.addChild(new Component());
     if (this.plugin.skillNotice !== null) {
@@ -153,11 +167,13 @@ export class KodaView extends ItemView {
 
   // — Streaming-Hooks, vom Plugin gerufen —
   streamToken(text: string): void {
+    this.clearSummarizingHint();
     if (this.streamEl === null) this.streamEl = this.logEl.createDiv({ cls: "koda-msg koda-assistant koda-streaming" });
     this.streamEl.setText(this.streamEl.getText() + text);
     this.logEl.scrollTo({ top: this.logEl.scrollHeight });
   }
   streamReasoning(text: string): void {
+    this.clearSummarizingHint();
     if (this.reasonEl === null) {
       const d = this.logEl.createEl("details", { cls: "koda-reasoning" });
       d.createEl("summary", { text: t("view.thinking") });
@@ -167,6 +183,7 @@ export class KodaView extends ItemView {
   }
   toolStep(label: string, detail: string): void {
     this.streamEl = null; // naechster Token-Block ist eine neue Blase
+    this.clearSummarizingHint();
     const d = this.logEl.createEl("details", { cls: "koda-tool" });
     d.createEl("summary", { text: label });
     d.createEl("pre", { text: detail });
