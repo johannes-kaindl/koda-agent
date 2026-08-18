@@ -11,7 +11,7 @@ import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm } from "./core/agent/loop";
-import type { ChatMessage } from "./core/agent/types";
+import { isChatMessage, type ChatMessage, type LogEntry } from "./core/agent/types";
 import { toolDefs } from "./core/tools/defs";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/memory/memory";
@@ -35,7 +35,7 @@ interface SkillFailure {
 
 export default class KodaPlugin extends Plugin {
   settings: KodaSettings = DEFAULT_SETTINGS;
-  chatLog: ChatMessage[] = [];
+  chatLog: LogEntry[] = [];
   busy = false;
   /** Transiente Notiz (Fehler/Abbruch/Rundenlimit) als Plugin-State statt DOM-Append —
    *  renderLog() zeichnet sie am Ende neu; ein Voll-Redraw kann sie sonst sofort wieder loeschen. */
@@ -243,7 +243,7 @@ export default class KodaPlugin extends Plugin {
 
       const appended = await runAgent(
         { llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback },
-        [system, ...this.chatLog],
+        [system, ...this.chatLog.filter(isChatMessage)],
         (tok) => { for (const v of this.views()) v.streamToken(tok); },
         (r) => { for (const v of this.views()) v.streamReasoning(r); },
         (e) => {

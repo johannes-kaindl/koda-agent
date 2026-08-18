@@ -1,5 +1,6 @@
 import { Component, ItemView, MarkdownRenderer, type WorkspaceLeaf } from "obsidian";
 import { t } from "../vendor/kit/i18n";
+import { isCompactionRecord } from "../core/agent/types";
 import type KodaPlugin from "../main";
 
 export const VIEW_TYPE_KODA = "koda-agent-view";
@@ -90,6 +91,7 @@ export class KodaView extends ItemView {
     };
     let toolNames = new Map<string, string>();
     for (const m of this.plugin.chatLog) {
+      if (isCompactionRecord(m)) continue; // Rendering kommt in Task 9
       if (m.role === "user") {
         this.logEl.createDiv({ cls: "koda-msg koda-user", text: m.content });
       } else if (m.role === "assistant") {

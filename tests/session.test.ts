@@ -1,5 +1,5 @@
 import { SessionStore, parseLines, serializeLine, type SessionSink } from "../src/core/memory/session";
-import type { ChatMessage } from "../src/core/agent/types";
+import type { ChatMessage, CompactionRecord } from "../src/core/agent/types";
 
 function memSink(): SessionSink & { files: Map<string, string> } {
   const files = new Map<string, string>();
@@ -43,6 +43,25 @@ describe("SessionStore", () => {
     await store.startNew();
     expect(await store.load()).toEqual([]);
     expect(sink.files.get("sessions/archive.jsonl")).toContain("Hallo");
+  });
+});
+
+describe("CompactionRecord im JSONL", () => {
+  const rec: CompactionRecord = { kind: "compaction", stage: 1, at: "2026-08-18T20:00:00.000Z", keepToolResults: 3, stats: { stubbed: 2, bytes: 4096 } };
+  const rec2: CompactionRecord = { kind: "compaction", stage: 2, at: "2026-08-18T20:01:00.000Z", keepToolResults: 3, summary: "Bisher: A gelesen.", turns: 2, stats: { stubbed: 0, bytes: 900 } };
+
+  it("Roundtrip Record neben Nachrichten, Reihenfolge bleibt", () => {
+    const text = serializeLine(msg) + serializeLine(rec) + serializeLine({ role: "assistant", content: "Hi" }) + serializeLine(rec2);
+    expect(parseLines(text)).toEqual([msg, rec, { role: "assistant", content: "Hi" }, rec2]);
+  });
+  it("Record ohne gueltige stage wird uebersprungen, kostet nur die Zeile", () => {
+    const text = '{"kind":"compaction","stage":9}\n' + serializeLine(msg);
+    expect(parseLines(text)).toEqual([msg]);
+  });
+  it("Store persistiert Records ueber appendMessages + load", async () => {
+    const store = new SessionStore(memSink(), "sessions");
+    await store.appendMessages([msg, rec]);
+    expect(await store.load()).toEqual([msg, rec]);
   });
 });
 

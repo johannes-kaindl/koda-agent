@@ -5,6 +5,39 @@ export interface ChatMessage {
   content: string;
   toolCalls?: ToolCall[];
   toolCallId?: string;
+  /** Nur in der Projektion (`projectForModel`): dieses Tool-Ergebnis ist ein Stub. Nie persistiert. */
+  stubbed?: true;
+  /** Nur in der Projektion: zusammengesetzte fruehere Nutzer-Nachrichten (Stufe 2). Nie persistiert. */
+  merged?: true;
+}
+
+/** Verdichtungs-Marke im Verlauf. Referenziert nichts — ihre POSITION ist die Referenz:
+ *  „alles vor mir wird nach dieser Regel verdichtet“. Robust gegen verlorene JSONL-Zeilen,
+ *  braucht keine Nachrichten-IDs und keine Migration (Spec § Datenmodell). */
+export interface CompactionRecord {
+  kind: "compaction";
+  stage: 1 | 2;
+  /** ISO-Zeitstempel, nur fuer Anzeige/Log. */
+  at: string;
+  /** Reaktiv nach einem Ueberlauf erzwungen — die Marke im Chat sagt es dazu. */
+  forced?: true;
+  /** Stufe 1: die K juengsten Tool-Ergebnisse vor mir bleiben woertlich. */
+  keepToolResults: number;
+  /** Stufe 2: Zusammenfassungstext. Ohne Text kein Record (leer waere schlimmer als keiner). */
+  summary?: string;
+  /** Stufe 2: wie viele abgeschlossene Runden zusammengefasst wurden (Anzeige). */
+  turns?: number;
+  /** Was Stufe 1 gekuerzt hat (Anzahl, Zeichen) — fuer die Marke im Chat. */
+  stats: { stubbed: number; bytes: number };
+}
+
+export type LogEntry = ChatMessage | CompactionRecord;
+
+export function isCompactionRecord(e: LogEntry): e is CompactionRecord {
+  return (e as CompactionRecord).kind === "compaction";
+}
+export function isChatMessage(e: LogEntry): e is ChatMessage {
+  return !isCompactionRecord(e);
 }
 
 export type ToolOutcome = { ok: true; content: string } | { ok: false; error: string };

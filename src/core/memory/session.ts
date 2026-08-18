@@ -1,4 +1,4 @@
-import type { ChatMessage } from "../agent/types";
+import type { LogEntry } from "../agent/types";
 
 export interface SessionSink {
   read(path: string): Promise<string | null>;
@@ -6,18 +6,26 @@ export interface SessionSink {
   append(path: string, data: string): Promise<void>;
 }
 
-export function serializeLine(m: ChatMessage): string {
+export function serializeLine(m: LogEntry): string {
   return JSON.stringify(m) + "\n";
 }
 
-export function parseLines(text: string): ChatMessage[] {
-  const out: ChatMessage[] = [];
+export function parseLines(text: string): LogEntry[] {
+  const out: LogEntry[] = [];
   for (const raw of text.split("\n")) {
     const lineText = raw.trim();
     if (lineText === "") continue;
     try {
-      const parsed = JSON.parse(lineText) as ChatMessage;
-      if (typeof parsed.role === "string" && typeof parsed.content === "string") out.push(parsed);
+      const parsed = JSON.parse(lineText) as Record<string, unknown>;
+      if (parsed.kind === "compaction") {
+        // Zweiter Shape neben ChatMessage. Minimal geprueft: stage 1|2 und stats-Objekt —
+        // eine kaputte Marke kostet die Marke, nicht die Session.
+        if ((parsed.stage === 1 || parsed.stage === 2) && typeof parsed.stats === "object" && parsed.stats !== null) {
+          out.push(parsed as unknown as LogEntry);
+        }
+        continue;
+      }
+      if (typeof parsed.role === "string" && typeof parsed.content === "string") out.push(parsed as unknown as LogEntry);
     } catch {
       // Eine kaputte Zeile kostet eine Nachricht, nicht die Session.
     }
@@ -33,12 +41,12 @@ export class SessionStore {
   private get current(): string { return `${this.dir}/current.jsonl`; }
   private get archive(): string { return `${this.dir}/archive.jsonl`; }
 
-  async load(): Promise<ChatMessage[]> {
+  async load(): Promise<LogEntry[]> {
     const text = await this.sink.read(this.current);
     return text === null ? [] : parseLines(text);
   }
 
-  async appendMessages(msgs: ChatMessage[]): Promise<void> {
+  async appendMessages(msgs: LogEntry[]): Promise<void> {
     try {
       await this.sink.append(this.current, msgs.map(serializeLine).join(""));
     } catch (e) {
