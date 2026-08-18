@@ -389,3 +389,33 @@ oder des Bestätigungs-Modals · ein Tokenizer.
 - `projectForModel` + Stufe 1 sind das **erste Exemplar** eines
   Verlaufs-Compaction-Musters → REGISTRY-Eintrag „Muster-Referenz (erstes Exemplar
   2026-08)"; Kit-Extraktion frühestens beim dritten Consumer.
+
+## Nachträge aus der Umsetzung (2026-08-18, Branch `feat/compaction` → `main` `1df1720`)
+
+Vier Punkte, an denen die Umsetzung von diesem Text abweicht oder ihn präzisiert —
+jeweils als Controller-Ruling im SDD-Lauf entschieden, hier festgehalten, damit die
+Spec nicht hinter dem Code zurückbleibt:
+
+1. **K zählt positionell.** „Die K jüngsten Tool-Ergebnisse bleiben wörtlich" meint die
+   K jüngsten *Tool-Nachrichten* — auch kurze oder schon gestubbte zählen mit; gestubbt
+   wird davon jenseits, was `shouldStub` erlaubt. Die andere Lesart (K jüngste
+   *Kandidaten*) wäre möglich, kostet aber zwei Testsätze für marginalen Nutzen bei K=3.
+   Eine Regel für Marke und Projektion: `stage1Targets` in `project.ts`.
+2. **Stufe 2 feuert nicht ohne Fortschritt.** Besteht die abgeschlossene Region nur noch
+   aus dem Ergebnis der letzten Stufe 2 (`[merged user, summary]`), wird Stufe 2
+   übersprungen — sonst kostete jede weitere Runde einen Minuten-Aufruf ohne neues
+   Material. Vom Task-Reviewer als Spec-Lücke benannt; Guard + Test in `loop.ts`.
+3. **Die Summarize-Anfrage ist abgeflacht.** `summarizeTurns` schickt je Runde genau
+   `[user, assistant]`; Kodas Anteile der Runde stehen als Text im `assistant`
+   (`[Werkzeugaufruf: …]`, `[Ergebnis: …]`), keine `tool`-Rollen, keine `tool_calls`
+   ohne Tool-Definitionen (strikte Server: 400), strikte Alternierung. Projektion und
+   Records sind davon unberührt. Dazu: Fehlgrund von Stufe 2 wird geloggt
+   (`console.warn`), und vor dem Aufruf erscheint ein Lebenszeichen im Chat
+   (`view.compaction.summarizing`).
+4. **Alternierungs-Annahme gemessen, nicht bestätigt.** 8 lokale Modelle (Gemma 4, Qwen
+   3.6/3.8, Qwen 2.5) akzeptierten zwei `user` hintereinander (`docs/LAB.md`
+   2026-08-18). Der zusammengesetzte Nutzer-Block bleibt vorsorglich — er schadet nicht.
+
+**Offen als Release-Gate (nicht Merge-Gate):** der Praxistest `gui:ask --full` mit
+Fenster 4096 (`docs/SMOKE.md` Handpunkt 20) — blockiert durch den CORS-Verdacht bei
+`gui:ask` (Memory `gui-ask-cors-verdacht`). Vor 0.7.0 fahren.

@@ -15,6 +15,36 @@
 > Plugin-Andockung wächst. Personas/Tool-Profile gehören ausdrücklich **nicht** hierher,
 > sondern zu vault-crews (`../AGENTS.md` § „Zuständigkeits-Zuschnitt").
 
+> **Nachtrag 2026-08-18 (spät) — Deferred Minors aus dem Compaction-Review.** Alle vom
+> Whole-Branch-Reviewer als „fine to defer" eingestuft; hier, damit sie nicht im Chat
+> sterben. Bei nächster Berührung der jeweiligen Datei mitnehmen:
+> - `tests/loop.test.ts`: Fall `overflow` + `partial !== ""` (kein eigener Test, 6 Zeilen) ·
+>   Ordnungs-Assertion „Record vor Runde" ist schwach · `compaction`-Event-Payload nicht
+>   asserted.
+> - `src/core/agent/compaction/project.ts`: `applyStage1` (void) vs. `applyStage2`
+>   (return) asymmetrisch · Testname „Stufe 2 mit leerer Region" bezeichnet Position, nicht
+>   `turns` (ok, nur Klarheit).
+> - `src/core/agent/compaction/stage2.ts`: `turnChars` misst die Roh-Länge, nicht die
+>   abgeflachte Länge (leichter Pack-Skew; 40 % Luft) · nach erzwungener Verdichtung kann
+>   `compact(false)` am Rundenanfang sofort einen zweiten Summarize versuchen — Guard/`null`
+>   fangen das, ein Kommentar fehlt.
+> - `src/obsidian/view.ts`: `stats.bytes` nicht-numerisch → „NaN KB" (nur bei
+>   handkorrumpiertem JSONL) · Stufe-1-Marke „1 Tool-Ergebnisse" (Plural) · Dezimaltrenner
+>   Marke `.` vs. Stub `,` · viele Einzeiler-Marken bei langen Läufen (eine je Runde) ·
+>   `reasonEl` nach Marke nicht zurückgesetzt (wie `toolStep`, Bestand).
+> - `src/main.ts`: toter Fallback-Zweig `?? new AbortController().signal` im summarize-Port.
+> - `src/core/llm/context-probe.ts`: `authHeaders`-Vorprüfung redundant · LM-Studio-Treffer
+>   ohne Längenfelder überspringt Ollama-Fallback.
+> - `src/core/memory/session.ts`: `parseLines` prüft `stats`-Felder nicht (Typ).
+> - `scripts/gui-smoke.ts`: `splice` der Test-Records nicht in `try/finally` · Ausgabe
+>   Punkt 8 vor 5 nur im Report erklärt · SMOKE.md sagt nicht explizit, dass Punkt 8 ohne
+>   Gegenprobe blieb. `docs/LAB.md`: Modell-Roster ≠ Eintrag 08-05, unerklärt.
+> - Vorbestehend, nicht Teil des Plans: `npx tsc --noEmit` (Root-tsconfig) meldet einen
+>   Fehler in `tests/skill_status.test.ts` (Gate nutzt `tsconfig.build.json`, grün) · ein
+>   Abbruch mitten in einer Mehrfach-Tool-Runde persistiert `assistant.tool_calls` ohne alle
+>   `tool`-Ergebnisse (Wire-Vertrag; Stufe 2 fasst es später weg).
+
+
 Stand: 2026-08-07, nach dem Store-Release von 0.1.0. Der vorherige Seed (Nach-Smoke der
 QoL-Features + `gui-smoke-setup`) ist **vollständig abgearbeitet**, ebenso
 `plugin-release-setup` und die Store-Einreichung. Das Plugin ist im Community-Store
