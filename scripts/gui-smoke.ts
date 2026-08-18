@@ -2,9 +2,12 @@
  * GUI-Smoke-Treiber — prueft die Naht zum Host gegen ein **laufendes** Obsidian statt
  * von Hand (CORE-TEST-02 b).
  *
- * CDP-Bruecke (Klasse `Cdp`, `waitFor`, `record`) uebernommen aus
- * `3d-codeblocks/scripts/gui-smoke.ts`, 2026-08-07 — dort erkauft mit den Details, die
- * unten in den Kommentaren stehen (Fokus-Drosselung, Vault-Wahl, Renderer-Ausnahmen).
+ * Die CDP-Bruecke liegt seit 2026-08-16 zentral im Dach (`tools/obsidian-cdp/`) und
+ * wird importiert, nicht vendored: sie ist plugin-neutral und lief hier bis 2026-08-18
+ * als eigene, aeltere Linie (`scripts/lib/cdp.ts`). Fehlt das Dach (fremder Checkout),
+ * bricht esbuild beim Aufloesen ab — das ist die gewollte Meldung, kein Fehler dieses
+ * Treibers. Was der Bruecke fehlt, wird DORT ergaenzt, nie hier nachgebaut — `clickReal`
+ * kam bei dieser Migration neu hinzu (Pruefpunkt 3 unten braucht einen echten Klick).
  *
  * ## Warum es diesen Treiber gibt
  *
@@ -59,7 +62,7 @@
 import { execFileSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { Cdp, waitFor, waitForAsync } from "./lib/cdp";
+import { Cdp, attachTo, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
 
 const PLUGIN_ID = "koda-agent";
 const VIEW_TYPE = "koda-agent-view";
@@ -124,7 +127,16 @@ async function main(): Promise<void> {
   const vault = flag("vault");
 
   console.log(`GUI-Smoke — Obsidian auf Port ${port}`);
-  const cdp = await Cdp.attach(port, vault);
+  // `attachTo` unterscheidet Haupt- und Einstellungen-Fenster an der Sache (nur das
+  // Hauptfenster traegt einen Workspace), nicht am lokalisierten Fenstertitel.
+  const cdp = await attachTo("workspace", port, vault);
+  if (!cdp) {
+    throw new Error(
+      `Kein Obsidian-Hauptfenster auf Port ${port}` +
+        (vault ? ` fuer Vault „${vault}"` : "") +
+        ". Laeuft Obsidian mit --remote-debugging-port? (siehe Kopfkommentar)",
+    );
+  }
   // Ausserhalb des try, damit das `finally` sie auch nach einem Abbruch mitten im Lauf
   // zurueckschreiben kann — sonst bliebe der Vault mit toten Endpunkten stehen.
   let previous: Settings | null = null;
@@ -134,8 +146,8 @@ async function main(): Promise<void> {
     // Ohne Fokus drosselt Chromium den Renderer. `Page.bringToFront` allein genuegt auf
     // macOS NICHT: es holt das Fenster innerhalb der App nach vorn, nicht die App nach
     // vorn. Im Hintergrund bleibt das DOM leer, obwohl die App-API den Zustand korrekt
-    // meldet — man debuggt dann ein Phantom.
-    await cdp.send("Page.bringToFront");
+    // meldet — man debuggt dann ein Phantom. `requireVisible` holt das Fenster selbst
+    // nach vorn und bricht mit Handlungsanweisung ab, wenn das nicht reicht.
     if (process.platform === "darwin") {
       try {
         execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']);
@@ -144,6 +156,7 @@ async function main(): Promise<void> {
         console.log("  (Hinweis: `osascript activate` schlug fehl — Fenster ggf. von Hand nach vorn holen)");
       }
     }
+    await requireVisible(cdp);
 
     const vaultName = await cdp.evaluate<string>(`return window.app?.appId ? app.vault.getName() : "";`);
     if (!vaultName) throw new Error("Obsidians `app` ist im Renderer nicht erreichbar.");
@@ -241,16 +254,24 @@ async function main(): Promise<void> {
     `);
 
     // --- 2. Die Sidebar oeffnet und ist bedienbar ---------------------------
-    const view = await cdp.evaluate<{ leaves: number; input: boolean; buttons: string[] } | null>(
-      waitForAsync(`
-        await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:open`)});
+    // Mutation (Command feuern) und Wartephase (auf gerenderte View pollen) sind
+    // getrennt: `Cdp.send` bricht nach 30 s ab, `pollUntil` fragt stattdessen
+    // wiederholt in eigenen, kurzen `Runtime.evaluate`-Aufrufen von der Node-Seite nach.
+    await cdp.evaluate(`
+      await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:open`)});
+      return true;
+    `);
+    const view = await pollUntil<{ leaves: number; input: boolean; buttons: string[] }>(
+      cdp,
+      `
         const leaves = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)});
         const el = leaves[0]?.view?.containerEl;
         if (!el) return null;
         const buttons = [...el.querySelectorAll(".koda-buttons button")].map((b) => b.textContent.trim());
         if (buttons.length === 0) return null;
         return { leaves: leaves.length, input: !!el.querySelector("textarea.koda-input"), buttons };
-      `),
+      `,
+      8000,
     );
     record(
       "2. Sidebar oeffnet mit Eingabefeld und Knoepfen",
@@ -281,96 +302,104 @@ async function main(): Promise<void> {
 
     let settings: Cdp | null = null;
     try {
-      settings = await Cdp.attachSettings(port, vault);
-      // Auch dieses Fenster wird im Hintergrund gedrosselt.
-      await settings.send("Page.bringToFront");
-
-      const zeilen = await settings.evaluate<number | null>(
-        waitFor(`
-          const rows = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".koda-endpoint-status"));
-          return rows.length >= 2 ? rows.length : 0;
-        `),
-      );
-      const hatZeile = zeilen !== null && zeilen >= 2;
-
-      if (!hatZeile) {
-        record("3. Klick auf „Testen“ friert den Renderer nicht ein", false, "Endpunkt-Zeile im Einstellungsfenster nicht gefunden");
-        record("4. Toter Endpunkt wird als nicht erreichbar angezeigt", false, "ohne Endpunkt-Zeile nicht entscheidbar");
+      settings = await attachTo("settings", port, vault);
+      if (!settings) {
+        record("3. Klick auf „Testen“ friert den Renderer nicht ein", false, "Einstellungsfenster nicht gefunden");
+        record("4. Toter Endpunkt wird als nicht erreichbar angezeigt", false, "ohne Einstellungsfenster nicht entscheidbar");
       } else {
-        const t0 = Date.now();
-        let survived = true;
-        let detail = "";
-        let status: string | null = null;
-        try {
-          // Klick + Warten auf das Status-Icon in EINEM Renderer-Aufruf: friert der
-          // Renderer ein, antwortet dieser Aufruf nie und laeuft in den Timeout.
-          const geklickt = await settings.clickReal(
-            `[...document.querySelectorAll(".setting-item")]
-               .filter((r) => r.querySelector(".koda-endpoint-status"))[0]
-               ?.querySelectorAll("button")[0]`,
-          );
-          if (!geklickt) throw new Error("Testen-Knopf nicht klickbar (unsichtbar oder nicht vorhanden)");
-          status = await settings.evaluate<string | null>(
-            `
-            ${waitFor(`
-              const rows2 = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".koda-endpoint-status"));
-              const el = rows2[0].querySelector(".koda-endpoint-status");
-              if (!el) return null;
-              if (el.classList.contains("is-ok")) return "is-ok";
-              if (el.classList.contains("is-bad")) return "is-bad";
-              return null;
-            `)}
-          `,
-            12_000,
-          );
-          // Der Freeze von 2026-08-06 nahm BEIDE Fenster mit. Das Hauptfenster wird
-          // deshalb mitgeprueft: antwortet es nicht mehr, ist der Punkt rot, auch wenn
-          // das Einstellungsfenster noch gezuckt hat.
-          const hauptfensterLebt = await cdp.evaluate<boolean>(`return true;`, 8000);
-          survived = status === "is-ok" && hauptfensterLebt;
-          detail =
-            status === "is-ok"
-              ? `beide Fenster antworten nach ${Date.now() - t0} ms · Status is-ok`
-              : `Status ${status ?? "(keiner)"} statt is-ok — erreichbarer Endpunkt nicht als solcher erkannt`;
-        } catch (error) {
-          survived = false;
-          detail = `Renderer antwortet nicht mehr (${error instanceof Error ? error.message : String(error)}) — Freeze-Verdacht`;
-        }
-        record("3. Klick auf „Testen“ friert den Renderer nicht ein", survived, detail);
+        // Auch dieses Fenster wird im Hintergrund gedrosselt.
+        await settings.send("Page.bringToFront");
 
-        // --- 4. Der Status ist der echte Status -----------------------------
-        // Gegen einen toten Port MUSS „nicht erreichbar“ stehen. Ein Statuspunkt, der
-        // immer gruen ist, waere schlimmer als keiner — deshalb wird die zweite Zeile
-        // (toter Port) separat geklickt statt die erste nur anders interpretiert.
-        let tot: string | null = null;
-        try {
-          const geklickt2 = await settings.clickReal(
-            `[...document.querySelectorAll(".setting-item")]
-               .filter((r) => r.querySelector(".koda-endpoint-status"))[1]
-               ?.querySelectorAll("button")[0]`,
-          );
-          if (!geklickt2) throw new Error("Testen-Knopf der zweiten Zeile nicht klickbar");
-          tot = await settings.evaluate<string | null>(
-            `
-            ${waitFor(`
-              const rows2 = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".koda-endpoint-status"));
-              const el = rows2[1].querySelector(".koda-endpoint-status");
-              if (!el) return null;
-              if (el.classList.contains("is-bad")) return "is-bad";
-              if (el.classList.contains("is-ok")) return "is-ok";
-              return null;
-            `)}
+        const zeilen = await pollUntil<number>(
+          settings,
+          `
+            const rows = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".koda-endpoint-status"));
+            return rows.length >= 2 ? rows.length : 0;
           `,
-            12_000,
-          );
-        } catch (error) {
-          tot = `FEHLER: ${error instanceof Error ? error.message : String(error)}`;
-        }
-        record(
-          "4. Toter Endpunkt wird als nicht erreichbar angezeigt",
-          tot === "is-bad",
-          `Status ${tot ?? "(keiner)"} bei ${DEAD_A}`,
+          8000,
         );
+        const hatZeile = zeilen !== null && zeilen >= 2;
+
+        if (!hatZeile) {
+          record("3. Klick auf „Testen“ friert den Renderer nicht ein", false, "Endpunkt-Zeile im Einstellungsfenster nicht gefunden");
+          record("4. Toter Endpunkt wird als nicht erreichbar angezeigt", false, "ohne Endpunkt-Zeile nicht entscheidbar");
+        } else {
+          const t0 = Date.now();
+          let survived = true;
+          let detail = "";
+          let status: string | null = null;
+          try {
+            // Klick (Mutation) und Warten auf das Status-Icon (Wartephase) sind getrennt:
+            // friert der Renderer ein, laeuft `pollUntil` in seine eigene Zeitueberschreitung,
+            // statt den ganzen 30-s-`Cdp.send`-Aufruf mitzureissen.
+            const geklickt = await clickReal(
+              settings,
+              `[...document.querySelectorAll(".setting-item")]
+                 .filter((r) => r.querySelector(".koda-endpoint-status"))[0]
+                 ?.querySelectorAll("button")[0]`,
+            );
+            if (!geklickt) throw new Error("Testen-Knopf nicht klickbar (unsichtbar oder nicht vorhanden)");
+            status = await pollUntil<string>(
+              settings,
+              `
+                const rows2 = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".koda-endpoint-status"));
+                const el = rows2[0]?.querySelector(".koda-endpoint-status");
+                if (!el) return null;
+                if (el.classList.contains("is-ok")) return "is-ok";
+                if (el.classList.contains("is-bad")) return "is-bad";
+                return null;
+              `,
+              12_000,
+            );
+            // Der Freeze von 2026-08-06 nahm BEIDE Fenster mit. Das Hauptfenster wird
+            // deshalb mitgeprueft: antwortet es nicht mehr, ist der Punkt rot, auch wenn
+            // das Einstellungsfenster noch gezuckt hat.
+            const hauptfensterLebt = await cdp.evaluate<boolean>(`return true;`);
+            survived = status === "is-ok" && hauptfensterLebt;
+            detail =
+              status === "is-ok"
+                ? `beide Fenster antworten nach ${Date.now() - t0} ms · Status is-ok`
+                : `Status ${status ?? "(keiner)"} statt is-ok — erreichbarer Endpunkt nicht als solcher erkannt`;
+          } catch (error) {
+            survived = false;
+            detail = `Renderer antwortet nicht mehr (${error instanceof Error ? error.message : String(error)}) — Freeze-Verdacht`;
+          }
+          record("3. Klick auf „Testen“ friert den Renderer nicht ein", survived, detail);
+
+          // --- 4. Der Status ist der echte Status -----------------------------
+          // Gegen einen toten Port MUSS „nicht erreichbar“ stehen. Ein Statuspunkt, der
+          // immer gruen ist, waere schlimmer als keiner — deshalb wird die zweite Zeile
+          // (toter Port) separat geklickt statt die erste nur anders interpretiert.
+          let tot: string | null = null;
+          try {
+            const geklickt2 = await clickReal(
+              settings,
+              `[...document.querySelectorAll(".setting-item")]
+                 .filter((r) => r.querySelector(".koda-endpoint-status"))[1]
+                 ?.querySelectorAll("button")[0]`,
+            );
+            if (!geklickt2) throw new Error("Testen-Knopf der zweiten Zeile nicht klickbar");
+            tot = await pollUntil<string>(
+              settings,
+              `
+                const rows2 = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".koda-endpoint-status"));
+                const el = rows2[1]?.querySelector(".koda-endpoint-status");
+                if (!el) return null;
+                if (el.classList.contains("is-bad")) return "is-bad";
+                if (el.classList.contains("is-ok")) return "is-ok";
+                return null;
+              `,
+              12_000,
+            );
+          } catch (error) {
+            tot = `FEHLER: ${error instanceof Error ? error.message : String(error)}`;
+          }
+          record(
+            "4. Toter Endpunkt wird als nicht erreichbar angezeigt",
+            tot === "is-bad",
+            `Status ${tot ?? "(keiner)"} bei ${DEAD_A}`,
+          );
+        }
       }
     } finally {
       settings?.close();
@@ -380,15 +409,19 @@ async function main(): Promise<void> {
     // --- 5. Failover-Klartext statt Stacktrace ------------------------------
     // Kommt ohne Modell aus: beide Endpunkte sind tot, der Resolver scheitert, lange
     // bevor irgendetwas gefragt wuerde. Deterministisch und in Sekunden entschieden.
-    const failover = await cdp.evaluate<{ text: string; busy: boolean; klasse: string } | null>(
-      `
+    // Mutation (Endpunkte setzen, `ask()` anstossen) und Wartephase (auf die
+    // Fehlermeldung pollen) sind getrennt — dieselbe Begruendung wie bei Pruefpunkt 2.
+    await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       p.settings.endpoints = [{ url: ${JSON.stringify(DEAD_A)} }, { url: ${JSON.stringify(DEAD_B)} }];
       await p.saveSettings();
       await p.newChat();
       void p.ask("Smoke-Test: bitte antworten.");
-      ${waitForAsync(
-        `
+      return true;
+    `);
+    const failover = await pollUntil<{ text: string; busy: boolean; klasse: string }>(
+      cdp,
+      `
         const p2 = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
         if (p2.busy) return null;
         const el = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0]?.view?.containerEl;
@@ -396,10 +429,7 @@ async function main(): Promise<void> {
         if (!msg) return null;
         return { text: msg.textContent.trim(), busy: p2.busy, klasse: msg.className };
       `,
-        20_000,
-      )}
-    `,
-      40_000,
+      20_000,
     );
     const looksLikeStacktrace = /\bat \w+.*:\d+|TypeError|undefined is not/.test(failover?.text ?? "");
     record(
@@ -411,36 +441,50 @@ async function main(): Promise<void> {
     // --- 6. Wikilinks in Antworten sind klickbar ----------------------------
     // Ueber `chatLog` + `renderLog()` statt ueber eine echte Antwort: geprueft wird die
     // Render- und Klick-Naht, und die haengt nicht am Modell. Gemessen wird der Effekt
-    // (welche Datei ist danach aktiv), nicht die Ursache.
-    const link = await cdp.evaluate<{ gerendert: boolean; vorher: string | null; nachher: string | null } | null>(
-      `
+    // (welche Datei ist danach aktiv), nicht die Ursache. Drei getrennte Schritte:
+    // Szene herstellen (Mutation), auf den gerenderten Link pollen (Wartephase),
+    // klicken (Mutation) und auf die Navigation pollen (Wartephase).
+    const szene = await cdp.evaluate<{ ziel: string | null; vorher: string | null }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       // Bewusst NICHT die gerade aktive Notiz: waere sie das Ziel, blieben vorher und
       // nachher gleich und der Punkt waere rot, obwohl der Klick funktioniert hat
       // (im Lauf vom 2026-08-07 genau so passiert).
       const aktiv = app.workspace.getActiveFile()?.path ?? null;
       const ziel = app.vault.getMarkdownFiles().find((f) => f.path !== aktiv);
-      if (!ziel) return null;
+      if (!ziel) return { ziel: null, vorher: aktiv };
       const view = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0].view;
       p.chatLog = [{ role: "assistant", content: "Siehe [[" + ziel.path.replace(/\\.md$/, "") + "]]." }];
       view.renderLog();
-      const a = await (async () => { ${waitFor(`return document.querySelector(".koda-log a.internal-link");`)} })();
-      if (!a) return { gerendert: false, vorher: null, nachher: null };
-      const vorher = app.workspace.getActiveFile()?.path ?? null;
-      a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
-      await new Promise((r) => setTimeout(r, 1200));
-      return { gerendert: true, vorher, nachher: app.workspace.getActiveFile()?.path ?? null };
-    `,
-      30_000,
-    );
+      return { ziel: ziel.path, vorher: aktiv };
+    `);
+    const gerendert =
+      szene.ziel !== null
+        ? await pollUntil<boolean>(cdp, `return !!document.querySelector(".koda-log a.internal-link");`, 8000)
+        : null;
+    let nachher: string | null = null;
+    if (gerendert) {
+      await cdp.evaluate(`
+        const a = document.querySelector(".koda-log a.internal-link");
+        a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+        return true;
+      `);
+      nachher = await pollUntil<string>(
+        cdp,
+        `
+          const cur = app.workspace.getActiveFile()?.path ?? null;
+          return cur && cur !== ${JSON.stringify(szene.vorher)} ? cur : null;
+        `,
+        8000,
+      );
+    }
     record(
       "6. Wikilink in der Antwort ist klickbar und oeffnet die Notiz",
-      link !== null && link.gerendert && link.nachher !== null && link.nachher !== link.vorher,
-      link
-        ? link.gerendert
-          ? `aktiv vorher ${link.vorher ?? "(keine)"} → nachher ${link.nachher ?? "(keine)"}`
-          : "kein a.internal-link im Log gerendert"
-        : "keine Markdown-Datei im Vault",
+      szene.ziel !== null && gerendert === true && nachher !== null,
+      szene.ziel === null
+        ? "keine Markdown-Datei im Vault"
+        : gerendert
+          ? `aktiv vorher ${szene.vorher ?? "(keine)"} → nachher ${nachher ?? "(keine — Navigation blieb aus)"}`
+          : "kein a.internal-link im Log gerendert",
     );
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt den Vault

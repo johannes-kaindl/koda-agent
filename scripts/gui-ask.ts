@@ -59,7 +59,10 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { Cdp } from "./lib/cdp";
+// Die CDP-Bruecke liegt seit 2026-08-16 zentral im Dach (tools/obsidian-cdp/) und wird
+// importiert, nicht vendored — sie ist plugin-neutral. Fehlt das Dach (fremder
+// Checkout), bricht esbuild beim Aufloesen ab: das ist die gewollte Meldung.
+import { Cdp, attachTo, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
 
 const PLUGIN_ID = "koda-agent";
 
@@ -188,10 +191,20 @@ async function main(): Promise<void> {
   const fresh = !argv.includes("--keep-session");
 
   console.log(`Praxistest — Obsidian auf Port ${port}`);
-  const cdp = await Cdp.attach(port, vault);
+  // `attachTo` unterscheidet Haupt- und Einstellungen-Fenster an der Sache (nur das
+  // Hauptfenster traegt einen Workspace), nicht am lokalisierten Fenstertitel.
+  const cdp = await attachTo("workspace", port, vault);
+  if (!cdp) {
+    throw new Error(
+      `Kein Obsidian-Hauptfenster auf Port ${port}` +
+        (vault ? ` fuer Vault „${vault}"` : "") +
+        ". Laeuft Obsidian mit --remote-debugging-port? (siehe Kopfkommentar)",
+    );
+  }
   try {
     // Ohne Fokus drosselt Chromium den Renderer — dieselbe Falle wie im GUI-Smoke.
-    await cdp.send("Page.bringToFront");
+    // `requireVisible` holt das Fenster selbst nach vorn und bricht mit
+    // Handlungsanweisung ab, wenn das nicht reicht.
     if (process.platform === "darwin") {
       try {
         execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']);
@@ -200,6 +213,7 @@ async function main(): Promise<void> {
         console.log("  (Hinweis: `osascript activate` schlug fehl — Fenster ggf. von Hand nach vorn holen)");
       }
     }
+    await requireVisible(cdp);
 
     const plugin = await cdp.evaluate<{ ok: boolean; version?: string; model?: string }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
