@@ -111,6 +111,11 @@ The full settings list:
 | Text tool-call fallback | off | For models without native tool calling |
 | UI language | auto | Follows Obsidian, or force German/English |
 | Open on startup | off | Opt-in; the sidebar stays closed unless you ask for it |
+| Context window (tokens) | 8192 (2048–1000000) | Size of the model's context window; one number for all endpoints. "Test" on an endpoint row fills it in when the server reports it (LM Studio, Ollama) and the field is still on its default |
+| Compact at (% of window) | 75 (40–95) | Koda compacts the conversation before a model call once the estimate exceeds this share of the window |
+| Keep tool results verbatim | 3 (0–20) | How many of the most recent tool results stay in full; older ones become a one-line stub |
+| Summarize with the model (stage 2) | on | If stubs are not enough, Koda asks the model to summarize completed turns; your own messages are never summarized |
+| Summary length (% of window) | 10 (3–30) | Upper bound for the summary text |
 
 ## How it works
 
@@ -133,6 +138,16 @@ Retrieval degrades rather than breaks: Koda looks up Vault Retrieval's plugin AP
 defensively at runtime. If it is there, `search_notes` tops up thin literal results
 with semantic ones (kept in a separate, labelled block) and `related_notes` is
 registered as a seventh tool; if it is not, neither appears in the prompt at all.
+
+A long conversation would eventually overflow the model's context window, so before
+each model call Koda estimates the conversation's size against **Context window** and
+**Compact at**. Past that share, it compacts in two stages: first, older tool results
+collapse into one-line stubs (**Keep tool results verbatim** decides how many stay in
+full); if that alone is not enough and **Summarize with the model** is on, Koda asks
+the model itself to summarize the completed turns it just dropped. Compaction is a
+*projection* — it changes what goes to the model, never the stored conversation you
+see in the chat, and your own messages are never touched. Every compaction leaves a
+visible mark in the conversation so you can tell it happened.
 
 ## The write rule
 
@@ -194,6 +209,8 @@ npm run lab:tools  # scripted tool-calling probe against a live endpoint (see do
 
 - `src/core/` — pure logic: agent loop, tool policy, memory, sessions, diff,
   retrieval merging (no Obsidian imports; enforced by `check:pure`).
+- `src/core/agent/compaction/` — two-staged conversation compaction (tool-result
+  stubbing, model summary of completed turns), pure projection over the stored log.
 - `src/llm/` — `KodaChatClient` + `XhrSseTransport` (streaming chat client).
 - `src/obsidian/` — the view, vault-facing tool adapter, write-confirmation modal,
   settings tab, and the defensive lookup of Vault Retrieval's plugin API.
@@ -210,8 +227,9 @@ release.
 ## Constraints (deliberate, not yet, or never)
 
 - No terminal/full-system access — out of scope permanently (store policy + safety).
-- No compaction or synthesis workflows yet — planned for later stages, see
-  `CLAUDE.md`.
+- Compaction is two-staged (tool stubs first, model summary of completed turns
+  second) and always visible in the chat; your own messages are never summarized.
+  No synthesis workflows yet — planned for a later stage, see `CLAUDE.md`.
 - No heartbeat, no scheduled background work — Koda acts only when you ask it to.
 
 ## License

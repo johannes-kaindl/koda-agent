@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Two-staged conversation compaction** so a long chat no longer overflows the
+  model's context window: past a configurable share of the window, older tool
+  results collapse into one-line stubs first, and if that alone is not enough the
+  model summarizes the completed turns it just dropped. Compaction is a pure
+  projection — it changes only what goes to the model, never the stored
+  conversation, and your own messages are never touched. Every compaction leaves a
+  visible mark in the chat.
+- **New settings group "Context & compaction"** — Context window (tokens), Compact
+  at (% of window), Keep tool results verbatim, Summarize with the model (stage 2),
+  Summary length (% of window).
+- **Context-window prefill**: "Test" on an endpoint row now fills in the context
+  window from the server's own reporting (LM Studio `/api/v0/models`, Ollama
+  `POST /api/show`), best-effort, when the field is still on its default.
+- GUI-Smoke checkpoints 7 (compaction marks) and 8 (the new settings group).
+
+### Changed
+
+- **`overflow` is now its own chat-error kind**, distinct from a plain unreachable
+  endpoint, so a context-window overrun is reported to the user for what it is.
+- **The stored conversation is now `LogEntry[]` with compaction marks**, persisted
+  in the existing JSONL session format — backward compatible with sessions written
+  before this change.
+
 ## [0.6.0] — 2026-08-14
 
 ### Changed

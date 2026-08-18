@@ -1,5 +1,10 @@
 # Seed: Stufe 2 — Skill-System, Compaction, Aufräum-Assistent
 
+> **Nachtrag 2026-08-18:** Baustein B (Compaction) ist erledigt 2026-08-18 (Branch
+> `feat/compaction`, Spec `docs/superpowers/specs/2026-08-18-koda-compaction-design.md`).
+> Offen bleibt **Baustein C** (Aufräum-Assistent) — beginnt wie A und B mit
+> `superpowers:brainstorming`, nicht mit Code.
+
 > **Nachtrag 2026-08-13:** Baustein A (Skill-System) ist erledigt, ebenso — außer der
 > Reihe — die **Retrieval-Andockung an vault-rag** (eigene Spec und eigener Plan unter
 > `docs/superpowers/`, Auslöser waren TaskNotes aus dem Arbeitsvault). Lücke 2 unten

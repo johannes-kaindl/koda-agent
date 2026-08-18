@@ -13,26 +13,34 @@ vault-rag), Schreibregel mit Bestätigungs-Modal, Memory-Notiz, Sessions als JSO
 Settings-Tab, i18n DE/EN, dazu die QoL-Schicht (Verbindungstest, Modell-Auswahl,
 Failover, Presets) und ein automatisierter GUI-Smoke (`scripts/gui-smoke.ts`, CDP
 gegen ein laufendes Obsidian) plus ein Praxistest-Treiber gegen ein echtes Modell
-(`scripts/gui-ask.ts`). Gate ist grün (277/277), `main.js` baut. Details zu
+(`scripts/gui-ask.ts`). Auf Branch `feat/compaction` ist **Compaction (Stufe-2-Baustein
+B) implementiert** — Spec `2026-08-18-koda-compaction-design.md` — noch nicht released
+(Version bleibt 0.6.0, kein Tag). Gate ist grün (331/331), `main.js` baut. Details zu
 Nutzung/Setup: `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`.
 Spezifiziert in `docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md` — dort
 stehen die Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Ordner
 frei, Rest bestätigt", Agent-Kern im Plugin, Roadmap-Stufen). Ideen-Quelle:
 `10_Pallas/00_Inbox/Koda Agent Plugin Recherche.md` (Pallas-Vault).
 
-## Nächster Schritt (geseedet 2026-08-07, Baustein A geseedet+erledigt 2026-08-07)
+## Nächster Schritt (geseedet 2026-08-07, Baustein A geseedet+erledigt 2026-08-07,
+Baustein B erledigt 2026-08-18)
 
 **Stufe 2** — Markdown-Skill-System, Compaction, Aufräum-Assistent. **Baustein A
 (Markdown-Skill-System) ist implementiert** (Branch `feat/skill-system`, 160/160
 Tests grün): Frontmatter-`description`/`enabled`, Budget-Auswahl beim
 Gesprächsstart, Selbst-Autorschaft über `write_skill` — immer bestätigungspflichtig,
-auch im Koda-Ordner. Offen bleiben Baustein B (Compaction — braucht Lücke 2+3 aus
-`docs/NEXT-SESSION.md`, Kontext-Overflow-Erkennung + Runden-Datenmodell) und
-Baustein C (Aufräum-Assistent). Beide beginnen mit `superpowers:brainstorming`,
-nicht mit Code: beides sind Schnitte, keine Features. Voller Seed mit offenen
-Design-Punkten und Kit-Ankern: `docs/NEXT-SESSION.md`. Erledigt und nicht mehr
-offen: QoL-Ausbau, GUI-Smoke-Automatisierung, Release-Infra, Store-Einreichung
-(0.1.0 ist gelistet). Geparkt: Freeze-Gegenprobe.
+auch im Koda-Ordner. **Baustein B (Compaction) ist implementiert** (Branch
+`feat/compaction`, 331/331 Tests grün): zweistufige Verdichtung (Tool-Stubs, dann
+Modell-Zusammenfassung abgeschlossener Runden), Settings-Gruppe „Kontext &
+Verdichtung", Fenster-Vorbefüllung über die Endpunkt-Probe, GUI-Smoke-Punkte 7/8.
+Der Praxistest gegen ein echtes Modell ist **offen** — `gui:ask` liefert wegen des
+ungeklärten CORS-Verdachts derzeit keine Modell-Antwort (`docs/SMOKE.md`
+2026-08-18). Spec: `docs/superpowers/specs/2026-08-18-koda-compaction-design.md`.
+Offen bleibt **Baustein C** (Aufräum-Assistent) — beginnt mit
+`superpowers:brainstorming`, nicht mit Code: das ist ein Schnitt, kein Feature.
+Voller Seed mit offenen Design-Punkten und Kit-Ankern: `docs/NEXT-SESSION.md`.
+Erledigt und nicht mehr offen: QoL-Ausbau, GUI-Smoke-Automatisierung, Release-Infra,
+Store-Einreichung (0.1.0 ist gelistet). Geparkt: Freeze-Gegenprobe.
 
 ## Verbindlicher Rahmen
 
@@ -109,7 +117,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (277/277).
+- `npm test` — `check-no-abs-paths` + vitest (331/331).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
@@ -127,6 +135,10 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   Tool-Policy/-Defs, Memory, Sessions, Diff.
 - `src/core/skills/` — Skill-Parser, Budget-Auswahl, Pfad-Bau (obsidian-frei wie der
   Rest von `core/`).
+- `src/core/agent/compaction/` — zweistufige Verdichtung des Gesprächsverlaufs
+  (`project.ts`/`estimate.ts`/`stage1.ts`/`stage2.ts`): Projektion statt Umschreiben,
+  positionsbasierte Marken, Tool-Stubs vor Modell-Zusammenfassung, Nutzer-Nachrichten
+  unantastbar (pure).
 - `src/core/tools/retrieval.ts` — Zusammenführung von Volltext- und Index-Treffern,
   Schwellenlogik, Ausfall-Meldungen (pure). Gegenstück: `src/obsidian/retrieval.ts`
   liest vault-rags API defensiv aus `app.plugins`.

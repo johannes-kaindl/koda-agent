@@ -114,6 +114,13 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 
 ### Durchläufe
 
+- **2026-08-18, Praxistest Verdichtung — offen.** Handpunkt „Verdichtung" (Fenster auf 4096,
+  `npm run gui:ask` mit einer Frage, die mehrere lange Notizen liest) ist **nicht gelaufen**:
+  Voraussetzung ist der CORS-Verdacht bei `gui:ask` (Zeile „Nebenbefund" unten,
+  2026-08-18/CDP-Bruecken-Migration; Memory `gui-ask-cors-verdacht`) — solange `chatLog` ohne
+  Modell-Antwort bleibt, gibt es keinen Verlauf, an dem sich eine `compaction`-Marke zeigen
+  könnte. **Weder bestanden noch fehlgeschlagen — offen**, bis die CORS-Ursache geklärt ist.
+
 - **2026-08-18, Verdichtungs-Marken + Settings-Gruppe (neue Prüfpunkte 7/8)** — direkt im
   Anschluss an die Baseline-Zeile unten, derselbe Obsidian-Lauf, derselbe Plugin-Build
   (`feat/compaction`, HEAD `58b86e0`). Treiber um Punkt 7 (Verdichtungs-Marken, nach Punkt 6)
