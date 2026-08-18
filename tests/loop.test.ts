@@ -326,3 +326,58 @@ describe("runAgent · Verdichtung (reaktiv)", () => {
     expect(errors).toEqual(["overflow"]);
   });
 });
+
+describe("runAgent · Stufe 2", () => {
+  /** Verlauf mit einer abgeschlossenen Runde (lange Antwort) und der laufenden Frage. */
+  const twoTurns: LogEntry[] = [
+    { role: "user", content: "F1" }, { role: "assistant", content: "A".repeat(2000) },
+    { role: "user", content: "F2" },
+  ];
+
+  it("Stufe 1 reicht nicht (nichts zu stubben) -> Stufe 2, Record mit summary, Modell sieht merged+summary", async () => {
+    const seen: ChatMessage[][] = [];
+    const llm: LoopLlm = { complete: async (m) => { seen.push(m); return { ok: true, content: "Fertig", toolCalls: [] }; } };
+    const summarizeCalls: ChatMessage[][] = [];
+    const out = await runAgent(
+      { llm, tools: okTools, maxRounds: 8, textFallback: false,
+        compaction: { ...compaction(100, 3), summarize: async (m) => { summarizeCalls.push(m); return "ZUSAMMENFASSUNG"; } } },
+      twoTurns, () => {}, () => {}, () => {}, sig(),
+    );
+    const recs = out.filter(isCompactionRecord);
+    expect(recs).toHaveLength(1);
+    expect(recs[0]).toMatchObject({ stage: 2, summary: "ZUSAMMENFASSUNG", turns: 1 });
+    expect(summarizeCalls).toHaveLength(1);
+    expect(seen[0].map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+    expect(seen[0][0]).toMatchObject({ merged: true });
+    expect(seen[0][1].content).toBe("ZUSAMMENFASSUNG");
+    expect(seen[0][2].content).toBe("F2");
+  });
+
+  it("Stufe 2 aus (summarize null): kein Stufe-2-Record, Lauf geht weiter", async () => {
+    const out = await runAgent(
+      { llm: scripted([{ ok: true, content: "Fertig", toolCalls: [] }]), tools: okTools, maxRounds: 8, textFallback: false, compaction: compaction(100, 3) },
+      twoTurns, () => {}, () => {}, () => {}, sig(),
+    );
+    expect(out.some(isCompactionRecord)).toBe(false);
+  });
+
+  it("summarize liefert null oder wirft: kein Record, Lauf geht weiter", async () => {
+    const outNull = await runAgent(
+      { llm: scripted([{ ok: true, content: "Fertig", toolCalls: [] }]), tools: okTools, maxRounds: 8, textFallback: false,
+        compaction: { ...compaction(100, 3), summarize: async () => null } },
+      twoTurns, () => {}, () => {}, () => {}, sig(),
+    );
+    expect(outNull.some(isCompactionRecord)).toBe(false);
+    expect(outNull[outNull.length - 1]).toMatchObject({ role: "assistant", content: "Fertig" });
+  });
+
+  it("summarize wirft: kein Record, Lauf geht weiter (Fremd-Port haerter abgefangen als der Vertrag verlangt)", async () => {
+    const out = await runAgent(
+      { llm: scripted([{ ok: true, content: "Fertig", toolCalls: [] }]), tools: okTools, maxRounds: 8, textFallback: false,
+        compaction: { ...compaction(100, 3), summarize: async () => { throw new Error("kaputt"); } } },
+      twoTurns, () => {}, () => {}, () => {}, sig(),
+    );
+    expect(out.some(isCompactionRecord)).toBe(false);
+    expect(out[out.length - 1]).toMatchObject({ role: "assistant", content: "Fertig" });
+  });
+});

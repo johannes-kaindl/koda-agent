@@ -11,6 +11,7 @@ import { parseTextToolCall } from "./text-fallback";
 import { projectForModel } from "./compaction/project";
 import { estimateTokens } from "./compaction/estimate";
 import { planStage1 } from "./compaction/stage1";
+import { splitTurns, summarizeTurns, makeStage2Record, PACK_RATIO } from "./compaction/stage2";
 
 export interface LoopLlm {
   complete(
@@ -92,7 +93,25 @@ export async function runAgent(
         msgs = projectForModel(entries());
       }
     }
-    // Stufe 2 folgt in Task 7 an genau dieser Stelle.
+    if ((forced || overBudget(msgs)) && c.summarize !== null) {
+      const { completed } = splitTurns(msgs);
+      if (completed.length > 0) {
+        // summarize() ist ein Fremd-Port (LLM-Aufruf) — ein werfender Port darf den Lauf
+        // nicht abbrechen, deshalb zusaetzlich zum vertraglichen null hier abgefangen.
+        const summary = await summarizeTurns(completed, {
+          lang: c.lang,
+          maxChars: c.summaryMaxChars,
+          packChars: Math.floor(c.budgetTokens * 4 * PACK_RATIO),
+          summarize: c.summarize,
+        }).catch(() => null);
+        if (summary !== null) {
+          const r2 = makeStage2Record(completed, summary, c.keepToolResults, c.now(), forced);
+          appended.push(r2);
+          onEvent({ kind: "compaction", record: r2 });
+          did = true;
+        }
+      }
+    }
     return did;
   };
 
