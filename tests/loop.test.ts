@@ -1,6 +1,10 @@
 import { runAgent, type LoopLlm } from "../src/core/agent/loop";
-import type { ChatMessage, ToolOutcome, ToolRunner } from "../src/core/agent/types";
+import { isChatMessage, isCompactionRecord, type ChatMessage, type LogEntry, type ToolOutcome, type ToolRunner } from "../src/core/agent/types";
+import { STUB_MIN_CHARS } from "../src/core/agent/compaction/project";
 import type { LlmResult } from "../src/llm/KodaChatClient";
+
+/** Nur die Nachrichten eines Laufs — Verdichtungs-Marken interessieren die Alt-Tests nicht. */
+const msgsOf = (out: LogEntry[]): ChatMessage[] => out.filter(isChatMessage);
 
 const sig = (): AbortSignal => new AbortController().signal;
 const user: ChatMessage[] = [{ role: "user", content: "Frage" }];
@@ -18,17 +22,17 @@ const okTools: ToolRunner = {
 describe("runAgent", () => {
   it("ohne Tool-Calls: final-Event + eine assistant-Nachricht", async () => {
     const events: string[] = [];
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       { llm: scripted([{ ok: true, content: "Antwort", toolCalls: [] }]), tools: okTools, maxRounds: 8, textFallback: false },
       user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
-    );
+    ));
     expect(events).toEqual(["final"]);
     expect(out).toEqual([{ role: "assistant", content: "Antwort" }]);
   });
 
   it("eine Tool-Runde: assistant(toolCalls) + tool + finale assistant-Nachricht", async () => {
     const events: string[] = [];
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       {
         llm: scripted([
           { ok: true, content: "", toolCalls: [{ id: "c1", name: "search_notes", arguments: '{"query":"x"}' }] },
@@ -37,7 +41,7 @@ describe("runAgent", () => {
         tools: okTools, maxRounds: 8, textFallback: false,
       },
       user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
-    );
+    ));
     expect(events).toEqual(["tool-start", "tool-end", "final"]);
     expect(out.map((m) => m.role)).toEqual(["assistant", "tool", "assistant"]);
     expect(out[1]).toMatchObject({ role: "tool", toolCallId: "c1", content: "ergebnis von search_notes" });
@@ -45,7 +49,7 @@ describe("runAgent", () => {
 
   it("Tool-Fehler geht als ERROR-Result zurueck ans Modell, kein Crash", async () => {
     const failing: ToolRunner = { run: async () => ({ ok: false, error: "Pfad geblockt" }) };
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       {
         llm: scripted([
           { ok: true, content: "", toolCalls: [{ id: "c1", name: "read_note", arguments: "{}" }] },
@@ -54,7 +58,7 @@ describe("runAgent", () => {
         tools: failing, maxRounds: 8, textFallback: false,
       },
       user, () => {}, () => {}, () => {}, sig(),
-    );
+    ));
     expect(out[1].content).toBe("ERROR: Pfad geblockt");
   });
 
@@ -64,7 +68,7 @@ describe("runAgent", () => {
         throw new Error("kaputt");
       },
     };
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       {
         llm: scripted([
           { ok: true, content: "", toolCalls: [{ id: "c1", name: "read_note", arguments: "{}" }] },
@@ -73,7 +77,7 @@ describe("runAgent", () => {
         tools: throwing, maxRounds: 8, textFallback: false,
       },
       user, () => {}, () => {}, () => {}, sig(),
-    );
+    ));
     expect(out[1].content).toBe("ERROR: kaputt");
     expect(out.map((m) => m.role)).toEqual(["assistant", "tool", "assistant"]);
     expect(out[2]).toEqual({ role: "assistant", content: "Verstanden" });
@@ -81,7 +85,7 @@ describe("runAgent", () => {
 
   it("eine Tool-Runde mit zwei nativen Tool-Calls: beide Tool-Nachrichten in Reihenfolge", async () => {
     const events: string[] = [];
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       {
         llm: scripted([
           {
@@ -97,7 +101,7 @@ describe("runAgent", () => {
         tools: okTools, maxRounds: 8, textFallback: false,
       },
       user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
-    );
+    ));
     expect(events).toEqual(["tool-start", "tool-end", "tool-start", "tool-end", "final"]);
     expect(out.map((m) => m.role)).toEqual(["assistant", "tool", "tool", "assistant"]);
     expect(out[1]).toMatchObject({ role: "tool", toolCallId: "c1", content: "ergebnis von search_notes" });
@@ -105,7 +109,7 @@ describe("runAgent", () => {
   });
 
   it("ungueltiges Argument-JSON wird zum Tool-Fehler, nicht zur Exception", async () => {
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       {
         llm: scripted([
           { ok: true, content: "", toolCalls: [{ id: "c1", name: "read_note", arguments: "{kaputt" }] },
@@ -114,7 +118,7 @@ describe("runAgent", () => {
         tools: okTools, maxRounds: 8, textFallback: false,
       },
       user, () => {}, () => {}, () => {}, sig(),
-    );
+    ));
     expect(out[1].content).toMatch(/^ERROR:/);
   });
 
@@ -133,10 +137,10 @@ describe("runAgent", () => {
 
   it("LLM-Fehler: error-Event mit partial, Rueckgabe enthaelt den Teiltext als assistant", async () => {
     const events: { kind: string; partial?: string }[] = [];
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       { llm: scripted([{ ok: false, kind: "timeout", detail: "zu langsam", partial: "Teil" }]), tools: okTools, maxRounds: 8, textFallback: false },
       user, () => {}, () => {}, (e) => events.push(e as never), sig(),
-    );
+    ));
     expect(events[0]).toMatchObject({ kind: "error", partial: "Teil", errorKind: "timeout" });
     expect(out).toEqual([{ role: "assistant", content: "Teil" }]);
   });
@@ -155,7 +159,7 @@ describe("runAgent", () => {
       },
     };
     const events: string[] = [];
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       {
         llm: scripted([
           {
@@ -171,14 +175,14 @@ describe("runAgent", () => {
         tools: abortingTools, maxRounds: 8, textFallback: false,
       },
       user, () => {}, () => {}, (e) => events.push(e.kind), ctrl.signal,
-    );
+    ));
     expect(secondRan).toBe(false);
     expect(out.map((m) => m.role)).toEqual(["assistant", "tool"]);
     expect(events).toEqual(["tool-start", "tool-end", "error"]);
   });
 
   it("textFallback: erkennt JSON-Tool-Call im content, wenn keine nativen toolCalls kamen", async () => {
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       {
         llm: scripted([
           { ok: true, content: '{"tool":"search_notes","arguments":{"query":"x"}}', toolCalls: [] },
@@ -187,11 +191,11 @@ describe("runAgent", () => {
         tools: okTools, maxRounds: 8, textFallback: true,
       },
       user, () => {}, () => {}, () => {}, sig(),
-    );
+    ));
     expect(out.map((m) => m.role)).toEqual(["assistant", "tool", "assistant"]);
   });
   it("meldet einen Tool-Call ohne Argumente als solchen, statt am ersten Pflichtfeld zu scheitern", async () => {
-    const out = await runAgent(
+    const out = msgsOf(await runAgent(
       {
         llm: scripted([
           { ok: true, content: "", toolCalls: [{ id: "c1", name: "write_note", arguments: "" }] },
@@ -200,11 +204,63 @@ describe("runAgent", () => {
         tools: okTools, maxRounds: 8, textFallback: false,
       },
       user, () => {}, () => {}, () => {}, sig(),
-    );
+    ));
     const toolMsg = out.find((m) => m.role === "tool");
     // Ein abgeschnittener Tool-Call ist etwas anderes als ein falsch befuelltes Feld — die
     // Rueckmeldung ans Modell muss das sagen, sonst korrigiert es am falschen Ende.
     expect(toolMsg?.content).toMatch(/ohne Argumente/i);
     expect(toolMsg?.content).toContain("write_note");
+  });
+});
+
+const big = (tag: string): string => `${tag} ${"x".repeat(STUB_MIN_CHARS + 40)}`;
+const compaction = (budgetTokens: number, keep = 3) => ({
+  budgetTokens, keepToolResults: keep, overheadChars: 0, summarize: null, summaryMaxChars: 400, lang: "de" as const, now: () => "T",
+});
+const bigTools: ToolRunner = { run: async (name): Promise<ToolOutcome> => ({ ok: true, content: big(name) }) };
+const readThenFinal = (n: number): LlmResult[] => [
+  ...Array.from({ length: n }, (_, i): LlmResult => ({ ok: true, content: "", toolCalls: [{ id: `c${i}`, name: "read_note", arguments: `{"path":"N${i}.md"}` }] })),
+  { ok: true, content: "Fertig", toolCalls: [] },
+];
+
+describe("runAgent · Verdichtung (proaktiv)", () => {
+  it("ohne compaction-Dep: keine Records, Bestandsverhalten", async () => {
+    const out = await runAgent(
+      { llm: scripted(readThenFinal(4)), tools: bigTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, () => {}, sig(),
+    );
+    expect(out.some(isCompactionRecord)).toBe(false);
+  });
+
+  it("ueber Budget: Stufe-1-Record im Rueckgabekanal, compaction-Event, das Modell sieht Stubs", async () => {
+    const seen: ChatMessage[][] = [];
+    const scriptedResults = readThenFinal(4);
+    const llm: LoopLlm = { complete: async (m) => { seen.push(m); return scriptedResults[Math.min(seen.length - 1, scriptedResults.length - 1)]; } };
+    const events: string[] = [];
+    // Budget so klein, dass nach zwei grossen Ergebnissen verdichtet werden muss, K=1
+    const out = await runAgent(
+      { llm, tools: bigTools, maxRounds: 8, textFallback: false, compaction: compaction(150, 1) },
+      user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
+    );
+    const recs = out.filter(isCompactionRecord);
+    expect(recs.length).toBeGreaterThan(0);
+    expect(recs[0]).toMatchObject({ stage: 1, keepToolResults: 1 });
+    expect(events).toContain("compaction");
+    // Im letzten Aufruf ans Modell sind aeltere Tool-Ergebnisse Stubs, das juengste nicht
+    const last = seen[seen.length - 1];
+    const tools = last.filter((m) => m.role === "tool");
+    expect(tools[tools.length - 1].stubbed).toBeUndefined();
+    expect(tools.slice(0, -1).some((m) => m.stubbed === true)).toBe(true);
+    // Reihenfolge: Record steht VOR den Nachrichten der Runde, in der er entstand
+    const firstRec = out.findIndex(isCompactionRecord);
+    expect(out[firstRec + 1]).toMatchObject({ role: "assistant" });
+  });
+
+  it("unter Budget: kein Record", async () => {
+    const out = await runAgent(
+      { llm: scripted(readThenFinal(2)), tools: bigTools, maxRounds: 8, textFallback: false, compaction: compaction(100_000) },
+      user, () => {}, () => {}, () => {}, sig(),
+    );
+    expect(out.some(isCompactionRecord)).toBe(false);
   });
 });

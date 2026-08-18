@@ -1,6 +1,16 @@
-import type { ChatMessage, ToolCall, ToolOutcome, ToolRunner } from "./types";
+import {
+  type ChatMessage,
+  type CompactionRecord,
+  type LogEntry,
+  type ToolCall,
+  type ToolOutcome,
+  type ToolRunner,
+} from "./types";
 import type { LlmResult } from "../../llm/KodaChatClient";
 import { parseTextToolCall } from "./text-fallback";
+import { projectForModel } from "./compaction/project";
+import { estimateTokens } from "./compaction/estimate";
+import { planStage1 } from "./compaction/stage1";
 
 export interface LoopLlm {
   complete(
@@ -16,7 +26,26 @@ export type AgentEvent =
   | { kind: "tool-end"; call: ToolCall; outcome: ToolOutcome }
   | { kind: "final"; text: string }
   | { kind: "error"; message: string; partial: string; errorKind: "aborted" | "http" | "network" | "timeout" | "overflow" }
-  | { kind: "round-limit" };
+  | { kind: "round-limit" }
+  | { kind: "compaction"; record: CompactionRecord };
+
+/** Verdichtung — alle Zahlen kommen aus den Settings, umgerechnet in `main.ts`.
+ *  `summarize === null` heisst: Stufe 2 ist aus. */
+export interface CompactionDeps {
+  /** Schwelle in Token (Fenster × Prozent). Darueber wird verdichtet. */
+  budgetTokens: number;
+  /** K — Tool-Ergebnisse, die woertlich bleiben. */
+  keepToolResults: number;
+  /** Zeichen, die neben den Nachrichten mitgehen (Tool-Definitionen). */
+  overheadChars: number;
+  /** Stufe 2: ein Modellaufruf ohne Tools; null bei Fehler/leer. */
+  summarize: ((msgs: ChatMessage[]) => Promise<string | null>) | null;
+  /** Obergrenze fuer den Zusammenfassungstext in Zeichen. */
+  summaryMaxChars: number;
+  lang: "de" | "en";
+  /** ISO-Zeitstempel fuer Records — injiziert, damit Tests deterministisch sind. */
+  now: () => string;
+}
 
 export interface AgentDeps {
   llm: LoopLlm;
@@ -25,24 +54,52 @@ export interface AgentDeps {
   /** true: JSON-Tool-Objekte im Antworttext werden als Tool-Call behandelt
    *  (Default laut koda-lab-Befund, docs/LAB.md). */
   textFallback: boolean;
+  /** Fehlt: keine Verdichtung (Bestandsverhalten, alte Tests). */
+  compaction?: CompactionDeps;
 }
 
 /** Der Agent-Loop: LLM → Tools → LLM … bis finale Antwort, Fehler oder Runden-Limit.
- *  Pure: kennt nur die Ports. Rueckgabe sind die NEU erzeugten Nachrichten —
- *  der Aufrufer haengt sie an seine Session und persistiert. */
+ *  Pure: kennt nur die Ports. Rueckgabe sind die NEU erzeugten Eintraege — Nachrichten
+ *  UND Verdichtungs-Marken im selben Kanal; der Aufrufer haengt sie an seine Session
+ *  und persistiert. Vor jedem Modellaufruf wird der Verlauf projiziert und bei Bedarf
+ *  verdichtet (Spec § Architektur). */
 export async function runAgent(
   deps: AgentDeps,
-  history: ChatMessage[],
+  history: LogEntry[],
   onToken: (t: string) => void,
   onReasoning: (t: string) => void,
   onEvent: (e: AgentEvent) => void,
   signal: AbortSignal,
-): Promise<ChatMessage[]> {
-  const appended: ChatMessage[] = [];
-  const messages = (): ChatMessage[] => [...history, ...appended];
+): Promise<LogEntry[]> {
+  const appended: LogEntry[] = [];
+  const entries = (): LogEntry[] => [...history, ...appended];
+  const c = deps.compaction;
 
-  for (let round = 0; round < deps.maxRounds; round++) {
-    const r = await deps.llm.complete(messages(), onToken, onReasoning, signal);
+  const overBudget = (msgs: ChatMessage[]): boolean =>
+    c !== undefined && estimateTokens(msgs, c.overheadChars) > c.budgetTokens;
+
+  /** Verdichtet, wenn noetig (oder erzwungen). true, wenn mindestens ein Record entstand. */
+  const compact = async (forced: boolean): Promise<boolean> => {
+    if (c === undefined) return false;
+    let did = false;
+    let msgs = projectForModel(entries());
+    if (forced || overBudget(msgs)) {
+      const r1 = planStage1(msgs, forced ? 0 : c.keepToolResults, c.now(), forced);
+      if (r1 !== null) {
+        appended.push(r1);
+        onEvent({ kind: "compaction", record: r1 });
+        did = true;
+        msgs = projectForModel(entries());
+      }
+    }
+    // Stufe 2 folgt in Task 7 an genau dieser Stelle.
+    return did;
+  };
+
+  let round = 0;
+  while (round < deps.maxRounds) {
+    await compact(false);
+    const r = await deps.llm.complete(projectForModel(entries()), onToken, onReasoning, signal);
 
     if (!r.ok) {
       if (r.partial !== "") appended.push({ role: "assistant", content: r.partial });
@@ -77,6 +134,7 @@ export async function runAgent(
         content: outcome.ok ? outcome.content : `ERROR: ${outcome.error}`,
       });
     }
+    round++;
   }
 
   onEvent({ kind: "round-limit" });
