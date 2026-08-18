@@ -30,6 +30,14 @@ All notable changes to this project are documented here. The format follows
 - **The stored conversation is now `LogEntry[]` with compaction marks**, persisted
   in the existing JSONL session format — backward compatible with sessions written
   before this change.
+- **A chat request blocked by a local server without CORS is now named for what it
+  is.** When the endpoint answers the connection test but the chat request fails on
+  the network twice on a freshly resolved endpoint, Koda no longer says "server off,
+  wrong address" (all of which are false in that case) but points to CORS (LM
+  Studio "Enable CORS" / `lms server start --cors`, Ollama `OLLAMA_ORIGINS`). The
+  probe runs through Obsidian's `requestUrl` in the main process and sends no
+  `Origin`; the chat streams as XHR from the renderer and always does. README
+  documents the requirement.
 
 ## [0.6.0] — 2026-08-14
 

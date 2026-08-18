@@ -55,6 +55,13 @@ See `CLAUDE.md` for the current scope and design decisions.*
   can be a local server ([LM Studio](https://lmstudio.ai), Ollama, …) or a hosted
   provider if you add an API key. Models without native tool calling can still be used
   via the text-tool-call fallback, less reliably.
+  **A local server needs CORS enabled.** The chat streams from Obsidian's renderer,
+  which always sends `Origin: app://obsidian.md`; most local servers reject that until
+  CORS is switched on (LM Studio: "Enable CORS" in the server settings, or
+  `lms server start --cors`; Ollama: `OLLAMA_ORIGINS`). The "Test" button in the
+  settings passes either way — it takes a different route that sends no `Origin` — so
+  a green test with a chat that reports the endpoint as unreachable is the CORS
+  signature, and Koda names it as such.
 - *Optional:* the [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag)
   plugin with an indexed vault, which adds semantic search and the `related_notes`
   tool. Koda works fully without it.

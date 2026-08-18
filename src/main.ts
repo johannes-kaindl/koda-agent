@@ -202,6 +202,8 @@ export default class KodaPlugin extends Plugin {
             // wiederholt (der Server antwortet ja), ein Abbruch schon gar nicht.
             (r) => !r.ok && r.kind === "network" && r.partial === "",
             () => ({ ok: false, kind: "network", detail: t("error.noEndpoint"), partial: "" }),
+            // Probe gruen, Chat rot: „Server aus" waere der falsche Rat (siehe withFailover).
+            () => ({ ok: false, kind: "network", detail: t("error.chatBlocked"), partial: "" }),
           ),
       };
 
@@ -221,6 +223,7 @@ export default class KodaPlugin extends Plugin {
             ),
           (r) => !r.ok && r.kind === "network" && r.partial === "",
           () => ({ ok: false, kind: "network", detail: t("error.noEndpoint"), partial: "" }),
+          () => ({ ok: false, kind: "network", detail: t("error.chatBlocked"), partial: "" }),
         );
         if (r.ok && r.content.trim() !== "") return r.content;
         // Ein stilles null macht Stufe 2 undiagnostizierbar — derselbe Idiom wie der

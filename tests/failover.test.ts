@@ -93,3 +93,50 @@ describe("withFailover", () => {
     expect(await withFailover(r, async () => "ok", () => false, () => "leer")).toBe("leer");
   });
 });
+
+describe("withFailover — Widerspruch zwischen Probe und Chat-Aufruf", () => {
+  const resolverOf = (...urls: string[]) => {
+    const reachable = new Set(urls);
+    const r = new EndpointResolver(() => eps(...urls), async (c) => reachable.has(c.url));
+    return { r, kill: (u: string) => reachable.delete(u) };
+  };
+
+  it("benennt den Widerspruch, wenn die Probe den Endpunkt erreicht, aber beide Chat-Versuche am Netz scheitern", async () => {
+    const { r } = resolverOf("http://a");
+    const out = await withFailover(
+      r,
+      async () => "netzfehler",
+      (res) => res === "netzfehler",
+      () => "leer",
+      (res) => `${res}, obwohl die Probe gruen war`,
+    );
+    expect(out).toBe("netzfehler, obwohl die Probe gruen war");
+  });
+
+  it("benennt ihn NICHT, wenn der Endpunkt beim erneuten Aufloesen wirklich weg ist", async () => {
+    const { r, kill } = resolverOf("http://a");
+    await r.resolve(); // a ist gecacht
+    kill("http://a");
+    const out = await withFailover(
+      r,
+      async () => "netzfehler",
+      (res) => res === "netzfehler",
+      () => "leer",
+      (res) => `${res}, obwohl die Probe gruen war`,
+    );
+    expect(out).toBe("netzfehler");
+  });
+
+  it("benennt ihn NICHT, wenn der zweite Versuch durchkommt", async () => {
+    const { r } = resolverOf("http://a", "http://b");
+    let runs = 0;
+    const out = await withFailover(
+      r,
+      async () => (runs++ === 0 ? "netzfehler" : "ok"),
+      (res) => res === "netzfehler",
+      () => "leer",
+      (res) => `${res}, obwohl die Probe gruen war`,
+    );
+    expect(out).toBe("ok");
+  });
+});

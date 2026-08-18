@@ -53,12 +53,22 @@ export class EndpointResolver {
  * Der Aufrufer entscheidet über `isRetryable`, was ein Ausfall ist — und muss dabei den
  * Streaming-Fall bedenken: sind bereits Token beim Nutzer angekommen, darf NICHT wiederholt
  * werden, sonst erscheint die halbe Antwort zweimal.
+ *
+ * `onRefusedDespiteProbe` benennt einen Widerspruch, den nur diese Stelle sehen kann: die
+ * Probe hat den Endpunkt gerade eben als erreichbar bewertet, und der eigentliche Aufruf
+ * scheitert trotzdem am Netz — zweimal, auf frisch aufgelöstem Endpunkt. Dann ist „Server
+ * aus, Adresse falsch" genau der falsche Rat: Probe und Aufruf nehmen verschiedene Wege
+ * (Probe über Obsidians `requestUrl` im Main-Prozess ohne `Origin`, Chat als XHR aus dem
+ * Renderer mit `Origin: app://obsidian.md`), und ein lokaler Server ohne CORS antwortet dem
+ * einen und blockt den anderen. Gemessen 2026-08-18 gegen LM Studio ohne CORS: Probe grün,
+ * Chat „nicht erreichbar" (Lesson 2026-08-16/yijing-oracle).
  */
 export async function withFailover<R>(
   resolver: Pick<EndpointResolver, "resolve" | "invalidate">,
   run: (ep: EndpointConfig) => Promise<R>,
   isRetryable: (result: R) => boolean,
   onNoEndpoint: () => R,
+  onRefusedDespiteProbe?: (result: R) => R,
 ): Promise<R> {
   const first = await resolver.resolve();
   if (first === null) return onNoEndpoint();
@@ -69,5 +79,7 @@ export async function withFailover<R>(
   resolver.invalidate();
   const second = await resolver.resolve();
   if (second === null) return result; // nichts Besseres in Sicht: der echte Fehler zählt
-  return run(second);
+  const retried = await run(second);
+  if (onRefusedDespiteProbe !== undefined && isRetryable(retried)) return onRefusedDespiteProbe(retried);
+  return retried;
 }
