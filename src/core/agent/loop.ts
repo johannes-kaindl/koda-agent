@@ -95,7 +95,11 @@ export async function runAgent(
     }
     if ((forced || overBudget(msgs)) && c.summarize !== null) {
       const { completed } = splitTurns(msgs);
-      if (completed.length > 0) {
+      // Kein Fortschritt moeglich: besteht die abgeschlossene Region nur noch aus dem
+      // Ergebnis der letzten Stufe 2 (merged user + summary), gaebe ein weiterer Aufruf
+      // nichts Neues her — er kostete nur Minuten. Dann bleibt der reaktive Pfad.
+      const onlySummary = completed.length === 1 && completed[0][0]?.merged === true;
+      if (completed.length > 0 && !onlySummary) {
         // summarize() ist ein Fremd-Port (LLM-Aufruf) — ein werfender Port darf den Lauf
         // nicht abbrechen, deshalb zusaetzlich zum vertraglichen null hier abgefangen.
         const summary = await summarizeTurns(completed, {

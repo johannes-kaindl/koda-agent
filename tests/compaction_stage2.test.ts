@@ -57,7 +57,16 @@ describe("summarizeTurns (rollend)", () => {
     expect(calls.length).toBeGreaterThan(1);
     expect(out).toBe(`ZF${n}`);
     expect(calls[1][0].content).toContain("ZF1");
-    // Eine Runde, die allein ueber packChars liegt, wird trotzdem allein geschickt (kein Endlos-Loop)
+  });
+
+  it("eine Runde, die allein ueber packChars liegt, wird trotzdem allein geschickt (kein Endlos-Loop)", async () => {
+    const calls: ChatMessage[][] = [];
+    const out = await summarizeTurns([turn(1, 5000)], {
+      lang: "de", maxChars: 500, packChars: 100,
+      summarize: async (m) => { calls.push(m); return "ZF"; },
+    });
+    expect(out).toBe("ZF");
+    expect(calls).toHaveLength(1);
   });
 
   it("liefert null, wenn ein Aufruf nichts Brauchbares liefert — dann kein Record", async () => {

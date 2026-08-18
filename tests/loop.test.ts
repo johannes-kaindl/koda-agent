@@ -380,4 +380,49 @@ describe("runAgent · Stufe 2", () => {
     expect(out.some(isCompactionRecord)).toBe(false);
     expect(out[out.length - 1]).toMatchObject({ role: "assistant", content: "Fertig" });
   });
+
+  it("kein Fortschritt nach Stufe 2 (Region ist nur noch merged+summary): kein zweiter Aufruf trotz weiterer Runden", async () => {
+    // Die laufende Runde (F2 + eine bereits ueberlange Antwort) allein liegt schon ueber
+    // dem Budget — nach der ersten Stufe-2-Verdichtung bleibt die abgeschlossene Region fuer
+    // immer [merged, summary]. Ohne Guard riefe jede weitere Runde summarize() erneut auf.
+    const oversizedCurrent: LogEntry[] = [
+      { role: "user", content: "F1" }, { role: "assistant", content: "A".repeat(2000) },
+      { role: "user", content: "F2" }, { role: "assistant", content: "B".repeat(2000) },
+    ];
+    const summarizeCalls: ChatMessage[][] = [];
+    let n = 0;
+    const llm: LoopLlm = {
+      complete: async () => {
+        n++;
+        if (n <= 2) return { ok: true, content: "", toolCalls: [{ id: `c${n}`, name: "search_notes", arguments: '{"query":"x"}' }] };
+        return { ok: true, content: "Fertig", toolCalls: [] };
+      },
+    };
+    const out = await runAgent(
+      { llm, tools: okTools, maxRounds: 8, textFallback: false,
+        compaction: { ...compaction(100, 3), summarize: async (m) => { summarizeCalls.push(m); return "ZF"; } } },
+      oversizedCurrent, () => {}, () => {}, () => {}, sig(),
+    );
+    expect(n).toBe(3); // zwei Tool-Runden, dann final
+    expect(summarizeCalls).toHaveLength(1);
+    expect(out.filter(isCompactionRecord).filter((r) => r.stage === 2)).toHaveLength(1);
+  });
+
+  it("reaktiver Ueberlauf ohne Stufe-1-Ziel erzwingt Stufe 2 direkt: Record mit forced:true", async () => {
+    const overflow: LlmResult = { ok: false, kind: "overflow", detail: "maximum context length is 8192", partial: "" };
+    let n = 0;
+    const script: LlmResult[] = [overflow, { ok: true, content: "Fertig", toolCalls: [] }];
+    const llm: LoopLlm = { complete: async () => script[Math.min(n++, script.length - 1)] };
+    const events: string[] = [];
+    const out = await runAgent(
+      { llm, tools: okTools, maxRounds: 8, textFallback: false,
+        compaction: { ...compaction(100_000, 3), summarize: async () => "ZF" } },
+      twoTurns, () => {}, () => {}, (e) => events.push(e.kind), sig(),
+    );
+    const recs = out.filter(isCompactionRecord);
+    expect(recs).toHaveLength(1);
+    expect(recs[0]).toMatchObject({ stage: 2, forced: true, summary: "ZF" });
+    expect(events.filter((k) => k === "error")).toHaveLength(0);
+    expect(events[events.length - 1]).toBe("final");
+  });
 });
