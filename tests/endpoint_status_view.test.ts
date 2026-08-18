@@ -43,4 +43,10 @@ describe("endpointStatusView", () => {
     const view = endpointStatusView({ reachable: false, kind: "unknown", klartext: "egal", raw });
     expect(view.tooltip).toBe(t("settings.probe.unknown", raw));
   });
+
+  it("haengt das gemeldete Kontextfenster an den Tooltip, wenn vorhanden", () => {
+    const ok = { reachable: true, kind: "ok" } as EndpointStatus;
+    expect(endpointStatusView(ok, 32768).tooltip).toMatch(/32768/);
+    expect(endpointStatusView(ok, null).tooltip).toBe(endpointStatusView(ok).tooltip);
+  });
 });

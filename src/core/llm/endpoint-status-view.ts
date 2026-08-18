@@ -20,17 +20,23 @@ export interface EndpointStatusView {
   tooltip: string;
 }
 
-/** `null` bedeutet „wird gerade geprüft“ — der Zustand zwischen Klick und Antwort. */
-export function endpointStatusView(status: EndpointStatus | null): EndpointStatusView {
+/** `null` bedeutet „wird gerade geprüft“ — der Zustand zwischen Klick und Antwort.
+ *  `contextTokens`: das vom Endpunkt gemeldete Kontextfenster (LM Studio/Ollama), falls
+ *  bekannt — wird an den Tooltip angehängt statt eine eigene Zeile zu bekommen, damit die
+ *  Statusspalte ein einzelnes Icon bleibt. */
+export function endpointStatusView(
+  status: EndpointStatus | null,
+  contextTokens: number | null = null,
+): EndpointStatusView {
   if (status === null) {
     return { icon: "loader", ok: null, tooltip: t("settings.probe.testing") };
   }
+  const base =
+    status.kind === "unknown" ? t("settings.probe.unknown", status.raw ?? "") : t(`settings.probe.${status.kind}`);
+  const tooltip = contextTokens === null ? base : `${base} · ${t("settings.probe.context", contextTokens)}`;
   return {
     icon: status.reachable ? "circle-check" : "circle-x",
     ok: status.reachable,
-    tooltip:
-      status.kind === "unknown"
-        ? t("settings.probe.unknown", status.raw ?? "")
-        : t(`settings.probe.${status.kind}`),
+    tooltip,
   };
 }

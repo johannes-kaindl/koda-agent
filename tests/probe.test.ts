@@ -6,7 +6,12 @@ const clock = {
   clearTimeout: (id: number) => clearTimeout(id),
 };
 
-const http = (impl: HttpProbe["getJson"]): HttpProbe => ({ getJson: impl });
+const http = (impl: HttpProbe["getJson"]): HttpProbe => ({
+  getJson: impl,
+  postJson: async () => {
+    throw new Error("nicht erwartet");
+  },
+});
 
 describe("probeEndpoint", () => {
   it("erkennt einen gesunden OpenAI-kompatiblen Endpunkt", async () => {

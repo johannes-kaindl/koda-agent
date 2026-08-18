@@ -18,4 +18,14 @@ export const requestUrlProbe: HttpProbe = {
     }
     return { status: res.status, json };
   },
+  async postJson(url, body, headers) {
+    const res = await requestUrl({ url, method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body), throw: false });
+    let json: unknown = null;
+    try {
+      json = res.json;
+    } catch {
+      json = null;
+    }
+    return { status: res.status, json };
+  },
 };

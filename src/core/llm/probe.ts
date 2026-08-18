@@ -24,6 +24,8 @@ export interface HttpProbe {
   /** Muss den echten Status zurückgeben statt bei 4xx/5xx zu werfen. Nur ein
    *  Transportfehler (kein Server, kein DNS) darf werfen. */
   getJson(url: string, headers: Record<string, string>): Promise<{ status: number; json: unknown }>;
+  /** Dito fuer POST mit JSON-Body (Ollama `/api/show`). */
+  postJson(url: string, body: unknown, headers: Record<string, string>): Promise<{ status: number; json: unknown }>;
 }
 
 export const PROBE_TIMEOUT_MS = 5000;

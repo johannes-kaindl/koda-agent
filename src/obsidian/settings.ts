@@ -31,6 +31,7 @@ import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
 import { resolveModelChoice, type ModelOption } from "../core/llm/model-choice";
 import {
+  DEFAULT_SETTINGS,
   mergeKodaSettings,
   MAX_ROUNDS_LIMIT,
   TIMEOUT_SEC_MIN,
@@ -309,9 +310,10 @@ export class KodaSettingsTab extends PluginSettingTab {
         // beim Klick auf „Testen" in eine Endlosschleife geschickt (2026-08-06, 100 % CPU,
         // beide Fenster tot). Form uebernommen aus `vault-rag/src/settings.ts`.
         const statusEl = row.controlEl.createSpan({ cls: "koda-endpoint-status" });
-        /** Setzt den Status als Icon + Tooltip. `null` = Pruefung laeuft. */
-        const showStatus = (s: EndpointStatus | null): void => {
-          const view = endpointStatusView(s);
+        /** Setzt den Status als Icon + Tooltip. `null` = Pruefung laeuft. `ctx` haengt das
+         *  gemeldete Kontextfenster an den Tooltip an, wenn vorhanden. */
+        const showStatus = (s: EndpointStatus | null, ctx: number | null = null): void => {
+          const view = endpointStatusView(s, ctx);
           statusEl.empty();
           setIcon(statusEl, view.icon);
           statusEl.toggleClass("is-ok", view.ok === true);
@@ -333,7 +335,21 @@ export class KodaSettingsTab extends PluginSettingTab {
               showStatus(null);
               void this.plugin
                 .probe(current)
-                .then(showStatus)
+                .then(async (status) => {
+                  if (!status.reachable) {
+                    showStatus(status);
+                    return;
+                  }
+                  // Erreichbar: zusaetzlich das Fenster erfragen. BERICHTET wird immer;
+                  // GESCHRIEBEN nur, wenn das Feld noch auf dem Default steht — wer bewusst
+                  // kleiner eingestellt hat, wird nicht ueberschrieben (Regel ohne Flag).
+                  const ctx = await this.plugin.probeContext(current);
+                  showStatus(status, ctx);
+                  if (ctx !== null && this.plugin.settings.contextWindowTokens === DEFAULT_SETTINGS.contextWindowTokens) {
+                    await this.setControlValue("contextWindowTokens", ctx);
+                    this.refreshUi();
+                  }
+                })
                 .finally(() => {
                   b.buttonEl.disabled = false;
                 });

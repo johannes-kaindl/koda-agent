@@ -7,6 +7,7 @@ import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
 import { KodaChatClient, type LlmResult } from "./llm/KodaChatClient";
 import { probeEndpoint, probeModels } from "./core/llm/probe";
+import { probeModelContext } from "./core/llm/context-probe";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
@@ -64,6 +65,12 @@ export default class KodaPlugin extends Plugin {
   /** Erreichbarkeit UND Modell-Liste aus einem Aufruf (Settings-Modellauswahl). */
   probeModels(ep: EndpointConfig): Promise<{ status: EndpointStatus; models: string[] }> {
     return probeModels(ep, requestUrlProbe, realClock);
+  }
+
+  /** Kontextfenster laut Endpunkt (LM Studio/Ollama), sonst null. Nutzt das Modell, das fuer
+   *  diese Zeile effektiv gilt. */
+  probeContext(ep: EndpointConfig): Promise<number | null> {
+    return probeModelContext(ep, effectiveModel(ep, this.settings.model), requestUrlProbe, realClock);
   }
   private store!: SessionStore;
 
