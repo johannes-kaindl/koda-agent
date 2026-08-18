@@ -222,7 +222,11 @@ export default class KodaPlugin extends Plugin {
           (r) => !r.ok && r.kind === "network" && r.partial === "",
           () => ({ ok: false, kind: "network", detail: t("error.noEndpoint"), partial: "" }),
         );
-        return r.ok && r.content.trim() !== "" ? r.content : null;
+        if (r.ok && r.content.trim() !== "") return r.content;
+        // Ein stilles null macht Stufe 2 undiagnostizierbar — derselbe Idiom wie der
+        // Append-Fehler in session.ts.
+        console.warn("Koda: Zusammenfassung (Stufe 2) fehlgeschlagen", r.ok ? "empty" : r.kind, r.ok ? undefined : r.detail);
+        return null;
       };
       const compaction: CompactionDeps = {
         budgetTokens: Math.floor((s.contextWindowTokens * s.compactAtPercent) / 100),
@@ -298,6 +302,7 @@ export default class KodaPlugin extends Plugin {
           }
           if (e.kind === "round-limit") this.lastNotice = { text: t("view.roundLimit", s.maxRounds), kind: "error" };
           if (e.kind === "compaction") for (const v of this.views()) v.compactionMark(e.record);
+          if (e.kind === "summarizing") for (const v of this.views()) v.summarizingHint();
         },
         this.abort.signal,
       );

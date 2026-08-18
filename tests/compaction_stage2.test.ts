@@ -1,10 +1,11 @@
-import { splitTurns, buildSummaryPrompt, summarizeTurns, makeStage2Record, PACK_RATIO } from "../src/core/agent/compaction/stage2";
+import { splitTurns, buildSummaryPrompt, summarizeTurns, makeStage2Record, flattenTurnForSummary, PACK_RATIO } from "../src/core/agent/compaction/stage2";
 import type { ChatMessage } from "../src/core/agent/types";
 
 const sys: ChatMessage = { role: "system", content: "SYS" };
 const u = (c: string): ChatMessage => ({ role: "user", content: c });
 const a = (c: string): ChatMessage => ({ role: "assistant", content: c });
 const tool = (id: string, c: string): ChatMessage => ({ role: "tool", toolCallId: id, content: c });
+const call = (id: string, name: string, args: string): ChatMessage => ({ role: "assistant", content: "", toolCalls: [{ id, name, arguments: args }] });
 
 describe("splitTurns", () => {
   it("trennt System-Praefix, abgeschlossene Runden und die laufende", () => {
@@ -31,6 +32,26 @@ describe("buildSummaryPrompt", () => {
   });
 });
 
+describe("flattenTurnForSummary", () => {
+  it("verkettet Werkzeugaufruf, Ergebnis und Antwort zu einer assistant-Nachricht ohne toolCalls", () => {
+    const [user, assistant] = flattenTurnForSummary([u("F1"), call("c1", "read_note", '{"path":"A.md"}'), tool("c1", "INHALT"), a("Antwort")]);
+    expect(user).toEqual(u("F1"));
+    expect(assistant.role).toBe("assistant");
+    expect(assistant.toolCalls).toBeUndefined();
+    const iCall = assistant.content.indexOf("[Werkzeugaufruf: read_note {\"path\":\"A.md\"}]");
+    const iResult = assistant.content.indexOf("[Ergebnis: INHALT]");
+    const iAntwort = assistant.content.indexOf("Antwort");
+    expect(iCall).toBeGreaterThanOrEqual(0);
+    expect(iResult).toBeGreaterThan(iCall);
+    expect(iAntwort).toBeGreaterThan(iResult);
+  });
+  it("Runde ohne Folgenachrichten -> Platzhalter, damit die Alternierung haelt", () => {
+    const [user, assistant] = flattenTurnForSummary([u("F1")]);
+    expect(user).toEqual(u("F1"));
+    expect(assistant).toEqual({ role: "assistant", content: "(keine Antwort)" });
+  });
+});
+
 describe("summarizeTurns (rollend)", () => {
   const turn = (i: number, size: number): ChatMessage[] => [u(`F${i}`), a("y".repeat(size))];
 
@@ -45,6 +66,11 @@ describe("summarizeTurns (rollend)", () => {
     expect(calls[0][0].role).toBe("system");
     expect(calls[0][calls[0].length - 1]).toMatchObject({ role: "user" });
     expect(calls[0].filter((m) => m.role === "user").map((m) => m.content)).toEqual(["F1", "F2", expect.stringMatching(/summary/i)]);
+    // Kein "tool"-Role und kein toolCalls-Feld gehen auf den Draht — dieser Aufruf laeuft
+    // ohne Tool-Definitionen; ausserdem muss die Rollen-Alternierung nach dem System strikt sein.
+    expect(calls[0].some((m) => m.role === "tool")).toBe(false);
+    expect(calls[0].some((m) => m.toolCalls !== undefined)).toBe(false);
+    expect(calls[0].slice(1).map((m) => m.role)).toEqual(["user", "assistant", "user", "assistant", "user"]);
   });
 
   it("Riesenverlauf: mehrere Aufrufe, jeder unter packChars, Zwischenstand wandert in den naechsten Prompt", async () => {

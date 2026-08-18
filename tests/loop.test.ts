@@ -338,10 +338,11 @@ describe("runAgent · Stufe 2", () => {
     const seen: ChatMessage[][] = [];
     const llm: LoopLlm = { complete: async (m) => { seen.push(m); return { ok: true, content: "Fertig", toolCalls: [] }; } };
     const summarizeCalls: ChatMessage[][] = [];
+    const events: string[] = [];
     const out = await runAgent(
       { llm, tools: okTools, maxRounds: 8, textFallback: false,
         compaction: { ...compaction(100, 3), summarize: async (m) => { summarizeCalls.push(m); return "ZUSAMMENFASSUNG"; } } },
-      twoTurns, () => {}, () => {}, () => {}, sig(),
+      twoTurns, () => {}, () => {}, (e) => events.push(e.kind), sig(),
     );
     const recs = out.filter(isCompactionRecord);
     expect(recs).toHaveLength(1);
@@ -351,6 +352,9 @@ describe("runAgent · Stufe 2", () => {
     expect(seen[0][0]).toMatchObject({ merged: true });
     expect(seen[0][1].content).toBe("ZUSAMMENFASSUNG");
     expect(seen[0][2].content).toBe("F2");
+    // Lebenszeichen VOR dem teuren Aufruf, nicht danach.
+    expect(events.indexOf("summarizing")).toBeGreaterThanOrEqual(0);
+    expect(events.indexOf("summarizing")).toBeLessThan(events.indexOf("compaction"));
   });
 
   it("Stufe 2 aus (summarize null): kein Stufe-2-Record, Lauf geht weiter", async () => {

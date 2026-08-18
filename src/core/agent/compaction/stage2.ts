@@ -1,8 +1,37 @@
 /* Stufe 2: abgeschlossene Runden durch das Modell zusammenfassen. Teuer (lokal Minuten)
  * und die unzuverlaessigste Stelle im System — deshalb zuletzt, selten, abschaltbar, und
  * ohne Ergebnis lieber KEIN Record als ein leerer. Rollend, weil die Eingabe selbst ins
- * Fenster passen muss (sie ist ja der Grund, warum wir ueber Budget sind). */
+ * Fenster passen muss (sie ist ja der Grund, warum wir ueber Budget sind).
+ *
+ * Der Summarize-Aufruf bekommt jede Runde FLACH als genau [user, assistant] statt der
+ * projizierten Nachrichten verbatim: eine `assistant`-Nachricht mit `toolCalls` und eine
+ * `role: "tool"`-Antwort gehen sonst ohne Tool-Definitionen auf den Draht (dieser Aufruf
+ * laeuft bewusst ohne Werkzeuge) — ein strenger OpenAI-kompatibler Server quittiert das
+ * mit HTTP 400, und Stufe 2 waere fuer diesen Nutzer tot. Ausserdem braucht eine
+ * Zusammenfassung Prosa, kein Protokoll, und stricte User/Assistant-Alternierung ist die
+ * verbreitetste Erwartung an einen Chat-Verlauf. Projektion und Records bleiben unberuehrt
+ * — geflacht wird nur das, was ueber diesen einen Draht geht. */
 import type { ChatMessage, CompactionRecord } from "../types";
+
+/** Ein Werkzeugaufruf/-ergebnis als lesbare Zeile fuer den Summarize-Aufruf — kein Protokoll,
+ *  nur Prosa, die das Modell zusammenfassen kann. */
+function renderNonUserMessage(m: ChatMessage): string {
+  if (m.role === "tool") return `[Ergebnis: ${m.content}]`;
+  const lines: string[] = [];
+  if (m.content !== "") lines.push(m.content);
+  for (const c of m.toolCalls ?? []) lines.push(`[Werkzeugaufruf: ${c.name} ${c.arguments}]`);
+  return lines.join("\n");
+}
+
+/** Flacht eine Runde (`[user, ...Rest]`) fuer den Summarize-Aufruf auf genau `[user, assistant]`
+ *  ab — siehe Modul-Kommentar. Der `user`-Anteil bleibt verbatim (inkl. `merged`), der
+ *  `assistant`-Anteil ist die Verkettung aller folgenden Nachrichten als Text; ohne
+ *  Folgenachrichten steht dort ein Platzhalter, damit die Alternierung haelt. */
+export function flattenTurnForSummary(turn: ChatMessage[]): [ChatMessage, ChatMessage] {
+  const [first, ...rest] = turn;
+  const text = rest.map(renderNonUserMessage).filter((s) => s !== "").join("\n");
+  return [first, { role: "assistant", content: text !== "" ? text : "(keine Antwort)" }];
+}
 
 /** Anteil des Budgets, den ein Zusammenfassungs-Aufruf hoechstens fuellt. Konstante, keine
  *  Einstellung: sie aendert nur, in wie viele Aufrufe eine Zusammenfassung zerfaellt. */
@@ -55,7 +84,7 @@ export async function summarizeTurns(
     }
     const msgs: ChatMessage[] = [
       { role: "system", content: buildSummaryPrompt(opts.lang, opts.maxChars, carry) },
-      ...batch.flat(),
+      ...batch.flatMap(flattenTurnForSummary),
       { role: "user", content: "Write the summary now." },
     ];
     const text = await opts.summarize(msgs);

@@ -28,7 +28,10 @@ export type AgentEvent =
   | { kind: "final"; text: string }
   | { kind: "error"; message: string; partial: string; errorKind: "aborted" | "http" | "network" | "timeout" | "overflow" }
   | { kind: "round-limit" }
-  | { kind: "compaction"; record: CompactionRecord };
+  | { kind: "compaction"; record: CompactionRecord }
+  /** Vor dem Stufe-2-Modellaufruf — der kann lokal Minuten dauern, ohne dieses Ereignis
+   *  steht der Chat solange ohne jedes Lebenszeichen da. */
+  | { kind: "summarizing" };
 
 /** Verdichtung — alle Zahlen kommen aus den Settings, umgerechnet in `main.ts`.
  *  `summarize === null` heisst: Stufe 2 ist aus. */
@@ -102,6 +105,7 @@ export async function runAgent(
       if (completed.length > 0 && !onlySummary) {
         // summarize() ist ein Fremd-Port (LLM-Aufruf) — ein werfender Port darf den Lauf
         // nicht abbrechen, deshalb zusaetzlich zum vertraglichen null hier abgefangen.
+        onEvent({ kind: "summarizing" });
         const summary = await summarizeTurns(completed, {
           lang: c.lang,
           maxChars: c.summaryMaxChars,

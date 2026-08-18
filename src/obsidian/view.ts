@@ -98,6 +98,14 @@ export class KodaView extends ItemView {
     this.logEl.scrollTo({ top: this.logEl.scrollHeight });
   }
 
+  /** Lebenszeichen VOR dem Stufe-2-Modellaufruf — der kann lokal Minuten dauern. Transient:
+   *  landet nicht in chatLog, der naechste renderLog() (finally in ask()) laesst sie weg. */
+  summarizingHint(): void {
+    this.streamEl = null;
+    this.logEl.createDiv({ cls: "koda-msg koda-notice koda-compaction", text: t("view.compaction.summarizing") });
+    this.logEl.scrollTo({ top: this.logEl.scrollHeight });
+  }
+
   /** Voll-Redraw aus plugin.chatLog (Sessionstart, final, Fehler). */
   renderLog(): void {
     this.logEl.empty();
