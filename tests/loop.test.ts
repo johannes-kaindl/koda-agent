@@ -264,3 +264,65 @@ describe("runAgent · Verdichtung (proaktiv)", () => {
     expect(out.some(isCompactionRecord)).toBe(false);
   });
 });
+
+describe("runAgent · Verdichtung (reaktiv)", () => {
+  const overflow: LlmResult = { ok: false, kind: "overflow", detail: "maximum context length is 8192", partial: "" };
+
+  it("erster Ueberlauf: erzwungene Stufe 1 mit K=0 (forced), dieselbe Runde wiederholt, dann ok", async () => {
+    let n = 0;
+    const script: LlmResult[] = [
+      ...readThenFinal(2).slice(0, 2),        // zwei read_note-Runden
+      overflow,                                // dritte Anfrage scheitert am Fenster
+      { ok: true, content: "Fertig", toolCalls: [] },
+    ];
+    const llm: LoopLlm = { complete: async () => script[Math.min(n++, script.length - 1)] };
+    const events: string[] = [];
+    const out = await runAgent(
+      { llm, tools: bigTools, maxRounds: 3, textFallback: false, compaction: compaction(100_000, 3) },
+      user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
+    );
+    const recs = out.filter(isCompactionRecord);
+    expect(recs).toHaveLength(1);
+    expect(recs[0]).toMatchObject({ stage: 1, keepToolResults: 0, forced: true });
+    expect(events.filter((k) => k === "error")).toHaveLength(0);
+    expect(events[events.length - 1]).toBe("final");
+    // maxRounds=3, drei Tool-Runden waeren das Limit — die Wiederholung zaehlt nicht mit
+    expect(n).toBe(4);
+  });
+
+  it("zweiter Ueberlauf: Fehler-Event overflow mit Server-Text, keine Endlosschleife", async () => {
+    let n = 0;
+    const script: LlmResult[] = [...readThenFinal(1).slice(0, 1), overflow, overflow];
+    const llm: LoopLlm = { complete: async () => script[Math.min(n++, script.length - 1)] };
+    const errors: { errorKind: string; message: string }[] = [];
+    const out = await runAgent(
+      { llm, tools: bigTools, maxRounds: 8, textFallback: false, compaction: compaction(100_000, 3) },
+      user, () => {}, () => {},
+      (e) => { if (e.kind === "error") errors.push({ errorKind: e.errorKind, message: e.message }); }, sig(),
+    );
+    expect(errors).toEqual([{ errorKind: "overflow", message: "maximum context length is 8192" }]);
+    expect(out.filter(isCompactionRecord)).toHaveLength(1);
+    expect(n).toBe(3);
+  });
+
+  it("Ueberlauf ohne Verdichtungsmasse (nichts zu stubben, Stufe 2 aus): sofort Fehler-Event", async () => {
+    let n = 0;
+    const llm: LoopLlm = { complete: async () => { n++; return overflow; } };
+    const errors: string[] = [];
+    await runAgent(
+      { llm, tools: okTools, maxRounds: 8, textFallback: false, compaction: compaction(100_000, 3) },
+      user, () => {}, () => {}, (e) => { if (e.kind === "error") errors.push(e.errorKind); }, sig(),
+    );
+    expect(errors).toEqual(["overflow"]);
+    expect(n).toBe(1);
+  });
+
+  it("Ueberlauf ohne compaction-Dep: Fehler-Event wie jeder andere Fehler", async () => {
+    const errors: string[] = [];
+    await runAgent(
+      { llm: scripted([overflow]), tools: okTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, (e) => { if (e.kind === "error") errors.push(e.errorKind); }, sig(),
+    );
+    expect(errors).toEqual(["overflow"]);
+  });
+});

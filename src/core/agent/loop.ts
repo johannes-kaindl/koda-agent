@@ -97,11 +97,22 @@ export async function runAgent(
   };
 
   let round = 0;
+  let overflowRetried = false;
   while (round < deps.maxRounds) {
     await compact(false);
     const r = await deps.llm.complete(projectForModel(entries()), onToken, onReasoning, signal);
 
     if (!r.ok) {
+      // Reaktives Netz: beim ERSTEN Ueberlauf einmal erzwungen verdichten (K=0, dann
+      // Stufe 2) und dieselbe Runde wiederholen — sie zaehlt nicht gegen maxRounds. Nur,
+      // wenn noch kein Token beim Nutzer war (sonst stuende die halbe Antwort doppelt in
+      // der Blase — dieselbe Regel wie beim Failover). Beim zweiten Mal oder ohne
+      // Verdichtungsmasse: Fehler mit dem Server-Text; die Session bleibt benutzbar, der
+      // naechste ask() darf wieder verdichten.
+      if (r.kind === "overflow" && r.partial === "" && !overflowRetried) {
+        overflowRetried = true;
+        if (await compact(true)) continue;
+      }
       if (r.partial !== "") appended.push({ role: "assistant", content: r.partial });
       onEvent({ kind: "error", message: r.detail, partial: r.partial, errorKind: r.kind });
       return appended;
