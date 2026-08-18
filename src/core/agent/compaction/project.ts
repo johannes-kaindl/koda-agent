@@ -4,7 +4,11 @@
  * JSONL ist append-only. Was auf den Draht geht, ist eine PROJEKTION: ein Fold von links
  * ueber die Verdichtungs-Marken. Eine Marke referenziert nichts; ihre Position ist die
  * Referenz („alles vor mir nach dieser Regel“). Ohne Marke ist die Projektion identisch
- * zum Verlauf. Spec: docs/superpowers/specs/2026-08-18-koda-compaction-design.md */
+ * zum Verlauf. Die Entfernung der Stufe-2-Region ist nur deshalb verwaisungssicher, weil eine
+ * Nutzer-Nachricht nie mitten in einer Runde auftauchen kann — `view.ts` verweigert Eingaben,
+ * solange `plugin.busy` steht. Unveraenderte Nachrichten liefert die Projektion per Referenz
+ * zurueck — Aufrufer duerfen sie nie beschreiben. Spec:
+ * docs/superpowers/specs/2026-08-18-koda-compaction-design.md */
 import { isCompactionRecord, type ChatMessage, type CompactionRecord, type LogEntry } from "../types";
 
 /** Unter dieser Laenge spart ein Stub nichts — Fehler-Ergebnisse (`ERROR: …`) bleiben. */

@@ -63,7 +63,7 @@ describe("projectForModel", () => {
     expect(out.slice(3)).toEqual(history().slice(9));
   });
 
-  it("Stufe 2 ohne abgeschlossene Runden ist ein No-op", () => {
+  it("Stufe 2 mit leerer Region (keine abgeschlossene Runde vor dem Record) ist ein No-op", () => {
     const h: LogEntry[] = [sys, u("Frage 1"), call("c1", "read_note", "{}"), tool("c1", big("A"))];
     expect(projectForModel([...h, s2("X", 0)])).toEqual(h);
   });
@@ -97,7 +97,7 @@ describe("projectForModel", () => {
   it("Invariante: nie zwei user hintereinander, jedes tool hat sein toolCalls-Gegenstueck", () => {
     // deterministischer Pseudo-Zufall, damit der Test reproduzierbar ist
     let seed = 42;
-    const rnd = (n: number): number => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+    const rnd = (n: number): number => { seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff; return seed % n; };
     for (let run = 0; run < 200; run++) {
       const entries: LogEntry[] = [sys];
       let id = 0;
