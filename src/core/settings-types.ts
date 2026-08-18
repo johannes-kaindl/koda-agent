@@ -42,6 +42,22 @@ export const LIST_ROWS_MIN = 20;
 export const LIST_ROWS_MAX = 1000;
 export const LIST_ROWS_STEP = 10;
 
+/** Spannen fuer „Kontext & Verdichtung“ (Spec 2026-08-18-koda-compaction-design.md).
+ *  Alle vier sind Einstellungen und keine Konstanten, weil sie beobachtbares Verhalten
+ *  steuern: das Fenster ist die Bezugsgroesse, die Schwelle sagt WANN verdichtet wird, K
+ *  entscheidet, ob Koda seinen Arbeitsplan noch woertlich hat, die Zusammenfassungslaenge,
+ *  wie viel er „erinnert“. Das Fenster ist ein Zahlenfeld, kein Slider — 2048 bis eine
+ *  Million in Rasten waere unbedienbar. */
+export const CONTEXT_WINDOW_MIN = 2048;
+export const CONTEXT_WINDOW_MAX = 1_000_000;
+export const COMPACT_AT_MIN = 40;
+export const COMPACT_AT_MAX = 95;
+export const COMPACT_AT_STEP = 5;
+export const KEEP_TOOLS_MIN = 0;
+export const KEEP_TOOLS_MAX = 20;
+export const SUMMARY_PCT_MIN = 3;
+export const SUMMARY_PCT_MAX = 30;
+
 export interface KodaSettings {
   endpoints: EndpointConfig[];
   model: string;
@@ -54,6 +70,11 @@ export interface KodaSettings {
   textFallback: boolean;
   language: "auto" | "de" | "en";
   openOnStartup: boolean;
+  contextWindowTokens: number;
+  compactAtPercent: number;
+  keepToolResults: number;
+  summarizeEnabled: boolean;
+  summaryPercent: number;
 }
 
 export const DEFAULT_SETTINGS: KodaSettings = {
@@ -68,6 +89,11 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   textFallback: false, // Default laut koda-lab-Befund setzen (docs/LAB.md)
   language: "auto",
   openOnStartup: false,
+  contextWindowTokens: 8192,
+  compactAtPercent: 75,
+  keepToolResults: 3,
+  summarizeEnabled: true,
+  summaryPercent: 10,
 };
 
 export function mergeKodaSettings(raw: unknown): KodaSettings {
@@ -85,6 +111,24 @@ export function mergeKodaSettings(raw: unknown): KodaSettings {
     ),
     listNotesMaxRows: clampInt(
       merged.listNotesMaxRows, LIST_ROWS_MIN, LIST_ROWS_MAX, DEFAULT_SETTINGS.listNotesMaxRows,
+    ),
+    contextWindowTokens: clampInt(
+      merged.contextWindowTokens, CONTEXT_WINDOW_MIN, CONTEXT_WINDOW_MAX, DEFAULT_SETTINGS.contextWindowTokens,
+    ),
+    compactAtPercent: clampInt(
+      merged.compactAtPercent, COMPACT_AT_MIN, COMPACT_AT_MAX, DEFAULT_SETTINGS.compactAtPercent,
+    ),
+    keepToolResults: clampInt(
+      merged.keepToolResults, KEEP_TOOLS_MIN, KEEP_TOOLS_MAX, DEFAULT_SETTINGS.keepToolResults,
+    ),
+    // mergeSettings laesst unbekannten Typ-Muell aus einer alten data.json unveraendert
+    // durch (Object.assign kennt keine Typprüfung) — hier trotzdem auf Boolean pruefen,
+    // statt einer eigenen clamp-Funktion nur fuer diesen einen Fall.
+    summarizeEnabled: typeof merged.summarizeEnabled === "boolean"
+      ? merged.summarizeEnabled
+      : DEFAULT_SETTINGS.summarizeEnabled,
+    summaryPercent: clampInt(
+      merged.summaryPercent, SUMMARY_PCT_MIN, SUMMARY_PCT_MAX, DEFAULT_SETTINGS.summaryPercent,
     ),
   };
 }

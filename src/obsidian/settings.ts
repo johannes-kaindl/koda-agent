@@ -42,6 +42,13 @@ import {
   LIST_ROWS_MIN,
   LIST_ROWS_MAX,
   LIST_ROWS_STEP,
+  COMPACT_AT_MIN,
+  COMPACT_AT_MAX,
+  COMPACT_AT_STEP,
+  KEEP_TOOLS_MIN,
+  KEEP_TOOLS_MAX,
+  SUMMARY_PCT_MIN,
+  SUMMARY_PCT_MAX,
   type KodaSettings,
 } from "../core/settings-types";
 import type KodaPlugin from "../main";
@@ -123,6 +130,40 @@ export class KodaSettingsTab extends PluginSettingTab {
           max: LIST_ROWS_MAX,
           step: LIST_ROWS_STEP,
         },
+      },
+      {
+        // Eigene Gruppe: alles, was beobachtbares Verdichtungs-Verhalten steuert. Der
+        // deklarative Host kennt keine aufklappbaren Gruppen — eine Ueberschrift ist, was
+        // beide Renderpfade koennen.
+        type: "group",
+        heading: t("settings.compaction"),
+        items: [
+          {
+            name: t("settings.contextWindow"),
+            desc: t("settings.contextWindow.desc"),
+            control: { type: "number", key: "contextWindowTokens" },
+          },
+          {
+            name: t("settings.compactAt"),
+            desc: t("settings.compactAt.desc"),
+            control: { type: "slider", key: "compactAtPercent", min: COMPACT_AT_MIN, max: COMPACT_AT_MAX, step: COMPACT_AT_STEP },
+          },
+          {
+            name: t("settings.keepTools"),
+            desc: t("settings.keepTools.desc"),
+            control: { type: "slider", key: "keepToolResults", min: KEEP_TOOLS_MIN, max: KEEP_TOOLS_MAX, step: 1 },
+          },
+          {
+            name: t("settings.summarize"),
+            desc: t("settings.summarize.desc"),
+            control: { type: "toggle", key: "summarizeEnabled" },
+          },
+          {
+            name: t("settings.summaryLen"),
+            desc: t("settings.summaryLen.desc"),
+            control: { type: "slider", key: "summaryPercent", min: SUMMARY_PCT_MIN, max: SUMMARY_PCT_MAX, step: 1 },
+          },
+        ],
       },
       {
         name: t("settings.fallback"),

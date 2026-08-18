@@ -8,6 +8,14 @@ import {
   SKILL_BUDGET_MAX,
   LIST_ROWS_MIN,
   LIST_ROWS_MAX,
+  CONTEXT_WINDOW_MIN,
+  CONTEXT_WINDOW_MAX,
+  COMPACT_AT_MIN,
+  COMPACT_AT_MAX,
+  KEEP_TOOLS_MIN,
+  KEEP_TOOLS_MAX,
+  SUMMARY_PCT_MIN,
+  SUMMARY_PCT_MAX,
 } from "../src/core/settings-types";
 
 describe("mergeKodaSettings", () => {
@@ -65,5 +73,30 @@ describe("listNotesMaxRows", () => {
   });
   it("faellt bei Unsinn auf den Default zurueck", () => {
     expect(mergeKodaSettings({ listNotesMaxRows: "viele" }).listNotesMaxRows).toBe(150);
+  });
+});
+
+describe("mergeKodaSettings · Kontext & Verdichtung", () => {
+  it("Defaults: 8192 / 75 % / K=3 / Stufe 2 an / 10 %", () => {
+    const s = mergeKodaSettings(null);
+    expect(s.contextWindowTokens).toBe(8192);
+    expect(s.compactAtPercent).toBe(75);
+    expect(s.keepToolResults).toBe(3);
+    expect(s.summarizeEnabled).toBe(true);
+    expect(s.summaryPercent).toBe(10);
+  });
+  it("klemmt alle vier Zahlen in ihre Spannen", () => {
+    expect(mergeKodaSettings({ contextWindowTokens: 100 }).contextWindowTokens).toBe(CONTEXT_WINDOW_MIN);
+    expect(mergeKodaSettings({ contextWindowTokens: 5_000_000 }).contextWindowTokens).toBe(CONTEXT_WINDOW_MAX);
+    expect(mergeKodaSettings({ compactAtPercent: 10 }).compactAtPercent).toBe(COMPACT_AT_MIN);
+    expect(mergeKodaSettings({ compactAtPercent: 100 }).compactAtPercent).toBe(COMPACT_AT_MAX);
+    expect(mergeKodaSettings({ keepToolResults: -1 }).keepToolResults).toBe(KEEP_TOOLS_MIN);
+    expect(mergeKodaSettings({ keepToolResults: 99 }).keepToolResults).toBe(KEEP_TOOLS_MAX);
+    expect(mergeKodaSettings({ summaryPercent: 0 }).summaryPercent).toBe(SUMMARY_PCT_MIN);
+    expect(mergeKodaSettings({ summaryPercent: 50 }).summaryPercent).toBe(SUMMARY_PCT_MAX);
+  });
+  it("Muellwerte fallen auf den Default zurueck, alte data.json ohne die Felder laedt", () => {
+    expect(mergeKodaSettings({ contextWindowTokens: "viel" }).contextWindowTokens).toBe(8192);
+    expect(mergeKodaSettings({ maxRounds: 8 }).summarizeEnabled).toBe(true);
   });
 });
