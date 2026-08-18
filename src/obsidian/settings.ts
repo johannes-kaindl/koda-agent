@@ -16,6 +16,7 @@
 // Schnitt, siehe Task-Brief) — jede Zeilen-Aenderung committet synchron und rendert neu.
 
 import {
+  Notice,
   PluginSettingTab,
   Setting,
   setIcon,
@@ -347,6 +348,11 @@ export class KodaSettingsTab extends PluginSettingTab {
                   showStatus(status, ctx);
                   if (ctx !== null && this.plugin.settings.contextWindowTokens === DEFAULT_SETTINGS.contextWindowTokens) {
                     await this.setControlValue("contextWindowTokens", ctx);
+                    // Der gleich folgende Redraw baut den Statuspunkt leer neu auf — das
+                    // eben gezeigte Haekchen samt Tooltip verschwindet in demselben Moment,
+                    // in dem das Zahlenfeld sich aendert. Die Notice ueberlebt den Redraw
+                    // und traegt die Meldung darueber hinweg.
+                    new Notice(t("settings.probe.contextApplied", ctx));
                     this.refreshUi();
                   }
                 })
