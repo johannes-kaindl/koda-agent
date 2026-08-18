@@ -4,3 +4,4 @@ coverage/
 .lab-tools.mjs
 .gui-smoke.mjs
 .gui-ask.mjs
+.superpowers/
