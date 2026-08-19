@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.7.0 released (Store-Rescan ausstehend), main, Stand 2026-08-19
+## Status: 0.7.0 im Community-Store (Rescan „passed“, Höchstwertung), main, Stand 2026-08-19
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
@@ -16,8 +16,8 @@ gegen ein laufendes Obsidian) plus ein Praxistest-Treiber gegen ein echtes Model
 (`scripts/gui-ask.ts`). **Compaction (Stufe-2-Baustein B) ist auf `main`** — Spec
 `2026-08-18-koda-compaction-design.md` — und hat am 2026-08-19 den Praxistest gegen ein
 echtes Modell bestanden (`docs/SMOKE.md`, Handpunkt 20: Stufe 1 und 2 sichtbar, kein
-overflow, GUI-Smoke 10/10). **0.7.0 ist released** (Tag `cb396b2` auf Forgejo+GitHub,
-GitHub-Release da) — der Store-Rescan im Developer Dashboard ist der offene Rest. Gate
+overflow, GUI-Smoke 10/10). **0.7.0 ist im Store** (Tag `cb396b2` auf Forgejo+GitHub, Rescan
+„passed“ mit Höchstwertung am 2026-08-19). Gate
 ist grün (336/336), `main.js` baut. Details zu Nutzung/Setup:
 `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`. **Ein lokaler
 LLM-Server braucht CORS** (LM Studio „Enable CORS"/`lms server start --cors`): der Chat
