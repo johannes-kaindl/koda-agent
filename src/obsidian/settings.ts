@@ -33,7 +33,7 @@ import { endpointStatusView } from "../core/llm/endpoint-status-view";
 import { resolveModelChoice, type ModelOption } from "../core/llm/model-choice";
 import {
   DEFAULT_SETTINGS,
-  mergeKodaSettings,
+  validateKodaSettings,
   MAX_ROUNDS_LIMIT,
   TIMEOUT_SEC_MIN,
   TIMEOUT_SEC_MAX,
@@ -195,13 +195,13 @@ export class KodaSettingsTab extends PluginSettingTab {
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {
-    // Immer durch mergeKodaSettings: das ist die einzige Stelle, die Muellwerte
+    // Immer durch validateKodaSettings: das ist die einzige Stelle, die Muellwerte
     // abfaengt (z.B. maxRounds ausserhalb 1..MAX_ROUNDS_LIMIT). Der deklarative
     // Host validiert nur den Typ, nicht unsere Grenzen.
     // Der zweite Einsatz als SCHREIBpfad ist kein Nebengebrauch: das Kit-Modul
     // dahinter (vendor/kit/settings_schema.ts) ist ausdruecklich idempotent und
     // genau dafuer gebaut — validateSettings(D, { ...settings, [key]: value }).
-    this.plugin.settings = mergeKodaSettings({ ...this.plugin.settings, [key]: value });
+    this.plugin.settings = validateKodaSettings({ ...this.plugin.settings, [key]: value });
     await this.plugin.saveSettings();
   }
 
@@ -223,7 +223,7 @@ export class KodaSettingsTab extends PluginSettingTab {
 
   /** render-Hatch: eine `Setting`-Zeile pro Endpunkt (URL · API-Schluessel · Modell-
    *  Override · "nach oben" · Entfernen) plus eine Adder-Zeile darunter. Jede Aenderung
-   *  laeuft durch Kit-`applyEndpointEdit`, dann `mergeKodaSettings` + `saveSettings`,
+   *  laeuft durch Kit-`applyEndpointEdit`, dann `validateKodaSettings` + `saveSettings`,
    *  dann kompletter Re-Render (kein Probing/Reconnect wie in vault-rag — hier gibt es
    *  nichts Asynchrones, das den Rebuild rechtfertigen wuerde, den Nutzer aber mitten im
    *  Tippen zu unterbrechen). Committet deshalb bei `blur`, nicht bei jedem Tastendruck —
@@ -234,7 +234,7 @@ export class KodaSettingsTab extends PluginSettingTab {
 
     const commit = (index: number, field: "url" | "apiKey" | "model", value: string, isAdder: boolean): void => {
       const next = applyEndpointEdit(this.plugin.settings.endpoints, index, field, value, isAdder);
-      this.plugin.settings = mergeKodaSettings({ ...this.plugin.settings, endpoints: next });
+      this.plugin.settings = validateKodaSettings({ ...this.plugin.settings, endpoints: next });
       void this.plugin.saveSettings();
       this.refreshUi();
     };
@@ -286,7 +286,7 @@ export class KodaSettingsTab extends PluginSettingTab {
               .setIcon("arrow-up-to-line")
               .setTooltip(t("settings.endpoints.moveToFront"))
               .onClick(() => {
-                this.plugin.settings = mergeKodaSettings({
+                this.plugin.settings = validateKodaSettings({
                   ...this.plugin.settings,
                   endpoints: moveEndpointToFront(this.plugin.settings.endpoints, i),
                 });
@@ -391,7 +391,7 @@ export class KodaSettingsTab extends PluginSettingTab {
     const cache = this.modelCache !== null && this.modelCache.url === url ? this.modelCache : null;
 
     const save = (value: string): void => {
-      this.plugin.settings = mergeKodaSettings({ ...this.plugin.settings, model: value });
+      this.plugin.settings = validateKodaSettings({ ...this.plugin.settings, model: value });
       void this.plugin.saveSettings();
     };
 

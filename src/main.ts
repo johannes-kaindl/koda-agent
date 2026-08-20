@@ -19,7 +19,7 @@ import { buildSystemPrompt } from "./core/memory/memory";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
 import { selectSkills, type Selection } from "./core/skills/select";
-import { DEFAULT_SETTINGS, mergeKodaSettings, type KodaSettings } from "./core/settings-types";
+import { DEFAULT_SETTINGS, validateKodaSettings, type KodaSettings } from "./core/settings-types";
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { readRetrievalApi } from "./obsidian/retrieval";
 import { confirmWrite } from "./obsidian/confirm-write";
@@ -75,7 +75,7 @@ export default class KodaPlugin extends Plugin {
   private store!: SessionStore;
 
   async onload(): Promise<void> {
-    this.settings = mergeKodaSettings(await this.loadData());
+    this.settings = validateKodaSettings(await this.loadData());
     this.applyLanguage();
 
     const dir = normalizePath(`${this.manifest.dir ?? ""}/sessions`);

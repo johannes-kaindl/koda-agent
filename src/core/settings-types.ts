@@ -7,7 +7,7 @@ import {
 } from "../vendor/kit/settings_schema";
 import { migrateEndpointList, type EndpointConfig } from "../vendor/kit/endpoint_config";
 
-/** Obergrenze für `maxRounds` — einzige Quelle, gegen die sowohl `mergeKodaSettings`
+/** Obergrenze für `maxRounds` — einzige Quelle, gegen die sowohl `validateKodaSettings`
  *  klemmt als auch der Settings-Slider (`src/obsidian/settings.ts`) seine Limits setzt.
  *
  *  Die Zahl begrenzt die Bedienbarkeit des Sliders, nicht die Sicherheit: das Runden-Limit
@@ -128,6 +128,6 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
  *  Ergebnis hat GENAU die Schluessel von `DEFAULT_SETTINGS`, jedes Feld ist ein geprueft
  *  uebernommener Wert oder der Default. Unbekannte Alt-Keys ueberleben das nicht — das
  *  ist gewollt (siehe `vendor/kit/settings_schema.ts`). */
-export function mergeKodaSettings(raw: unknown): KodaSettings {
+export function validateKodaSettings(raw: unknown): KodaSettings {
   return validateSettings(DEFAULT_SETTINGS, raw, SCHEMA);
 }
