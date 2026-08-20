@@ -198,6 +198,9 @@ export class KodaSettingsTab extends PluginSettingTab {
     // Immer durch mergeKodaSettings: das ist die einzige Stelle, die Muellwerte
     // abfaengt (z.B. maxRounds ausserhalb 1..MAX_ROUNDS_LIMIT). Der deklarative
     // Host validiert nur den Typ, nicht unsere Grenzen.
+    // Der zweite Einsatz als SCHREIBpfad ist kein Nebengebrauch: das Kit-Modul
+    // dahinter (vendor/kit/settings_schema.ts) ist ausdruecklich idempotent und
+    // genau dafuer gebaut — validateSettings(D, { ...settings, [key]: value }).
     this.plugin.settings = mergeKodaSettings({ ...this.plugin.settings, [key]: value });
     await this.plugin.saveSettings();
   }

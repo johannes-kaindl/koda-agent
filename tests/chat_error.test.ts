@@ -1,24 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ChatHttpError, chatErrorMessage, extractErrorMessage, isContextOverflow } from "../src/core/llm/chat-error";
-
-describe("extractErrorMessage", () => {
-  it("zieht error.message aus einem OpenAI-Fehlerbody", () => {
-    expect(extractErrorMessage({ error: { message: "model not found" } })).toBe("model not found");
-  });
-  it("zieht error, wenn es selbst ein String ist", () => {
-    expect(extractErrorMessage({ error: "kaputt" })).toBe("kaputt");
-  });
-  it("zieht message als Rückfall", () => {
-    expect(extractErrorMessage({ message: "hoppla" })).toBe("hoppla");
-  });
-  it("zieht detail — die FastAPI-Form, die OpenWebUI schickt", () => {
-    expect(extractErrorMessage({ detail: "Not authenticated" })).toBe("Not authenticated");
-  });
-  it("null bei unbekanntem Body — der Aufrufer nutzt dann den Rohtext", () => {
-    expect(extractErrorMessage({ irgendwas: 1 })).toBeNull();
-    expect(extractErrorMessage("kein objekt")).toBeNull();
-  });
-});
+import { ChatHttpError, chatErrorMessage, isContextOverflow } from "../src/core/llm/chat-error";
 
 describe("chatErrorMessage", () => {
   it("401 nennt den Schlüssel als Ursache statt das Netz", () => {
@@ -33,6 +14,14 @@ describe("chatErrorMessage", () => {
   it("400 zeigt die Serverbegründung — dort steht der eigentliche Grund", () => {
     const msg = chatErrorMessage(new ChatHttpError(400, '{"error":{"message":"model \\"\\" not found"}}'));
     expect(msg).toContain('model "" not found');
+  });
+  // Regression zur Kit-Uebernahme (obsidian-kit@0.27.0 pure/error_body): ein LEERER
+  // Feldwert galt frueher als Treffer. `""` ist nicht nullish, der `?? raw`-Fallback
+  // griff also genau dann NICHT — der Nutzer sah "Anfrage abgelehnt (HTTP 400)." ohne
+  // die Servermeldung, die daneben im Body stand.
+  it("überspringt ein leeres Feld und nimmt die Meldung daneben", () => {
+    const msg = chatErrorMessage(new ChatHttpError(400, '{"error":"","message":"model not found"}'));
+    expect(msg).toContain("model not found");
   });
   it("404 zeigt auf die Adresse, nicht auf die Erreichbarkeit", () => {
     const msg = chatErrorMessage(new ChatHttpError(404, ""));

@@ -1,6 +1,6 @@
 import { ButtonComponent, Modal, type App } from "obsidian";
 import { applyDestructive } from "../vendor/kit-obsidian/confirm";
-import { diffLines } from "../core/diff";
+import { diffLines } from "../vendor/kit/diff";
 import { t } from "../vendor/kit/i18n";
 import type { WriteRequest } from "./vault-tools";
 

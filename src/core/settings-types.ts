@@ -1,5 +1,10 @@
-import { mergeSettings } from "../vendor/kit/settings";
-import { clampInt } from "../vendor/kit/num";
+import {
+  validateSettings,
+  clampIntField,
+  oneOf,
+  arrayThen,
+  type SettingsSchema,
+} from "../vendor/kit/settings_schema";
 import { migrateEndpointList, type EndpointConfig } from "../vendor/kit/endpoint_config";
 
 /** Obergrenze für `maxRounds` — einzige Quelle, gegen die sowohl `mergeKodaSettings`
@@ -96,39 +101,33 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   summaryPercent: 10,
 };
 
+/** Feldpruefer fuer die Felder, bei denen die generische Bauform-Pruefung des Kits nicht
+ *  reicht. Ein Schema-Eintrag ERSETZT sie fuer sein Feld und bekommt den ROHEN Wert —
+ *  genau deshalb kommt `"25"` ueberhaupt bei `clampInt` an. Die uebrigen sechs Felder
+ *  (model, suppressThinking, kodaFolder, textFallback, openOnStartup, summarizeEnabled)
+ *  brauchen keinen Eintrag: ihre Defaults tragen die Typinformation, die die generische
+ *  Pruefung braucht. */
+const SCHEMA: SettingsSchema<KodaSettings> = {
+  // Ganze Liste durch die Migration, nicht Element fuer Element: Alt-Eintraege sind
+  // Strings und werden umgeschrieben, nicht gefiltert.
+  endpoints: arrayThen((items) => migrateEndpointList(undefined, items as (string | EndpointConfig)[])),
+  maxRounds: clampIntField(1, MAX_ROUNDS_LIMIT),
+  timeoutSec: clampIntField(TIMEOUT_SEC_MIN, TIMEOUT_SEC_MAX),
+  skillBudgetChars: clampIntField(SKILL_BUDGET_MIN, SKILL_BUDGET_MAX),
+  listNotesMaxRows: clampIntField(LIST_ROWS_MIN, LIST_ROWS_MAX),
+  // Ohne Enum-Pruefung liesse die generische Pruefung jeden String durch (typeof passt) —
+  // `applyLanguage()` bekaeme dann "klingonisch" bis in `setLang()` gereicht.
+  language: oneOf(["auto", "de", "en"]),
+  contextWindowTokens: clampIntField(CONTEXT_WINDOW_MIN, CONTEXT_WINDOW_MAX),
+  compactAtPercent: clampIntField(COMPACT_AT_MIN, COMPACT_AT_MAX),
+  keepToolResults: clampIntField(KEEP_TOOLS_MIN, KEEP_TOOLS_MAX),
+  summaryPercent: clampIntField(SUMMARY_PCT_MIN, SUMMARY_PCT_MAX),
+};
+
+/** Gueltiger Settings-Stand aus einer ungepruften `data.json`. Geschlossene Welt: das
+ *  Ergebnis hat GENAU die Schluessel von `DEFAULT_SETTINGS`, jedes Feld ist ein geprueft
+ *  uebernommener Wert oder der Default. Unbekannte Alt-Keys ueberleben das nicht — das
+ *  ist gewollt (siehe `vendor/kit/settings_schema.ts`). */
 export function mergeKodaSettings(raw: unknown): KodaSettings {
-  const merged = mergeSettings(DEFAULT_SETTINGS, raw);
-  const rawEndpoints = (raw as { endpoints?: unknown } | null)?.endpoints;
-  return {
-    ...merged,
-    endpoints: Array.isArray(rawEndpoints)
-      ? migrateEndpointList(undefined, rawEndpoints as (string | EndpointConfig)[])
-      : merged.endpoints,
-    maxRounds: clampInt(merged.maxRounds, 1, MAX_ROUNDS_LIMIT, DEFAULT_SETTINGS.maxRounds),
-    timeoutSec: clampInt(merged.timeoutSec, TIMEOUT_SEC_MIN, TIMEOUT_SEC_MAX, DEFAULT_SETTINGS.timeoutSec),
-    skillBudgetChars: clampInt(
-      merged.skillBudgetChars, SKILL_BUDGET_MIN, SKILL_BUDGET_MAX, DEFAULT_SETTINGS.skillBudgetChars,
-    ),
-    listNotesMaxRows: clampInt(
-      merged.listNotesMaxRows, LIST_ROWS_MIN, LIST_ROWS_MAX, DEFAULT_SETTINGS.listNotesMaxRows,
-    ),
-    contextWindowTokens: clampInt(
-      merged.contextWindowTokens, CONTEXT_WINDOW_MIN, CONTEXT_WINDOW_MAX, DEFAULT_SETTINGS.contextWindowTokens,
-    ),
-    compactAtPercent: clampInt(
-      merged.compactAtPercent, COMPACT_AT_MIN, COMPACT_AT_MAX, DEFAULT_SETTINGS.compactAtPercent,
-    ),
-    keepToolResults: clampInt(
-      merged.keepToolResults, KEEP_TOOLS_MIN, KEEP_TOOLS_MAX, DEFAULT_SETTINGS.keepToolResults,
-    ),
-    // mergeSettings laesst unbekannten Typ-Muell aus einer alten data.json unveraendert
-    // durch (Object.assign kennt keine Typprüfung) — hier trotzdem auf Boolean pruefen,
-    // statt einer eigenen clamp-Funktion nur fuer diesen einen Fall.
-    summarizeEnabled: typeof merged.summarizeEnabled === "boolean"
-      ? merged.summarizeEnabled
-      : DEFAULT_SETTINGS.summarizeEnabled,
-    summaryPercent: clampInt(
-      merged.summaryPercent, SUMMARY_PCT_MIN, SUMMARY_PCT_MAX, DEFAULT_SETTINGS.summaryPercent,
-    ),
-  };
+  return validateSettings(DEFAULT_SETTINGS, raw, SCHEMA);
 }
