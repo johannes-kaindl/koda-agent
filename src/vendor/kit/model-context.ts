@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.26.1, src/pure/model-context.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.27.0, src/pure/model-context.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 export interface ModelContext {
   maxContextLength?: number;
   loadedContextLength?: number;
