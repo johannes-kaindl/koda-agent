@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Settings are now validated against a closed set of keys.** Loading `data.json`
+  produces exactly the settings Koda knows about; anything else is dropped, and the
+  next save writes the reduced file. If you hand-edited `data.json` to carry notes or
+  keys of your own, they will not survive — copy them out first. No Koda setting is
+  affected, and nothing is lost for a file Koda wrote itself.
+
+### Fixed
+
+- **A server's reason is no longer swallowed when the error body carries an empty
+  field.** A body like `{"error":"","message":"model not found"}` used to show only
+  "request rejected (HTTP 400)" — the empty `error` counted as a hit and hid the
+  message sitting right next to it. The reason is now shown, and surrounding
+  whitespace is trimmed off it.
+- **A broken endpoint list in `data.json` falls back to the default instead of being
+  used.** A non-list value (say a bare string) used to be passed through untouched
+  and reached the endpoint resolver as if it were a list of endpoints.
+- **An unknown interface language falls back to "auto".** Any string used to be
+  accepted and handed to the language switch; only `auto`, `de` and `en` are now.
+  Same for a non-text model name, which falls back to empty.
+
 ## [0.7.0] — 2026-08-19
 
 ### Added

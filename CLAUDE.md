@@ -154,5 +154,6 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `src/llm/` — `KodaChatClient` + `XhrSseTransport` (Streaming-Chat-Client).
 - `src/obsidian/` — View, Vault-Tools-Adapter, Bestätigungs-Modal, Settings-Tab.
 - `src/vendor/kit` + `src/vendor/kit-obsidian/` — verbatim vendorter `../obsidian-kit`
-  (0.25.0), Re-Sync über `tools/sync-kit.sh` — nie von Hand editieren.
+  (0.27.0; maßgeblich ist immer `src/vendor/kit/VENDOR.json`, nicht diese Zeile),
+  Re-Sync über `tools/sync-kit.sh` — nie von Hand editieren.
 - `src/i18n/` — DE/EN-Strings.

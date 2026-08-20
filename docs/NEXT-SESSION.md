@@ -149,13 +149,17 @@ vierzig. Eine Stapel-Bestätigung ist ein neues UI-Konzept — nicht nebenbei mi
 
 ## Kit-first-Anker (vor dem Bauen prüfen)
 
-- **`isContextOverflow`** — `vault-crews/src/core/chat-response.ts`. Die REGISTRY führt die
-  Fehler-Teilmenge davon bereits als **Kit-Kandidat n=4 (extraktionsreif)**; koda-agent ist
-  das 3. Exemplar der Kette. Wer `isContextOverflow` nachzieht, sollte prüfen, ob das
-  zusammen mit der Kit-Extraktion passiert statt als vierte Kopie.
+- **`isContextOverflow`** — bleibt lokal in `src/core/llm/chat-error.ts`. Die
+  Fehler-Teilmenge ist seit 2026-08-20 **erledigt**: sie steht als `pure/error_body.ts`
+  im Kit 0.27.0 und ist hier vendoriert (`src/vendor/kit/error_body.ts`);
+  `extractErrorMessage` ist entfernt. `isContextOverflow` hat das Kit dabei
+  **ausdrücklich nicht** mitgenommen (so sagt es sein Modulkopf) — zusammen mit
+  `ChatHttpError` und `chatErrorMessage` ist es koda-eigene Komposition und kein
+  Kit-Kandidat mehr. Hier ist also nichts mehr nachzuziehen.
 - **Skill-Loader-Muster** — vor Neubau die REGISTRY nach Markdown-getriebenen Loadern
   durchsuchen; der `registry-session-start`-Hook injiziert den Katalog ohnehin.
-- **Diff-/Bestätigungs-UI** — steht (`src/core/diff.ts` + ConfirmModal). Die
+- **Diff-/Bestätigungs-UI** — steht (`src/vendor/kit/diff.ts` + ConfirmModal; die lokale
+  `src/core/diff.ts` ist seit 2026-08-20 durch das Kit-Modul ersetzt). Die
   Invariante „Vorschau == geschriebener Inhalt" ist regression-gepinnt; sie darf durch
   Skill-Autorschaft oder Stapel-Bestätigung **nicht** aufgeweicht werden.
 
