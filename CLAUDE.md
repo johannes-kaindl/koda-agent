@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.7.0 im Community-Store (Rescan „passed“, Höchstwertung), main, Stand 2026-08-21
+## Status: 0.7.1 released (Rescan ausstehend), 0.7.0 im Store mit Höchstwertung, main, Stand 2026-08-21
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
@@ -17,10 +17,10 @@ gegen ein laufendes Obsidian) plus ein Praxistest-Treiber gegen ein echtes Model
 `2026-08-18-koda-compaction-design.md` — und hat am 2026-08-19 den Praxistest gegen ein
 echtes Modell bestanden (`docs/SMOKE.md`, Handpunkt 20: Stufe 1 und 2 sichtbar, kein
 overflow, GUI-Smoke 10/10). **0.7.0 ist im Store** (Tag `cb396b2` auf Forgejo+GitHub, Rescan
-„passed“ mit Höchstwertung am 2026-08-19). **Seit 0.7.0 liegen unveröffentlichte Änderungen
-auf `main`** — der Kit-Rückfluss auf `obsidian-kit@0.27.0` mit vier Verhaltensänderungen,
-nutzerseitig unter `[Unreleased]` im `CHANGELOG.md`; der Store hat sie noch nicht. Gate
-ist grün (332/332), `main.js` baut. Details zu Nutzung/Setup:
+„passed“ mit Höchstwertung am 2026-08-19). **0.7.1 ist am 2026-08-21 released** (Tag
+`6455e2b` auf Forgejo+GitHub, GUI-Smoke 10/10 mit dem Kandidaten) — der Kit-Rückfluss auf
+`obsidian-kit@0.27.0` mit vier Verhaltensänderungen; **der Store-Rescan steht noch aus** und
+kann nur im Developer Dashboard angestoßen werden. Gate ist grün (332/332), `main.js` baut. Details zu Nutzung/Setup:
 `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`. **Ein lokaler
 LLM-Server braucht CORS** (LM Studio „Enable CORS"/`lms server start --cors`): der Chat
 streamt als XHR aus dem Renderer, die Testen-Probe läuft über `requestUrl` — Koda benennt

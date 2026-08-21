@@ -114,6 +114,24 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 
 ### Durchläufe
 
+- **2026-08-21 (13:39), GUI-Smoke 10/10 mit dem 0.7.1-Kandidaten.** Vault `10_Pallas`,
+  Obsidian 1.13.7, Build des Kit-Rückflusses (`ac13201`, vor dem Release-Bump), Plugin per
+  `disablePlugin`/`enablePlugin` neu geladen. Anlass war nicht Routine: der Tausch gegen
+  `obsidian-kit@0.27.0` berührt genau zwei Prüfpunkte — **5** (Klartext statt Stacktrace)
+  hängt jetzt an `error_body`, **8** (Settings-Gruppe) am `settings_schema`-Walker; beide
+  grün, dazu 7 (Verdichtungs-Marken, `stage1/stage2/forced` je 1). Handpunkte nicht gefahren
+  — die Änderungen sind Kern-Refactor ohne Modell-Naht.
+  - **Vorlauf, der zum Ablauf gehört:** das Zielfenster war `visible: true`, aber
+    `document.visibilityState: "hidden"` (zwei Vault-Fenster in einem Prozess, `10_Pallas`
+    verdeckt). Weder `osascript activate` noch `w.show()/focus()` allein kippten es;
+    gewirkt hat **`activate` + `show()` + `moveTop()` + `focus()` mit Wartepause danach**.
+    Kandidat für `requireVisible` in der zentralen Brücke (Memory
+    `obsidian-fenster-sichtbarkeit-cdp`).
+  - **Nach dem Deploy zeigt Obsidian die alte Version, bis der Manifest-Cache neu liest.**
+    `disablePlugin`/`enablePlugin` allein meldete weiter 0.7.0, obwohl der neue Code lief —
+    erst `app.plugins.loadManifests()` davor stellte 0.7.1 richtig. Wer die Version als Beleg
+    für „der neue Build läuft" nimmt, misst den Cache, nicht das Plugin.
+
 - **2026-08-19 (00:00–00:25), Handpunkt 20 (Praxistest Verdichtung) — grün, plus GUI-Smoke
   10/10 mit dem Release-Build.** Vault `10_Pallas`, Obsidian 1.13.7, LM Studio
   `qwen/qwen3.6-35b-a3b`, Fenster auf 4096 (`compactAt` 75 %, `keepToolResults` 3, Stufe 2
