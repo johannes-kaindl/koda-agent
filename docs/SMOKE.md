@@ -144,7 +144,10 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   - **Ablauf-Befund:** `visibilityState: "hidden"` trat wiederholt auf, weil ein anderes Fenster
     Obsidian vollständig überdeckte; `activate` + `show`/`moveTop`/`focus` kippt es nur, bis das
     nächste Fenster davorkommt. Verlässlich war erst `setAlwaysOnTop(true, "floating")` für die
-    Dauer des Laufs (danach zurücksetzen). Kandidat für `requireVisible` in `tools/obsidian-cdp/`.
+    Dauer des Laufs (danach zurücksetzen). **Seitdem in der zentralen Brücke** — `requireVisible`
+    eskaliert über `show`/`moveTop`/`focus` bis `setAlwaysOnTop`, `releaseAlwaysOnTop` nimmt es
+    zurück (`obsidian-plugins@63f3eab`, CONVENTIONS CORE-TEST-09 a). Stufe 3 ist gemessen,
+    Stufe 2 noch nicht live gefahren.
 
 - **2026-08-21 (13:39), GUI-Smoke 10/10 mit dem 0.7.1-Kandidaten.** Vault `10_Pallas`,
   Obsidian 1.13.7, Build des Kit-Rückflusses (`ac13201`, vor dem Release-Bump), Plugin per
