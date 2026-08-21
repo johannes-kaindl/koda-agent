@@ -258,8 +258,12 @@ async function main(): Promise<void> {
     const plugin = await cdp.evaluate<{ ok: boolean; version?: string; model?: string }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       if (!p) return { ok: false };
+      // Das Modell am Endpunkt ist ein OVERRIDE, kein Pflichtfeld — greift keiner, gilt das
+      // globale settings.model (Kit: effectiveModel). Ohne den Fallback meldete der Kopf
+      // „(keins gesetzt)", waehrend der Lauf laengst gegen ein Modell sprach.
       const ep = p.settings?.endpoints?.[0];
-      return { ok: true, version: p.manifest.version, model: ep?.model ?? "(keins gesetzt)" };
+      const model = (ep?.model ?? "").trim() || (p.settings?.model ?? "").trim();
+      return { ok: true, version: p.manifest.version, model: model || "(keins gesetzt)" };
     `);
     if (!plugin.ok) throw new Error(`Plugin ${PLUGIN_ID} ist nicht aktiv. Erst deployen.`);
     console.log(`Vault: ${await cdp.evaluate<string>("return app.vault.getName();")}`);
