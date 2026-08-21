@@ -130,7 +130,10 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   - **Nach dem Deploy zeigt Obsidian die alte Version, bis der Manifest-Cache neu liest.**
     `disablePlugin`/`enablePlugin` allein meldete weiter 0.7.0, obwohl der neue Code lief —
     erst `app.plugins.loadManifests()` davor stellte 0.7.1 richtig. Wer die Version als Beleg
-    für „der neue Build läuft" nimmt, misst den Cache, nicht das Plugin.
+    für „der neue Build läuft" nimmt, misst den Cache, nicht das Plugin. **Steht seit
+    2026-08-21 zentral** in `tools/obsidian-cdp/CLAUDE.md` § Architektur-Grundannahmen
+    (`2e29544`, von vault-rag übernommen) — dort neben dem verwandten Notice-Befund: beides
+    sind Prüfpunkte, die etwas Falsches belegen, ohne rot zu werden.
 
 - **2026-08-19 (00:00–00:25), Handpunkt 20 (Praxistest Verdichtung) — grün, plus GUI-Smoke
   10/10 mit dem Release-Build.** Vault `10_Pallas`, Obsidian 1.13.7, LM Studio
