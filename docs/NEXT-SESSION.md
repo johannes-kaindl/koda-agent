@@ -4,6 +4,10 @@
 > `feat/compaction`, Spec `docs/superpowers/specs/2026-08-18-koda-compaction-design.md`).
 > Offen bleibt **Baustein C** (Aufräum-Assistent) — beginnt wie A und B mit
 > `superpowers:brainstorming`, nicht mit Code.
+>
+> **Nachtrag 2026-08-21: Baustein C ist geparkt** (Entscheidung Johannes). Dieser Seed
+> bleibt vollständig gültig — geparkt heißt aufgeschoben, nicht verworfen; er ist der
+> Wiedereinstieg, wenn C wieder drankommt.
 
 > **Nachtrag 2026-08-13:** Baustein A (Skill-System) ist erledigt, ebenso — außer der
 > Reihe — die **Retrieval-Andockung an vault-rag** (eigene Spec und eigener Plan unter
@@ -52,10 +56,10 @@
 >   Aufräum-Assistent sollte nicht darauf bauen, dass ein einmal gelesener Inhalt „drin"
 >   bleibt. Ggf. Summary-Prompt so schärfen, dass *entschiedene* Fakten (hier: welche Notiz
 >   welche Version nennt) in die Zusammenfassung wandern — dann muss weniger neu gelesen werden.
-> - `scripts/gui-ask.ts`: der Report kennt `compaction`-Einträge nicht (zeigt nur user/
->   assistant/tool); Marken und Stufe-2-Zusammenfassung sind heute nur per CDP am
->   `chatLog`/DOM sichtbar. Für den nächsten Praxistest: Records im Report ausweisen
->   (`kind: "compaction"` → eine Zeile „⇢ Verlauf verdichtet (Stufe n, …)").
+> - ~~`scripts/gui-ask.ts`: der Report kennt `compaction`-Einträge nicht~~ — **erledigt
+>   2026-08-21.** Der Bericht weist Marken als „⇢ Verlauf verdichtet (Stufe n, …)" aus;
+>   die Stufe-2-Zusammenfassung steht mit `--full` vollständig da, ohne `--full` geklippt.
+>   Defensiv wie die Marke im Fenster (kaputte `stats` → 0 statt NaN).
 > - `gui:ask`/`smoke:gui` mit mehreren Vault-Fenstern: die Sichtbarkeitsprüfung bricht hart
 >   ab, wenn das Zielfenster auf einem anderen Space liegt; Fenster holen per
 >   `electron.remote.getCurrentWindow().show()/focus()` (Memory `obsidian-fenster-sichtbarkeit-cdp`).

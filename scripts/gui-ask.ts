@@ -29,6 +29,13 @@
  * 2026-08-08, dort als Sampling-Varianz belegt). Der Bericht zeigt deshalb zuerst die
  * Aufrufe aus `chatLog` und erst danach die Prosa.
  *
+ * Aus demselben Grund weist er **Verdichtungs-Marken** aus (`kind: "compaction"`): ab einer
+ * Verdichtung sieht das Modell die Runden davor nur noch als Stub oder Zusammenfassung.
+ * Ohne die Marke laese sich der Bericht so, als haette Koda den ganzen Verlauf vor Augen —
+ * und ein spaeteres Neu-Lesen derselben Notiz saehe nach Verschwendung aus statt nach Folge.
+ * Die Stufe-2-Zusammenfassung steht nur mit `--full` vollstaendig da; sie ist der Beleg
+ * dafuer, WAS in die Verdichtung gerettet wurde.
+ *
  * ## Nicht deterministisch — bewusst
  *
  * Zwei Laeufe derselben Frage koennen verschiedene Werkzeuge waehlen. Ein einzelner Lauf
@@ -75,9 +82,25 @@ interface ChatMessage {
   toolCallId?: string;
 }
 
+/** Verdichtungs-Marke (`CompactionRecord` in `src/core/agent/types.ts`) — der zweite Shape
+ *  im `chatLog` neben `ChatMessage`. Referenziert nichts: ihre POSITION im Verlauf sagt,
+ *  was verdichtet wurde. Hier gespiegelt statt importiert, wie `ChatMessage` darueber. */
+interface CompactionRecord {
+  kind: "compaction";
+  stage: 1 | 2;
+  at: string;
+  forced?: true;
+  keepToolResults: number;
+  summary?: string;
+  turns?: number;
+  stats: { stubbed: number; bytes: number };
+}
+
+type LogEntry = ChatMessage | CompactionRecord;
+
 /** Eine Zeile Bericht je Schritt, den Koda tatsaechlich gegangen ist. */
 interface Step {
-  kind: "tool-call" | "tool-result" | "answer";
+  kind: "tool-call" | "tool-result" | "answer" | "compaction";
   label: string;
   body: string;
 }
@@ -87,12 +110,29 @@ function clip(text: string, max: number): string {
   return flat.length <= max ? flat : `${flat.slice(0, max)}…`;
 }
 
+/** Eine Marke je Verdichtung. Wortlaut bewusst nah an der Marke im Chat
+ *  (`view.compaction.*`), damit Bericht und Fenster dasselbe Ereignis gleich benennen.
+ *  Defensiv gelesen wie dort: `parseLines` prueft nur, DASS `stats` ein Objekt ist. */
+function compactionStep(rec: CompactionRecord): Step {
+  const forced = rec.forced === true ? ", erzwungen" : "";
+  if (rec.stage === 1) {
+    const kb = ((rec.stats?.bytes ?? 0) / 1024).toFixed(1);
+    return { kind: "compaction", label: `Stufe 1: ${rec.stats?.stubbed ?? 0} Tool-Ergebnisse gekuerzt, ${kb} KB${forced}`, body: "" };
+  }
+  return { kind: "compaction", label: `Stufe 2: ${rec.turns ?? 0} Runden zusammengefasst${forced}`, body: rec.summary ?? "" };
+}
+
 /** `chatLog` → Bericht. Tool-Ergebnisse werden ihrem Aufruf ueber `toolCallId` zugeordnet,
  *  damit im Bericht „was wurde gefragt" und „was kam zurueck" beieinanderstehen. */
-function toSteps(messages: ChatMessage[]): Step[] {
+function toSteps(entries: LogEntry[]): Step[] {
   const nameById = new Map<string, string>();
   const steps: Step[] = [];
-  for (const m of messages) {
+  for (const entry of entries) {
+    if ((entry as CompactionRecord).kind === "compaction") {
+      steps.push(compactionStep(entry as CompactionRecord));
+      continue;
+    }
+    const m = entry as ChatMessage;
     if (m.role === "assistant") {
       for (const c of m.toolCalls ?? []) {
         nameById.set(c.id, c.name);
@@ -151,7 +191,7 @@ async function runOnce(cdp: Cdp, question: string, timeoutMs: number, fresh: boo
     }
   }
 
-  const messages = await cdp.evaluate<ChatMessage[]>(`
+  const messages = await cdp.evaluate<LogEntry[]>(`
     return JSON.parse(JSON.stringify(
       app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].chatLog.slice(${before}),
     ));
@@ -239,6 +279,14 @@ async function main(): Promise<void> {
           console.log(full
             ? `    ${s.label}:\n${s.body.split("\n").map((l) => `      ${l}`).join("\n")}`
             : `    ${s.label}: ${clip(s.body, 400)}`);
+        }
+        else if (s.kind === "compaction") {
+          console.log(`  ⇢ Verlauf verdichtet (${s.label})`);
+          if (s.body !== "") {
+            console.log(full
+              ? s.body.split("\n").map((l) => `      ${l}`).join("\n")
+              : `      ${clip(s.body, 400)}`);
+          }
         }
         else console.log(`\n  Antwort:\n${s.body.split("\n").map((l) => `    ${l}`).join("\n")}`);
       }

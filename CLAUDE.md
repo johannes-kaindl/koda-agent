@@ -44,11 +44,12 @@ Verdichtung", Fenster-Vorbefüllung über die Endpunkt-Probe, GUI-Smoke-Punkte 7
 Der Praxistest gegen ein echtes Modell ist **bestanden** (2026-08-19, `docs/SMOKE.md`);
 der „CORS-Verdacht" bei `gui:ask` war LM Studio ohne CORS, kein Plugin-Defekt. Spec:
 `docs/superpowers/specs/2026-08-18-koda-compaction-design.md`.
-Offen bleibt **Baustein C** (Aufräum-Assistent) — beginnt mit
+**Baustein C** (Aufräum-Assistent) ist **seit 2026-08-21 geparkt** (Entscheidung
+Johannes) — der Seed bleibt unverändert gültig und beginnt bei Wiederaufnahme mit
 `superpowers:brainstorming`, nicht mit Code: das ist ein Schnitt, kein Feature.
 Voller Seed mit offenen Design-Punkten und Kit-Ankern: `docs/NEXT-SESSION.md`.
 Erledigt und nicht mehr offen: QoL-Ausbau, GUI-Smoke-Automatisierung, Release-Infra,
-Store-Einreichung (0.1.0 ist gelistet). Geparkt: Freeze-Gegenprobe.
+Store-Einreichung (0.1.0 ist gelistet). Geparkt: Freeze-Gegenprobe, Baustein C.
 
 ## Verbindlicher Rahmen
 
