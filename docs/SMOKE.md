@@ -111,10 +111,9 @@ lief, nicht dass ein genannter Pfad daher stammt.
 Zusammenfassung selbst nur mit `--full` vollständig. Ohne sie las sich der Bericht ab einer
 Verdichtung so, als hätte Koda den ganzen Verlauf vor Augen: ein erneutes `read_note` auf eine
 schon gelesene Notiz sah nach Verschwendung aus statt nach Folge der Verdichtung.
-**Gegen ein echtes Modell steht das noch aus** — belegt ist die Aufbereitung bisher nur trocken
-gegen einen konstruierten Verlauf (beide Stufen, `forced`, kaputte `stats`). Die Gegenprobe ist
-ein Lauf im Stil von Handpunkt 20, mit einem Fenster klein genug, dass Stufe 1 und 2 greifen;
-geseedet als TaskNote im Cockpit.
+**Stufe 1 ist am 2026-08-22 gegen echte Records belegt, Stufe 2 noch nicht** — Einzelheiten
+unter „Durchläufe". Für Stufe 2 fehlt ein Lauf, der mit kleinem Fenster *durchläuft* und dann
+eine Folgefrage mit `--keep-session` bekommt; geseedet als TaskNote im Cockpit.
 
 **Was der Treiber bewusst nicht prüft:** alles, was eine echte Modell-Antwort braucht (die
 Punkte 2, 3, 5, 6, 7, 10, 14–19 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
@@ -123,6 +122,29 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 `VaultTools` wird in `ask()` lokal erzeugt und ist am Plugin nicht exponiert.
 
 ### Durchläufe
+
+- **2026-08-22 (00:00–00:20), Gegenprobe der Verdichtungs-Marken im `gui:ask`-Bericht —
+  Stufe 1 belegt, Stufe 2 offen.** Vault `10_Pallas`, Obsidian 1.13.7, Koda 0.7.1,
+  LM Studio `qwen/qwen3.8-27b`, Fenster 4096 (`compactAt` 75 %, `keepToolResults` 3,
+  Stufe 2 an), `maxRounds` testweise 15.
+  - **Lauf mit fünf Notizen lief in die Zeitüberschreitung (600 s), erzeugte dabei aber fünf
+    echte Stufe-1-Records** (`stubbed` 8/5/2/2/1, `bytes` 33456/16157/8454/15478/4990). Die
+    Berichtslogik gegen genau diesen `chatLog` gefahren: Marken sitzen an der richtigen
+    Position, Zahlen decken sich mit `stats` („Stufe 1: 8 Tool-Ergebnisse gekuerzt, 32.7 KB").
+  - **Was der Bericht damit erstmals zeigt:** das Modell liest nach jeder Verdichtung dieselben
+    Notizen erneut — `2026-08-06.md` viermal. Das ist die Ursache der Zeitüberschreitung und
+    genau die Beobachtung aus dem Nachtrag vom 19.08., die vorher nur am DOM sichtbar war.
+    Ohne die Marken läse sich derselbe Bericht als sinnlose Wiederholung.
+  - **Stufe 2 nicht erreicht:** sie braucht eine *abgeschlossene* Runde, der Lauf kam wegen des
+    Lesekreises nie so weit. Ein zweiter Lauf mit engem Auftrag lief zwar durch (eine Notiz,
+    Antwort korrekt), da standen die Settings aber wieder auf 262144 — ohne Verdichtung.
+  - **Nebenbefund, behoben (`466fcec`):** der Berichtskopf meldete „Modell (keins gesetzt)",
+    obwohl `qwen/qwen3.8-27b` lief — er las nur den Endpunkt-Override statt des globalen
+    `settings.model`.
+  - **Ablauf-Befund:** `visibilityState: "hidden"` trat wiederholt auf, weil ein anderes Fenster
+    Obsidian vollständig überdeckte; `activate` + `show`/`moveTop`/`focus` kippt es nur, bis das
+    nächste Fenster davorkommt. Verlässlich war erst `setAlwaysOnTop(true, "floating")` für die
+    Dauer des Laufs (danach zurücksetzen). Kandidat für `requireVisible` in `tools/obsidian-cdp/`.
 
 - **2026-08-21 (13:39), GUI-Smoke 10/10 mit dem 0.7.1-Kandidaten.** Vault `10_Pallas`,
   Obsidian 1.13.7, Build des Kit-Rückflusses (`ac13201`, vor dem Release-Bump), Plugin per
