@@ -106,6 +106,16 @@ nur zu behaupten: die Messgröße ist der Tool-Aufruf aus `chatLog`, nicht der A
 Bei einer Gegenprobe immer `--full` — ohne das belegt ein Treffer nur, *dass* ein Werkzeug
 lief, nicht dass ein genannter Pfad daher stammt.
 
+**Seit 2026-08-21 weist der Bericht auch Verdichtungs-Marken aus** — `⇢ Verlauf verdichtet
+(Stufe 1: n Tool-Ergebnisse gekürzt, x KB)` bzw. `(Stufe 2: n Runden zusammengefasst)`, die
+Zusammenfassung selbst nur mit `--full` vollständig. Ohne sie las sich der Bericht ab einer
+Verdichtung so, als hätte Koda den ganzen Verlauf vor Augen: ein erneutes `read_note` auf eine
+schon gelesene Notiz sah nach Verschwendung aus statt nach Folge der Verdichtung.
+**Gegen ein echtes Modell steht das noch aus** — belegt ist die Aufbereitung bisher nur trocken
+gegen einen konstruierten Verlauf (beide Stufen, `forced`, kaputte `stats`). Die Gegenprobe ist
+ein Lauf im Stil von Handpunkt 20, mit einem Fenster klein genug, dass Stufe 1 und 2 greifen;
+geseedet als TaskNote im Cockpit.
+
 **Was der Treiber bewusst nicht prüft:** alles, was eine echte Modell-Antwort braucht (die
 Punkte 2, 3, 5, 6, 7, 10, 14–19 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
 großen Vault **>90 s stumm**, bevor das erste Token kommt — Prüfpunkte darauf wären langsam
