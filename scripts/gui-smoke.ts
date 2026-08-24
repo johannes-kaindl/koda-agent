@@ -47,6 +47,10 @@
  *
  * ## Voraussetzung
  *
+ * ⚠️ Der Lauf leert das laufende Koda-Gespraech im Zielvault (Punkt 5 braucht ein frisches).
+ * Der bisherige Verlauf wandert nach `.obsidian/plugins/koda-agent/sessions/archive.jsonl` und ist nicht verloren, aber
+ * aus der Sidebar weg. Wer gerade an einem Verlauf misst, faehrt den Smoke davor oder danach.
+ *
  * ```bash
  * osascript -e 'quit app "Obsidian"'
  * open -a Obsidian --args --remote-debugging-port=9222
@@ -532,9 +536,19 @@ async function main(): Promise<void> {
       JSON.stringify(marks),
     );
   } finally {
-    // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt den Vault
-    // so zurück, wie er ihn vorgefunden hat — sonst bleiben tote Endpunkte in den
-    // Einstellungen des Maintainers stehen.
+    // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
+    // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
+    // beim Maintainer stehen.
+    //
+    // Was hier NICHT wiederhergestellt wird, und das ist Absicht: das laufende Gespräch.
+    // Punkt 5 braucht ein frisches (`newChat()` vor dem Failover-Versuch), und der Aufruf
+    // hier räumt dessen Fehlermeldung wieder weg. Der vorherige Verlauf ist damit aus der
+    // Sidebar verschwunden — nicht verloren: `SessionStore.startNew()` hängt ihn an
+    // `sessions/archive.jsonl`, bevor es `current.jsonl` leert. Wer also mitten in einem Gespräch
+    // den Smoke fährt, findet danach ein leeres. Gemessen am 2026-08-24: ein Smoke zwischen
+    // zwei Messungen kostete den Verlauf, an dem gerade gemessen wurde.
+    // Ein echtes Zurückschreiben wäre mehr Mechanik, als der Fall wert ist — die Warnung
+    // im Kopfkommentar ist der billigere Weg.
     if (previous !== null) {
       await cdp
         .evaluate(
