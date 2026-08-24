@@ -111,9 +111,8 @@ lief, nicht dass ein genannter Pfad daher stammt.
 Zusammenfassung selbst nur mit `--full` vollständig. Ohne sie las sich der Bericht ab einer
 Verdichtung so, als hätte Koda den ganzen Verlauf vor Augen: ein erneutes `read_note` auf eine
 schon gelesene Notiz sah nach Verschwendung aus statt nach Folge der Verdichtung.
-**Stufe 1 ist am 2026-08-22 gegen echte Records belegt, Stufe 2 noch nicht** — Einzelheiten
-unter „Durchläufe". Für Stufe 2 fehlt ein Lauf, der mit kleinem Fenster *durchläuft* und dann
-eine Folgefrage mit `--keep-session` bekommt; geseedet als TaskNote im Cockpit.
+**Beide Stufen sind gegen echte Records belegt** — Stufe 1 am 2026-08-22, Stufe 2 am
+2026-08-24; Einzelheiten unter „Durchläufe".
 
 **Was der Treiber bewusst nicht prüft:** alles, was eine echte Modell-Antwort braucht (die
 Punkte 2, 3, 5, 6, 7, 10, 14–19 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
@@ -122,6 +121,29 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 `VaultTools` wird in `ask()` lokal erzeugt und ist am Plugin nicht exponiert.
 
 ### Durchläufe
+
+- **2026-08-24 (04:05–04:20), Stufe-2-Marke belegt — die Gegenprobe ist damit vollständig.**
+  Vault `10_Pallas`, Obsidian 1.13.7, Koda 0.7.1, LM Studio `qwen/qwen3.8-27b` (mit CORS),
+  Fenster 4096 (`compactAt` 75 %, `keepToolResults` 3, Stufe 2 an, `maxRounds` 8).
+  - **Der Ablauf, der am 22.08. fehlte:** erst eine Frage, die *durchläuft* (eine Tagesnotiz
+    lesen + ausführlich zusammenfassen) — damit ist eine Runde abgeschlossen —, dann die
+    Folgefrage mit `--keep-session` über eine zweite Notiz. Kein Lesekreis, beide Läufe unter
+    dem Timeout.
+  - **Der Bericht zeigte `⇢ Verlauf verdichtet (Stufe 2: 1 Runden zusammengefasst)`**, und der
+    `chatLog` bestätigt ihn: der Record steht an Position 5 — direkt nach der zweiten
+    `user`-Nachricht, also am Anfang der neuen Runde, mit der abgeschlossenen Runde 1 davor.
+    Die positionsbasierte Marke sitzt richtig.
+  - **`stats.bytes` = 13384 belegt die Verlust-Regel an der Zahl.** Runde 1 bestand aus
+    109 (user) + 11869 (Tool-Ergebnis) + 1515 (Antwort) Zeichen. 11869 + 1515 = **13384** —
+    die Nutzer-Nachricht ist nicht mitgezählt, weil sie nicht angetastet wird. Das ist der
+    erste Beleg für „Nutzer-Nachrichten sind unantastbar" aus einem echten Lauf statt aus
+    einem Unit-Test.
+  - **Die Zusammenfassung erfüllt, was `buildSummaryPrompt` verlangt:** sie nennt den
+    gelesenen Pfad, das Ergebnis und „keine offenen Punkte" — und keinen Rohinhalt.
+  - **Kein Stufe-1-Record davor, und das ist korrekt:** `keepToolResults` steht auf 3, im
+    Verlauf gab es genau *ein* Tool-Ergebnis. `stage1Targets` verschont die K jüngsten,
+    `planStage1` liefert `null`, und der Loop geht zu Stufe 2. Wer nur den Bericht liest,
+    hält das leicht für eine übersprungene Stufe — es ist die Regel, nicht ihr Ausfall.
 
 - **2026-08-22 (00:00–00:20), Gegenprobe der Verdichtungs-Marken im `gui:ask`-Bericht —
   Stufe 1 belegt, Stufe 2 offen.** Vault `10_Pallas`, Obsidian 1.13.7, Koda 0.7.1,
