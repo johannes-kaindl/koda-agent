@@ -291,6 +291,16 @@ async function main(): Promise<void> {
     //
     // Erst die Existenz des Knopfes belegen, dann klicken: ein Klick ins Leere waere
     // sonst gruen — ausgerechnet im Defektfall (Falle „Pruefpunkt ohne Gegenstand“).
+    //
+    // ⚠️ WAS DIESER PUNKT BELEGT UND WAS NICHT. Belegt ist: der Renderer ueberlebt den
+    // Klick, und ein erreichbarer Endpunkt wird als `is-ok` erkannt. NICHT belegt ist,
+    // dass er den historischen Freeze fangen wuerde — die Gegenprobe am 2026-08-07 (mit
+    // wieder eingebautem `setDisabled()`) blieb gruen, der Defekt ist seither nicht
+    // reproduzierbar. Der Punkt ist gegen seinen eigenen Bug also **unbewiesen**; nur die
+    // beiden Aussagen darueber sind gemessen. Nachgebaut wird der Freeze bewusst nicht:
+    // das belegte, dass der Punkt einen NACHGEBAUTEN Freeze sieht, was eine andere
+    // Aussage ist. Offen gefuehrt als geparkte Task „Freeze-Gegenprobe klaeren“ im
+    // Cockpit; taucht der Freeze im Alltag wieder auf, wird sie hochgeholt.
     fake = await startFakeEndpoint();
     // Zeile 1 erreichbar (trifft den historischen Freeze-Fall), Zeile 2 tot (Pruefpunkt 4).
     await cdp.evaluate(`
@@ -358,6 +368,13 @@ async function main(): Promise<void> {
             // Der Freeze von 2026-08-06 nahm BEIDE Fenster mit. Das Hauptfenster wird
             // deshalb mitgeprueft: antwortet es nicht mehr, ist der Punkt rot, auch wenn
             // das Einstellungsfenster noch gezuckt hat.
+            //
+            // Das `return true` ist KEINE tote Assertion, auch wenn es so aussieht: die
+            // Aussage steckt nicht im Wert, sondern darin, DASS eine Antwort kommt. Haengt
+            // der Renderer des Hauptfensters, laeuft dieser Aufruf in seine
+            // Zeitueberschreitung, das `catch` unten greift und der Punkt wird rot. Ein
+            // Ping, kein Vergleich — vermerkt, weil die Zeile beim Lesen wie der Fehler
+            // aussieht, den sie gerade nicht macht.
             const hauptfensterLebt = await cdp.evaluate<boolean>(`return true;`);
             survived = status === "is-ok" && hauptfensterLebt;
             detail =
