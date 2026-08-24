@@ -122,6 +122,34 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 
 ### Durchläufe
 
+- **2026-08-24 (04:25–04:50), Handpunkte 13, 14, 15, 16, 19 gefahren — alle grün; ein
+  Fremdbefund für vault-rag.** Vault `10_Pallas`, Obsidian 1.13.7, Koda 0.7.1,
+  LM Studio `qwen/qwen3.8-27b`, GUI-Smoke davor 10/10.
+  - **13 (nie zuvor verifiziert): belegt.** `.koda-log` trägt `user-select: text`, und eine
+    echte `Selection` über den Log-Inhalt liefert 34 von 35 Zeichen zurück (Differenz ist der
+    Umbruch zwischen den Blöcken). Gemessen wurde die Selektion selbst, nicht nur die
+    CSS-Regel — ein Elternteil hätte sie sonst still schlucken können.
+  - **14 + 15 in einem Lauf belegt.** Fünf `search_notes`-Aufrufe, **jeder** mit beiden
+    beschrifteten Blöcken. Punkt 15 trägt der Aufruf `Stress`: ≥6 wörtliche Treffer, und der
+    semantische Block steht trotzdem da — die Schwelle von vor 0.6.0 ist nachweislich weg.
+  - **16 belegt, seine Gegenprobe nicht auslösbar.** `related_notes` läuft und liefert eine
+    Liste mit Scores. Die eigens angelegte frische Notiz war binnen Minuten indexiert, „(noch)
+    nicht im Index" ließ sich damit nicht herstellen; der Fall bleibt offen.
+  - **19 vollständig belegt.** `list_notes` gewählt, Kappung als `⚠ UNVOLLSTÄNDIG: 848
+    Notizen gefunden, 150 gezeigt` — und Koda **benennt** sie in der Antwort („insgesamt 848
+    … daher hier die ersten 150"), statt sie zu verschweigen.
+  - **Fremdbefund (gehört vault-rag, nicht Koda):** `related_notes` zur Notiz
+    `40_Zettelkasten/Stress und Kapazitätsreduktion.md` liefert als ähnlichste Notiz einen
+    Marp-Bugreport (0.92). Kodas Aufbereitung ist unschuldig — `api.related()` liefert direkt
+    dasselbe. Eingegrenzt mit einer Selbstfindungs-Probe (Suche mit den ersten 300 Zeichen
+    einer Notiz, dann nach ihr selbst im Ergebnis suchen): die **heute** angelegte Notiz findet
+    sich auf Rang 0 mit 0.953, drei ältere (`Stress und Kapazitätsreduktion`, `Smart Composer
+    Konfiguration`, `25_Coding/koda-agent/koda-agent.md`) finden sich **gar nicht**, obwohl der
+    Suchtext wörtlich aus ihnen stammt. Da `related()` für dieselbe Notiz funktioniert, liegt
+    ihr Vektor sehr wohl im Index — er passt nur nicht mehr zu ihrem Inhalt. Naheliegende
+    Hypothese (nicht gemessen): die Re-Indexierung geänderter Notizen greift nicht.
+    Abgelegt als Task im vault-rag-Cockpit, Zeiger hier.
+
 - **2026-08-24 (04:05–04:20), Stufe-2-Marke belegt — die Gegenprobe ist damit vollständig.**
   Vault `10_Pallas`, Obsidian 1.13.7, Koda 0.7.1, LM Studio `qwen/qwen3.8-27b` (mit CORS),
   Fenster 4096 (`compactAt` 75 %, `keepToolResults` 3, Stufe 2 an, `maxRounds` 8).
