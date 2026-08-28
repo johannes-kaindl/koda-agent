@@ -156,7 +156,15 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   kommt aus Obsidians `metadataCache`, kein Datei-Lesen je Notiz.
 - `src/llm/` — `KodaChatClient` + `XhrSseTransport` (Streaming-Chat-Client).
 - `src/obsidian/` — View, Vault-Tools-Adapter, Bestätigungs-Modal, Settings-Tab.
+- `src/obsidian/settings.ts` — Settings-Tab. Die **Endpunkt-Liste kommt seit 2026-08-28 aus
+  dem Kit** (`buildEndpointList`), nicht mehr aus Eigenbau; Kodas Kontextfenster-Uebernahme
+  haengt im `clientFor().probe()` der Zeile. Das CSS liegt nach Kit-Vertrag in `styles.css`
+  (Herkunftsstempel dort) — nie von Hand aendern, sondern den Block ersetzen.
 - `src/vendor/kit` + `src/vendor/kit-obsidian/` — verbatim vendorter `../obsidian-kit`
   (0.27.0; maßgeblich ist immer `src/vendor/kit/VENDOR.json`, nicht diese Zeile),
-  Re-Sync über `tools/sync-kit.sh` — nie von Hand editieren.
+  Re-Sync über `tools/sync-kit.sh` — nie von Hand editieren. **Das Skript liest aus einer
+  festen Ref (`KIT_REF`, Default `0.27.0`), nicht aus dem Arbeitsstand des Nachbar-Repos:
+  obsidian-kit steht auf 0.28.0 und hat die pure-Module nach `code-kit` verschoben, ein
+  `cp`-Lauf zoege also andere Dateien und stempelte sie falsch. Gegenprobe nach jedem Umbau
+  am Skript: ein zweiter Lauf mit demselben `KIT_REF` darf keine vendorte Datei aendern.**
 - `src/i18n/` — DE/EN-Strings.
