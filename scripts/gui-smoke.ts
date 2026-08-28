@@ -335,7 +335,7 @@ async function main(): Promise<void> {
         const hatZeile = zeilen !== null && zeilen >= 2;
 
         if (!hatZeile) {
-          record("3. Klick auf „Testen“ friert den Renderer nicht ein", false, "Endpunkt-Zeile im Einstellungsfenster nicht gefunden");
+          record("3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein", false, "Endpunkt-Zeile im Einstellungsfenster nicht gefunden");
           record("4. Toter Endpunkt wird als nicht erreichbar angezeigt", false, "ohne Endpunkt-Zeile nicht entscheidbar");
         } else {
           const t0 = Date.now();
@@ -346,13 +346,27 @@ async function main(): Promise<void> {
             // Klick (Mutation) und Warten auf das Status-Icon (Wartephase) sind getrennt:
             // friert der Renderer ein, laeuft `pollUntil` in seine eigene Zeitueberschreitung,
             // statt den ganzen 30-s-`Cdp.send`-Aufruf mitzureissen.
+            // Seit dem Kit-Umstieg (2026-08-28) gibt es KEINEN Testen-Knopf je Zeile mehr:
+            // der Kit-Baustein setzt Preset- und „Verbindung pruefen"-Knoepfe in eine eigene
+            // `actions`-Zeile am Listenende, und deren letzter Knopf ist der Pruef-Knopf.
+            // Sprachfrei ueber die Position gegriffen, nicht ueber den Text — der Treiber
+            // laeuft sonst nur auf einer Oberflaechensprache.
+            //
+            // Der Punkt misst dadurch etwas Staerkeres als vorher: dieser Klick loest einen
+            // vollstaendigen Neuaufbau der Liste aus (`rerender()`), nicht nur eine Probe.
             const geklickt = await clickReal(
               settings,
-              `[...document.querySelectorAll(".setting-item")]
-                 .filter((r) => r.querySelector(".okit-ep-status"))[0]
-                 ?.querySelectorAll("button")[0]`,
+              `(() => {
+                 const items = [...document.querySelectorAll(".setting-item")];
+                 const letzteZeile = items.map((r, i) => r.querySelector(".okit-ep-status") ? i : -1)
+                                          .filter((i) => i >= 0).pop();
+                 if (letzteZeile === undefined) return null;
+                 const aktionen = items.slice(letzteZeile + 1).find((r) => r.querySelectorAll("button").length > 0);
+                 const knoepfe = aktionen ? [...aktionen.querySelectorAll("button")] : [];
+                 return knoepfe[knoepfe.length - 1] ?? null;
+               })()`,
             );
-            if (!geklickt) throw new Error("Testen-Knopf nicht klickbar (unsichtbar oder nicht vorhanden)");
+            if (!geklickt) throw new Error("„Verbindung pruefen\"-Knopf nicht klickbar (unsichtbar oder nicht vorhanden)");
             status = await pollUntil<string>(
               settings,
               `
@@ -385,21 +399,20 @@ async function main(): Promise<void> {
             survived = false;
             detail = `Renderer antwortet nicht mehr (${error instanceof Error ? error.message : String(error)}) — Freeze-Verdacht`;
           }
-          record("3. Klick auf „Testen“ friert den Renderer nicht ein", survived, detail);
+          record("3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein", survived, detail);
 
           // --- 4. Der Status ist der echte Status -----------------------------
           // Gegen einen toten Port MUSS „nicht erreichbar“ stehen. Ein Statuspunkt, der
           // immer gruen ist, waere schlimmer als keiner — deshalb wird die zweite Zeile
           // (toter Port) separat geklickt statt die erste nur anders interpretiert.
+          //
+          // Seit dem Kit-Umstieg braucht dieser Punkt KEINEN Klick mehr: der Baustein laedt
+          // Status und Modell-Liste jeder Zeile beim Zeichnen. Er misst damit naeher am
+          // Erlebten — ob der Nutzer den toten Endpunkt sieht, ohne etwas zu tun. Der Klick
+          // auf Punkt 3 (globales „Verbindung pruefen") hat die Liste gerade neu aufgebaut,
+          // die Proben laufen also frisch.
           let tot: string | null = null;
           try {
-            const geklickt2 = await clickReal(
-              settings,
-              `[...document.querySelectorAll(".setting-item")]
-                 .filter((r) => r.querySelector(".okit-ep-status"))[1]
-                 ?.querySelectorAll("button")[0]`,
-            );
-            if (!geklickt2) throw new Error("Testen-Knopf der zweiten Zeile nicht klickbar");
             tot = await pollUntil<string>(
               settings,
               `
