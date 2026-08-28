@@ -11,22 +11,28 @@
 // Muster uebernommen aus `3d-codeblocks/src/obsidian/settings.ts` (minimale Form: reine
 // Controls) + `vault-rag/src/settings.ts` (render-Hatch fuer die Endpunkt-Liste — dort
 // das Erst-Exemplar der Hatch-Mechanik, REGISTRY „Zweigleisige deklarative Settings —
-// eine-Wahrheit-Walker"). Die Endpunkt-Liste selbst ist gegenueber vault-rag bewusst
+// eine-Wahrheit-Walker").
+//
+// Die Endpunkt-Liste selbst kommt seit 2026-08-28 aus dem Kit (`buildEndpointList`).
+// Hier stand davor ein Eigenbau mit der Begruendung „gegenueber vault-rag bewusst
 // abgespeckt: kein Erreichbarkeits-Ping, keine Modell-Liste, kein Test-Button (MVP-
-// Schnitt, siehe Task-Brief) — jede Zeilen-Aenderung committet synchron und rendert neu.
+// Schnitt)". Die Begruendung war zu diesem Zeitpunkt seit Wochen hinfaellig — alle drei
+// Verzichte hatte die QoL-Schicht zurueckgenommen —, nur hatte sie das niemand nachgeprueft.
+// Merksatz fuer den naechsten Sonderweg: eine Ausnahme verfaellt nicht mit ihrem Grund.
+// Wer eine deklariert, nennt die Bedingung, unter der sie endet (UI-STANDARD §1a).
 
 import {
   Notice,
   PluginSettingTab,
   Setting,
-  setIcon,
-  setTooltip,
   type App,
   type SettingDefinitionItem,
 } from "obsidian";
 import { t } from "../vendor/kit/i18n";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
-import { applyEndpointEdit, moveEndpointToFront, type EndpointConfig } from "../vendor/kit/endpoint_config";
+import type { EndpointConfig } from "../vendor/kit/endpoint_config";
+import { buildEndpointList, type EndpointListStrings } from "../vendor/kit-obsidian/endpoint-list";
+import { createModelListCache, type ModelListCache, type ModelListClient } from "../vendor/kit/model-list-cache";
 import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
@@ -214,158 +220,126 @@ export class KodaSettingsTab extends PluginSettingTab {
     this.cleanupPrevious = renderSettingDefinitions(this.containerEl, this.getSettingDefinitions(), this, this.app);
   }
 
+  /** Kit-Vertrag von `ModelListCache`: der Cache haelt Promises und ueberlebt jeden
+   *  Tab-Neuaufbau bewusst — verworfen wird er erst, wenn der Tab wirklich zugeht.
+   *  Ohne diesen Aufruf bliebe ein einmal als „nicht erreichbar" gemessener Endpunkt
+   *  fuer die restliche Sitzung so stehen: wer seinen LLM-Server erst danach startet
+   *  und die Einstellungen erneut oeffnet, saehe dauerhaft den alten Zustand.
+   *  NICHT aus `refreshUi()` heraus aufrufen — das ist ein Neuaufbau, kein Schliessen. */
+  hide(): void {
+    this.modelCache.clear();
+    this.globalModelCache = null;
+    super.hide();
+  }
+
   /** Re-Render des Tabs nach einer Endpunkt-Mutation. */
   private refreshUi(): void {
     refreshSettingsTab(this, () => this.display());
   }
 
-  // ── Endpunkt-Liste (render-Hatch) ────────────────────────────────────────
+  // ── Endpunkt-Liste (render-Hatch auf den Kit-Baustein) ───────────────────
 
-  /** render-Hatch: eine `Setting`-Zeile pro Endpunkt (URL · API-Schluessel · Modell-
-   *  Override · "nach oben" · Entfernen) plus eine Adder-Zeile darunter. Jede Aenderung
-   *  laeuft durch Kit-`applyEndpointEdit`, dann `validateKodaSettings` + `saveSettings`,
-   *  dann kompletter Re-Render (kein Probing/Reconnect wie in vault-rag — hier gibt es
-   *  nichts Asynchrones, das den Rebuild rechtfertigen wuerde, den Nutzer aber mitten im
-   *  Tippen zu unterbrechen). Committet deshalb bei `blur`, nicht bei jedem Tastendruck —
-   *  sonst haengte das Adder-Feld jeden Zwischenstand (h, ht, htt, …) als eigenen Eintrag an. */
+  /** render-Hatch: delegiert an `buildEndpointList` (obsidian-kit@0.27.0). Bis 0.7.1 stand
+   *  hier ein Eigenbau — begruendet als „gegenueber vault-rag bewusst abgespeckt: kein
+   *  Erreichbarkeits-Ping, keine Modell-Liste, kein Test-Knopf (MVP-Schnitt)". Alle drei
+   *  Verzichte waren laengst zurueckgenommen (QoL-Schicht), die Begruendung galt also nicht
+   *  mehr, waehrend der Eigenbau stehenblieb. Gemessen am 2026-08-28: das Kit-Modul entstand
+   *  am 08.08., Kodas Fassung am 05.08. — es war kein Design-Entscheid, sondern die aeltere
+   *  Linie, die niemand nachgezogen hat (UI-STANDARD §8 fuehrt den Baustein als verbindlich).
+   *
+   *  Zwei Kodas-Gotchas sind in der Zentrale bereits richtig geloest und deshalb kein Grund
+   *  fuer einen Sonderweg: der Status sitzt in `controlEl` statt als `setText` im `descEl`,
+   *  und Knoepfe schalten ueber `buttonEl.disabled` statt `setDisabled()` (beides
+   *  Renderer-Endlosschleifen, 2026-08-06, `_docs/docs/obsidian-api-gotchas.md`). */
   private renderEndpointList(setting: Setting): void {
     const host = settingBodyHost(setting);
-    new Setting(host).setName(t("settings.endpoints")).setDesc(t("settings.endpoints.desc"));
 
-    const commit = (index: number, field: "url" | "apiKey" | "model", value: string, isAdder: boolean): void => {
-      const next = applyEndpointEdit(this.plugin.settings.endpoints, index, field, value, isAdder);
-      this.plugin.settings = validateKodaSettings({ ...this.plugin.settings, endpoints: next });
-      void this.plugin.saveSettings();
-      this.refreshUi();
-    };
-
-    const eps = this.plugin.settings.endpoints;
-    const rows: EndpointConfig[] = [...eps, { url: "" }]; // leeres Adder-Feld am Ende
-
-    rows.forEach((cfg, i) => {
-      const isAdder = i >= eps.length;
-      const row = new Setting(host);
-
-      row.addText((tx) => {
-        tx.setPlaceholder(isAdder ? t("settings.addEndpoint") : "http://127.0.0.1:1234").setValue(cfg.url);
-        tx.inputEl.addEventListener("blur", () => commit(i, "url", tx.getValue(), isAdder));
-      });
-
-      // Schnellauswahl nur an der leeren Zeile am Ende: dort entsteht eine neue Adresse.
-      // An bestehenden Zeilen waere ein Preset-Knopf ein Ueberschreib-Knopf.
-      if (isAdder) {
-        for (const preset of ENDPOINT_PRESETS) {
-          row.addExtraButton((b) =>
-            b
-              .setIcon("plus-circle")
-              .setTooltip(t("settings.endpoints.preset", preset.label))
-              .onClick(() => commit(i, "url", preset.url, true)),
-          );
-        }
-      }
-
-      // Schluessel + Modell nur an bestehenden Zeilen — am leeren Adder gaebe es nichts zu tragen.
-      if (!isAdder) {
-        row.addText((tx) => {
-          tx.setPlaceholder(t("settings.endpoints.apiKeyPlaceholder")).setValue(cfg.apiKey ?? "");
-          tx.inputEl.type = "password"; // maskiert gegen Schultergucken/Screenshots
-          tx.inputEl.setAttribute("autocomplete", "off");
-          tx.inputEl.addEventListener("blur", () => commit(i, "apiKey", tx.getValue(), false));
-        });
-        row.addText((tx) => {
-          tx.setPlaceholder(t("settings.endpoints.modelPlaceholder")).setValue(cfg.model ?? "");
-          tx.inputEl.addEventListener("blur", () => commit(i, "model", tx.getValue(), false));
-        });
-
-        // "Nach oben": die Listenreihenfolge IST die Prioritaet (der erste erreichbare
-        // Endpunkt gewinnt). An Platz 1 nicht gezeichnet statt deaktiviert — ein
-        // disabled-Element traegt seinen Tooltip in Electron unsichtbar.
-        if (i > 0) {
-          row.addExtraButton((b) =>
-            b
-              .setIcon("arrow-up-to-line")
-              .setTooltip(t("settings.endpoints.moveToFront"))
-              .onClick(() => {
-                this.plugin.settings = validateKodaSettings({
-                  ...this.plugin.settings,
-                  endpoints: moveEndpointToFront(this.plugin.settings.endpoints, i),
-                });
-                void this.plugin.saveSettings();
-                this.refreshUi();
-              }),
-          );
-        }
-
-        row.addExtraButton((b) =>
-          b
-            .setIcon("trash-2")
-            .setTooltip(t("settings.remove"))
-            .onClick(() => commit(i, "url", "", false)),
-        );
-
-        // Der Status wird direkt in sein eigenes Element geschrieben statt ueber einen
-        // Neuaufbau des Tabs: ein Redraw waehrend des Tippens nimmt den Fokus aus dem Feld.
-        // Er ueberlebt bewusst keinen Redraw — ein alter Status neben einer inzwischen
-        // geaenderten URL waere eine Behauptung ueber etwas Ungetestetes.
-        //
-        // Der Punkt sitzt in der Steuerspalte (`controlEl`) und ist ein Icon mit Tooltip,
-        // NICHT Text im `descEl`: die Beschreibungsspalte gehoert seit dem eigenen
-        // Settings-Fenster (Obsidian 1.13) dem Host. Ein `setText` darauf hat den Renderer
-        // beim Klick auf „Testen" in eine Endlosschleife geschickt (2026-08-06, 100 % CPU,
-        // beide Fenster tot). Form uebernommen aus `vault-rag/src/settings.ts`.
-        const statusEl = row.controlEl.createSpan({ cls: "koda-endpoint-status" });
-        /** Setzt den Status als Icon + Tooltip. `null` = Pruefung laeuft. `ctx` haengt das
-         *  gemeldete Kontextfenster an den Tooltip an, wenn vorhanden. */
-        const showStatus = (s: EndpointStatus | null, ctx: number | null = null): void => {
-          const view = endpointStatusView(s, ctx);
-          statusEl.empty();
-          setIcon(statusEl, view.icon);
-          statusEl.toggleClass("is-ok", view.ok === true);
-          statusEl.toggleClass("is-bad", view.ok === false);
-          setTooltip(statusEl, view.tooltip);
-        };
-        row.addButton((b) =>
-          b
-            .setButtonText(t("settings.probe"))
-            .setTooltip(t("settings.probe.tooltip"))
-            .onClick(() => {
-              const current = this.plugin.settings.endpoints[i];
-              if (current === undefined) return;
-              // `b.buttonEl.disabled` statt `b.setDisabled()`: die Component-Methode hat den
-              // Renderer in Obsidian 1.13.5 in eine Endlosschleife geschickt (100 % CPU, beide
-              // Fenster tot). Gemessen am 2026-08-06 durch Ausschluss — derselbe Ablauf mit
-              // direktem DOM-Zugriff laeuft sauber, mit `setDisabled()` friert er ein.
-              b.buttonEl.disabled = true;
-              showStatus(null);
-              void this.plugin
-                .probe(current)
-                .then(async (status) => {
-                  if (!status.reachable) {
-                    showStatus(status);
-                    return;
-                  }
-                  // Erreichbar: zusaetzlich das Fenster erfragen. BERICHTET wird immer;
-                  // GESCHRIEBEN nur, wenn das Feld noch auf dem Default steht — wer bewusst
-                  // kleiner eingestellt hat, wird nicht ueberschrieben (Regel ohne Flag).
-                  const ctx = await this.plugin.probeContext(current);
-                  showStatus(status, ctx);
-                  if (ctx !== null && this.plugin.settings.contextWindowTokens === DEFAULT_SETTINGS.contextWindowTokens) {
-                    await this.setControlValue("contextWindowTokens", ctx);
-                    // Der gleich folgende Redraw baut den Statuspunkt leer neu auf — das
-                    // eben gezeigte Haekchen samt Tooltip verschwindet in demselben Moment,
-                    // in dem das Zahlenfeld sich aendert. Die Notice ueberlebt den Redraw
-                    // und traegt die Meldung darueber hinweg.
-                    new Notice(t("settings.probe.contextApplied", ctx));
-                    this.refreshUi();
-                  }
-                })
-                .finally(() => {
-                  b.buttonEl.disabled = false;
-                });
-            }),
-        );
-      }
+    buildEndpointList({
+      containerEl: host,
+      label: t("settings.endpoints"),
+      desc: t("settings.endpoints.desc"),
+      placeholder: t("settings.addEndpoint"),
+      strings: this.endpointStrings(),
+      cache: this.modelCache,
+      get: () => this.plugin.settings.endpoints,
+      set: (eps) => {
+        this.plugin.settings = validateKodaSettings({ ...this.plugin.settings, endpoints: eps });
+      },
+      active: () => this.plugin.settings.endpoints[0]?.url ?? null,
+      clientFor: (cfg) => this.endpointClient(cfg),
+      globalModel: () => this.plugin.settings.model,
+      save: () => this.plugin.saveSettings(),
+      // Koda haelt keine stehende Verbindung — es gibt nichts wiederherzustellen. Der
+      // Kit-Vertrag verlangt den Callback trotzdem, weil andere Consumer (vault-rag) beim
+      // Endpunktwechsel ihren Index neu anbinden muessen.
+      reconnect: () => Promise.resolve(),
+      rerender: () => { this.refreshUi(); },
+      presets: ENDPOINT_PRESETS,
     });
+  }
+
+  /** Client GENAU dieser Zeile. `probe()` traegt zusaetzlich Kodas Kontextfenster-Uebernahme:
+   *  meldet der Server ein Fenster und steht das Feld noch auf dem Default, wird es
+   *  eingetragen (Regel ohne Flag — wer bewusst kleiner eingestellt hat, wird nicht
+   *  ueberschrieben). Das haengt hier und nicht im Kit, weil es Kodas Compaction betrifft
+   *  und kein Endpunkt-Thema ist: der Kit-Baustein weiss nichts von Verdichtung. */
+  private endpointClient(cfg: EndpointConfig): { probe(): Promise<EndpointStatus> } & ModelListClient {
+    return {
+      probe: async (): Promise<EndpointStatus> => {
+        const status = await this.plugin.probe(cfg);
+        if (!status.reachable) return status;
+        const ctx = await this.plugin.probeContext(cfg);
+        if (ctx !== null && this.plugin.settings.contextWindowTokens === DEFAULT_SETTINGS.contextWindowTokens) {
+          await this.setControlValue("contextWindowTokens", ctx);
+          // Die Notice ueberlebt den Redraw, den das geaenderte Zahlenfeld ausloest — das
+          // eben gesetzte Status-Icon tut das nicht.
+          new Notice(t("settings.probe.contextApplied", ctx));
+          this.refreshUi();
+        }
+        return status;
+      },
+      listModels: async (): Promise<string[]> => (await this.plugin.probeModels(cfg)).models,
+    };
+  }
+
+  /** Der Textbaustein-Satz fuer den Kit-Editor — das Kit formuliert nicht selbst.
+   *  Wortlaut uebernommen aus `vault-crews/src/obsidian/settings.ts` (2026-08-28): derselbe
+   *  Baustein soll in beiden Plugins dasselbe sagen. */
+  private endpointStrings(): EndpointListStrings {
+    return {
+      addPlaceholder: t("settings.addEndpoint"),
+      apiKeyPlaceholder: t("settings.endpoints.apiKeyPlaceholder"),
+      modelPlaceholder: t("settings.endpoints.modelPlaceholder"),
+      ariaUrl: t("settings.endpoints.aria.url"),
+      ariaAdd: t("settings.endpoints.aria.add"),
+      ariaApiKey: (url) => t("settings.endpoints.aria.apiKey", url),
+      ariaModel: (url) => t("settings.endpoints.aria.model", url),
+      emptyModelLabel: (globalModel) =>
+        globalModel === "" ? t("settings.model.useGlobalUnset") : t("settings.model.useGlobal", globalModel),
+      modelHint: (key) => (key === "" ? "" : t(`settings.model.hint.${key}`)),
+      savedSuffix: t("settings.model.savedSuffix"),
+      refreshModels: t("settings.model.fetch"),
+      moveToFront: t("settings.endpoints.moveToFront"),
+      remove: t("settings.remove"),
+      thirdParty: t("settings.endpoints.thirdParty"),
+      probing: t("settings.probe.testing"),
+      // Ueber `kind` statt ueber das Kit-Feld `klartext`: das Kit formuliert nur auf
+      // Deutsch, Koda spricht beide Sprachen. `endpointStatusView` macht genau das.
+      statusTooltip: (status) => endpointStatusView(status).tooltip,
+      role: (role) =>
+        role.kind === "active"
+          ? t("settings.endpoints.role.active")
+          : role.kind === "unreachable"
+            ? t("settings.endpoints.role.unreachable")
+            : role.kind === "skipped-model"
+              ? t("settings.endpoints.role.modelMismatch")
+              : t("settings.endpoints.role.standby", String(role.position)),
+      warnings: (ws) => ws.map((w) => t(`settings.endpoints.warn.${w.rule}`)).join(" · "),
+      presetTooltip: (preset) => t("settings.endpoints.preset", preset.label),
+      presetLabel: (preset) => t("settings.endpoints.presetAdd", preset.label),
+      checkConnection: t("settings.probe"),
+      saveFailed: t("settings.endpoints.saveFailed"),
+    };
   }
 
   // ── Modellauswahl ─────────────────────────────────────────────────────────
@@ -377,7 +351,12 @@ export class KodaSettingsTab extends PluginSettingTab {
   // leeren Auswahl — sonst waere das Feld nach frischer Installation unbedienbar, bis
   // jemand einen Knopf findet.
 
-  private modelCache: { url: string; models: string[]; reachable: boolean } | null = null;
+  /** Modell-Listen je Endpunkt-Zeile. Gehoert der Lebensdauer des Tabs, nicht dem Render —
+   *  deshalb Feld und nicht lokal. Wird in `hide()` verworfen (Kit-Vertrag: sonst bleibt ein
+   *  einmal als nicht erreichbar gemessener Endpunkt die ganze Sitzung so stehen). */
+  private modelCache: ModelListCache = createModelListCache();
+  /** Zustand der GLOBALEN Modell-Zeile (Default fuer Zeilen ohne Override). */
+  private globalModelCache: { url: string; models: string[]; reachable: boolean } | null = null;
   /** Gegen verspaetete Antworten: ein zweiter Abruf entwertet den ersten. */
   private modelGeneration = 0;
 
@@ -388,7 +367,7 @@ export class KodaSettingsTab extends PluginSettingTab {
 
     const ep = this.plugin.settings.endpoints[0];
     const url = ep?.url ?? "";
-    const cache = this.modelCache !== null && this.modelCache.url === url ? this.modelCache : null;
+    const cache = this.globalModelCache !== null && this.globalModelCache.url === url ? this.globalModelCache : null;
 
     const save = (value: string): void => {
       this.plugin.settings = validateKodaSettings({ ...this.plugin.settings, model: value });
@@ -441,12 +420,12 @@ export class KodaSettingsTab extends PluginSettingTab {
             .probeModels(ep)
             .then(({ status, models }) => {
               if (gen !== this.modelGeneration) return; // ein neuerer Abruf gilt
-              this.modelCache = { url, models, reachable: status.reachable };
+              this.globalModelCache = { url, models, reachable: status.reachable };
               this.refreshUi();
             })
             .catch(() => {
               if (gen !== this.modelGeneration) return;
-              this.modelCache = { url, models: [], reachable: false };
+              this.globalModelCache = { url, models: [], reachable: false };
               this.refreshUi();
             });
         }),

@@ -27,6 +27,29 @@ defineStrings({
     "settings.endpoints.modelPlaceholder": "Model override (empty = global model)",
     "settings.endpoints.preset": "Add {0}",
     "settings.endpoints.moveToFront": "Move to top — use this endpoint first",
+    // Wortlaut ab hier uebernommen aus vault-crews/src/i18n/strings.ts (2026-08-28) —
+    // derselbe Kit-Baustein soll in beiden Plugins dasselbe sagen, nicht dasselbe meinen.
+    "settings.endpoints.aria.url": "Endpoint URL",
+    "settings.endpoints.aria.add": "Add endpoint URL",
+    "settings.endpoints.aria.apiKey": "API key for {0}",
+    "settings.endpoints.aria.model": "Model for {0}",
+    "settings.endpoints.thirdParty": "This endpoint has an API key — requests leave your machine.",
+    "settings.endpoints.role.active": "Active",
+    "settings.endpoints.role.unreachable": "Unreachable",
+    "settings.endpoints.role.modelMismatch": "Reachable, but skipped (model mismatch)",
+    "settings.endpoints.role.standby": "Standby — position {0}",
+    "settings.endpoints.saveFailed": "Could not save — check the console.",
+    "settings.endpoints.presetAdd": "+ {0}",
+    "settings.endpoints.warn.scheme": "Address needs http:// or https://",
+    "settings.endpoints.warn.malformed": "Address is not a valid URL",
+    "settings.endpoints.warn.port": "Local LLM servers almost always need a port (e.g. :1234)",
+    "settings.endpoints.warn.placeholder-ip": "Looks like an example/placeholder address",
+    // Abweichung von vault-crews mit Grund: dort gibt es kein globales Modell (Design
+    // 2026-08-14, E1), die Leer-Option heisst deshalb „kein Modell gewaehlt". Koda hat
+    // eines, also sagt die Leer-Option, WAS dann gilt — und faengt den Fall ab, dass
+    // global nichts gesetzt ist (sonst stuende dort „global model ()").
+    "settings.model.useGlobal": "global model ({0})",
+    "settings.model.useGlobalUnset": "global model (none set)",
     "error.noEndpoint": "No endpoint reachable. Check the endpoint list in the settings — the test button says which one answers.",
     "error.chatBlocked": "The endpoint answers the connection test but not the chat request from Obsidian. A local server usually needs CORS enabled for that — LM Studio: turn on “Enable CORS” in the server settings (or start it with `lms server start --cors`); Ollama: set `OLLAMA_ORIGINS`. The test button stays green either way — it takes a different route.",
     "settings.probe": "Test",
@@ -47,6 +70,7 @@ defineStrings({
     "settings.model.fetching": "Fetching…",
     "settings.model.notLoaded": "Fetch the models to pick from a list instead of typing.",
     "settings.model.saved": "{0} (saved)",
+    "settings.model.savedSuffix": "(saved)",
     "settings.model.hint.unreachable": "Endpoint not reachable — the stored name is kept. Fetch again once it is running.",
     "settings.model.hint.no-list": "Endpoint does not publish a model list — type the name yourself.",
     "settings.suppress": "Suppress thinking",
@@ -112,6 +136,29 @@ defineStrings({
     "settings.endpoints.modelPlaceholder": "Modell-Override (leer = globales Modell)",
     "settings.endpoints.preset": "{0} hinzufügen",
     "settings.endpoints.moveToFront": "Nach oben — diesen Endpunkt zuerst verwenden",
+    // Wortlaut ab hier uebernommen aus vault-crews/src/i18n/strings.ts (2026-08-28) —
+    // derselbe Kit-Baustein soll in beiden Plugins dasselbe sagen, nicht dasselbe meinen.
+    "settings.endpoints.aria.url": "Endpunkt-URL",
+    "settings.endpoints.aria.add": "Endpunkt-URL hinzufügen",
+    "settings.endpoints.aria.apiKey": "API-Schlüssel für {0}",
+    "settings.endpoints.aria.model": "Modell für {0}",
+    "settings.endpoints.thirdParty": "Dieser Endpunkt hat einen API-Schlüssel — Anfragen verlassen deinen Rechner.",
+    "settings.endpoints.role.active": "Aktiv",
+    "settings.endpoints.role.unreachable": "Nicht erreichbar",
+    "settings.endpoints.role.modelMismatch": "Erreichbar, aber übersprungen (Modell passt nicht)",
+    "settings.endpoints.role.standby": "Bereitschaft — Platz {0}",
+    "settings.endpoints.saveFailed": "Konnte nicht speichern — siehe Konsole.",
+    "settings.endpoints.presetAdd": "+ {0}",
+    "settings.endpoints.warn.scheme": "Adresse braucht http:// oder https://",
+    "settings.endpoints.warn.malformed": "Adresse ist keine gültige URL",
+    "settings.endpoints.warn.port": "Lokale LLM-Server brauchen fast immer einen Port (z. B. :1234)",
+    "settings.endpoints.warn.placeholder-ip": "Sieht aus wie eine Beispiel-/Platzhalter-Adresse",
+    // Abweichung von vault-crews mit Grund: dort gibt es kein globales Modell (Design
+    // 2026-08-14, E1), die Leer-Option heisst deshalb „kein Modell gewaehlt". Koda hat
+    // eines, also sagt die Leer-Option, WAS dann gilt — und faengt den Fall ab, dass
+    // global nichts gesetzt ist (sonst stuende dort „globales Modell ()").
+    "settings.model.useGlobal": "globales Modell ({0})",
+    "settings.model.useGlobalUnset": "globales Modell (keins gesetzt)",
     "error.noEndpoint": "Kein Endpunkt erreichbar. Prüf die Endpunkt-Liste in den Einstellungen — der Testknopf sagt, welcher antwortet.",
     "error.chatBlocked": "Der Endpunkt antwortet dem Verbindungstest, aber nicht der Chat-Anfrage aus Obsidian. Ein lokaler Server braucht dafür meist aktiviertes CORS — LM Studio: „Enable CORS“ in den Server-Einstellungen einschalten (oder mit `lms server start --cors` starten); Ollama: `OLLAMA_ORIGINS` setzen. Der Testknopf bleibt davon unberührt — er nimmt einen anderen Weg.",
     "settings.probe": "Testen",
@@ -132,6 +179,7 @@ defineStrings({
     "settings.model.fetching": "Rufe ab …",
     "settings.model.notLoaded": "Modelle abrufen, um statt zu tippen aus einer Liste zu wählen.",
     "settings.model.saved": "{0} (gespeichert)",
+    "settings.model.savedSuffix": "(gespeichert)",
     "settings.model.hint.unreachable": "Endpunkt nicht erreichbar — der gespeicherte Name bleibt. Erneut abrufen, sobald er läuft.",
     "settings.model.hint.no-list": "Endpunkt gibt keine Modell-Liste heraus — Namen selbst eintragen.",
     "settings.suppress": "Denken unterdrücken",
