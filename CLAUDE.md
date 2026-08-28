@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.7.1 im Community-Store (Rescan „passed“, Höchstwertung, zero warnings), main, Stand 2026-08-21
+## Status: 0.8.0 released (Rescan offen), 0.7.1 im Community-Store, main, Stand 2026-08-28
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
