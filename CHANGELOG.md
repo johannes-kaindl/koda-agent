@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The endpoint list is now the shared component used by the other plugins.** Same
+  behaviour, one visible addition per row: a role line (active / standby / unreachable)
+  and a model dropdown that is filled from the endpoint itself, so a per-endpoint model
+  no longer has to be typed by hand. The global model setting stays and applies to every
+  row that carries no model of its own.
+- **Opening the settings now contacts your endpoints without being asked.** Each row
+  fetches its model list when the tab is drawn, instead of waiting for a click. For a
+  local server this is a request to your own machine. For an endpoint with an API key it
+  means one request to that provider every time you open the settings — it asks for the
+  model list (`/v1/models`) and sends no vault content, but it does happen unprompted.
+
+### Fixed
+
+- **The “Fetch models” button could freeze Obsidian.** It disabled itself through
+  `ButtonComponent.setDisabled()`, which drives the renderer into an endless loop when
+  called from the plugin's own settings window (Obsidian 1.13.5). The same bug was found
+  and fixed on the endpoint test button in August; this second caller was missed and only
+  surfaced when the endpoint row moved to the shared component.
+
 ## [0.7.1] — 2026-08-21
 
 ### Changed

@@ -327,7 +327,7 @@ async function main(): Promise<void> {
         const zeilen = await pollUntil<number>(
           settings,
           `
-            const rows = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".koda-endpoint-status"));
+            const rows = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".okit-ep-status"));
             return rows.length >= 2 ? rows.length : 0;
           `,
           8000,
@@ -349,18 +349,18 @@ async function main(): Promise<void> {
             const geklickt = await clickReal(
               settings,
               `[...document.querySelectorAll(".setting-item")]
-                 .filter((r) => r.querySelector(".koda-endpoint-status"))[0]
+                 .filter((r) => r.querySelector(".okit-ep-status"))[0]
                  ?.querySelectorAll("button")[0]`,
             );
             if (!geklickt) throw new Error("Testen-Knopf nicht klickbar (unsichtbar oder nicht vorhanden)");
             status = await pollUntil<string>(
               settings,
               `
-                const rows2 = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".koda-endpoint-status"));
-                const el = rows2[0]?.querySelector(".koda-endpoint-status");
+                const rows2 = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".okit-ep-status"));
+                const el = rows2[0]?.querySelector(".okit-ep-status");
                 if (!el) return null;
                 if (el.classList.contains("is-ok")) return "is-ok";
-                if (el.classList.contains("is-bad")) return "is-bad";
+                if (el.classList.contains("is-error")) return "is-error";
                 return null;
               `,
               12_000,
@@ -396,17 +396,17 @@ async function main(): Promise<void> {
             const geklickt2 = await clickReal(
               settings,
               `[...document.querySelectorAll(".setting-item")]
-                 .filter((r) => r.querySelector(".koda-endpoint-status"))[1]
+                 .filter((r) => r.querySelector(".okit-ep-status"))[1]
                  ?.querySelectorAll("button")[0]`,
             );
             if (!geklickt2) throw new Error("Testen-Knopf der zweiten Zeile nicht klickbar");
             tot = await pollUntil<string>(
               settings,
               `
-                const rows2 = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".koda-endpoint-status"));
-                const el = rows2[1]?.querySelector(".koda-endpoint-status");
+                const rows2 = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".okit-ep-status"));
+                const el = rows2[1]?.querySelector(".okit-ep-status");
                 if (!el) return null;
-                if (el.classList.contains("is-bad")) return "is-bad";
+                if (el.classList.contains("is-error")) return "is-error";
                 if (el.classList.contains("is-ok")) return "is-ok";
                 return null;
               `,
@@ -417,7 +417,7 @@ async function main(): Promise<void> {
           }
           record(
             "4. Toter Endpunkt wird als nicht erreichbar angezeigt",
-            tot === "is-bad",
+            tot === "is-error",
             `Status ${tot ?? "(keiner)"} bei ${DEAD_A}`,
           );
 

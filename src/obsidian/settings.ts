@@ -291,10 +291,17 @@ export class KodaSettingsTab extends PluginSettingTab {
         const ctx = await this.plugin.probeContext(cfg);
         if (ctx !== null && this.plugin.settings.contextWindowTokens === DEFAULT_SETTINGS.contextWindowTokens) {
           await this.setControlValue("contextWindowTokens", ctx);
-          // Die Notice ueberlebt den Redraw, den das geaenderte Zahlenfeld ausloest — das
-          // eben gesetzte Status-Icon tut das nicht.
+          // Die Notice ueberlebt einen Redraw, das eben gesetzte Status-Icon nicht — sie ist
+          // deshalb die einzige Meldung, auf die hier Verlass ist.
           new Notice(t("settings.probe.contextApplied", ctx));
-          this.refreshUi();
+          // BEWUSST kein `refreshUi()`. Bis 0.7.1 stand hier einer, weil der Eigenbau nur
+          // auf Klick prüfte und sonst nie neu zeichnete. Der Kit-Editor ruft `clientFor(cfg)`
+          // dagegen fuer JEDE Zeile schon beim Zeichnen (Modell-Liste vorladen) — ein Redraw
+          // aus dem Probe-Ergebnis heraus traefe damit den Aufbau, der ihn ausgeloest hat,
+          // und zwar ungefragt beim blossen Oeffnen der Einstellungen. Ein Flag „gerade im
+          // display()" hilft nicht: `probe()` ist asynchron und laeuft lange nach dem
+          // Aufbau. Der Wert ist gespeichert, die Notice meldet ihn, das Zahlenfeld zieht
+          // beim naechsten Aufbau nach.
         }
         return status;
       },
@@ -415,7 +422,14 @@ export class KodaSettingsTab extends PluginSettingTab {
         .onClick(() => {
           if (ep === undefined) return;
           const gen = ++this.modelGeneration;
-          b.setDisabled(true).setButtonText(t("settings.model.fetching"));
+          // `buttonEl.disabled` statt `setDisabled()`: die Component-Methode hat den Renderer
+          // in Obsidian 1.13.5 aus dem eigenen Settings-Fenster heraus in eine Endlosschleife
+          // geschickt (100 % CPU, beide Fenster tot, gemessen 2026-08-06 durch Ausschluss).
+          // Der Befund wurde damals nur am Testen-Knopf der Endpunkt-Zeile behoben — hier
+          // blieb der Aufruf stehen und war ab da der letzte seiner Art im Repo. Aufgefallen
+          // beim Kit-Umstieg am 2026-08-28, weil der andere Aufrufer damit verschwand.
+          b.buttonEl.disabled = true;
+          b.setButtonText(t("settings.model.fetching"));
           void this.plugin
             .probeModels(ep)
             .then(({ status, models }) => {
