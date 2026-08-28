@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Endpoint rows no longer run past the right edge of the settings window.** Below
+  roughly 1100 px of window width the row's controls overflowed their container — the
+  second row worse than the first, because only it carries the "move to top" button.
+  Koda's three input fields had a fixed width and did not shrink with the window. They
+  now behave like every other plugin's endpoint list. Measured before and after across
+  five window widths.
+
 ### Changed
 
 - **The endpoint list is now the shared component used by the other plugins.** Same
