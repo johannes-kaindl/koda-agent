@@ -422,12 +422,13 @@ export class KodaSettingsTab extends PluginSettingTab {
         .onClick(() => {
           if (ep === undefined) return;
           const gen = ++this.modelGeneration;
-          // `buttonEl.disabled` statt `setDisabled()`: die Component-Methode hat den Renderer
-          // in Obsidian 1.13.5 aus dem eigenen Settings-Fenster heraus in eine Endlosschleife
-          // geschickt (100 % CPU, beide Fenster tot, gemessen 2026-08-06 durch Ausschluss).
-          // Der Befund wurde damals nur am Testen-Knopf der Endpunkt-Zeile behoben — hier
-          // blieb der Aufruf stehen und war ab da der letzte seiner Art im Repo. Aufgefallen
-          // beim Kit-Umstieg am 2026-08-28, weil der andere Aufrufer damit verschwand.
+          // `buttonEl.disabled` statt `setDisabled()` — als EINE Form im Repo, nicht als Bugfix.
+          // Der Renderer-Freeze vom 2026-08-06 war echt, aber die daraus abgeleitete Regel
+          // („setDisabled() aus dem Settings-Fenster friert ein") ist am 2026-08-08 widerlegt
+          // worden: derselbe Aufruf lief hier und in vault-rag folgenlos. Gemessen ist nur ein
+          // engeres Muster — die Kombination mit `setIcon`/`setTooltip` auf einem Span
+          // derselben Zeile. Diese Stelle hatte die Kombination nie. Der Wechsel ist also
+          // Vereinheitlichung auf die konservativere Form, kein behobener Defekt.
           b.buttonEl.disabled = true;
           b.setButtonText(t("settings.model.fetching"));
           void this.plugin

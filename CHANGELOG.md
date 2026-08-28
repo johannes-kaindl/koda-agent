@@ -19,14 +19,6 @@ All notable changes to this project are documented here. The format follows
   means one request to that provider every time you open the settings — it asks for the
   model list (`/v1/models`) and sends no vault content, but it does happen unprompted.
 
-### Fixed
-
-- **The “Fetch models” button could freeze Obsidian.** It disabled itself through
-  `ButtonComponent.setDisabled()`, which drives the renderer into an endless loop when
-  called from the plugin's own settings window (Obsidian 1.13.5). The same bug was found
-  and fixed on the endpoint test button in August; this second caller was missed and only
-  surfaced when the endpoint row moved to the shared component.
-
 ## [0.7.1] — 2026-08-21
 
 ### Changed
