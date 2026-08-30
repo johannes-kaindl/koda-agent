@@ -100,3 +100,42 @@ describe("validateKodaSettings · Kontext & Verdichtung", () => {
     expect(validateKodaSettings({ maxRounds: 8 }).summarizeEnabled).toBe(true);
   });
 });
+
+describe("Modell-Steuerung: die drei neuen Felder", () => {
+  it("liefert leere Defaults — gespeichert wird die Abweichung, nie der Auslieferungsstand", () => {
+    expect(DEFAULT_SETTINGS.systemPromptOverride).toBe("");
+    expect(DEFAULT_SETTINGS.toolsDisabled).toEqual([]);
+    expect(DEFAULT_SETTINGS.toolDescriptions).toEqual({});
+  });
+  it("uebernimmt gueltige Werte", () => {
+    const s = validateKodaSettings({
+      systemPromptOverride: "Sei knapp.",
+      toolsDisabled: ["write_skill"],
+      toolDescriptions: { read_note: "Liest." },
+    });
+    expect(s.systemPromptOverride).toBe("Sei knapp.");
+    expect(s.toolsDisabled).toEqual(["write_skill"]);
+    expect(s.toolDescriptions).toEqual({ read_note: "Liest." });
+  });
+  it("behaelt einen unbekannten Werkzeugnamen — sonst loescht ein Speichern die "
+    + "related_notes-Anpassung, sobald vault-rag gerade aus ist (Spec E4)", () => {
+    const s = validateKodaSettings({
+      toolsDisabled: ["related_notes"],
+      toolDescriptions: { related_notes: "Meins." },
+    });
+    expect(s.toolsDisabled).toEqual(["related_notes"]);
+    expect(s.toolDescriptions).toEqual({ related_notes: "Meins." });
+  });
+  it("wirft kaputte Bauformen weg statt sie durchzureichen", () => {
+    expect(validateKodaSettings({ toolsDisabled: "write_note" }).toolsDisabled).toEqual([]);
+    expect(validateKodaSettings({ toolsDisabled: [1, "a", null] }).toolsDisabled).toEqual(["a"]);
+    expect(validateKodaSettings({ toolDescriptions: ["x"] }).toolDescriptions).toEqual({});
+    expect(validateKodaSettings({ toolDescriptions: { a: 5, b: "gut" } }).toolDescriptions).toEqual({ b: "gut" });
+    expect(validateKodaSettings({ systemPromptOverride: 42 }).systemPromptOverride).toBe("");
+  });
+  it("teilt keinen Container mit den Defaults", () => {
+    const s = validateKodaSettings({});
+    s.toolsDisabled.push("x");
+    expect(DEFAULT_SETTINGS.toolsDisabled).toEqual([]);
+  });
+});

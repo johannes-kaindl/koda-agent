@@ -3,6 +3,8 @@ import {
   clampIntField,
   oneOf,
   arrayThen,
+  isPlainObject,
+  type FieldCheck,
   type SettingsSchema,
 } from "../vendor/kit/settings_schema";
 import { migrateEndpointList, type EndpointConfig } from "../vendor/kit/endpoint_config";
@@ -80,6 +82,15 @@ export interface KodaSettings {
   keepToolResults: number;
   summarizeEnabled: boolean;
   summaryPercent: number;
+  /** Ersetzt den ausgelieferten Regelblock. "" heisst Auslieferungsstand — der Default wird
+   *  NIE in die data.json kopiert, sonst friere er beim ersten Oeffnen des Feldes ein und
+   *  jede spaetere Verbesserung erreichte genau die Nutzer nicht mehr, die hineingesehen
+   *  haben (Spec E2). */
+  systemPromptOverride: string;
+  /** Werkzeuge, die dem Modell nicht angeboten werden. */
+  toolsDisabled: string[];
+  /** Eigene Beschreibung je Werkzeug; fehlend oder leer heisst Auslieferungsstand. */
+  toolDescriptions: Record<string, string>;
 }
 
 export const DEFAULT_SETTINGS: KodaSettings = {
@@ -99,6 +110,24 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   keepToolResults: 3,
   summarizeEnabled: true,
   summaryPercent: 10,
+  systemPromptOverride: "",
+  toolsDisabled: [],
+  toolDescriptions: {},
+};
+
+/** Liste von Strings — Nicht-Strings fliegen raus, die Schluesselmenge bleibt offen.
+ *  Die geschlossene Welt von `validateSettings` gilt auf FELD-Ebene und endet hier
+ *  bewusst: `related_notes` existiert nur, solange vault-rag laeuft, und ein Filter gegen
+ *  die bekannte Werkzeugmenge loeschte die Anpassung genau dann, wenn es aus ist (Spec E4). */
+const stringArray: FieldCheck<string[]> = (raw, fallback) =>
+  Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : fallback;
+
+/** Record von Strings — dieselbe bewusste Ausnahme wie `stringArray`. */
+const stringRecord: FieldCheck<Record<string, string>> = (raw, fallback) => {
+  if (!isPlainObject(raw)) return fallback;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) if (typeof v === "string") out[k] = v;
+  return out;
 };
 
 /** Feldpruefer fuer die Felder, bei denen die generische Bauform-Pruefung des Kits nicht
@@ -122,6 +151,8 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
   compactAtPercent: clampIntField(COMPACT_AT_MIN, COMPACT_AT_MAX),
   keepToolResults: clampIntField(KEEP_TOOLS_MIN, KEEP_TOOLS_MAX),
   summaryPercent: clampIntField(SUMMARY_PCT_MIN, SUMMARY_PCT_MAX),
+  toolsDisabled: stringArray,
+  toolDescriptions: stringRecord,
 };
 
 /** Gueltiger Settings-Stand aus einer ungepruften `data.json`. Geschlossene Welt: das
