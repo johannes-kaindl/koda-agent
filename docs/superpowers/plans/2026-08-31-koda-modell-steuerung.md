@@ -128,7 +128,7 @@ export function renderRules(template: string, opts: { lang: "de" | "en"; folder:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/prompt_rules.test.ts`
-Expected: PASS (10 Tests)
+Expected: PASS (7 Tests)
 
 - [ ] **Step 5: Commit**
 
@@ -223,7 +223,7 @@ export function checkRules(text: string, activeReadingTools: string[]): RuleWarn
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/prompt_rules.test.ts`
-Expected: PASS (17 Tests)
+Expected: PASS (14 Tests — 7 aus Task 1, 7 neue)
 
 - [ ] **Step 5: Commit**
 
