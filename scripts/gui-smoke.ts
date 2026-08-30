@@ -140,6 +140,31 @@ async function startFakeEndpoint(): Promise<{ url: string; close: () => void }> 
   return { url: `http://127.0.0.1:${port}`, close: () => server.close() };
 }
 
+/**
+ * Wie `pollUntil`, nur auf ZWEI Fenstern zugleich — fuer Punkt 18: die Settings-Bruecke hat
+ * kein `window.app` (s. Kopfkommentar von `attachTo`), also ist von hier aus nicht sicher
+ * entschieden, ob das Vorschau-Modal im Haupt- oder im Einstellungsfenster entsteht. Statt
+ * das zu raten, wird auf beiden gepollt; welches zuerst liefert, gewinnt — `from` haelt fest,
+ * welches das war, fuer den Detailtext und zum gezielten Schliessen danach.
+ */
+async function pollEither<T>(
+  a: Cdp,
+  b: Cdp,
+  expression: string,
+  timeoutMs = 8000,
+  stepMs = 500,
+): Promise<{ value: T; from: "a" | "b" } | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const va = await a.evaluate<T | null>(expression);
+    if (va) return { value: va, from: "a" };
+    const vb = await b.evaluate<T | null>(expression);
+    if (vb) return { value: vb, from: "b" };
+    await new Promise((resolve) => setTimeout(resolve, stepMs));
+  }
+  return null;
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const flag = (name: string): string | undefined => {
@@ -794,6 +819,195 @@ async function main(): Promise<void> {
         dritte.vorKlick === dritte.nachKlick,
       `normal: „${dritte.normalAn.label}" / „${dritte.normalAus.label}" · gesperrt: „${dritte.gesperrt.label}" · Klick folgenlos: ${String(dritte.vorKlick === dritte.nachKlick)}`,
     );
+
+    // --- 16. Reset stellt den Auslieferungsstand her -------------------------
+    // Anweisung setzen (dieselbe Kette wie Punkt 3/4: Wert setzen, dann erst das Fenster
+    // oeffnen), den rotate-ccw-Knopf mit clickReal druecken, danach pruefen: Override UND
+    // Textarea leer, Platzhalter (die ausgelieferte Fassung) weiterhin da. Vorwert gesichert
+    // und zurueckgeschrieben wie beim Thinking-Schalter (Punkt 13) — ein Abbruch darf keinen
+    // fremden Prompt stehen lassen.
+    const vorherPrompt = await cdp.evaluate<string>(`
+      return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.systemPromptOverride;
+    `);
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.systemPromptOverride = "SMOKE-EIGENE-ANWEISUNG";
+        await p.saveSettings();
+        app.setting.open();
+        app.setting.openTabById(${JSON.stringify(PLUGIN_ID)});
+        return true;
+      `);
+      // Das Fenster entsteht erst durch `open()` — vorher gibt es kein Target (wie Punkt 3).
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      let settings16: Cdp | null = null;
+      try {
+        settings16 = await attachTo("settings", port, vault);
+        if (!settings16) {
+          record("16. Zuruecksetzen stellt den Auslieferungsstand her", false, "Einstellungsfenster nicht gefunden");
+        } else {
+          await settings16.send("Page.bringToFront");
+          const vorKlick = await pollUntil<{ value: string }>(
+            settings16,
+            `
+              const ta = document.querySelector("textarea.koda-prompt-textarea");
+              return ta ? { value: ta.value } : null;
+            `,
+            8000,
+          );
+          if (vorKlick === null) {
+            record("16. Zuruecksetzen stellt den Auslieferungsstand her", false, "Anweisungs-Textarea nicht gefunden");
+          } else {
+            const geklickt = await clickReal(
+              settings16,
+              `(() => {
+                 const item = document.querySelector("textarea.koda-prompt-textarea")?.closest(".setting-item");
+                 const kandidaten = item ? [...item.querySelectorAll("[aria-label]")] : [];
+                 return kandidaten.find((el) => /Ausgelieferte Fassung wiederherstellen|Restore the shipped version/.test(el.getAttribute("aria-label") ?? "")) ?? null;
+               })()`,
+            );
+            const leer = geklickt
+              ? await pollUntil<boolean>(
+                  cdp,
+                  `return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.systemPromptOverride === "";`,
+                  4000,
+                )
+              : null;
+            const nachher = await pollUntil<{ value: string; placeholder: string }>(
+              settings16,
+              `
+                const ta = document.querySelector("textarea.koda-prompt-textarea");
+                return ta ? { value: ta.value, placeholder: ta.placeholder } : null;
+              `,
+              4000,
+            );
+            record(
+              "16. Zuruecksetzen stellt den Auslieferungsstand her",
+              geklickt === true && leer === true && nachher !== null && nachher.value === "" && nachher.placeholder !== "",
+              `vorher: „${vorKlick.value}" · geklickt: ${String(geklickt)} · Override leer: ${String(leer)} · danach: ${JSON.stringify(nachher)}`,
+            );
+          }
+        }
+      } finally {
+        settings16?.close();
+      }
+    } finally {
+      // Vorwert zurueck — auch wenn der Punkt oben abgebrochen ist. Sonst bleibt dem Nutzer
+      // eine fremde SMOKE-Anweisung oder ein zu frueh geleerter eigener Prompt stehen.
+      await cdp
+        .evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.settings.systemPromptOverride = ${JSON.stringify(vorherPrompt)};
+          await p.saveSettings();
+          app.setting.close();
+          return true;
+        `)
+        .catch(() => undefined);
+    }
+
+    // --- 17. Ein abgeschaltetes Werkzeug wird nicht gesendet -----------------
+    // Gemessen wird `plugin.currentToolNames()` — DIESELBE Methode, die `ask()` ruft, um die
+    // Liste zu bauen; es gibt keinen zweiten Weg. Der Punkt misst damit die GESENDETE Liste,
+    // nicht den Schalter, und braucht dafuer kein Modell. Die dritte Bedingung
+    // (`wieder.includes`) ist kein Beiwerk: sie belegt, dass der Punkt seinen Gegenstand
+    // wirklich bewegt hat — ohne sie waere eine Liste, die `write_note` nie enthielt, ebenso
+    // gruen. Vorwert gesichert und zurueckgeschrieben wie bei Punkt 16/13.
+    const vorherDisabled = await cdp.evaluate<string[]>(`
+      return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.toolsDisabled;
+    `);
+    try {
+      const mitAus = await cdp.evaluate<string[]>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.toolsDisabled = ["write_note"];
+        await p.saveSettings();
+        return p.currentToolNames();
+      `);
+      const wieder = await cdp.evaluate<string[]>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.toolsDisabled = ${JSON.stringify(vorherDisabled ?? [])};
+        await p.saveSettings();
+        return p.currentToolNames();
+      `);
+      record(
+        "17. Abgeschaltetes Werkzeug wird nicht gesendet",
+        !mitAus.includes("write_note") && mitAus.includes("read_note") && wieder.includes("write_note"),
+        `aus: ${mitAus.join(", ")} · wieder: ${wieder.join(", ")}`,
+      );
+    } finally {
+      await cdp
+        .evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.settings.toolsDisabled = ${JSON.stringify(vorherDisabled ?? [])};
+          return p.saveSettings();
+        `)
+        .catch(() => undefined);
+    }
+
+    // --- 18. „Aktive Anweisung ansehen" zeigt Memory und Skills ---------------
+    // `previewSystemPrompt()` ruft DIESELBE `buildSystemPrompt` wie `ask()` — kein Nachbau
+    // (Spec E6, s. Kopfkommentar von prompt-modal.ts). Geprueft wird deshalb nicht die
+    // Zusammensetzung selbst (das ist Sache der Unit-Tests fuer build.ts), sondern die
+    // Modal-Naht: kommt der fertige Text im `<pre class="koda-prompt-preview">` an, und
+    // traegt er beide Abschnitte, die der Staging-Vault ueber sein Fixture immer hat?
+    await cdp.evaluate(`
+      app.setting.open();
+      app.setting.openTabById(${JSON.stringify(PLUGIN_ID)});
+      return true;
+    `);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    let settings18: Cdp | null = null;
+    try {
+      settings18 = await attachTo("settings", port, vault);
+      if (!settings18) {
+        record("18. „Aktive Anweisung ansehen“ zeigt Memory und Skills", false, "Einstellungsfenster nicht gefunden");
+      } else {
+        await settings18.send("Page.bringToFront");
+        const knopfDa = await pollUntil<boolean>(
+          settings18,
+          `
+            const btn = [...document.querySelectorAll("button")].find((b) => /Aktive Anweisung ansehen|Show active instructions/.test(b.textContent ?? ""));
+            return !!btn;
+          `,
+          8000,
+        );
+        if (!knopfDa) {
+          record("18. „Aktive Anweisung ansehen“ zeigt Memory und Skills", false, "Knopf nicht gefunden");
+        } else {
+          const geklickt = await clickReal(
+            settings18,
+            `[...document.querySelectorAll("button")].find((b) => /Aktive Anweisung ansehen|Show active instructions/.test(b.textContent ?? "")) ?? null`,
+          );
+          const gefunden = geklickt
+            ? await pollEither<string>(
+                cdp,
+                settings18,
+                `
+                  const pre = document.querySelector(".koda-prompt-preview");
+                  return pre && pre.textContent.trim() !== "" ? pre.textContent : null;
+                `,
+                8000,
+              )
+            : null;
+          const text = gefunden?.value ?? "";
+          record(
+            "18. „Aktive Anweisung ansehen“ zeigt Memory und Skills",
+            geklickt === true && text.includes("## Memory") && text.includes("## Skills"),
+            gefunden
+              ? `Modal im ${gefunden.from === "a" ? "Hauptfenster" : "Einstellungsfenster"} · ${text.length} Zeichen · Memory: ${String(text.includes("## Memory"))} · Skills: ${String(text.includes("## Skills"))}`
+              : "kein .koda-prompt-preview mit Text in einem der beiden Fenster",
+          );
+          // In welchem Fenster auch immer es entstand — auf beiden schliessen ist billiger
+          // als vorher zu klaeren, in welchem es sicher steht.
+          await cdp.evaluate(`document.querySelector(".modal-container .modal-close-button")?.click(); return true;`).catch(() => undefined);
+          await settings18.evaluate(`document.querySelector(".modal-container .modal-close-button")?.click(); return true;`).catch(() => undefined);
+        }
+      }
+    } finally {
+      settings18?.close();
+      await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+    }
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
