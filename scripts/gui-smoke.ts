@@ -265,7 +265,7 @@ async function main(): Promise<void> {
       await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:open`)});
       return true;
     `);
-    const view = await pollUntil<{ leaves: number; input: boolean; buttons: string[]; cta: boolean; actions: string[]; status: boolean }>(
+    const view = await pollUntil<{ leaves: number; input: boolean; buttons: string[]; cta: boolean; actions: string[]; hasThink: boolean; hasNewChat: boolean; status: boolean }>(
       cdp,
       `
         const leaves = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)});
@@ -273,13 +273,24 @@ async function main(): Promise<void> {
         if (!el) return null;
         const buttons = [...el.querySelectorAll(".koda-buttons button")].map((b) => b.textContent.trim());
         if (buttons.length === 0) return null;
+        // Obsidian haengt eigene Aktionen in denselben Kopf (Lesezeichen, "Weitere Optionen"),
+        // und zwar VOR die des Plugins. Gezaehlt wird deshalb nicht, sondern gesucht: sind
+        // Kodas beide da? Der Thinking-Knopf wird ueber die Referenz der View identifiziert,
+        // nicht ueber die Position — genau daran ist Pruefpunkt 11 im Lauf vom 2026-08-30
+        // falsch-gruen vorbeigemessen (er nahm Obsidians "Lesezeichen").
+        const view0 = leaves[0].view;
         const actions = [...el.querySelectorAll(".view-action")].map((a) => a.getAttribute("aria-label") ?? "");
+        const think = view0.thinkActionEl;
+        const hasThink = !!think && el.contains(think);
+        const hasNewChat = actions.some((a) => /Neues Gespräch|New chat/.test(a));
         return {
           leaves: leaves.length,
           input: !!el.querySelector("textarea.koda-input"),
           buttons,
           cta: !!el.querySelector(".koda-buttons button.mod-cta"),
           actions,
+          hasThink,
+          hasNewChat,
           status: !!el.querySelector(".koda-status"),
         };
       `,
@@ -287,9 +298,9 @@ async function main(): Promise<void> {
     );
     record(
       "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen und zwei Kopf-Aktionen",
-      view !== null && view.input && view.buttons.length === 2 && view.cta && view.actions.length === 2 && view.status,
+      view !== null && view.input && view.buttons.length === 2 && view.cta && view.hasThink && view.hasNewChat && view.status,
       view
-        ? `${view.leaves} Leaf · Knoepfe: ${view.buttons.join(", ")} · Kopf: ${view.actions.join(" | ")} · Statuszeile: ${view.status}`
+        ? `${view.leaves} Leaf · Knoepfe: ${view.buttons.join(", ")} · Kopf: ${view.actions.join(" | ")} · Thinking-Aktion: ${view.hasThink} · Statuszeile: ${view.status}`
         : "keine View entstanden",
     );
 
@@ -506,18 +517,34 @@ async function main(): Promise<void> {
     // (welche Datei ist danach aktiv), nicht die Ursache. Drei getrennte Schritte:
     // Szene herstellen (Mutation), auf den gerenderten Link pollen (Wartephase),
     // klicken (Mutation) und auf die Navigation pollen (Wartephase).
-    const szene = await cdp.evaluate<{ ziel: string | null; vorher: string | null }>(`
+    const szene = await cdp.evaluate<{ ziel: string | null; vorher: string | null; verworfen?: string[] }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       // Bewusst NICHT die gerade aktive Notiz: waere sie das Ziel, blieben vorher und
       // nachher gleich und der Punkt waere rot, obwohl der Klick funktioniert hat
       // (im Lauf vom 2026-08-07 genau so passiert).
       const aktiv = app.workspace.getActiveFile()?.path ?? null;
-      const ziel = app.vault.getMarkdownFiles().find((f) => f.path !== aktiv);
-      if (!ziel) return { ziel: null, vorher: aktiv };
       const view = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0].view;
-      p.chatLog = [{ role: "assistant", content: "Siehe [[" + ziel.path.replace(/\\.md$/, "") + "]]." }];
-      view.renderLog();
-      return { ziel: ziel.path, vorher: aktiv };
+      // ⚠️ Das Ziel wird PROBIERT, nicht gewaehlt. Gemessen 2026-08-30: der Punkt fiel auf
+      // TaskNotes/Tasks/test.md, und das TaskNotes-Plugin ersetzt den Wikilink beim Rendern
+      // durch ein eigenes Inline-Widget (span.tasknotes-inline-widget) — kein a.internal-link,
+      // Punkt rot, obwohl an Koda nichts kaputt war. Vorher war er gruen, weil die Auswahl
+      // ("erste Datei != die aktive") vom Zustand des VORIGEN Laufs abhing: Lauf 1 machte
+      // _Cockpit.md aktiv, also traf Lauf 2 die naechste Datei.
+      // Lehre, die ueber diesen Fall hinausgeht: wer seine Testdaten aus dem Nutzer-Vault
+      // nimmt, misst irgendwann ein fremdes Plugin. Deshalb bis zu fuenf Kandidaten
+      // durchprobieren und den ersten nehmen, bei dem Kodas eigener Link wirklich entsteht.
+      const kandidaten = app.vault.getMarkdownFiles().filter((f) => f.path !== aktiv).slice(0, 5);
+      let ziel = null;
+      const verworfen = [];
+      for (const k of kandidaten) {
+        p.chatLog = [{ role: "assistant", content: "Siehe [[" + k.path.replace(/\\.md$/, "") + "]]." }];
+        view.renderLog();
+        await new Promise((r) => setTimeout(r, 400));
+        if (document.querySelector(".koda-log a.internal-link")) { ziel = k.path; break; }
+        verworfen.push(k.path);
+      }
+      if (!ziel) return { ziel: null, vorher: aktiv, verworfen };
+      return { ziel, vorher: aktiv, verworfen };
     `);
     const gerendert =
       szene.ziel !== null
@@ -543,9 +570,9 @@ async function main(): Promise<void> {
       "6. Wikilink in der Antwort ist klickbar und oeffnet die Notiz",
       szene.ziel !== null && gerendert === true && nachher !== null,
       szene.ziel === null
-        ? "keine Markdown-Datei im Vault"
+        ? `kein Kandidat rendert einen eigenen Wikilink — verworfen: ${(szene.verworfen ?? []).join(", ") || "(keiner)"}`
         : gerendert
-          ? `aktiv vorher ${szene.vorher ?? "(keine)"} → nachher ${nachher ?? "(keine — Navigation blieb aus)"}`
+          ? `${szene.ziel} · aktiv vorher ${szene.vorher ?? "(keine)"} → nachher ${nachher ?? "(keine — Navigation blieb aus)"}${(szene.verworfen ?? []).length > 0 ? ` · uebersprungen (Fremd-Widget): ${(szene.verworfen ?? []).join(", ")}` : ""}`
           : "kein a.internal-link im Log gerendert",
     );
 
@@ -646,16 +673,18 @@ async function main(): Promise<void> {
       const start = p.settings.suppressThinking;
       await v.toggleThinking();
       const after = p.settings.suppressThinking;
-      const label = v.containerEl.querySelector(".view-action")?.getAttribute("aria-label") ?? "";
+      // NICHT querySelector(".view-action") — das ist Obsidians erste Aktion (Lesezeichen).
+      // Genau so war dieser Punkt am 2026-08-30 gruen, ohne den Schalter je anzusehen.
+      const label = v.thinkActionEl?.getAttribute("aria-label") ?? "";
       v.syncThinkAction();
-      const survives = v.containerEl.querySelector(".view-action")?.getAttribute("aria-label") === label;
+      const survives = v.thinkActionEl?.getAttribute("aria-label") === label;
       p.settings.suppressThinking = start;
       await p.saveSettings();
       return { start, after, label, survives };
     `);
     record(
       "11. Thinking-Schalter im Kopf schaltet und ueberlebt den Neuaufbau",
-      think.start !== think.after && think.label !== "" && think.survives,
+      think.start !== think.after && /Thinking/.test(think.label) && think.survives,
       `${String(think.start)} → ${String(think.after)} · Beschriftung „${think.label}"`,
     );
 
