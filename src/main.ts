@@ -12,7 +12,7 @@ import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
-import type { ChatMessage, LogEntry } from "./core/agent/types";
+import { isCompactionRecord, type ChatMessage, type LogEntry } from "./core/agent/types";
 import { toolDefs, toWireTools } from "./core/tools/defs";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/memory/memory";
@@ -23,6 +23,8 @@ import { DEFAULT_SETTINGS, validateKodaSettings, type KodaSettings } from "./cor
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { readRetrievalApi } from "./obsidian/retrieval";
 import { confirmWrite } from "./obsidian/confirm-write";
+import { estimateTokens } from "./core/agent/compaction/estimate";
+import { contextUsage, type ContextUsage } from "./core/chat/context-usage";
 import { KodaView, VIEW_TYPE_KODA } from "./obsidian/view";
 import { KodaSettingsTab } from "./obsidian/settings";
 
@@ -120,6 +122,9 @@ export default class KodaPlugin extends Plugin {
     this.applyLanguage();
     // Eine geaenderte Liste macht den gemerkten Endpunkt zu einer Aussage ueber die alte.
     this.resolver.invalidate();
+    // Der Settings-Tab schaltet denselben suppressThinking-Wert wie die Kopf-Aktion —
+    // ein Zustand, zwei Zugaenge, also muss der zweite mitziehen.
+    for (const v of this.views()) v.syncThinkAction();
   }
 
   async activateView(): Promise<void> {
@@ -128,6 +133,19 @@ export default class KodaPlugin extends Plugin {
     if (leaf === null) return;
     await leaf.setViewState({ type: VIEW_TYPE_KODA, active: true });
     await this.app.workspace.revealLeaf(leaf);
+  }
+
+  /** Belegung des Kontextfensters fuer die Statuszeile. Dieselben Zutaten wie die
+   *  Verdichtungs-Entscheidung in ask(): dieselbe Schaetzung, derselbe Tool-Overhead,
+   *  dieselbe Schwelle. Eine Anzeige, die davon abweicht, waere schlimmer als keine. */
+  contextUsage(): ContextUsage | null {
+    const s = this.settings;
+    const defs = toolDefs({ related: readRetrievalApi(this.app)?.status().indexed === true });
+    const used = estimateTokens(
+      this.chatLog.filter((m): m is ChatMessage => !isCompactionRecord(m)),
+      JSON.stringify(toWireTools(defs)).length,
+    );
+    return contextUsage(used, s.contextWindowTokens, s.compactAtPercent);
   }
 
   private views(): KodaView[] {
@@ -155,6 +173,7 @@ export default class KodaPlugin extends Plugin {
     this.busy = true;
     this.lastNotice = null;
     this.abort = new AbortController();
+    for (const v of this.views()) v.activity({ kind: "ask" });
 
     const userMsg: ChatMessage = { role: "user", content: question };
     this.chatLog.push(userMsg);
@@ -288,10 +307,14 @@ export default class KodaPlugin extends Plugin {
       const appended = await runAgent(
         { llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback, compaction },
         [system, ...this.chatLog],
-        (tok) => { for (const v of this.views()) v.streamToken(tok); },
-        (r) => { for (const v of this.views()) v.streamReasoning(r); },
+        (tok) => { for (const v of this.views()) { v.activity({ kind: "token" }); v.streamToken(tok); } },
+        (r) => { for (const v of this.views()) { v.activity({ kind: "reasoning" }); v.streamReasoning(r); } },
         (e) => {
-          if (e.kind === "tool-start") for (const v of this.views()) v.toolStep(`⚙ ${e.call.name}`, e.call.arguments);
+          if (e.kind === "tool-start") for (const v of this.views()) {
+            v.activity({ kind: "tool-start", name: e.call.name, args: e.call.arguments });
+            v.toolStep(`⚙ ${e.call.name}`, e.call.arguments);
+          }
+          if (e.kind === "tool-end") for (const v of this.views()) v.activity({ kind: "tool-end" });
           if (e.kind === "tool-end") for (const v of this.views()) v.toolStep(
             `${e.outcome.ok ? "✓" : "✗"} ${e.call.name}`,
             e.outcome.ok ? e.outcome.content.slice(0, 400) : e.outcome.error,
@@ -305,7 +328,7 @@ export default class KodaPlugin extends Plugin {
           }
           if (e.kind === "round-limit") this.lastNotice = { text: t("view.roundLimit", s.maxRounds), kind: "error" };
           if (e.kind === "compaction") for (const v of this.views()) v.compactionMark(e.record);
-          if (e.kind === "summarizing") for (const v of this.views()) v.summarizingHint();
+          if (e.kind === "summarizing") for (const v of this.views()) v.activity({ kind: "summarizing" });
         },
         this.abort.signal,
       );
@@ -318,7 +341,7 @@ export default class KodaPlugin extends Plugin {
     } finally {
       this.busy = false;
       this.abort = null;
-      for (const v of this.views()) v.renderLog();
+      for (const v of this.views()) { v.activity({ kind: "done" }); v.renderLog(); }
     }
   }
 

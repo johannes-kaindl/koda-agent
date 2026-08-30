@@ -1,6 +1,10 @@
-import { Component, ItemView, MarkdownRenderer, type WorkspaceLeaf } from "obsidian";
+import { Component, ItemView, MarkdownRenderer, setIcon, type WorkspaceLeaf } from "obsidian";
 import { t } from "../vendor/kit/i18n";
+import { confirmAction } from "../vendor/kit-obsidian/confirm";
 import { isCompactionRecord, type CompactionRecord } from "../core/agent/types";
+import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
+import { splitStable } from "../core/chat/stream-blocks";
+import { thinkToggleView } from "../core/chat/reasoning-toggle";
 import type KodaPlugin from "../main";
 
 export const VIEW_TYPE_KODA = "koda-agent-view";
@@ -11,14 +15,28 @@ export class KodaView extends ItemView {
   private logEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
   private streamEl: HTMLElement | null = null;
-  /** Das transiente Lebenszeichen der Stufe 2 — wird beim naechsten sichtbaren Fortschritt
-   *  (Marke, Werkzeugschritt, Token) entfernt, nicht erst beim Voll-Redraw am Ende. */
-  private summarizingEl: HTMLElement | null = null;
   private reasonEl: HTMLElement | null = null;
   /** Lebensdauer-Anker fuer alles, was MarkdownRenderer im Log anlegt (Embeds, Hover-
    *  Handler). Wird bei jedem Voll-Redraw ausgetauscht, sonst wachsen die Kind-Komponenten
    *  mit jeder Antwort weiter an. */
   private mdComp: Component | null = null;
+
+  // — Statuszeile (§8-Baustein „Status-Indikator": Form UND Farbe UND Klasse UND aria-label) —
+  private statusEl!: HTMLElement;
+  private statusIconEl!: HTMLElement;
+  private statusLabelEl!: HTMLElement;
+  private act: Activity = IDLE;
+
+  // — Streaming mit Markdown: was fertig ist, ist gerendert; der Rest bleibt Rohtext —
+  /** Roher Text der laufenden Antwort. Quelle fuer splitStable, nicht fuers Anzeigen. */
+  private streamRaw = "";
+  /** Wie viele Zeichen davon bereits als Markdown-Bloecke stehen. */
+  private streamStableLen = 0;
+  /** Der laufende Absatz. Immer das letzte Kind von streamEl. */
+  private streamTailEl: HTMLElement | null = null;
+
+  /** Kopf-Aktion des Thinking-Schalters — Zustand kommt aus thinkToggleView. */
+  private thinkActionEl: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: KodaPlugin) {
     super(leaf);
@@ -36,16 +54,30 @@ export class KodaView extends ItemView {
     // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
     // registriert, damit jeder spaetere Redraw automatisch mitgedeckt ist.
     this.logEl.addEventListener("click", (e) => this.onLogClick(e));
+
+    // Statuszeile zwischen Verlauf und Eingabe: waehrend eines Laufs die Taetigkeit, im
+    // Ruhezustand die Belegung des Kontextfensters. Ein Ort fuer „was ist gerade los".
+    this.statusEl = root.createDiv({ cls: "koda-status" });
+    this.statusIconEl = this.statusEl.createSpan({ cls: "koda-status-icon" });
+    this.statusLabelEl = this.statusEl.createSpan({ cls: "koda-status-label" });
+
     const bar = root.createDiv({ cls: "koda-input-bar" });
     this.inputEl = bar.createEl("textarea", { cls: "koda-input", attr: { placeholder: t("view.placeholder"), rows: "2" } });
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
     });
+    // Nur noch Senden und Stopp. „Neues Gespraech" sass hier daneben und wurde regelmaessig
+    // versehentlich getroffen — es steht jetzt im Kopf, hinter einer Bestaetigung.
     const buttons = bar.createDiv({ cls: "koda-buttons" });
-    buttons.createEl("button", { text: t("view.send") }).addEventListener("click", () => this.send());
+    buttons.createEl("button", { text: t("view.send"), cls: "mod-cta" }).addEventListener("click", () => this.send());
     buttons.createEl("button", { text: t("view.stop") }).addEventListener("click", () => this.plugin.stopRun());
-    buttons.createEl("button", { text: t("view.newChat") }).addEventListener("click", () => void this.plugin.newChat());
+
+    this.thinkActionEl = this.addAction("brain", t("view.thinkingOn"), () => void this.toggleThinking());
+    this.addAction("plus", t("view.newChat"), () => void this.askNewChat());
+    this.syncThinkAction();
+
     this.renderLog();
+    this.paintStatus();
     return Promise.resolve();
   }
 
@@ -58,6 +90,83 @@ export class KodaView extends ItemView {
     if (href === "") return;
     e.preventDefault();
     void this.app.workspace.openLinkText(href, "", e.ctrlKey || e.metaKey);
+  }
+
+  // — Kopf-Aktionen —
+
+  /** Verwerfen ist endgueltig: der Verlauf wandert nach archive.jsonl, aber ohne Trenner —
+   *  zurueckholen kann ihn heute niemand. Deshalb die Rueckfrage (Kit-confirmAction, §8). */
+  private async askNewChat(): Promise<void> {
+    if (this.plugin.busy) return;
+    const ok = await confirmAction(this.app, {
+      title: t("view.newChat.confirm"),
+      message: t("view.newChat.confirm.body"),
+      confirmLabel: t("view.newChat.confirm.ok"),
+      cancelLabel: t("confirm.cancel"),
+    });
+    if (ok) await this.plugin.newChat();
+  }
+
+  private async toggleThinking(): Promise<void> {
+    // Bei einem Modell, das sich nicht abschalten laesst, tut der Schalter nichts — die
+    // Sperre steht im Zustand, und der Handler prueft sie erneut: ein veralteter Klick auf
+    // einen gerade gesperrten Knopf darf nicht durchschlagen (Muster canActivatePack).
+    const s = this.plugin.settings;
+    if (thinkToggleView(s.model, s.suppressThinking).disabled) return;
+    s.suppressThinking = !s.suppressThinking;
+    await this.plugin.saveSettings();
+  }
+
+  /** Beschriftung, Klasse und Sperre des Thinking-Schalters aus dem puren Zustand ziehen.
+   *  Wird auch von saveSettings gerufen: der Settings-Tab schaltet denselben Wert. */
+  syncThinkAction(): void {
+    const el = this.thinkActionEl;
+    if (el === null) return;
+    const s = this.plugin.settings;
+    const v = thinkToggleView(s.model, s.suppressThinking);
+    const label = v.hintKey === null ? t(v.labelKey) : `${t(v.labelKey)} — ${t(v.hintKey)}`;
+    el.setAttribute("aria-label", label);
+    el.setAttribute("aria-disabled", String(v.disabled));
+    el.removeClass("is-off");
+    el.removeClass("is-disabled");
+    if (v.cls !== "") el.addClass(v.cls);
+  }
+
+  // — Statuszeile —
+
+  /** Einziger Weg, den Taetigkeits-Zustand zu aendern. */
+  activity(e: ActivityEvent): void {
+    this.act = nextActivity(this.act, e);
+    this.paintStatus();
+  }
+
+  private paintStatus(): void {
+    const el = this.statusEl;
+    el.removeClass("is-checking");
+    el.removeClass("is-ok");
+    el.removeClass("is-warning");
+    if (this.act.busy) {
+      el.addClass("is-checking");
+      setIcon(this.statusIconEl, "loader");
+      const text = this.act.labelArg === "" ? t(this.act.labelKey) : t(this.act.labelKey, this.act.labelArg);
+      this.statusLabelEl.setText(text);
+      el.setAttribute("aria-label", text);
+      el.hidden = false;
+      return;
+    }
+    const usage = this.plugin.contextUsage();
+    if (usage === null) {
+      // Ohne bekanntes Fenster gibt es nichts, wovon Prozent zu nehmen waeren — dann lieber
+      // nichts zeigen als eine Zahl erfinden.
+      el.hidden = true;
+      return;
+    }
+    el.addClass(usage.warn ? "is-warning" : "is-ok");
+    setIcon(this.statusIconEl, usage.warn ? "alert-triangle" : "gauge");
+    const text = t("activity.context", String(usage.percent));
+    this.statusLabelEl.setText(text);
+    el.setAttribute("aria-label", text);
+    el.hidden = false;
   }
 
   /** Assistenten-Text als Markdown rendern — dadurch sind `[[Wikilinks]]` klickbar und
@@ -96,35 +205,16 @@ export class KodaView extends ItemView {
 
   /** Live waehrend eines Laufs (onEvent) — bei einem 90-Sekunden-Loop soll man sehen, dass er lebt. */
   compactionMark(rec: CompactionRecord): void {
-    this.streamEl = null;
-    this.clearSummarizingHint();
+    this.endStream();
     this.renderCompaction(this.logEl, rec);
     this.logEl.scrollTo({ top: this.logEl.scrollHeight });
-  }
-
-  /** Lebenszeichen VOR dem Stufe-2-Modellaufruf — der kann lokal Minuten dauern. Transient:
-   *  landet nicht in chatLog, der naechste renderLog() (finally in ask()) laesst sie weg. */
-  summarizingHint(): void {
-    this.streamEl = null;
-    this.clearSummarizingHint();
-    this.summarizingEl = this.logEl.createDiv({ cls: "koda-msg koda-notice koda-compaction", text: t("view.compaction.summarizing") });
-    this.logEl.scrollTo({ top: this.logEl.scrollHeight });
-  }
-
-  /** Gemessen 2026-08-19 (Praxistest): ohne das stand „Fasse frühere Runden zusammen…" rund
-   *  100 s laenger im Chat als der Aufruf dauerte — bis zum Voll-Redraw am Ende von ask().
-   *  Ein Lebenszeichen, das die Taetigkeit ueberlebt, ist eine falsche Aussage. */
-  private clearSummarizingHint(): void {
-    this.summarizingEl?.remove();
-    this.summarizingEl = null;
   }
 
   /** Voll-Redraw aus plugin.chatLog (Sessionstart, final, Fehler). */
   renderLog(): void {
     this.logEl.empty();
-    this.streamEl = null;
+    this.endStream();
     this.reasonEl = null;
-    this.summarizingEl = null; // empty() hat ihn schon entfernt — nur den Zeiger loslassen
     if (this.mdComp !== null) this.removeChild(this.mdComp);
     this.mdComp = this.addChild(new Component());
     if (this.plugin.skillNotice !== null) {
@@ -166,14 +256,42 @@ export class KodaView extends ItemView {
   }
 
   // — Streaming-Hooks, vom Plugin gerufen —
+
+  /** Der naechste Token-Block ist eine neue Blase. Setzt den Markdown-Schnitt mit zurueck,
+   *  sonst rechnete er gegen den Text der vorigen Blase weiter. */
+  private endStream(): void {
+    this.streamEl = null;
+    this.streamTailEl = null;
+    this.streamRaw = "";
+    this.streamStableLen = 0;
+  }
+
   streamToken(text: string): void {
-    this.clearSummarizingHint();
-    if (this.streamEl === null) this.streamEl = this.logEl.createDiv({ cls: "koda-msg koda-assistant koda-streaming" });
-    this.streamEl.setText(this.streamEl.getText() + text);
+    if (this.streamEl === null) {
+      this.streamEl = this.logEl.createDiv({ cls: "koda-msg koda-assistant koda-streaming" });
+      this.streamTailEl = this.streamEl.createDiv({ cls: "koda-stream-tail" });
+      this.streamRaw = "";
+      this.streamStableLen = 0;
+    }
+    this.streamRaw += text;
+    const { stable, tail } = splitStable(this.streamRaw);
+    if (stable.length > this.streamStableLen) {
+      // Nur der NEU stabil gewordene Teil wird gerendert — bereits Gezeichnetes bleibt
+      // unangetastet. Das ist der Unterschied zum Voll-Rerender: kein Flackern, keine
+      // springende Scrollposition, kein quadratischer Aufwand.
+      const fresh = stable.slice(this.streamStableLen);
+      this.streamStableLen = stable.length;
+      const blockEl = this.streamEl.createDiv({ cls: "koda-stream-block" });
+      // Ein kaputter Block kostet die Formatierung, nicht die Antwort (Idiom aus session.ts).
+      void this.renderMarkdownInto(blockEl, fresh).catch(() => { blockEl.setText(fresh); });
+      // Der laufende Absatz gehoert immer ans Ende.
+      if (this.streamTailEl !== null) this.streamEl.appendChild(this.streamTailEl);
+    }
+    this.streamTailEl?.setText(tail);
     this.logEl.scrollTo({ top: this.logEl.scrollHeight });
   }
+
   streamReasoning(text: string): void {
-    this.clearSummarizingHint();
     if (this.reasonEl === null) {
       const d = this.logEl.createEl("details", { cls: "koda-reasoning" });
       d.createEl("summary", { text: t("view.thinking") });
@@ -181,9 +299,9 @@ export class KodaView extends ItemView {
     }
     this.reasonEl.setText(this.reasonEl.getText() + text);
   }
+
   toolStep(label: string, detail: string): void {
-    this.streamEl = null; // naechster Token-Block ist eine neue Blase
-    this.clearSummarizingHint();
+    this.endStream();
     const d = this.logEl.createEl("details", { cls: "koda-tool" });
     d.createEl("summary", { text: label });
     d.createEl("pre", { text: detail });

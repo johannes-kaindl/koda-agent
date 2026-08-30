@@ -84,10 +84,10 @@ function toolActivity(name: string, rawArgs: string): Activity {
  *  eine spaetere Regel mit Gedaechtnis nichts umbaut. */
 export function nextActivity(_prev: Activity, e: ActivityEvent): Activity {
   switch (e.kind) {
+    // `tool-end` gehoert hierher, weil danach wieder das Modell dran ist — genau dort liegt
+    // die zweite tote Phase, in der frueher nichts zu sehen war.
     case "ask":
     case "reasoning":
-    // Nach einem Werkzeugschritt ist wieder das Modell dran — und genau dort liegt die zweite
-    // tote Phase, in der frueher nichts zu sehen war.
     case "tool-end":
       return THINKING;
     case "token":

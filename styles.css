@@ -10,7 +10,7 @@
 /* pre-wrap gilt nur fuer die Plaintext-Blasen. Kodas fertige Antworten laufen durch
    MarkdownRenderer und bringen echte Block-Elemente mit — dort wuerde pre-wrap die
    Quelltext-Umbrueche ZUSAETZLICH zu den Absaetzen anzeigen (doppelte Leerzeilen). */
-.koda-user, .koda-streaming, .koda-placeholder, .koda-notice, .koda-error { white-space: pre-wrap; }
+.koda-user, .koda-stream-tail, .koda-placeholder, .koda-notice, .koda-error { white-space: pre-wrap; }
 /* Gerendertes Markdown in der Blase: aeussere Blockabstaende gehoeren der Blase. */
 .koda-assistant > :first-child { margin-top: 0; }
 .koda-assistant > :last-child { margin-bottom: 0; }
@@ -27,6 +27,41 @@
 .koda-placeholder { color: var(--text-muted); font-style: italic; }
 .koda-tool, .koda-reasoning { margin-bottom: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .koda-tool pre, .koda-reasoning pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
+/* Waehrend des Streams gerenderte Bloecke: dieselben Blockabstaende wie in der fertigen
+   Blase, sonst springt die Antwort beim Abschluss sichtbar um. */
+.koda-stream-block > :first-child { margin-top: 0; }
+.koda-stream-block > :last-child { margin-bottom: 0; }
+.koda-stream-block ul, .koda-stream-block ol { margin: var(--size-4-1) 0; padding-inline-start: var(--size-4-4); }
+
+/* Statuszeile: was gerade laeuft, im Ruhezustand die Belegung des Kontextfensters.
+   Baustein „Status-Indikator" aus UI-STANDARD.md §8 — Form (Icon) UND Farbe UND
+   Zustandsklasse UND aria-label; Farbe traegt nie allein die Aussage (WCAG 1.4.1). */
+.koda-status {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  padding: var(--size-4-1) var(--size-4-2);
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+.koda-status-icon { display: flex; align-items: center; }
+.koda-status-icon svg { width: var(--icon-s); height: var(--icon-s); }
+.koda-status-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.koda-status.is-warning { color: var(--text-warning); }
+/* Das animierte Element aus Johannes' Quicktask: solange gearbeitet wird, dreht sich der
+   loader. Ohne Bewegung ist eine Statuszeile von einem eingefrorenen Fenster nicht zu
+   unterscheiden — genau der Zustand, den sie beheben soll. */
+.koda-status.is-checking .koda-status-icon svg { animation: koda-spin 1.2s linear infinite; }
+@keyframes koda-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .koda-status.is-checking .koda-status-icon svg { animation: none; }
+}
+
+/* Thinking-Schalter im View-Kopf: der Zustand steht in der Klasse, nicht nur in der Farbe. */
+.view-action.is-off { color: var(--text-faint); }
+.view-action.is-disabled { color: var(--text-faint); cursor: default; }
+
 .koda-input-bar { border-top: 1px solid var(--background-modifier-border); padding: var(--size-4-2); }
 .koda-input { width: 100%; resize: vertical; }
 .koda-buttons { display: flex; gap: var(--size-4-1); margin-top: var(--size-4-1); }
