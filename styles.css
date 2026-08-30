@@ -149,3 +149,10 @@
   flex: 1 1 auto;
   min-width: 0;
 }
+.koda-prompt-textarea { width: 100%; min-height: 8em; font-family: var(--font-monospace); }
+.koda-warn {
+  display: flex; align-items: center; gap: var(--size-4-1);
+  font-size: var(--font-ui-smaller); margin-top: var(--size-4-1);
+}
+.koda-warn.is-warning { color: var(--text-warning); }
+.koda-warn-icon { display: flex; }

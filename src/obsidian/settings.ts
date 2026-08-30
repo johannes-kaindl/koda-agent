@@ -37,6 +37,8 @@ import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
 import { resolveModelChoice, type ModelOption } from "../core/llm/model-choice";
+import { renderPromptRow, type ModelControlCtx } from "./model-control";
+import { readRetrievalApi } from "./retrieval";
 import {
   DEFAULT_SETTINGS,
   validateKodaSettings,
@@ -174,6 +176,15 @@ export class KodaSettingsTab extends PluginSettingTab {
         ],
       },
       {
+        type: "group",
+        heading: t("settings.modelControl"),
+        items: [
+          // `name` ist bei der nativen 1.13-API Pflicht (Suchindex) — `renderPromptRow`
+          // setzt ihn intern noch einmal, das ist idempotent (wie bei `renderModelPicker`).
+          { name: t("settings.prompt"), render: (setting) => renderPromptRow(setting, this.modelCtx()) },
+        ],
+      },
+      {
         name: t("settings.fallback"),
         desc: t("settings.fallback.desc"),
         control: { type: "toggle", key: "textFallback" },
@@ -235,6 +246,22 @@ export class KodaSettingsTab extends PluginSettingTab {
   /** Re-Render des Tabs nach einer Endpunkt-Mutation. */
   private refreshUi(): void {
     refreshSettingsTab(this, () => this.display());
+  }
+
+  /** Kontext fuer die Modell-Steuerung (`renderPromptRow`/`renderToolList`). Eine
+   *  Hilfsmethode statt eines Feldes: `relatedAvailable` haengt an `readRetrievalApi`,
+   *  das bei JEDEM Aufruf frisch prueft, weil vault-rag zur Laufzeit an- und ausgehen
+   *  kann — ein einmal gebauter Kontext wuerde das nicht mehr sehen. */
+  private modelCtx(): ModelControlCtx {
+    return {
+      settings: this.plugin.settings,
+      save: () => this.plugin.saveSettings(),
+      refresh: () => this.refreshUi(),
+      relatedAvailable: readRetrievalApi(this.app)?.status().indexed === true,
+      // `PromptPreviewModal` entsteht erst im naechsten Task; bis dahin ist der Knopf
+      // wirkungslos, aber vorhanden — er wird dort verdrahtet, nicht hier gebaut.
+      openPreview: () => {},
+    };
   }
 
   // ── Endpunkt-Liste (render-Hatch auf den Kit-Baustein) ───────────────────
