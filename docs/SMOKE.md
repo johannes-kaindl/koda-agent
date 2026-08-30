@@ -155,6 +155,12 @@ nur zu behaupten: die Messgröße ist der Tool-Aufruf aus `chatLog`, nicht der A
 Bei einer Gegenprobe immer `--full` — ohne das belegt ein Treffer nur, *dass* ein Werkzeug
 lief, nicht dass ein genannter Pfad daher stammt.
 
+**Seit 2026-08-31 fuehrt der Bericht vor den Werkzeug-Aufrufen den zuletzt gesendeten
+System-Prompt** (`plugin.lastSystemPrompt`) — Laenge in Zeichen plus, ob er vom
+Auslieferungsstand abweicht (`settings.systemPromptOverride.trim() !== ""`, kein
+Textvergleich). Ohne `--full` stehen nur die ersten 400 Zeichen da; `null` (noch keine
+Frage in dieser Sitzung) zeigt „noch nichts gesendet" statt eines leeren Blocks.
+
 **Seit 2026-08-21 weist der Bericht auch Verdichtungs-Marken aus** — `⇢ Verlauf verdichtet
 (Stufe 1: n Tool-Ergebnisse gekürzt, x KB)` bzw. `(Stufe 2: n Runden zusammengefasst)`, die
 Zusammenfassung selbst nur mit `--full` vollständig. Ohne sie las sich der Bericht ab einer
