@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   DEFAULT_RULES, renderRules, PLACEHOLDER_LANG, PLACEHOLDER_FOLDER, checkRules, effectiveRules,
+  READING_TOOLS,
 } from "../src/core/prompt/rules";
+import { toolDefs } from "../src/core/tools/defs";
 
 describe("DEFAULT_RULES", () => {
   it("traegt beide Platzhalter statt eingesetzter Werte", () => {
@@ -14,6 +16,25 @@ describe("DEFAULT_RULES", () => {
     expect(DEFAULT_RULES).toContain("save_memory");
     // Bis 0.9.0 fehlte write_skill im Prompt vollstaendig — der Anlass dieser Task.
     expect(DEFAULT_RULES).toContain("write_skill");
+  });
+});
+
+/** Die Warnungen haengen an Namen, die woanders definiert sind. Ein Rename in
+ *  `tools/defs.ts` schaltete sie sonst STILL ab: `READING_TOOLS` filtert dann ins Leere,
+ *  `no-reading-tool` schlaegt dauerhaft an, `no-tools` prueft auf einen Satz, der ein
+ *  Werkzeug nennt, das es nicht mehr gibt — und kein Test braeche. */
+describe("Kopplung an die echten Werkzeugnamen", () => {
+  const vorhanden = new Set(toolDefs({ related: true }).map((d) => d.name));
+
+  it("kennt jedes lesende Werkzeug aus READING_TOOLS auch als echtes Werkzeug", () => {
+    for (const n of READING_TOOLS) expect(vorhanden).toContain(n);
+  });
+  it("nennt in DEFAULT_RULES nur Werkzeuge, die es wirklich gibt", () => {
+    // Die Literale aus dem Regelblock — sie stehen dort als Namen, nicht als Prosa.
+    for (const n of ["save_memory", "write_skill"]) {
+      expect(DEFAULT_RULES).toContain(n);
+      expect(vorhanden).toContain(n);
+    }
   });
 });
 
