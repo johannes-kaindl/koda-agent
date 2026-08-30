@@ -168,6 +168,34 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 
 ### Durchläufe
 
+- **2026-08-30 (19:02–19:15), Handpunkte 21 und 22 gefahren — beide belegt, plus ein
+  Nebenbefund, der schwerer wiegt als beide.** Vault `10_Pallas`, Obsidian 1.13.7,
+  LM Studio `qwen/qwen3.6-27b` (CORS geprüft, nicht angenommen). CDP-Lock gehalten und
+  freigegeben (neuer Mechanismus seit diesem Abend).
+  - **21 (Markdown während des Streams) belegt, und zwar mitsamt der Codefence-Regel.**
+    88 Abtastungen über 35 s. Bei t=23,0 s stand der erste Block **gerendert** (`p`, `strong`),
+    während der Tail im selben Moment Rohtext trug (`1. **Lesbarkeit und Einfach`). Bei
+    t=34,6 s zwei Blöcke mit `ol`/`li` — die Aufzählung formatiert, während der Tail einen
+    **offenen** Codefence hielt (```` ```python\nprint(" ````). Dass der Codeblock während des
+    Streams **nie** gerendert wurde, ist kein Fehlschlag, sondern der Beleg: ein offener Fence
+    ist keine Absatzgrenze, sonst zerrisse er.
+  - **22 (Thinking-Schalter, always-on) belegt — mit ausdrücklicher Einschränkung.** Kein
+    gpt-oss/harmony-Modell ist lokal vorhanden (LM Studio hält qwen3.x, gemma-4,
+    qwen2.5-coder — alle hybrid oder nicht-denkend). Gemessen wurde die **Anzeige**-Seite über
+    den Modellnamen, weil `isAlwaysOnThinker` eine Namensheuristik ist: normales Modell →
+    „Thinking: an/aus", `aria-disabled=false`; `gpt-oss:20b` → „Thinking: immer an",
+    `aria-disabled=true`, `is-disabled`, und ein Klick ändert nichts (`false` → `false`).
+    **Nicht** gemessen ist die Request-Seite (dass gpt-oss `reasoning_effort:"none"` ablehnt) —
+    die ist per Unit-Test fixiert. Der Punkt heißt also ehrlich „der Schalter verspricht
+    nichts, was er nicht hält", nicht „gpt-oss wurde ausprobiert".
+  - ⚠️ **Nebenbefund: Koda spricht Englisch in einem deutschen Obsidian.** Aufgefallen, weil
+    die Schalter-Beschriftung nach einem `saveSettings()` von „Thinking: aus" auf
+    „Thinking: off" wechselte. Obsidian selbst ist deutsch (sechs Zeugen aus seiner eigenen
+    UI), `localStorage.language` steht auf `en`, Kodas `settings.language` auf `auto`.
+    **Warum es niemandem auffiel:** Platzhalter und Knöpfe sind DOM-Werte, die beim `onOpen()`
+    einmal gesetzt wurden — sie tragen die Sprache von damals. Nur Stellen, die `t()` **jetzt**
+    auswerten, zeigen den echten Zustand. Eigene Task, `braucht_entscheidung`.
+
 - **2026-08-30 (11:41–12:05), erster Lauf nach der Sidebar-Angleichung — 14/14 grün, aber erst
   im vierten Anlauf; die drei roten Läufe davor waren alle Prüfpunkt-Defekte, keine
   Produktfehler.** Vault `10_Pallas`, Obsidian 1.13.7, Koda 0.8.0 mit dem Sidebar-Stand
