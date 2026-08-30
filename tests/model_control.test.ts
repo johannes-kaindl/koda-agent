@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Setting, makeFakeEl, ExtraButtonComponent, TextAreaComponent, ToggleComponent } from "obsidian";
+import { Setting, makeFakeEl, ExtraButtonComponent, TextAreaComponent } from "obsidian";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "../src/obsidian/model-control";
 import { DEFAULT_SETTINGS, type KodaSettings } from "../src/core/settings-types";
 import { DEFAULT_RULES } from "../src/core/prompt/rules";
@@ -123,38 +123,39 @@ describe("renderToolList", () => {
   it("schaltet ein Werkzeug ab und schreibt das in die Einstellungen", () => {
     const c = ctx();
     const s = new Setting(makeFakeEl());
-    renderToolList(s, c);
-    const tg = s.components.filter((x) => x instanceof ToggleComponent) as ToggleComponent[];
-    // Reihenfolge der Komponenten = Reihenfolge der Zeilen (write_note ist die vierte).
-    tg[3].onChangeCB?.(false);
+    const handles = renderToolList(s, c);
+    // Ueber den Namen adressiert, nicht ueber einen Index — ein neues Werkzeug
+    // verschoebe sonst still jeden nachfolgenden Index (Fix-Runde 1).
+    const h = handles.find((x) => x.name === "write_note")!;
+    h.toggle.onChangeCB?.(false);
     expect(c.settings.toolsDisabled).toContain("write_note");
     expect(c.save).toHaveBeenCalled();
   });
   it("schaltet wieder ein, ohne einen Rest in der Liste zu lassen", () => {
     const c = ctx({ toolsDisabled: ["write_note"] });
     const s = new Setting(makeFakeEl());
-    renderToolList(s, c);
-    const tg = s.components.filter((x) => x instanceof ToggleComponent) as ToggleComponent[];
-    tg[3].onChangeCB?.(true);
+    const handles = renderToolList(s, c);
+    const h = handles.find((x) => x.name === "write_note")!;
+    h.toggle.onChangeCB?.(true);
     expect(c.settings.toolsDisabled).toEqual([]);
   });
   it("nimmt eine eigene Beschreibung erst beim blur an, nicht bei jedem Tastendruck", () => {
     const c = ctx();
     const s = new Setting(makeFakeEl());
-    renderToolList(s, c);
-    const ta = s.components.filter((x) => x instanceof TextAreaComponent) as TextAreaComponent[];
-    ta[1].setValue("Liest."); // read_note ist die zweite Zeile
+    const handles = renderToolList(s, c);
+    const h = handles.find((x) => x.name === "read_note")!;
+    h.textarea.setValue("Liest.");
     expect(c.settings.toolDescriptions.read_note).toBeUndefined();
-    ta[1].inputEl.dispatchEvent({ type: "blur" });
+    h.textarea.inputEl.dispatchEvent({ type: "blur" });
     expect(c.settings.toolDescriptions.read_note).toBe("Liest.");
   });
   it("loescht den Eintrag wieder, wenn das Feld geleert wird — leer heisst ausgeliefert", () => {
     const c = ctx({ toolDescriptions: { read_note: "Liest." } });
     const s = new Setting(makeFakeEl());
-    renderToolList(s, c);
-    const ta = s.components.filter((x) => x instanceof TextAreaComponent) as TextAreaComponent[];
-    ta[1].setValue("   ");
-    ta[1].inputEl.dispatchEvent({ type: "blur" });
+    const handles = renderToolList(s, c);
+    const h = handles.find((x) => x.name === "read_note")!;
+    h.textarea.setValue("   ");
+    h.textarea.inputEl.dispatchEvent({ type: "blur" });
     expect(c.settings.toolDescriptions.read_note).toBeUndefined();
   });
 });

@@ -184,7 +184,10 @@ export class KodaSettingsTab extends PluginSettingTab {
           // `renderToolList` setzen ihn intern noch einmal, das ist idempotent (wie bei
           // `renderModelPicker`).
           { name: t("settings.prompt"), render: (setting) => renderPromptRow(setting, this.modelCtx()) },
-          { name: t("settings.tools"), render: (setting) => renderToolList(setting, this.modelCtx()) },
+          // Block-Body statt Ausdrucks-Body: `renderToolList` gibt die Zeilen-Handles
+          // zurueck (Fix-Runde 1), die Definition erwartet aber `void | (() => void)` —
+          // der Aufrufer hier braucht sie nicht und darf den Rueckgabewert ignorieren.
+          { name: t("settings.tools"), render: (setting) => { renderToolList(setting, this.modelCtx()); } },
         ],
       },
       {

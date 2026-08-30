@@ -1,4 +1,4 @@
-import { Setting, setIcon } from "obsidian";
+import { Setting, setIcon, type TextAreaComponent, type ToggleComponent } from "obsidian";
 import { t } from "../vendor/kit/i18n";
 import { type RuleWarning } from "../core/prompt/rules";
 import { promptRow, toolRows } from "../core/prompt/view-model";
@@ -50,12 +50,30 @@ export function renderPromptRow(setting: Setting, ctx: ModelControlCtx): void {
   }
 }
 
+/** Referenz auf die interaktiven Komponenten EINER Werkzeug-Zeile — ueber den Namen
+ *  adressiert, nicht ueber einen Index (ein neues Werkzeug verschoebe sonst still jeden
+ *  nachfolgenden Index). Der Rueckgabewert ist die einzige Quelle dafuer; `setting`
+ *  bleibt unberuehrt (s.u.). */
+export interface ToolRowHandle {
+  name: string;
+  toggle: ToggleComponent;
+  textarea: TextAreaComponent;
+}
+
 /** Eine Zeile je Werkzeug: Name, eigene Beschreibung, Schalter. Die volle Liste — auch
  *  related_notes ohne vault-rag, dann ausgegraut. Ein Werkzeug, das spurlos verschwindet,
- *  schickt den Nutzer auf die Suche nach einem Schalter, den es nie gab (Spec E3). */
-export function renderToolList(setting: Setting, ctx: ModelControlCtx): void {
+ *  schickt den Nutzer auf die Suche nach einem Schalter, den es nie gab (Spec E3).
+ *
+ *  Gibt die Zeilen-Handles zurueck, statt sie in `setting.components` zu schreiben:
+ *  `Setting.components` ist eine oeffentliche Obsidian-API (seit 0.9.7), an der u.a.
+ *  `Setting.setDisabled()` (seit 1.2.3) haengt — ein `push` fremder Komponenten dort
+ *  waere eine geteilte Objektreferenz in einem API-Array mit Bulk-Semantik, deren
+ *  Wirkung auf dem nativen >=1.13-Pfad von hier aus nicht einsehbar ist (Review-Befund
+ *  Fix-Runde 1). Ein Aufrufer, der die Zeilen braucht, adressiert sie ueber `name`. */
+export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowHandle[] {
   setting.setName(t("settings.tools")).setDesc(t("settings.tools.desc"));
   const host = setting.settingEl.createDiv({ cls: "koda-tool-list" });
+  const handles: ToolRowHandle[] = [];
   for (const row_ of toolRows(ctx.settings, ctx.relatedAvailable)) {
     const row = host.createDiv({ cls: "koda-tool-row" });
     // `setAttribute` statt `dataset`: der Fake-DOM des Mocks kennt Attribute, kein dataset.
@@ -68,7 +86,9 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): void {
 
     const zeile = new Setting(row);
     zeile.setClass("koda-tool-controls");
+    let textarea: TextAreaComponent | undefined;
     zeile.addTextArea((ta) => {
+      textarea = ta;
       ta.setPlaceholder(row_.placeholder).setValue(row_.own);
       ta.inputEl.rows = 2;
       // Uebernahme bei blur, nicht bei onChange — sonst landet jeder Zwischenstand in der
@@ -80,17 +100,18 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): void {
         void ctx.save();
       });
     });
-    zeile.addToggle((tg) =>
+    let toggle: ToggleComponent | undefined;
+    zeile.addToggle((tg) => {
+      toggle = tg;
       tg.setValue(row_.enabled).onChange((an) => {
         const ohne = ctx.settings.toolsDisabled.filter((n) => n !== row_.name);
         ctx.settings.toolsDisabled = an ? ohne : [...ohne, row_.name];
         void ctx.save().then(() => ctx.refresh()); // die Warnzeile oben haengt daran
-      }),
-    );
-    // Buchfuehrung, kein DOM-Effekt: die Zeilen-Komponenten haengen zusaetzlich an der
-    // AEUSSEREN Setting-Instanz, damit ein Aufrufer (Test, ein spaeterer Sammel-Reset)
-    // ueber `setting.components` alle Werkzeug-Zeilen in einem Zug sieht, statt je Zeile
-    // eine eigene `Setting`-Referenz mitschleppen zu muessen.
-    setting.components.push(...zeile.components);
+      });
+    });
+    // `addTextArea`/`addToggle` rufen ihr Callback synchron auf (echtes Obsidian wie Mock)
+    // — an dieser Stelle sind beide Variablen also immer gesetzt.
+    handles.push({ name: row_.name, textarea: textarea!, toggle: toggle! });
   }
+  return handles;
 }
