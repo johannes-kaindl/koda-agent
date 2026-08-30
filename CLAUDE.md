@@ -42,7 +42,7 @@ ein leeres Feld heißt „die ausgelieferte Fassung gilt", nie „leer", damit e
 Verbesserung des ausgelieferten Textes auch die Nutzer erreicht, die das Feld schon einmal
 geöffnet haben. Der Prompt-Bau (`buildSystemPrompt`) ist dabei aus `src/core/memory/` in
 ein eigenes, pures Modul `src/core/prompt/` umgezogen — er war dort nur zu Gast.
-Gate ist grün (478/478), `main.js` baut. Details zu Nutzung/Setup:
+Gate ist grün (490/490), `main.js` baut. Details zu Nutzung/Setup:
 `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`. **Ein lokaler
 LLM-Server braucht CORS** (LM Studio „Enable CORS"/`lms server start --cors`): der Chat
 streamt als XHR aus dem Renderer, die Testen-Probe läuft über `requestUrl` — Koda benennt
@@ -148,7 +148,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (478/478).
+- `npm test` — `check-no-abs-paths` + vitest (490/490).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
