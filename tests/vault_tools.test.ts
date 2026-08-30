@@ -102,14 +102,39 @@ describe("VaultTools", () => {
     const tools = new VaultTools(fakeVault({}), yes, opts);
     expect((await tools.run("gibt_es_nicht", {})).ok).toBe(false);
   });
-  it("lehnt den Aufruf eines Werkzeugs ab, das nicht angeboten wurde", async () => {
-    // Ein abgeschaltetes Werkzeug ist fuer den Runner dasselbe wie ein erfundenes: es steht
-    // nicht in der gesendeten Liste. Der Beleg gehoert trotzdem hierher — die Spec verlangt
-    // ausdruecklich, das zu messen statt anzunehmen.
-    const tools = new VaultTools(fakeVault({}), yes, opts);
-    const r = await tools.run("write_skill_das_es_nicht_gibt", '{"a":1}');
+  it("lehnt ein abgeschaltetes, aber existierendes Werkzeug ab, statt es auszufuehren", async () => {
+    // Der echte Fall aus Spec E3: `write_note` GIBT es, der Nutzer hat es abgeschaltet, und
+    // das Modell ruft es trotzdem — halluziniert oder aus einer aelteren Runde im Verlauf.
+    // Ein erfundener Name belegt nur den default-Zweig und damit gar nichts hiervon.
+    const vault = fakeVault({});
+    const tools = new VaultTools(vault, yes, { ...opts, allowed: () => new Set(["read_note"]) });
+    const r = await tools.run("write_note", { path: "Koda/x.md", content: "Text", mode: "create" });
     expect(r.ok).toBe(false);
-    expect(r.error).toContain("unbekanntes Tool");
+    expect(r.error).toContain("abgeschaltet");
+    // Die zweite Haelfte des Belegs: nichts wurde geschrieben.
+    expect(vault.files["Koda/x.md"]).toBeUndefined();
+  });
+  it("fuehrt dasselbe Werkzeug aus, sobald es erlaubt ist", async () => {
+    // Ohne diese Haelfte waere der Test oben gruen, ohne je etwas bewegt zu haben.
+    const vault = fakeVault({});
+    const tools = new VaultTools(vault, yes, { ...opts, allowed: () => new Set(["write_note"]) });
+    const r = await tools.run("write_note", { path: "Koda/x.md", content: "Text", mode: "create" });
+    expect(r.ok).toBe(true);
+    expect(vault.files["Koda/x.md"]).toBe("Text");
+  });
+  it("erlaubt ohne `allowed` alles — Altaufrufer fuehren keine Liste mit", async () => {
+    const vault = fakeVault({});
+    const tools = new VaultTools(vault, yes, opts);
+    expect((await tools.run("write_note", { path: "Koda/x.md", content: "Text", mode: "create" })).ok).toBe(true);
+  });
+  it("liest die erlaubten Namen bei JEDEM Aufruf frisch", async () => {
+    // Als Wert gecacht wuerde eine Aenderung in den Einstellungen erst im naechsten
+    // Gespraech greifen — genau das soll die Callback-Form verhindern.
+    let erlaubt = new Set(["write_note"]);
+    const tools = new VaultTools(fakeVault({}), yes, { ...opts, allowed: () => erlaubt });
+    expect((await tools.run("write_note", { path: "Koda/a.md", content: "T", mode: "create" })).ok).toBe(true);
+    erlaubt = new Set(["read_note"]);
+    expect((await tools.run("write_note", { path: "Koda/b.md", content: "T", mode: "create" })).ok).toBe(false);
   });
 });
 

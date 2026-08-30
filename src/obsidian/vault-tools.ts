@@ -53,12 +53,28 @@ export class VaultTools implements ToolRunner {
       retrieval?: () => RetrievalApi | null;
       /** Frisch je Aufruf gelesen, damit eine Aenderung in den Einstellungen sofort greift. */
       listMaxRows(): number;
+      /** Die Namen, die gerade angeboten werden — Quelle ist `currentToolNames()`.
+       *  Bewusst als Funktion und nicht als Wert: schaltet der Nutzer mitten im Gespraech
+       *  ein Werkzeug ab, greift das ab dem naechsten Aufruf, statt bis zum Neustart auf
+       *  dem Stand vom Aufbau zu stehen (dieselbe Ueberlegung wie bei `retrieval`).
+       *  Fehlt das Feld ganz, ist alles erlaubt — Altaufrufer und Tests, die nur den
+       *  Werkzeug-Kern messen, sollen keine Liste mitfuehren muessen. */
+      allowed?: () => Set<string>;
     },
   ) {}
 
   async run(name: string, args: unknown): Promise<ToolOutcome> {
     const a = (typeof args === "object" && args !== null ? args : {}) as Record<string, unknown>;
     try {
+      // VOR dem switch: der Runner darf nicht allein am Namen entscheiden. Ein Modell kann
+      // ein abgeschaltetes Werkzeug halluzinieren oder es aus einer aelteren Runde im
+      // Verlauf aufgreifen — ohne diese Zeile schriebe `write_note` dann trotzdem, im
+      // Koda-Ordner sogar ohne Rueckfrage. Die Oberflaeche verspricht „Was Koda tun darf";
+      // gehalten wird das Versprechen hier (Spec E3: messen statt annehmen).
+      const erlaubt = this.opts.allowed?.();
+      if (erlaubt !== undefined && !erlaubt.has(name)) {
+        return { ok: false, error: `Werkzeug abgeschaltet: ${name} — der Nutzer hat es in den Einstellungen deaktiviert. Nutze ein anderes.` };
+      }
       switch (name) {
         case "search_notes": return await this.search(str(a.query), num(a.max_results, SEARCH_CAP));
         case "read_note": return await this.read(str(a.path));

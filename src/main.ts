@@ -359,6 +359,10 @@ export default class KodaPlugin extends Plugin {
         // meldet Klartext, statt zu werfen.
         retrieval: () => readRetrievalApi(this.app),
         listMaxRows: () => this.settings.listNotesMaxRows,
+        // Aus derselben Quelle wie die gesendete Liste — es gibt keinen zweiten Weg, auf
+        // dem sie entsteht. Ebenfalls als Callback: eine Aenderung in den Einstellungen
+        // wirkt damit ab dem naechsten Werkzeug-Aufruf, nicht erst im naechsten Gespraech.
+        allowed: () => new Set(this.currentToolNames()),
       });
 
       const appended = await runAgent(
