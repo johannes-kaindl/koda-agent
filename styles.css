@@ -163,3 +163,9 @@
 .koda-tool-name { font-family: var(--font-monospace); font-size: var(--font-ui-small); }
 .koda-tool-hint { font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .koda-tool-controls { border-top: none; padding-top: 0; }
+.koda-modal-sub { color: var(--text-muted); font-size: var(--font-ui-smaller); margin-bottom: var(--size-4-2); }
+.koda-prompt-preview {
+  white-space: pre-wrap; max-height: 50vh; overflow-y: auto;
+  background: var(--background-secondary); padding: var(--size-4-2); border-radius: var(--radius-m);
+  font-size: var(--font-ui-smaller);
+}

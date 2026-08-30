@@ -38,6 +38,7 @@ import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
 import { resolveModelChoice, type ModelOption } from "../core/llm/model-choice";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "./model-control";
+import { PromptPreviewModal } from "./prompt-modal";
 import { readRetrievalApi } from "./retrieval";
 import {
   DEFAULT_SETTINGS,
@@ -260,9 +261,7 @@ export class KodaSettingsTab extends PluginSettingTab {
       save: () => this.plugin.saveSettings(),
       refresh: () => this.refreshUi(),
       relatedAvailable: readRetrievalApi(this.app)?.status().indexed === true,
-      // `PromptPreviewModal` entsteht erst im naechsten Task; bis dahin ist der Knopf
-      // wirkungslos, aber vorhanden — er wird dort verdrahtet, nicht hier gebaut.
-      openPreview: () => {},
+      openPreview: () => { new PromptPreviewModal(this.app, this.plugin).open(); },
     };
   }
 
