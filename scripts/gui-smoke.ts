@@ -265,7 +265,7 @@ async function main(): Promise<void> {
       await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:open`)});
       return true;
     `);
-    const view = await pollUntil<{ leaves: number; input: boolean; buttons: string[] }>(
+    const view = await pollUntil<{ leaves: number; input: boolean; buttons: string[]; cta: boolean; actions: string[]; status: boolean }>(
       cdp,
       `
         const leaves = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)});
@@ -273,14 +273,24 @@ async function main(): Promise<void> {
         if (!el) return null;
         const buttons = [...el.querySelectorAll(".koda-buttons button")].map((b) => b.textContent.trim());
         if (buttons.length === 0) return null;
-        return { leaves: leaves.length, input: !!el.querySelector("textarea.koda-input"), buttons };
+        const actions = [...el.querySelectorAll(".view-action")].map((a) => a.getAttribute("aria-label") ?? "");
+        return {
+          leaves: leaves.length,
+          input: !!el.querySelector("textarea.koda-input"),
+          buttons,
+          cta: !!el.querySelector(".koda-buttons button.mod-cta"),
+          actions,
+          status: !!el.querySelector(".koda-status"),
+        };
       `,
       8000,
     );
     record(
-      "2. Sidebar oeffnet mit Eingabefeld und Knoepfen",
-      view !== null && view.input && view.buttons.length === 3,
-      view ? `${view.leaves} Leaf · Knoepfe: ${view.buttons.join(", ")}` : "keine View entstanden",
+      "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen und zwei Kopf-Aktionen",
+      view !== null && view.input && view.buttons.length === 2 && view.cta && view.actions.length === 2 && view.status,
+      view
+        ? `${view.leaves} Leaf · Knoepfe: ${view.buttons.join(", ")} · Kopf: ${view.actions.join(" | ")} · Statuszeile: ${view.status}`
+        : "keine View entstanden",
     );
 
     // --- 3. Der Freeze-Waechter ---------------------------------------------
@@ -564,6 +574,117 @@ async function main(): Promise<void> {
       "7. Verdichtungs-Marken (Stufe 1 + Stufe 2, erzwungen) werden gerendert",
       marks.stage1 === 1 && marks.stage2 === 1 && marks.forced === 1 && marks.summaryText === "SMOKE-ZUSAMMENFASSUNG",
       JSON.stringify(marks),
+    );
+
+    // --- 9. Statuszeile ueber eine ganze Werkzeug-Runde ----------------------
+    // Kein Modell noetig: gespeist wird der Zustandsautomat direkt mit derselben
+    // Ereignisfolge, die main.ts aus dem Agent-Loop durchreicht. Geprueft wird die
+    // ZUSAMMENSETZUNG (Klasse + Icon + Text), nicht nur das Vorhandensein — eine Zeile,
+    // die immer „arbeitet" sagt, waere gruen und trotzdem kaputt.
+    const status = await cdp.evaluate<{ steps: { cls: string; icon: string; text: string }[] }>(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      const v = p.views()[0];
+      const el = v.containerEl.querySelector(".koda-status");
+      const snap = () => ({
+        cls: el.className,
+        icon: el.querySelector(".koda-status-icon svg")?.getAttribute("class") ?? "",
+        text: el.querySelector(".koda-status-label")?.textContent ?? "",
+      });
+      const steps = [];
+      v.activity({ kind: "ask" });                                                    steps.push(snap());
+      v.activity({ kind: "tool-start", name: "search_notes", args: '{"query":"Stress"}' }); steps.push(snap());
+      v.activity({ kind: "tool-end" });                                                steps.push(snap());
+      v.activity({ kind: "token" });                                                   steps.push(snap());
+      v.activity({ kind: "done" });                                                    steps.push(snap());
+      return { steps };
+    `);
+    const [ask, tool, back, writing, done] = status.steps;
+    record(
+      "9. Statuszeile nennt die Taetigkeit und dreht sich dabei",
+      ask?.cls.includes("is-checking") === true &&
+        tool?.text.includes("Stress") === true &&
+        back?.text === ask?.text &&
+        writing?.text !== ask?.text &&
+        done?.cls.includes("is-checking") === false,
+      status.steps.map((x) => `${x.text}[${x.cls.replace("koda-status", "").trim()}]`).join(" → "),
+    );
+
+    // --- 10. Kontextfenster-Auslastung im Ruhezustand ------------------------
+    // Schliesst die Messluecke „Kontextfenster-Uebernahme ist ungemessen" von der anderen
+    // Seite: hier wird nicht das Settings-Feld geprueft, sondern dass die Zahl daraus in
+    // der Sidebar ankommt. Gegenprobe mit einem winzigen Fenster — die Zahl muss steigen.
+    const usage = await cdp.evaluate<{ normal: string; tiny: string; warnCls: string }>(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      const v = p.views()[0];
+      const el = v.containerEl.querySelector(".koda-status");
+      const before = p.settings.contextWindowTokens;
+      p.chatLog.push({ role: "user", content: "x".repeat(4000) });
+      v.activity({ kind: "done" });
+      const normal = el.querySelector(".koda-status-label").textContent;
+      p.settings.contextWindowTokens = 1024;
+      v.activity({ kind: "done" });
+      const tiny = el.querySelector(".koda-status-label").textContent;
+      const warnCls = el.className;
+      p.settings.contextWindowTokens = before;
+      p.chatLog.pop();
+      v.activity({ kind: "done" });
+      return { normal, tiny, warnCls };
+    `);
+    const pct = (s: string): number => Number(/(\d+)/.exec(s)?.[1] ?? "-1");
+    record(
+      "10. Statuszeile zeigt die Belegung des Kontextfensters",
+      pct(usage.normal) >= 0 && pct(usage.tiny) > pct(usage.normal) && usage.warnCls.includes("is-warning"),
+      `${usage.normal} → bei 1024 Token: ${usage.tiny} (${usage.warnCls.includes("is-warning") ? "gewarnt" : "keine Warnung"})`,
+    );
+
+    // --- 11. Thinking-Schalter im Kopf --------------------------------------
+    // Beide Richtungen, und das Ueberleben eines Neuaufbaus: der Zustand kommt aus den
+    // Einstellungen, nicht aus dem DOM — sonst faellt er beim naechsten Redraw zurueck.
+    const think = await cdp.evaluate<{ start: boolean; after: boolean; label: string; survives: boolean }>(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      const v = p.views()[0];
+      const start = p.settings.suppressThinking;
+      await v.toggleThinking();
+      const after = p.settings.suppressThinking;
+      const label = v.containerEl.querySelector(".view-action")?.getAttribute("aria-label") ?? "";
+      v.syncThinkAction();
+      const survives = v.containerEl.querySelector(".view-action")?.getAttribute("aria-label") === label;
+      p.settings.suppressThinking = start;
+      await p.saveSettings();
+      return { start, after, label, survives };
+    `);
+    record(
+      "11. Thinking-Schalter im Kopf schaltet und ueberlebt den Neuaufbau",
+      think.start !== think.after && think.label !== "" && think.survives,
+      `${String(think.start)} → ${String(think.after)} · Beschriftung „${think.label}"`,
+    );
+
+    // --- 12. Verwerfen fragt nach ------------------------------------------
+    // Der Quicktask sagt: „man klickt leicht aus Versehen auf Neues Gespraech und verliert
+    // alles ohne Rueckkehrmoeglichkeit". Geprueft wird deshalb der Abbruch-Weg — dass die
+    // Bestaetigung erscheint UND dass ein Nein den Verlauf stehen laesst.
+    const discard = await cdp.evaluate<{ modal: boolean; kept: number; before: number }>(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      const v = p.views()[0];
+      p.chatLog.push({ role: "user", content: "SMOKE-BEHALTEN" });
+      v.renderLog();
+      const before = p.chatLog.length;
+      v.askNewChat();
+      await new Promise((r) => setTimeout(r, 300));
+      const modal = document.querySelector(".modal-container .modal-button-container");
+      const found = !!modal;
+      // Abbrechen ist der erste Knopf (Cancel links, UI-STANDARD §2).
+      modal?.querySelector("button")?.click();
+      await new Promise((r) => setTimeout(r, 300));
+      const kept = p.chatLog.length;
+      p.chatLog.pop();
+      v.renderLog();
+      return { modal: found, kept, before };
+    `);
+    record(
+      "12. „Neues Gespraech“ fragt nach, Abbruch laesst den Verlauf stehen",
+      discard.modal && discard.kept === discard.before,
+      `Modal: ${String(discard.modal)} · Verlauf ${discard.before} → ${discard.kept} Eintraege`,
     );
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
