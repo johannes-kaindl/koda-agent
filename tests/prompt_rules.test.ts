@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_RULES, renderRules, PLACEHOLDER_LANG, PLACEHOLDER_FOLDER, checkRules } from "../src/core/prompt/rules";
+import {
+  DEFAULT_RULES, renderRules, PLACEHOLDER_LANG, PLACEHOLDER_FOLDER, checkRules, effectiveRules,
+} from "../src/core/prompt/rules";
 
 describe("DEFAULT_RULES", () => {
   it("traegt beide Platzhalter statt eingesetzter Werte", () => {
@@ -12,6 +14,17 @@ describe("DEFAULT_RULES", () => {
     expect(DEFAULT_RULES).toContain("save_memory");
     // Bis 0.9.0 fehlte write_skill im Prompt vollstaendig — der Anlass dieser Task.
     expect(DEFAULT_RULES).toContain("write_skill");
+  });
+});
+
+describe("effectiveRules", () => {
+  it("gibt den Auslieferungsstand zurueck, wenn nichts ueberschrieben ist", () => {
+    expect(effectiveRules(undefined)).toBe(DEFAULT_RULES);
+    expect(effectiveRules("")).toBe(DEFAULT_RULES);
+    expect(effectiveRules("   \n  ")).toBe(DEFAULT_RULES);
+  });
+  it("gibt den Override zurueck, sobald einer da ist — unbeschnitten", () => {
+    expect(effectiveRules("  Sei knapp.  ")).toBe("  Sei knapp.  ");
   });
 });
 

@@ -1,4 +1,4 @@
-import { DEFAULT_RULES, checkRules, type RuleWarning } from "./rules";
+import { DEFAULT_RULES, checkRules, effectiveRules, type RuleWarning } from "./rules";
 import { activeReadingTools } from "./effective";
 import { toolDefs } from "../tools/defs";
 
@@ -15,7 +15,9 @@ export function promptRow(
   s: { systemPromptOverride: string; toolsDisabled: string[] },
   related: boolean,
 ): PromptRowModel {
-  const wirksam = s.systemPromptOverride.trim() === "" ? DEFAULT_RULES : s.systemPromptOverride;
+  // Dieselbe Funktion, die auch `buildSystemPrompt` waehlen laesst: die Warnzeile prueft
+  // damit garantiert den Text, der gesendet wird (Spec E2, eine Wahrheit).
+  const wirksam = effectiveRules(s.systemPromptOverride);
   return {
     value: s.systemPromptOverride,
     placeholder: DEFAULT_RULES,

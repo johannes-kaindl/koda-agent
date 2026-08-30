@@ -1,5 +1,5 @@
 import type { Selection } from "../skills/select";
-import { DEFAULT_RULES, renderRules } from "./rules";
+import { effectiveRules, renderRules } from "./rules";
 
 /** Drei Schichten: Regelblock (ersetzbar), Memory, Skills. Die letzten beiden sind
  *  systemgesetzt und haengen auch an einem ueberschriebenen Regelblock — sie sind pro Lauf
@@ -11,8 +11,7 @@ export function buildSystemPrompt(opts: {
   skills?: Selection;
   rulesOverride?: string;
 }): string {
-  const template = (opts.rulesOverride ?? "").trim() === "" ? DEFAULT_RULES : (opts.rulesOverride as string);
-  const parts = [renderRules(template, { lang: opts.lang, folder: opts.kodaFolder })];
+  const parts = [renderRules(effectiveRules(opts.rulesOverride), { lang: opts.lang, folder: opts.kodaFolder })];
   if (opts.memory.trim() !== "") parts.push(`## Memory\n${opts.memory.trim()}`);
   const skillsBlock = renderSkills(opts.skills);
   if (skillsBlock !== "") parts.push(skillsBlock);

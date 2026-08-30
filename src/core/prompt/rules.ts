@@ -18,6 +18,16 @@ export const DEFAULT_RULES = [
   "If two instructions conflict — two skills, or a skill and your memory — say so instead of silently picking one.",
 ].join("\n\n");
 
+/** „Leer heisst ausgeliefert" (Spec E2) steht genau HIER und sonst nirgends. Zuvor
+ *  entschieden `build.ts` (was gesendet wird) und `view-model.ts` (was die Warnzeile prueft)
+ *  das unabhaengig voneinander — liefen sie je auseinander, warnte die Oberflaeche ueber
+ *  einen anderen Text als den gesendeten. Genau die zweite Wahrheit, gegen die diese Spec
+ *  sonst sorgfaeltig ist. */
+export function effectiveRules(override?: string): string {
+  const eigen = override ?? "";
+  return eigen.trim() === "" ? DEFAULT_RULES : eigen;
+}
+
 /** Setzt die Platzhalter ein. Unbekannte `{{…}}` bleiben stehen: sie sind entweder ein
  *  Tippfehler des Nutzers (dann soll er ihn sehen) oder ein Platzhalter aus einer neueren
  *  Version (dann waere Verschlucken der schlechtere Ausgang). */
