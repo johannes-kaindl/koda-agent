@@ -144,6 +144,37 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 
 ### Durchläufe
 
+- **2026-08-30 (11:41–12:05), erster Lauf nach der Sidebar-Angleichung — 14/14 grün, aber erst
+  im vierten Anlauf; die drei roten Läufe davor waren alle Prüfpunkt-Defekte, keine
+  Produktfehler.** Vault `10_Pallas`, Obsidian 1.13.7, Koda 0.8.0 mit dem Sidebar-Stand
+  (`4a0e4d8` + Smoke-Fix), vault-rag reindexierte parallel (abgesprochen: kein App-Reload).
+  - **Lauf 1 brach ab** (`v.activity is not a function`) — der Deploy allein reicht nicht, das
+    Plugin muss neu geladen werden. Der Treiber tut das **nicht** selbst; er setzt ein
+    deploytes, aktives Plugin voraus. Nachgeholt per `disablePlugin`/`loadManifests`/
+    `enablePlugin` auf der eigenen Plugin-ID — bewusst **kein** App-Reload, weil eine
+    Nachbar-Session einen zweistündigen Reindex im Speicher hielt.
+  - **Punkt 11 war grün und maß den falschen Knopf.** `querySelector(".view-action")` traf
+    Obsidians Lesezeichen-Aktion, nicht Kodas Thinking-Schalter — Obsidian hängt seine eigenen
+    Aktionen in denselben Kopf und **vor** die des Plugins. Verraten hat es allein die
+    Detailzeile („Beschriftung `Lesezeichen`"). **Ein Prüfpunkt, dessen Detailtext niemand
+    liest, kann grün sein, ohne seinen Gegenstand je berührt zu haben.** Aus demselben Grund
+    war Punkt 2 rot (er zählte Aktionen statt zu suchen).
+  - **Punkt 6 maß ein fremdes Plugin.** Sein Ziel ist „erste Markdown-Datei ≠ die aktive" — und
+    fiel damit auf `TaskNotes/Tasks/test.md`, wo TaskNotes den Wikilink durch ein eigenes
+    Inline-Widget ersetzt. Kein `a.internal-link`, Punkt rot, an Koda nichts kaputt. Vorher war
+    er grün, weil die Auswahl vom Zustand des **vorigen** Laufs abhing (Lauf 1 machte
+    `_Cockpit.md` aktiv). Der Punkt probiert jetzt bis zu fünf Kandidaten und berichtet den
+    übersprungenen. Merksatz: **wer seine Testdaten aus dem Nutzer-Vault nimmt, misst
+    irgendwann ein fremdes Plugin.**
+  - **Die vier neuen Punkte 9–12 waren auf Anhieb grün** und haben gemessen, was sie sollen:
+    Statuszeile über fünf Zustände (`Denkt nach… → Durchsucht den Vault nach „Stress"… → Denkt
+    nach… → Schreibt… → Kontext 1 % belegt`), Kontext-Belegung mit Gegenprobe (2 % → 100 % bei
+    1024 Token, Warnung springt an), Thinking-Schalter in beide Richtungen, Rückfrage vor dem
+    Verwerfen (Verlauf 2 → 2 Einträge nach Abbruch).
+  - **Nicht gemessen, weil sie ein Modell brauchen:** Handpunkte 21 (Markdown während des
+    Streams) und 22 (Thinking-Schalter bei einem always-on-Modell). Ollama war bis ~14:10 vom
+    Reindex belegt.
+
 - **2026-08-24 (04:25–04:50), Handpunkte 13, 14, 15, 16, 19 gefahren — alle grün; ein
   Fremdbefund für vault-rag.** Vault `10_Pallas`, Obsidian 1.13.7, Koda 0.7.1,
   LM Studio `qwen/qwen3.8-27b`, GUI-Smoke davor 10/10.
