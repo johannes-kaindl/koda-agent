@@ -22,6 +22,17 @@ All notable changes to this project are documented here. The format follows
   reasoning off (gpt-oss/harmony) it reads "always on" and stays disabled, instead of
   promising something the request will not honour.
 
+### Fixed
+
+- **The interface language is detected once at startup, not re-detected on every settings
+  save.** The shared i18n module asks for exactly that, and the neighbouring plugins do it that
+  way; Koda did not, which meant the language could change mid-session. Picking a language
+  explicitly in the settings still takes effect immediately. A failed detection no longer
+  silently counts as "English" either — it keeps the current language and says so in the log.
+- **The system prompt takes its language from the same source as the interface.** Until now
+  the two were detected independently and could disagree, so Koda might answer in a different
+  language than its own buttons were labelled in.
+
 ### Changed
 
 - **Answers are formatted while they stream in, not only when they finish.** Paragraphs that

@@ -194,7 +194,15 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
     UI), `localStorage.language` steht auf `en`, Kodas `settings.language` auf `auto`.
     **Warum es niemandem auffiel:** Platzhalter und Knöpfe sind DOM-Werte, die beim `onOpen()`
     einmal gesetzt wurden — sie tragen die Sprache von damals. Nur Stellen, die `t()` **jetzt**
-    auswerten, zeigen den echten Zustand. Eigene Task, `braucht_entscheidung`.
+    auswerten, zeigen den echten Zustand.
+    ✅ **Am selben Abend aufgelöst — es war kein Koda-Fehler.** `getLanguage()` liefert korrekt
+    `en` (und wirft nicht, gemessen): `localStorage.language = en` **ist** Obsidians aktuelle
+    Einstellung, die deutsche Oberfläche ist der Stand von vor der Umstellung und zieht erst
+    beim Neustart nach. Koda war das einzige Plugin, das an dem Tag oft genug neu geladen wurde,
+    um das zu zeigen. Zwei Zwischendiagnosen wurden dabei von Messungen widerlegt (Details in
+    der Task). Die Reparatur blieb trotzdem richtig, korrigiert aber etwas anderes: die
+    Auto-Erkennung lief entgegen dem Kit-Vertrag bei **jedem** `saveSettings()` statt einmal
+    beim onload, und ein verschluckter Fehler wurde stillschweigend zu „Englisch".
 
 - **2026-08-30 (11:41–12:05), erster Lauf nach der Sidebar-Angleichung — 14/14 grün, aber erst
   im vierten Anlauf; die drei roten Läufe davor waren alle Prüfpunkt-Defekte, keine
