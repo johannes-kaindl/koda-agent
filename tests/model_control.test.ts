@@ -7,7 +7,11 @@ import "../src/i18n/strings";
 
 function ctx(over: Partial<KodaSettings> = {}): ModelControlCtx & { save: ReturnType<typeof vi.fn> } {
   return {
-    settings: { ...DEFAULT_SETTINGS, ...over },
+    // Tief geklont, nicht flach gespreadet: `toolDescriptions` waere sonst DASSELBE Objekt
+    // wie `DEFAULT_SETTINGS.toolDescriptions`, und der blur-Test mutierte damit die
+    // Modul-Vorlage fuer den Rest der Datei — gruen nur wegen der Reihenfolge. Die
+    // Produktion ist davon unbetroffen, der Kit klont beim Validieren.
+    settings: { ...structuredClone(DEFAULT_SETTINGS), ...structuredClone(over) },
     save: vi.fn(async () => {}),
     refresh: vi.fn(),
     relatedAvailable: false,
@@ -199,5 +203,11 @@ describe("renderToolList", () => {
     h.textarea.setValue("   ");
     h.textarea.inputEl.dispatchEvent({ type: "blur" });
     expect(c.settings.toolDescriptions.read_note).toBeUndefined();
+  });
+  // Steht bewusst am Ende der Datei: er misst, was die Tests DAVOR hinterlassen haben.
+  it("hat die Modul-Vorlage nicht angefasst — kein geteilter Container", () => {
+    expect(DEFAULT_SETTINGS.toolDescriptions).toEqual({});
+    expect(DEFAULT_SETTINGS.toolsDisabled).toEqual([]);
+    expect(DEFAULT_SETTINGS.systemPromptOverride).toBe("");
   });
 });
