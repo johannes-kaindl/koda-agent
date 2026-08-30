@@ -142,8 +142,9 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 14 Punkte (9–12 seit
-  2026-08-30: Statuszeile, Kontext-Belegung, Thinking-Schalter, Rückfrage vorm Verwerfen).
+  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 15 Punkte (9–13 seit
+  2026-08-30: Statuszeile, Kontext-Belegung, Thinking-Schalter, Rückfrage vorm Verwerfen,
+  gesperrter Thinking-Zustand).
 - `npm run gui:ask -- --vault <name> --ask "<Frage>" [--expect <text>] [--full]` —
   Praxistest: stellt Koda im laufenden Obsidian eine echte Frage und berichtet, **welche
   Werkzeuge er wählt**. Das Gegenstück zum Smoke — langsam und nicht deterministisch,

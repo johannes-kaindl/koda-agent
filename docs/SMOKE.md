@@ -18,10 +18,12 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
 21. Eine Antwort mit Liste **und** Codeblock erzeugen → schon **während** des Streams stehen die
     fertigen Absätze gerendert da (Aufzählungspunkte statt Bindestriche); nur der laufende Absatz
     ist Rohtext, und ein angefangener ```-Block wird nicht mittendrin als Absatz gerendert.
-22. Bei einem Modell, das sich nicht abschalten lässt (gpt-oss/harmony), zeigt die Kopf-Aktion
-    „Thinking: immer an" und tut auf Klick nichts — statt etwas zu versprechen, das die Anfrage
-    nicht einhält. Der einzige Punkt der neuen Sidebar, den kein Automat erreicht: er braucht ein
-    konkretes Modell.
+22. ~~Thinking-Schalter bei einem always-on-Modell~~ → **automatisiert als Prüfpunkt 13**
+    (2026-08-30). Er brauchte nie ein solches Modell: `isAlwaysOnThinker` ist eine
+    **Namens**heuristik, der Modellname genügt. Was als „der einzige Punkt, den kein Automat
+    erreicht" in dieser Liste stand, war eine Annahme über den Prüfling — nicht über den Prüfer.
+    Offen bleibt allein die Request-Seite (dass gpt-oss `reasoning_effort:"none"` wirklich
+    ablehnt); die ist per Unit-Test fixiert und braucht ein echtes Modell.
 
 ### Semantisches Retrieval (nur mit aktivem „Vault Retrieval")
 
@@ -80,10 +82,11 @@ CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den Port wartet.
 
 Erst wenn nichts läuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
 
-Vierzehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+Fünfzehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
 laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
 2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
-erweitert, 2026-08-30 um 9–12 für die umgebaute Sidebar). Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
+erweitert, 2026-08-30 um 9–12 für die umgebaute Sidebar und um 13, den gesperrten Zustand des
+Thinking-Schalters). Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
 
 ```bash
 osascript -e 'quit app "Obsidian"'
