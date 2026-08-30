@@ -109,6 +109,9 @@ function record(name: string, passed: boolean, detail: string): void {
 interface Settings {
   endpoints: { url: string; model?: string; apiKey?: string }[];
   timeoutSec: number;
+  /** Pruefpunkt 13 setzt das Modell voruebergehend auf einen Always-on-Namen. */
+  model: string;
+  suppressThinking: boolean;
 }
 
 /**
@@ -270,7 +273,7 @@ async function main(): Promise<void> {
     // Vorwerte sichern, bevor irgendetwas veraendert wird.
     previous = await cdp.evaluate<Settings>(`
       const s = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings;
-      return { endpoints: JSON.parse(JSON.stringify(s.endpoints)), timeoutSec: s.timeoutSec };
+      return { endpoints: JSON.parse(JSON.stringify(s.endpoints)), timeoutSec: s.timeoutSec, model: s.model, suppressThinking: s.suppressThinking };
     `);
 
     // --- 2. Die Sidebar oeffnet und ist bedienbar ---------------------------
@@ -742,6 +745,55 @@ async function main(): Promise<void> {
         ? `${discard.fremd} fremde(s) Modal offen — Punkt nicht entscheidbar`
         : `Modal „${discard.titel}" · Verlauf ${discard.before} → ${discard.kept} Eintraege`,
     );
+
+    // --- 13. Der dritte Zustand des Thinking-Schalters -----------------------
+    // Punkt 11 prueft das Umschalten; die inhaltlich interessante Zusicherung ist aber die
+    // SPERRE: Modelle wie gpt-oss/harmony lehnen `reasoning_effort:"none"` ab, deshalb darf
+    // der Schalter dort kein Abschalten versprechen. Das ist ueber den Modell-NAMEN pruefbar,
+    // weil `isAlwaysOnThinker` eine Namensheuristik ist — es braucht also kein solches Modell,
+    // und genau deshalb gehoert der Punkt in den Automaten statt in die Handliste.
+    //
+    // ⚠️ Was er belegt: die Anzeige-Seite und dass ein Klick folgenlos bleibt (der Handler
+    // prueft die Sperre erneut — ein veralteter DOM-Klick darf nie durchschlagen). NICHT
+    // belegt ist die Request-Seite (dass gpt-oss die Parameter wirklich ablehnt); die ist per
+    // Unit-Test fixiert und braucht ein echtes Modell.
+    const dritte = await cdp.evaluate<{
+      normalAus: { label: string; disabled: string; klassen: string[] };
+      normalAn: { label: string; disabled: string; klassen: string[] };
+      gesperrt: { label: string; disabled: string; klassen: string[] };
+      vorKlick: boolean;
+      nachKlick: boolean;
+    }>(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      const v = p.views()[0];
+      const lies = () => {
+        const el = v.thinkActionEl;
+        return {
+          label: el?.getAttribute("aria-label") ?? "",
+          disabled: el?.getAttribute("aria-disabled") ?? "",
+          klassen: el ? [...el.classList].filter((c) => c.startsWith("is-")) : [],
+        };
+      };
+      p.settings.model = "qwen3:8b";
+      p.settings.suppressThinking = true;  v.syncThinkAction(); const normalAus = lies();
+      p.settings.suppressThinking = false; v.syncThinkAction(); const normalAn = lies();
+      // Ein Name, den isAlwaysOnThinker erkennt — das Modell muss nicht existieren.
+      p.settings.model = "gpt-oss:20b";    v.syncThinkAction(); const gesperrt = lies();
+      const vorKlick = p.settings.suppressThinking;
+      await v.toggleThinking();
+      const nachKlick = p.settings.suppressThinking;
+      return { normalAus, normalAn, gesperrt, vorKlick, nachKlick };
+    `);
+    record(
+      "13. Thinking-Schalter sperrt bei einem Modell, das sich nicht abschalten laesst",
+      dritte.normalAus.disabled === "false" &&
+        dritte.normalAn.disabled === "false" &&
+        dritte.normalAus.klassen.includes("is-off") &&
+        dritte.gesperrt.disabled === "true" &&
+        dritte.gesperrt.klassen.includes("is-disabled") &&
+        dritte.vorKlick === dritte.nachKlick,
+      `normal: „${dritte.normalAn.label}" / „${dritte.normalAus.label}" · gesperrt: „${dritte.gesperrt.label}" · Klick folgenlos: ${String(dritte.vorKlick === dritte.nachKlick)}`,
+    );
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
@@ -763,6 +815,8 @@ async function main(): Promise<void> {
           const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
           p.settings.endpoints = ${JSON.stringify(previous.endpoints)};
           p.settings.timeoutSec = ${JSON.stringify(previous.timeoutSec)};
+          p.settings.model = ${JSON.stringify(previous.model)};
+          p.settings.suppressThinking = ${JSON.stringify(previous.suppressThinking)};
           await p.saveSettings();
           await p.newChat();
           app.setting.close();
