@@ -37,6 +37,14 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
 16. „Was hängt mit [[bekannte Notiz]] zusammen?" → ⚙ `related_notes`, Liste mit Score.
     Gegenprobe: dieselbe Frage zu einer **frisch angelegten** Notiz → Klartext „(noch)
     nicht im Index", kein Fehler.
+    ⚠️ **Zwei Fallen, beide 2026-08-30 von der vault-rag-Session gemeldet.** (a) Die Trefferliste
+    auf **Plausibilität** ansehen, nicht nur darauf, dass sie kommt — ein defekter Index liefert
+    zusammenhanglose Treffer mit *hohen* Scores (0.85–0.92), also überzeugender als ein gesunder
+    (Median ~0.4). (b) **Keine Notiz nehmen, die während eines laufenden Reindex entstanden oder
+    geändert wurde:** `reindexAll` sammelt in einer lokalen Map und ersetzt am Ende die ganze
+    Vektor-Tabelle — parallele Updates gehen dabei verloren. Ausgerechnet „frisch angelegt", das
+    Mittel für die Gegenprobe, trifft diesen Fall. Sonst misst man vault-rags Race und schreibt
+    ihn Kodas Aufbereitung zu (`src/core/tools/retrieval.ts` ist an beidem unschuldig).
 17. Embedding-Endpunkt stoppen (Ollama beenden), dann Punkt 14 wiederholen → Volltext-Treffer
     plus die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)". **Nicht** stilles
     Schweigen — das ist der Kern von Spec E6.
