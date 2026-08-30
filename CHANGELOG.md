@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-08-30
+
 ### Added
 
 - **A status line in the sidebar says what Koda is doing.** Between the conversation and the
