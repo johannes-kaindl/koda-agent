@@ -3,7 +3,10 @@
 import { ThinkSplitter } from "../vendor/kit/think-splitter";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { authHeaders } from "../vendor/kit/endpoint_config";
-import { suppressParams, isAlwaysOnThinker } from "../vendor/kit/reasoning";
+import { suppressParams } from "../vendor/kit/reasoning";
+// Anzeige- und Request-Seite treffen dieselbe Entscheidung — deshalb EINE Definition,
+// im uebernommenen Toggle-Modul (REGISTRY: „wer nur die Anzeige uebernimmt, hat die Haelfte").
+import { effectiveSuppress } from "../core/chat/reasoning-toggle";
 import { realClock, type ClockPort } from "../vendor/kit-obsidian/clock";
 import { parseAgentSSE, ToolCallAssembler } from "../core/agent/stream";
 import { toWireMessages, type ChatMessage, type ToolCall } from "../core/agent/types";
@@ -33,10 +36,6 @@ export type LlmResult =
 
 const ERROR_BODY_CAP = 2048;
 export const DEFAULT_TIMEOUT_MS = 120_000;
-
-export function effectiveSuppress(model: string, wanted: boolean): boolean {
-  return wanted && !isAlwaysOnThinker(model);
-}
 
 export class KodaChatClient {
   constructor(
