@@ -692,28 +692,39 @@ async function main(): Promise<void> {
     // Der Quicktask sagt: „man klickt leicht aus Versehen auf Neues Gespraech und verliert
     // alles ohne Rueckkehrmoeglichkeit". Geprueft wird deshalb der Abbruch-Weg — dass die
     // Bestaetigung erscheint UND dass ein Nein den Verlauf stehen laesst.
-    const discard = await cdp.evaluate<{ modal: boolean; kept: number; before: number }>(`
+    const discard = await cdp.evaluate<{ modal: boolean; kept: number; before: number; titel: string; fremd: number }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       const v = p.views()[0];
       p.chatLog.push({ role: "user", content: "SMOKE-BEHALTEN" });
       v.renderLog();
       const before = p.chatLog.length;
+      // .modal-container ist ein GETEILTER Ort — jedes Plugin kann dort ein Modal haben.
+      // Deshalb erst sicherstellen, dass keines offen ist, und danach pruefen, dass das
+      // gefundene wirklich Kodas ist. Ohne das klickt der Punkt im Zweifel den Abbrechen-
+      // Knopf eines fremden Dialogs und meldet trotzdem gruen. (Gleiches Muster wie der
+      // .view-action-Fehler in Punkt 11 und die geteilte .notice-Leiste, 2026-08-30.)
+      const fremd = document.querySelectorAll(".modal-container").length;
       v.askNewChat();
       await new Promise((r) => setTimeout(r, 300));
-      const modal = document.querySelector(".modal-container .modal-button-container");
-      const found = !!modal;
+      const container = [...document.querySelectorAll(".modal-container")].pop();
+      const titel = container?.querySelector(".modal-title")?.textContent ?? "";
+      const meins = /Gespräch verwerfen|Discard this conversation/.test(titel);
+      const modal = meins ? container.querySelector(".modal-button-container") : null;
+      const found = !!modal && fremd === 0;
       // Abbrechen ist der erste Knopf (Cancel links, UI-STANDARD §2).
       modal?.querySelector("button")?.click();
       await new Promise((r) => setTimeout(r, 300));
       const kept = p.chatLog.length;
       p.chatLog.pop();
       v.renderLog();
-      return { modal: found, kept, before };
+      return { modal: found, kept, before, titel, fremd };
     `);
     record(
       "12. „Neues Gespraech“ fragt nach, Abbruch laesst den Verlauf stehen",
       discard.modal && discard.kept === discard.before,
-      `Modal: ${String(discard.modal)} · Verlauf ${discard.before} → ${discard.kept} Eintraege`,
+      discard.fremd > 0
+        ? `${discard.fremd} fremde(s) Modal offen — Punkt nicht entscheidbar`
+        : `Modal „${discard.titel}" · Verlauf ${discard.before} → ${discard.kept} Eintraege`,
     );
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
