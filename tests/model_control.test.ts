@@ -34,13 +34,55 @@ describe("renderPromptRow", () => {
     renderPromptRow(s, ctx({ systemPromptOverride: "Sei knapp." }));
     expect(textarea(s).getValue()).toBe("Sei knapp.");
   });
-  it("schreibt eine Aenderung in die Einstellungen und speichert", () => {
+  it("nimmt eine Aenderung erst beim blur an, nicht bei jedem Tastendruck", () => {
+    // Dieselbe Grammatik wie die Werkzeug-Zeilen: zwei Bedienformen fuer dasselbe Element
+    // in derselben Gruppe waeren ein Bedien-Bruch (Review-Befund Minor 6).
     const c = ctx();
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);
-    textarea(s).onChangeCB?.("Sei knapp.");
+    textarea(s).setValue("Sei knapp.");
+    expect(c.settings.systemPromptOverride).toBe("");
+    expect(c.save).not.toHaveBeenCalled();
+    textarea(s).inputEl.dispatchEvent({ type: "blur" });
     expect(c.settings.systemPromptOverride).toBe("Sei knapp.");
     expect(c.save).toHaveBeenCalled();
+  });
+  it("aktualisiert die Warnzeile beim blur, statt sie bis zum naechsten Oeffnen zu verstecken", () => {
+    // Der Kern des Befunds: die Warnung ist die einzige Absicherung dieses Entwurfs
+    // („warnen statt verbieten") — sie muss sichtbar werden, wenn die Abweichung entsteht.
+    const c = ctx();
+    const s = new Setting(makeFakeEl());
+    renderPromptRow(s, c);
+    expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(0);
+    textarea(s).setValue("Sei knapp."); // weder Werkzeuge noch Platzhalter
+    textarea(s).inputEl.dispatchEvent({ type: "blur" });
+    expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(2);
+  });
+  it("nimmt eine ueberfluessige Warnzeile beim blur wieder weg, statt sie zu stapeln", () => {
+    const c = ctx({ systemPromptOverride: "Sei knapp." });
+    const s = new Setting(makeFakeEl());
+    renderPromptRow(s, c);
+    expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(2);
+    textarea(s).setValue(DEFAULT_RULES);
+    textarea(s).inputEl.dispatchEvent({ type: "blur" });
+    expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(0);
+  });
+  it("zeichnet beim blur NUR die Warnzeilen, nicht den ganzen Tab", () => {
+    // Ein voller `refresh()` liefe zwischen mousedown (das den blur ausloest) und click —
+    // der Zuruecksetzen-Knopf waere im Moment seines eigenen Klicks schon ersetzt.
+    const c = ctx();
+    const s = new Setting(makeFakeEl());
+    renderPromptRow(s, c);
+    textarea(s).setValue("Sei knapp.");
+    textarea(s).inputEl.dispatchEvent({ type: "blur" });
+    expect(c.refresh).not.toHaveBeenCalled();
+  });
+  it("laesst einen unveraenderten Text beim blur unangetastet", () => {
+    const c = ctx({ systemPromptOverride: "Eigenes" });
+    const s = new Setting(makeFakeEl());
+    renderPromptRow(s, c);
+    textarea(s).inputEl.dispatchEvent({ type: "blur" });
+    expect(c.save).not.toHaveBeenCalled();
   });
   it("traegt den Zuruecksetzen-Knopf mit dem erwarteten Icon und Tooltip", () => {
     const s = new Setting(makeFakeEl());

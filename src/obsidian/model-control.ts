@@ -23,13 +23,50 @@ const WARN_TEXT: Record<RuleWarning, string> = {
 export function renderPromptRow(setting: Setting, ctx: ModelControlCtx): void {
   const model = promptRow(ctx.settings, ctx.relatedAvailable);
   setting.setName(t("settings.prompt")).setDesc(t("settings.prompt.desc"));
+
+  /** Zeichnet NUR die Warnzeilen neu, nicht den ganzen Tab. Zwei Gruende:
+   *  - Ein `ctx.refresh()` baut den Tab neu auf (`display()`), und dieses Neuzeichnen
+   *    liefe zwischen `mousedown` (das den blur ausloest) und `click` — der
+   *    Zuruecksetzen-Knopf waere im Moment seines eigenen Klicks schon ersetzt und der
+   *    Klick ginge verloren. Der Nutzer muesste zweimal druecken.
+   *  - Die Warnungen haengen an genau zwei Dingen (dem wirksamen Text und den aktiven
+   *    lesenden Werkzeugen); alles andere in der Zeile bleibt unberuehrt. */
+  const zeichneWarnungen = (): void => {
+    // `forEach` statt `for…of`: `NodeListOf` ist ohne die `dom.iterable`-Lib nicht iterierbar,
+    // und die Schleifenvariable waere `any` (dieselbe Form wie im Kit-Endpunkt-Editor).
+    setting.settingEl.querySelectorAll<HTMLElement>(".koda-warn").forEach((alt) => { alt.remove(); });
+    for (const w of promptRow(ctx.settings, ctx.relatedAvailable).warnings) {
+      // §8 Status-Indikator: Form UND Farbe UND State-Klasse UND aria-label — Farbe nie allein.
+      const el = setting.settingEl.createDiv({ cls: "koda-warn is-warning" });
+      setIcon(el.createSpan({ cls: "koda-warn-icon" }), "alert-triangle");
+      el.createSpan({ text: t(WARN_TEXT[w]) });
+      el.setAttribute("aria-label", t(WARN_TEXT[w]));
+    }
+  };
+
   setting
     .addTextArea((ta) => {
       ta.setPlaceholder(model.placeholder).setValue(model.value);
       ta.inputEl.rows = 8;
       ta.inputEl.addClass("koda-prompt-textarea");
-      ta.onChange((v) => {
+      // Uebernahme UND Neuzeichnen bei blur — dieselbe Grammatik wie die Werkzeug-Zeilen
+      // eine Funktion weiter unten; zwei Bedienformen fuer dasselbe Element in derselben
+      // Gruppe waeren ein Bedien-Bruch. Zwei Gruende, die zusammenfallen:
+      //  - Zeichnen: `onChange` speicherte, zeichnete aber nicht neu. Die zwei Warnungen,
+      //    die am getippten Text haengen (`no-tools`, `missing-placeholder`), erschienen
+      //    deshalb erst beim naechsten Oeffnen des Tabs — und die Warnung ist die einzige
+      //    Absicherung dieses Entwurfs („warnen statt verbieten", Spec E3/E5). Bei jedem
+      //    Tastendruck neu zu zeichnen geht nicht: das Re-Render zerstoert den Cursor.
+      //  - Speichern: mit `onChange` landete jeder Zwischenstand in der data.json; ein
+      //    halb getippter Prompt ist kein gewollter Stand. Beides an ein Ereignis zu
+      //    haengen haelt Gespeichertes und Geprueftes zusammen — waere nur das Zeichnen
+      //    auf blur gezogen, koennte eine Warnzeile aus einem Text entstehen, der schon
+      //    gespeichert, aber noch nicht fertig ist.
+      ta.inputEl.addEventListener("blur", () => {
+        const v = ta.getValue();
+        if (v === ctx.settings.systemPromptOverride) return; // nichts geaendert, nichts anfassen
         ctx.settings.systemPromptOverride = v;
+        zeichneWarnungen(); // synchron und vor dem Speichern — s. Kommentar an der Funktion
         void ctx.save();
       });
     })
@@ -41,13 +78,7 @@ export function renderPromptRow(setting: Setting, ctx: ModelControlCtx): void {
     )
     .addButton((b) => b.setButtonText(t("settings.prompt.show")).onClick(() => ctx.openPreview()));
 
-  for (const w of model.warnings) {
-    // §8 Status-Indikator: Form UND Farbe UND State-Klasse UND aria-label — Farbe nie allein.
-    const el = setting.settingEl.createDiv({ cls: "koda-warn is-warning" });
-    setIcon(el.createSpan({ cls: "koda-warn-icon" }), "alert-triangle");
-    el.createSpan({ text: t(WARN_TEXT[w]) });
-    el.setAttribute("aria-label", t(WARN_TEXT[w]));
-  }
+  zeichneWarnungen();
 }
 
 /** Referenz auf die interaktiven Komponenten EINER Werkzeug-Zeile — ueber den Namen
