@@ -2,6 +2,6 @@
   "source": "obsidian-kit",
   "version": "0.27.0",
   "sha": "548041b",
-  "vendored": "think-splitter.ts, reasoning.ts, endpoint.ts, endpoint_config.ts, endpoint_diagnostics.ts, settings.ts, i18n.ts, num.ts, timeout.ts, frontmatter.ts, model-context.ts, error_body.ts, diff.ts, settings_schema.ts, model-choice.ts, model-list-cache.ts",
+  "vendored": "think-splitter.ts, reasoning.ts, capabilities.ts, endpoint.ts, endpoint_config.ts, endpoint_diagnostics.ts, settings.ts, i18n.ts, num.ts, timeout.ts, frontmatter.ts, model-context.ts, error_body.ts, diff.ts, settings_schema.ts, model-choice.ts, model-list-cache.ts",
   "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh (liest KIT_REF, nicht den Arbeitsstand). kit-obsidian/ siehe dessen VENDOR.json; tests/vendor/kit/obsidian-mock.ts traegt seinen Pin in der Stempelzeile (dort liegt kein VENDOR.json)."
 }
