@@ -1,7 +1,8 @@
 import { Plugin, WorkspaceLeaf, normalizePath } from "obsidian";
 import "./i18n/strings";
 import { getLanguage } from "obsidian";
-import { pickLang, setLang, t } from "./vendor/kit/i18n";
+import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
+import { resolveLang, type Lang } from "./core/lang";
 import { effectiveModel, type EndpointConfig } from "./vendor/kit/endpoint_config";
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
@@ -108,9 +109,24 @@ export default class KodaPlugin extends Plugin {
     }
   }
 
+  /** Einmal ermittelte Auto-Sprache. Der Kit-Vertrag verlangt die Erkennung EINMAL beim
+   *  onload; `applyLanguage()` haengt aber auch an `saveSettings()`, damit ein Umschalten in
+   *  den Einstellungen sofort wirkt. Der Cache versoehnt beides. */
+  private autoLang: Lang | null = null;
+
   applyLanguage(): void {
-    const raw = this.settings.language;
-    setLang(raw === "auto" ? pickLang(safeGetLanguage()) : raw);
+    const r = resolveLang(this.settings.language, this.autoLang, () => detectLang(), getLang());
+    this.autoLang = r.cache;
+    setLang(r.lang);
+  }
+
+  /** Sprache fuer den System-Prompt — dieselbe Quelle wie die Oberflaeche. Zwei getrennte
+   *  Erkennungen koennten auseinanderlaufen, und dann antwortet Koda in einer anderen
+   *  Sprache, als seine Knoepfe tragen. */
+  private promptLang(): Lang {
+    const r = resolveLang(this.settings.language, this.autoLang, () => detectLang(), getLang());
+    this.autoLang = r.cache;
+    return r.lang;
   }
 
   private async ensureDir(dir: string): Promise<void> {
@@ -185,7 +201,7 @@ export default class KodaPlugin extends Plugin {
       const memory = await this.readMemory();
       const { selection, failed } = await this.readSkills();
       this.skillNotice = this.skillStatusText(selection, failed);
-      const lang = s.language === "auto" ? pickLang(safeGetLanguage()) : s.language;
+      const lang = this.promptLang();
       const system: ChatMessage = {
         role: "system",
         content: buildSystemPrompt({ lang, memory, kodaFolder: s.kodaFolder, skills: selection }),
@@ -406,10 +422,15 @@ export default class KodaPlugin extends Plugin {
   }
 }
 
-function safeGetLanguage(): string {
+/** Sprach-Erkennung ueber Obsidians API. `null` heisst „hat nicht geklappt" — ausdruecklich
+ *  NICHT "en". Vorher gab diese Funktion bei einem Fehler "" zurueck, woraus `pickLang`
+ *  stillschweigend Englisch machte: ein verschluckter Fehler wurde so zu einer Aussage ueber
+ *  die Sprache des Nutzers, und niemand konnte die beiden Faelle unterscheiden. */
+function detectLang(): Lang | null {
   try {
-    return getLanguage();
-  } catch {
-    return "";
+    return pickLang(getLanguage());
+  } catch (e) {
+    console.warn("Koda: Spracherkennung fehlgeschlagen, bisherige Sprache bleibt", e);
+    return null;
   }
 }
