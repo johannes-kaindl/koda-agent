@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.8.0 im Community-Store, Sidebar-Angleichung auf main (unreleased), Stand 2026-08-30
+## Status: 0.9.0 im Community-Store (Rescan „passed", zero warnings), main, Stand 2026-08-30
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
@@ -20,14 +20,19 @@ overflow, GUI-Smoke 10/10). **0.7.0 ist im Store** (Tag `cb396b2` auf Forgejo+Gi
 „passed“ mit Höchstwertung am 2026-08-19). **0.7.1 ist am 2026-08-21 im Store** (Tag
 `6455e2b` auf Forgejo+GitHub, GUI-Smoke 10/10 mit dem Kandidaten, Rescan „passed“ mit
 Höchstwertung und **zero warnings**) — Inhalt ist der Kit-Rückfluss auf `obsidian-kit@0.27.0`
-mit vier Verhaltensänderungen. **Die Sidebar-Angleichung ist seit 2026-08-30 auf `main`** (Spec
+mit vier Verhaltensänderungen. **0.9.0 ist seit 2026-08-30 im Store** (Tag `45c7590` auf Forgejo+GitHub, Rescan „passed" mit
+Hoechstwertung und zero warnings — vierter befundfreier Anlauf in Folge). Inhalt ist die
+Sidebar-Angleichung plus der i18n-Fix (Auto-Sprache **einmal** beim onload ermitteln, wie der
+Kit-Vertrag es verlangt; ein verschluckter Fehler gilt nicht mehr stillschweigend als
+„Englisch"; System-Prompt und Oberflaeche ziehen aus derselben Quelle).
+**Die Sidebar-Angleichung ist seit 2026-08-30 auf `main`** (Spec
 `2026-08-30-koda-sidebar-angleichung-design.md`) und schliesst fuenf von Johannes'
 Quicktasks: Statuszeile mit Taetigkeit und drehendem Icon, Kontextfenster-Belegung,
 Thinking-Schalter im View-Kopf, Markdown waehrend des Streams, „Neues Gespraech" als
 Kopf-Aktion hinter einer Rueckfrage. Vier der fuenf Punkte kamen aus dem Bestand statt
 aus Eigenbau — der Kit-first-Check lief **vor** dem Entwurf, weil Johannes ihn eingefordert
 hatte, und korrigierte den ersten Entwurf in vier von fuenf Punkten.
-Gate ist grün (398/398), `main.js` baut. Details zu Nutzung/Setup:
+Gate ist grün (405/405), `main.js` baut. Details zu Nutzung/Setup:
 `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`. **Ein lokaler
 LLM-Server braucht CORS** (LM Studio „Enable CORS"/`lms server start --cors`): der Chat
 streamt als XHR aus dem Renderer, die Testen-Probe läuft über `requestUrl` — Koda benennt
@@ -133,7 +138,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (398/398).
+- `npm test` — `check-no-abs-paths` + vitest (405/405).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
