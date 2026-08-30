@@ -236,7 +236,16 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
     Verwerfen (Verlauf 2 → 2 Einträge nach Abbruch).
   - **Nicht gemessen, weil sie ein Modell brauchen:** Handpunkte 21 (Markdown während des
     Streams) und 22 (Thinking-Schalter bei einem always-on-Modell). Ollama war bis ~14:10 vom
-    Reindex belegt.
+    Reindex belegt. *(Beide am selben Abend nachgeholt; 22 wurde dabei zu Prüfpunkt 13.)*
+  - **Nebenertrag für vault-rag, den kein einzelner Lauf gezeigt hätte:** über **vier** Läufe
+    des Tages meldete Prüfpunkt 1b dessen Vertrag durchgehend wohlgeformt (`apiVersion 1`, alle
+    vier Methoden, `indexed=true`), während die Notizzahl sichtbar wanderte —
+    6665 → 6666 → 6526 → 6787. Der Vertrag hat also einen laufenden Voll-Reindex **und** ein
+    Release des Anbieters unbeschadet überstanden. Zugleich ist es die praktische Bestätigung
+    des Befunds vom selben Tag: **`indexed: true` sagt nichts über die Aktualität** — vier
+    verschiedene Notizzahlen, viermal dieselbe Bereitschaftsmeldung. vault-rag hat das
+    inzwischen ausdrücklich in den Doc-Kommentar von `ApiStatus.indexed` geschrieben
+    (`f082af3`).
 
 - **2026-08-24 (04:25–04:50), Handpunkte 13, 14, 15, 16, 19 gefahren — alle grün; ein
   Fremdbefund für vault-rag.** Vault `10_Pallas`, Obsidian 1.13.7, Koda 0.7.1,
