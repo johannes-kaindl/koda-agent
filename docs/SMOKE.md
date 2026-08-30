@@ -64,6 +64,22 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
 
 ## Automatisierter Teil: `npm run smoke:gui`
 
+⚠️ **Zuerst prüfen, wer sonst an Obsidian hängt.** Obsidian ist Single-Instance — ein
+`quit` trifft die Instanz, an der möglicherweise eine andere Session arbeitet, und zerstört
+deren Zustand. Der eigene Lauf ist danach sauber grün; der Schaden entsteht woanders und
+fällt nicht auf.
+
+```bash
+lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null && echo "läuft bereits — NICHT beenden"
+```
+
+Hört der Port schon, dann **mitnutzen statt neu starten**: ein eigenes Fenster per
+`vault-open` über IPC öffnen, dann `attachTo("workspace", port, vault)` — der Vault-Name
+wählt, nicht die Reihenfolge. ⚠️ Die Port-Prüfung ersetzt die Frage nicht: sie zeigt aktive
+CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den Port wartet.
+
+Erst wenn nichts läuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
+
 Vierzehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
 laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
 2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
