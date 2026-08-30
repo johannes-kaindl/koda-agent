@@ -27,3 +27,20 @@ export function renderRules(template: string, opts: { lang: "de" | "en"; folder:
     .split(PLACEHOLDER_LANG).join(LANGUAGE_NAME[opts.lang])
     .split(PLACEHOLDER_FOLDER).join(folder);
 }
+
+/** Die vier Werkzeuge, die Vault-Inhalt ins Gespraech holen. Steht hier als eine Liste und
+ *  nicht verstreut in Bedingungen — die Warnung haengt daran (Spec E3). */
+export const READING_TOOLS = ["search_notes", "read_note", "list_notes", "related_notes"];
+
+export type RuleWarning = "no-tools" | "missing-placeholder" | "no-reading-tool";
+
+/** Prueft den Regelblock GROB. Absichtlich keine Satzpruefung: sie verbietet nichts, also
+ *  darf sie ungenau sein — eine Sperre duerfte es nicht (Spec E5). Falsch-negativ ist
+ *  hier der billigere Fehler als falsch-positiv, weil Fehlalarme zum Wegsehen erziehen. */
+export function checkRules(text: string, activeReadingTools: string[]): RuleWarning[] {
+  const out: RuleWarning[] = [];
+  if (!/tool|werkzeug/i.test(text)) out.push("no-tools");
+  if (!text.includes(PLACEHOLDER_LANG) || !text.includes(PLACEHOLDER_FOLDER)) out.push("missing-placeholder");
+  if (activeReadingTools.length === 0) out.push("no-reading-tool");
+  return out;
+}
