@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.9.0 im Community-Store (Rescan „passed", zero warnings), Modell-Steuerung auf main, Stand 2026-08-31
+## Status: 0.9.0 im Community-Store (Rescan „passed", zero warnings), Modell-Steuerung auf `feat/modell-steuerung`, Stand 2026-08-31
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
@@ -32,8 +32,8 @@ Thinking-Schalter im View-Kopf, Markdown waehrend des Streams, „Neues Gespraec
 Kopf-Aktion hinter einer Rueckfrage. Vier der fuenf Punkte kamen aus dem Bestand statt
 aus Eigenbau — der Kit-first-Check lief **vor** dem Entwurf, weil Johannes ihn eingefordert
 hatte, und korrigierte den ersten Entwurf in vier von fuenf Punkten.
-**Die Modell-Steuerung ist seit 2026-08-31 auf `main`** (Branch `feat/modell-steuerung`,
-Spec `2026-08-31-koda-modell-steuerung-design.md`) — der Regelblock des System-Prompts ist
+**Die Modell-Steuerung liegt fertig und mergefaehig auf `feat/modell-steuerung`, noch NICHT
+auf `main`** (Spec `2026-08-31-koda-modell-steuerung-design.md`) — der Regelblock des System-Prompts ist
 in den Einstellungen vollständig ersetzbar (mit Zurücksetzen und einer Warnung, die
 nichts verbietet), jedes der sieben Werkzeuge einzeln abschaltbar und umbeschreibbar, und
 die aktive Anweisung einsehbar: im Einstellungs-Modal für das nächste Gespräch, im

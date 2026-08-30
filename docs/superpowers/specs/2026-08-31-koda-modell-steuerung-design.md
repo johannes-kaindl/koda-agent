@@ -183,6 +183,12 @@ Hatch (ein Reset-Knopf und eine Schalterliste haben kein deklaratives Control) â
 Datei zu legen, triebe sie Richtung 700 Zeilen. `renderSkills` bleibt bei `memory.ts`, bis es
 einen Grund gibt, es zu bewegen.
 
+**Nachtrag (2026-08-31, beim Schluss-Review gemessen):** Der Grund gab sich beim Umzug selbst
+â€” `renderSkills` ist mit nach `build.ts` gezogen und liegt dort als modulprivate Funktion.
+`buildSystemPrompt` ist sein einziger Aufrufer; bliebe es bei `memory.ts`, stuende dort ein
+Helfer, den nur noch eine andere Datei braucht, und `memory.ts` exportierte ihn allein
+dafuer. Der Satz oben beschreibt also den Entwurfsstand, nicht den Code.
+
 ## Datenmodell und Migration
 
 ```ts
