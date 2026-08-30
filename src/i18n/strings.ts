@@ -144,7 +144,6 @@ defineStrings({
     "settings.tools.needsRag": "needs the vault-rag plugin",
     "prompt.modal.title": "Active instructions",
     "prompt.modal.subtitle": "This is how the next conversation starts — including memory and skills.",
-    "prompt.modal.close": "Close",
   },
   de: {
     "view.title": "Koda",
@@ -285,6 +284,5 @@ defineStrings({
     "settings.tools.needsRag": "braucht das Plugin vault-rag",
     "prompt.modal.title": "Aktive Anweisung",
     "prompt.modal.subtitle": "So beginnt das nächste Gespräch — mit Memory und Skills.",
-    "prompt.modal.close": "Schließen",
   },
 });
