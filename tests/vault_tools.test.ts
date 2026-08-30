@@ -102,6 +102,15 @@ describe("VaultTools", () => {
     const tools = new VaultTools(fakeVault({}), yes, opts);
     expect((await tools.run("gibt_es_nicht", {})).ok).toBe(false);
   });
+  it("lehnt den Aufruf eines Werkzeugs ab, das nicht angeboten wurde", async () => {
+    // Ein abgeschaltetes Werkzeug ist fuer den Runner dasselbe wie ein erfundenes: es steht
+    // nicht in der gesendeten Liste. Der Beleg gehoert trotzdem hierher — die Spec verlangt
+    // ausdruecklich, das zu messen statt anzunehmen.
+    const tools = new VaultTools(fakeVault({}), yes, opts);
+    const r = await tools.run("write_skill_das_es_nicht_gibt", '{"a":1}');
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain("unbekanntes Tool");
+  });
 });
 
 describe("write_skill", () => {
