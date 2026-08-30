@@ -156,3 +156,10 @@
 }
 .koda-warn.is-warning { color: var(--text-warning); }
 .koda-warn-icon { display: flex; }
+.koda-tool-list { display: flex; flex-direction: column; gap: var(--size-4-2); margin-top: var(--size-4-2); }
+.koda-tool-row { display: flex; flex-direction: column; gap: var(--size-4-1); }
+.koda-tool-row.is-unavailable { opacity: 0.5; }
+.koda-tool-head { display: flex; align-items: baseline; gap: var(--size-4-2); }
+.koda-tool-name { font-family: var(--font-monospace); font-size: var(--font-ui-small); }
+.koda-tool-hint { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.koda-tool-controls { border-top: none; padding-top: 0; }

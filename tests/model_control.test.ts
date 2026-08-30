@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { Setting, makeFakeEl, ExtraButtonComponent, TextAreaComponent } from "obsidian";
-import { renderPromptRow, type ModelControlCtx } from "../src/obsidian/model-control";
+import { Setting, makeFakeEl, ExtraButtonComponent, TextAreaComponent, ToggleComponent } from "obsidian";
+import { renderPromptRow, renderToolList, type ModelControlCtx } from "../src/obsidian/model-control";
 import { DEFAULT_SETTINGS, type KodaSettings } from "../src/core/settings-types";
 import { DEFAULT_RULES } from "../src/core/prompt/rules";
 import "../src/i18n/strings";
@@ -91,5 +91,70 @@ describe("renderPromptRow", () => {
       && !(x instanceof ExtraButtonComponent)) as { clickCB?: () => void };
     btn.clickCB?.();
     expect(c.openPreview).toHaveBeenCalled();
+  });
+});
+
+/** Eine Werkzeug-Zeile im Fake-DOM. Der Zugriff laeuft ueber die Klasse und das
+ *  data-Attribut, weil der Mock nur Tag- und Klassen-Selektoren kennt
+ *  (obsidian-mock.ts:48). */
+const zeilen = (s: Setting): any[] => s.settingEl.querySelectorAll(".koda-tool-row");
+const zeile = (s: Setting, name: string): any =>
+  zeilen(s).find((r) => r.getAttribute("data-tool") === name);
+
+describe("renderToolList", () => {
+  it("fuehrt jedes Werkzeug mit einer eigenen Zeile", () => {
+    const s = new Setting(makeFakeEl());
+    renderToolList(s, ctx());
+    expect(zeilen(s)).toHaveLength(7); // sechs feste plus related_notes
+  });
+  it("zeigt related_notes ausgegraut statt es zu verschweigen, wenn vault-rag fehlt", () => {
+    const s = new Setting(makeFakeEl());
+    renderToolList(s, ctx());
+    const r = zeile(s, "related_notes");
+    expect(r.hasClass("is-unavailable")).toBe(true);
+    expect(r.textContent).toContain("vault-rag");
+  });
+  it("graut nichts aus, wenn ein Index da ist", () => {
+    const c = { ...ctx(), relatedAvailable: true };
+    const s = new Setting(makeFakeEl());
+    renderToolList(s, c);
+    expect(zeile(s, "related_notes").hasClass("is-unavailable")).toBe(false);
+  });
+  it("schaltet ein Werkzeug ab und schreibt das in die Einstellungen", () => {
+    const c = ctx();
+    const s = new Setting(makeFakeEl());
+    renderToolList(s, c);
+    const tg = s.components.filter((x) => x instanceof ToggleComponent) as ToggleComponent[];
+    // Reihenfolge der Komponenten = Reihenfolge der Zeilen (write_note ist die vierte).
+    tg[3].onChangeCB?.(false);
+    expect(c.settings.toolsDisabled).toContain("write_note");
+    expect(c.save).toHaveBeenCalled();
+  });
+  it("schaltet wieder ein, ohne einen Rest in der Liste zu lassen", () => {
+    const c = ctx({ toolsDisabled: ["write_note"] });
+    const s = new Setting(makeFakeEl());
+    renderToolList(s, c);
+    const tg = s.components.filter((x) => x instanceof ToggleComponent) as ToggleComponent[];
+    tg[3].onChangeCB?.(true);
+    expect(c.settings.toolsDisabled).toEqual([]);
+  });
+  it("nimmt eine eigene Beschreibung erst beim blur an, nicht bei jedem Tastendruck", () => {
+    const c = ctx();
+    const s = new Setting(makeFakeEl());
+    renderToolList(s, c);
+    const ta = s.components.filter((x) => x instanceof TextAreaComponent) as TextAreaComponent[];
+    ta[1].setValue("Liest."); // read_note ist die zweite Zeile
+    expect(c.settings.toolDescriptions.read_note).toBeUndefined();
+    ta[1].inputEl.dispatchEvent({ type: "blur" });
+    expect(c.settings.toolDescriptions.read_note).toBe("Liest.");
+  });
+  it("loescht den Eintrag wieder, wenn das Feld geleert wird — leer heisst ausgeliefert", () => {
+    const c = ctx({ toolDescriptions: { read_note: "Liest." } });
+    const s = new Setting(makeFakeEl());
+    renderToolList(s, c);
+    const ta = s.components.filter((x) => x instanceof TextAreaComponent) as TextAreaComponent[];
+    ta[1].setValue("   ");
+    ta[1].inputEl.dispatchEvent({ type: "blur" });
+    expect(c.settings.toolDescriptions.read_note).toBeUndefined();
   });
 });

@@ -37,7 +37,7 @@ import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
 import { resolveModelChoice, type ModelOption } from "../core/llm/model-choice";
-import { renderPromptRow, type ModelControlCtx } from "./model-control";
+import { renderPromptRow, renderToolList, type ModelControlCtx } from "./model-control";
 import { readRetrievalApi } from "./retrieval";
 import {
   DEFAULT_SETTINGS,
@@ -179,9 +179,11 @@ export class KodaSettingsTab extends PluginSettingTab {
         type: "group",
         heading: t("settings.modelControl"),
         items: [
-          // `name` ist bei der nativen 1.13-API Pflicht (Suchindex) — `renderPromptRow`
-          // setzt ihn intern noch einmal, das ist idempotent (wie bei `renderModelPicker`).
+          // `name` ist bei der nativen 1.13-API Pflicht (Suchindex) — `renderPromptRow`/
+          // `renderToolList` setzen ihn intern noch einmal, das ist idempotent (wie bei
+          // `renderModelPicker`).
           { name: t("settings.prompt"), render: (setting) => renderPromptRow(setting, this.modelCtx()) },
+          { name: t("settings.tools"), render: (setting) => renderToolList(setting, this.modelCtx()) },
         ],
       },
       {
