@@ -16,7 +16,7 @@ import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
 import { isCompactionRecord, type ChatMessage, type LogEntry } from "./core/agent/types";
 import { toolDefs, toWireTools } from "./core/tools/defs";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
-import { buildSystemPrompt } from "./core/memory/memory";
+import { buildSystemPrompt } from "./core/prompt/build";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
 import { selectSkills, type Selection } from "./core/skills/select";
