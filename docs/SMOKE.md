@@ -15,6 +15,13 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
 11. Skill von Hand anlegen → `⚙ Skills aktiv` erscheint beim nächsten Gesprächsstart, Antwort folgt der Anweisung.
 12. Koda einen Skill schreiben lassen → Modal zeigt `Künftig:` plus vollständigen Inhalt; Ablehnung schreibt nichts.
 13. Eine Antwort in der Sidebar mit der Maus markieren → Text lässt sich auswählen und mit Cmd+C kopieren.
+21. Eine Antwort mit Liste **und** Codeblock erzeugen → schon **während** des Streams stehen die
+    fertigen Absätze gerendert da (Aufzählungspunkte statt Bindestriche); nur der laufende Absatz
+    ist Rohtext, und ein angefangener ```-Block wird nicht mittendrin als Absatz gerendert.
+22. Bei einem Modell, das sich nicht abschalten lässt (gpt-oss/harmony), zeigt die Kopf-Aktion
+    „Thinking: immer an" und tut auf Klick nichts — statt etwas zu versprechen, das die Anfrage
+    nicht einhält. Der einzige Punkt der neuen Sidebar, den kein Automat erreicht: er braucht ein
+    konkretes Modell.
 
 ### Semantisches Retrieval (nur mit aktivem „Vault Retrieval")
 
@@ -49,10 +56,10 @@ Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool
 
 ## Automatisierter Teil: `npm run smoke:gui`
 
-Zehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+Vierzehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
 laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
 2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
-erweitert). Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
+erweitert, 2026-08-30 um 9–12 für die umgebaute Sidebar). Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
 
 ```bash
 osascript -e 'quit app "Obsidian"'
@@ -68,7 +75,22 @@ Knöpfen · Klick auf „Testen“ friert den Renderer nicht ein · toter Endpun
 erreichbar angezeigt · **Settings-Gruppe „Kontext & Verdichtung“** (Überschrift + Zahlenfeld
 „Kontextfenster (Token)“ vorhanden) · zwei tote Endpunkte ergeben Klartext statt Stacktrace ·
 Wikilink in der Antwort öffnet die Notiz · **Verdichtungs-Marken** (Stufe 1, Stufe 2
-aufklappbar mit Text, erzwungener Zusatz „Überlauf“/„overflow“) werden gerendert.
+aufklappbar mit Text, erzwungener Zusatz „Überlauf“/„overflow“) werden gerendert · **Statuszeile**
+über eine ganze Werkzeug-Runde · **Kontextfenster-Belegung** inkl. Warnschwelle · **Thinking-Schalter**
+im Kopf · **Rückfrage vor dem Verwerfen** eines Gesprächs.
+
+Die Punkte **9–12** (2026-08-30) kommen wie 7 ohne Modell aus — sie speisen den
+Aktivitäts-Zustandsautomaten mit derselben Ereignisfolge, die `main.ts` aus dem Agent-Loop
+durchreicht, und räumen ihre Spuren im `chatLog` selbst wieder weg. Zwei von ihnen sind
+**Gegenproben mit zwei Werten**, nicht bloße Vorhandenseins-Prüfungen: Punkt 9 vergleicht die
+Beschriftung über fünf Zustände hinweg (eine Zeile, die immer „arbeitet" sagt, wäre grün und
+trotzdem kaputt), Punkt 10 misst die Belegung einmal am echten und einmal an einem winzigen
+Kontextfenster — die Zahl muss steigen **und** die Warnung anspringen.
+
+Punkt **10 schließt zugleich eine der beiden Messlücken vom 2026-08-28** von der anderen Seite:
+gemessen wird nicht mehr nur, dass das Settings-Feld existiert, sondern dass seine Zahl in der
+Sidebar ankommt. Offen bleibt `hide()` (Cache-Verwurf beim Schließen des Tabs) — dafür braucht es
+einen Endpunkt, der während des Laufs an- und ausgeht.
 
 Prüfpunkt **7** und **8** kommen ohne Modell und ohne Persistenz aus: Punkt 7 haengt zwei
 `CompactionRecord`s nur im Speicher an `p.chatLog`, ruft `renderLog()`, prueft die drei

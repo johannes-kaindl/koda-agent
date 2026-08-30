@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.8.0 released (Rescan offen), 0.7.1 im Community-Store, main, Stand 2026-08-28
+## Status: 0.8.0 im Community-Store, Sidebar-Angleichung auf main (unreleased), Stand 2026-08-30
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
@@ -20,7 +20,14 @@ overflow, GUI-Smoke 10/10). **0.7.0 ist im Store** (Tag `cb396b2` auf Forgejo+Gi
 „passed“ mit Höchstwertung am 2026-08-19). **0.7.1 ist am 2026-08-21 im Store** (Tag
 `6455e2b` auf Forgejo+GitHub, GUI-Smoke 10/10 mit dem Kandidaten, Rescan „passed“ mit
 Höchstwertung und **zero warnings**) — Inhalt ist der Kit-Rückfluss auf `obsidian-kit@0.27.0`
-mit vier Verhaltensänderungen. Gate ist grün (332/332), `main.js` baut. Details zu Nutzung/Setup:
+mit vier Verhaltensänderungen. **Die Sidebar-Angleichung ist seit 2026-08-30 auf `main`** (Spec
+`2026-08-30-koda-sidebar-angleichung-design.md`) und schliesst fuenf von Johannes'
+Quicktasks: Statuszeile mit Taetigkeit und drehendem Icon, Kontextfenster-Belegung,
+Thinking-Schalter im View-Kopf, Markdown waehrend des Streams, „Neues Gespraech" als
+Kopf-Aktion hinter einer Rueckfrage. Vier der fuenf Punkte kamen aus dem Bestand statt
+aus Eigenbau — der Kit-first-Check lief **vor** dem Entwurf, weil Johannes ihn eingefordert
+hatte, und korrigierte den ersten Entwurf in vier von fuenf Punkten.
+Gate ist grün (398/398), `main.js` baut. Details zu Nutzung/Setup:
 `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`. **Ein lokaler
 LLM-Server braucht CORS** (LM Studio „Enable CORS"/`lms server start --cors`): der Chat
 streamt als XHR aus dem Renderer, die Testen-Probe läuft über `requestUrl` — Koda benennt
@@ -126,11 +133,12 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (332/332).
+- `npm test` — `check-no-abs-paths` + vitest (398/398).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort.
+  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 14 Punkte (9–12 seit
+  2026-08-30: Statuszeile, Kontext-Belegung, Thinking-Schalter, Rückfrage vorm Verwerfen).
 - `npm run gui:ask -- --vault <name> --ask "<Frage>" [--expect <text>] [--full]` —
   Praxistest: stellt Koda im laufenden Obsidian eine echte Frage und berichtet, **welche
   Werkzeuge er wählt**. Das Gegenstück zum Smoke — langsam und nicht deterministisch,
@@ -144,6 +152,13 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   Tool-Policy/-Defs, Memory, Sessions, Diff.
 - `src/core/skills/` — Skill-Parser, Budget-Auswahl, Pfad-Bau (obsidian-frei wie der
   Rest von `core/`).
+- `src/core/chat/` — die Sidebar-Logik, pure (seit 2026-08-30): `activity.ts` (was Koda
+  gerade tut, als Zustandsautomat — die Statuszeile bildet ihn nur ab), `context-usage.ts`
+  (Belegung des Kontextfensters, **dieselbe** Schaetzung und Schwelle wie die Verdichtung),
+  `stream-blocks.ts` (`splitStable`: fertige Absaetze rendern, laufenden Absatz als Rohtext
+  lassen — ein offener ```-Fence ist keine Grenze), `reasoning-toggle.ts` (**uebernommen**
+  aus `image-to-markdown`, Herkunftsstempel; drei Toggle-Zustaende **und** `effectiveSuppress`
+  fuer die Request-Seite — die REGISTRY warnt, dass wer nur die Anzeige nimmt, die Haelfte hat).
 - `src/core/agent/compaction/` — zweistufige Verdichtung des Gesprächsverlaufs
   (`project.ts`/`estimate.ts`/`stage1.ts`/`stage2.ts`): Projektion statt Umschreiben,
   positionsbasierte Marken, Tool-Stubs vor Modell-Zusammenfassung, Nutzer-Nachrichten

@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A status line in the sidebar says what Koda is doing.** Between the conversation and the
+  input box, a line now shows the current activity in plain words — thinking, writing,
+  searching the vault for a term, reading a note, summarising earlier turns — with a spinning
+  icon while work is under way. Until now the two long silences (before the first token, and
+  between tool steps) were indistinguishable from a frozen window.
+- **The same line shows how much of the context window is in use** when Koda is idle, and
+  turns amber once the compaction threshold is reached — so the line explains why the history
+  is about to be compacted instead of just doing it. The number comes from the same estimate
+  and the same threshold that trigger compaction.
+- **A thinking switch in the view header.** It toggles the same setting as the one in the
+  settings tab, and knows three states rather than two: with a model that cannot turn
+  reasoning off (gpt-oss/harmony) it reads "always on" and stays disabled, instead of
+  promising something the request will not honour.
+
+### Changed
+
+- **Answers are formatted while they stream in, not only when they finish.** Paragraphs that
+  are complete get rendered as Markdown right away; only the paragraph still being written
+  stays plain text. An unfinished code block is never split mid-fence.
+- **"New chat" left the button row and became a header action with a confirmation.** It sat
+  next to "Send" and was easy to hit by accident, which discarded the conversation with no way
+  back. Send (now the primary button) and Stop keep their places.
+
+
 ## [0.8.0] — 2026-08-28
 
 ### Fixed
