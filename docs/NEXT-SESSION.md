@@ -306,14 +306,21 @@ sich mit dem Befund oben. Alle drei sind Stellschrauben, die der Nutzer heute ni
    selbst markierbar; vault-rag setzt dieselbe Zeile aus demselben Grund. **Noch nicht im
    laufenden Obsidian verifiziert** — steht als Punkt 13 in `docs/SMOKE.md`.
 
-### Sidebar-UI ans Ökosystem angleichen (Johannes' Feedback aus der Handover-Note)
+### Sidebar-UI ans Ökosystem angleichen — ✅ erledigt 2026-08-30
 
-Gehört zum Endpunkt-UI-Punkt oben, ist aber ein eigener Schnitt:
+Umgesetzt, Spec `docs/superpowers/specs/2026-08-30-koda-sidebar-angleichung-design.md`,
+neun Commits bis `83f6259`, Gate 398/398. Was aus den drei Punkten wurde:
 
-- **Thinking sichtbar machen.** Kein Bug — `suppressThinking: true` unterdrückt es absichtlich,
-  und Kodas View hat den ausklappbaren „Denkt nach…"-Block bereits. Der Punkt ist trotzdem
-  richtig: bei einem MoE-Modell wartet man minutenlang vor einem UI, das tot aussieht.
-  Frage fürs Design: Default umdrehen, oder eine „arbeitet…"-Anzeige unabhängig vom Thinking?
-- **Farbiger Senden-Knopf** und die übrigen Sidebar-Details nach vault-rag-Vorbild.
-- **Sidebar-UI ins Kit**, falls dort noch nicht vorhanden — Johannes hält das ausdrücklich für
-  überfällig. Zusammen mit der Endpunkt-Zeile (n=3) ist das ein gemeinsamer Extraktions-Anlass.
+- **Thinking sichtbar machen** → weder das eine noch das andere aus der damaligen Designfrage,
+  sondern **beides getrennt**: eine Statuszeile zeigt die Tätigkeit unabhängig vom Thinking
+  (das war der eigentliche Bedarf), und der Thinking-Schalter sitzt jetzt im View-Kopf. Der
+  Default bleibt unverändert — die Begründung fürs Umdrehen („UI sieht tot aus") erledigt
+  die Statuszeile.
+- **Farbiger Senden-Knopf** → `mod-cta`; zusätzlich verließ „Neues Gespräch" die Leiste
+  (Kopf-Aktion hinter `confirmAction`), weil es dort regelmäßig versehentlich getroffen wurde.
+- **Sidebar-UI ins Kit** → die Bestandsaufnahme fiel anders aus als erwartet: nicht die
+  Sidebar als Ganzes ist Kit-Material, sondern die vier Bausteine darin — und drei davon
+  **existierten bereits** (Status-Indikator als verbindlicher `UI-STANDARD` §8-Baustein,
+  Thinking-Toggle als REGISTRY-Zeile, `confirmAction` vendored). Übernommen statt gebaut.
+  Die fällige Kit-Extraktion des Thinking-Toggles liegt als Dach-Task und wartet bewusst
+  auf den `code-kit`-Umzug, nicht auf Reife.
