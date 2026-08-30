@@ -27,6 +27,39 @@ describe("toolDefs", () => {
   });
 });
 
+describe("toolDefs mit Nutzer-Steuerung", () => {
+  it("laesst abgeschaltete Werkzeuge weg — das Modell erfaehrt nichts von ihnen", () => {
+    const names = toolDefs({ related: false, disabled: ["write_note", "save_memory"] }).map((d) => d.name);
+    expect(names).not.toContain("write_note");
+    expect(names).not.toContain("save_memory");
+    expect(names).toContain("read_note");
+  });
+  it("schaltet auch related_notes ab", () => {
+    const names = toolDefs({ related: true, disabled: ["related_notes"] }).map((d) => d.name);
+    expect(names).not.toContain("related_notes");
+  });
+  it("ersetzt die Beschreibung, wenn eine eigene da ist", () => {
+    const d = toolDefs({ related: false, descriptions: { read_note: "Liest eine Notiz. Sonst nichts." } })
+      .find((x) => x.name === "read_note");
+    expect(d?.description).toBe("Liest eine Notiz. Sonst nichts.");
+  });
+  it("nimmt bei leerer eigener Beschreibung den Auslieferungsstand (Spec E2)", () => {
+    const d = toolDefs({ related: false, descriptions: { read_note: "   " } }).find((x) => x.name === "read_note");
+    expect(d?.description).toContain("Read the full content");
+  });
+  it("ignoriert eine Beschreibung fuer ein Werkzeug, das es nicht gibt", () => {
+    const list = toolDefs({ related: false, descriptions: { gibt_es_nicht: "x" } });
+    expect(list.map((d) => d.name)).not.toContain("gibt_es_nicht");
+  });
+  it("veraendert TOOL_DEFS nicht — auch nicht ueber die ersetzte Beschreibung", () => {
+    toolDefs({ related: false, descriptions: { read_note: "geaendert" } });
+    expect(TOOL_DEFS.find((d) => d.name === "read_note")?.description).toContain("Read the full content");
+  });
+  it("bleibt ohne die neuen Angaben rueckwaertskompatibel", () => {
+    expect(toolDefs({ related: false }).map((d) => d.name)).toEqual(TOOL_DEFS.map((d) => d.name));
+  });
+});
+
 describe("list_notes in den Tool-Defs", () => {
   it("ist Teil der festen Werkzeuge — auch ohne vault-rag", () => {
     const names = toolDefs({ related: false }).map((d) => d.name);
