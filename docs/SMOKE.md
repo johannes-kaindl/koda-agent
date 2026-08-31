@@ -552,3 +552,42 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   (frisch gestartete App, Plugin per `disablePlugin/enablePlugin` geladen; echter *und*
   synthetischer Mausklick probiert). **Prüfpunkt 3 ist damit unbewiesen** — er war noch nie
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
+
+
+## Belegter Lauf: 2026-08-31, Modell-Steuerung (18/18)
+
+Gefahren gegen den **Staging-Vault `koda-agent`**, der bis dahin nicht existierte — Koda war
+nur in `10_Pallas` installiert. Der Vault wurde für diesen Lauf angelegt (Notizen, `Koda/Memory.md`,
+ein Skill); ein getracktes Fixture fehlt weiterhin und bleibt offen. Der Grund, es nicht gegen
+den Arbeits-Vault zu fahren, steht in den Prüfpunkten selbst: **16 und 17 schreiben Einstellungen**
+(`systemPromptOverride`, `toolsDisabled`) — im Arbeits-Vault wären das die echten.
+
+Die drei neuen Punkte klären die drei Zweifel, mit denen sie geschrieben wurden:
+
+- **16** findet den `rotate-ccw`-Knopf über sein `aria-label` (`geklickt: true`) — der Verdacht,
+  `setTooltip()` schreibe es nicht aufs Element, war unbegründet.
+- **17** misst die gesendete Liste über `currentToolNames()`: `write_note` fehlt bei
+  abgeschaltetem Schalter und ist nach dem Zurückschreiben wieder da. Beide Hälften nötig — ohne
+  die zweite wäre eine Liste, die es nie enthielt, ebenso grün.
+- **18** rendert im **Einstellungsfenster**, nicht im Hauptfenster (1165 Zeichen, Memory und
+  Skills beide vorhanden).
+
+### Praxistest (`gui:ask`, qwen/qwen3.8-27b)
+
+Drei Läufe, jeder belegt eine Hälfte des Features:
+
+1. **Ausgelieferter Stand:** `search_notes` → `read_note`, Antwort mit `[[wikilinks]]`. Der
+   Bericht führt den gesendeten Prompt inklusive Memory- und Skills-Block.
+2. **Überschriebene Anweisung** („Benutze KEINE Werkzeuge, sage nur: Ich sehe nicht nach."):
+   **kein einziger Werkzeugaufruf**, Antwort wörtlich wie angewiesen. Der Override wirkt.
+3. **`read_note` abgeschaltet**, Frage nach dem Inhalt einer Notiz: das Werkzeug fehlt in der
+   gesendeten Liste, und das Modell **dreht Suchschleifen bis ins Runden-Limit** (`search_notes`
+   mit „a", „e", „Ziel"), statt den Mangel zu benennen.
+
+⚠️ **Punkt 3 ist kein Defekt, sondern der Preis einer bewussten Entscheidung** — abgeschaltet
+heißt „das Modell erfährt nichts davon" (Spec E3). Die Folge ist trotzdem wissenswert: wer ein
+**einzelnes** lesendes Werkzeug abschaltet, bekommt keine Fehlermeldung, sondern Rundenverschleiß.
+Die Warnung in den Einstellungen deckt nur den Totalfall ab („kein lesendes Werkzeug aktiv"),
+nicht das Abschalten eines von vieren. Wer hier nachbessern will, hat zwei Wege: die Warnung
+verfeinern, oder dem Modell das Fehlen im Prompt mitteilen — Letzteres widerspricht E3 und wäre
+eine Design-Änderung, keine Reparatur.
