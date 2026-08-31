@@ -38,27 +38,26 @@ describe("renderPromptRow", () => {
     renderPromptRow(s, ctx({ systemPromptOverride: "Sei knapp." }));
     expect(textarea(s).getValue()).toBe("Sei knapp.");
   });
-  it("nimmt eine Aenderung erst beim blur an, nicht bei jedem Tastendruck", () => {
-    // Dieselbe Grammatik wie die Werkzeug-Zeilen: zwei Bedienformen fuer dasselbe Element
-    // in derselben Gruppe waeren ein Bedien-Bruch (Review-Befund Minor 6).
+  it("speichert schon beim Tippen — ein Escape darf getippten Text nicht verschlucken", () => {
+    // Schliesst das Einstellungsfenster per Escape, waehrend die Textarea den Fokus haelt,
+    // feuert im echten Chromium KEIN blur. Haengt das Speichern daran, ist der Text weg
+    // (Review-Befund Fix-Runde 4).
     const c = ctx();
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);
-    textarea(s).setValue("Sei knapp.");
-    expect(c.settings.systemPromptOverride).toBe("");
-    expect(c.save).not.toHaveBeenCalled();
-    textarea(s).inputEl.dispatchEvent({ type: "blur" });
+    textarea(s).onChangeCB?.("Sei knapp.");
     expect(c.settings.systemPromptOverride).toBe("Sei knapp.");
     expect(c.save).toHaveBeenCalled();
   });
-  it("aktualisiert die Warnzeile beim blur, statt sie bis zum naechsten Oeffnen zu verstecken", () => {
-    // Der Kern des Befunds: die Warnung ist die einzige Absicherung dieses Entwurfs
-    // („warnen statt verbieten") — sie muss sichtbar werden, wenn die Abweichung entsteht.
+  it("zeichnet die Warnzeile aber ERST beim blur — Speichern und Zeichnen sind getrennt", () => {
+    // Die beiden Ereignisse duerfen nicht wieder zusammengelegt werden: Speichern bei
+    // onChange verhindert Datenverlust, Zeichnen bei blur schont den Cursor.
     const c = ctx();
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);
+    textarea(s).onChangeCB?.("Sei knapp."); // weder Werkzeuge noch Platzhalter
+    expect(c.save).toHaveBeenCalled();
     expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(0);
-    textarea(s).setValue("Sei knapp."); // weder Werkzeuge noch Platzhalter
     textarea(s).inputEl.dispatchEvent({ type: "blur" });
     expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(2);
   });
@@ -67,7 +66,7 @@ describe("renderPromptRow", () => {
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);
     expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(2);
-    textarea(s).setValue(DEFAULT_RULES);
+    textarea(s).onChangeCB?.(DEFAULT_RULES);
     textarea(s).inputEl.dispatchEvent({ type: "blur" });
     expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(0);
   });
@@ -77,11 +76,11 @@ describe("renderPromptRow", () => {
     const c = ctx();
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);
-    textarea(s).setValue("Sei knapp.");
+    textarea(s).onChangeCB?.("Sei knapp.");
     textarea(s).inputEl.dispatchEvent({ type: "blur" });
     expect(c.refresh).not.toHaveBeenCalled();
   });
-  it("laesst einen unveraenderten Text beim blur unangetastet", () => {
+  it("speichert beim blur nicht noch einmal — der blur zeichnet nur", () => {
     const c = ctx({ systemPromptOverride: "Eigenes" });
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);

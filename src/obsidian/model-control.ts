@@ -49,26 +49,25 @@ export function renderPromptRow(setting: Setting, ctx: ModelControlCtx): void {
       ta.setPlaceholder(model.placeholder).setValue(model.value);
       ta.inputEl.rows = 8;
       ta.inputEl.addClass("koda-prompt-textarea");
-      // Uebernahme UND Neuzeichnen bei blur — dieselbe Grammatik wie die Werkzeug-Zeilen
-      // eine Funktion weiter unten; zwei Bedienformen fuer dasselbe Element in derselben
-      // Gruppe waeren ein Bedien-Bruch. Zwei Gruende, die zusammenfallen:
-      //  - Zeichnen: `onChange` speicherte, zeichnete aber nicht neu. Die zwei Warnungen,
-      //    die am getippten Text haengen (`no-tools`, `missing-placeholder`), erschienen
-      //    deshalb erst beim naechsten Oeffnen des Tabs — und die Warnung ist die einzige
-      //    Absicherung dieses Entwurfs („warnen statt verbieten", Spec E3/E5). Bei jedem
-      //    Tastendruck neu zu zeichnen geht nicht: das Re-Render zerstoert den Cursor.
-      //  - Speichern: mit `onChange` landete jeder Zwischenstand in der data.json; ein
-      //    halb getippter Prompt ist kein gewollter Stand. Beides an ein Ereignis zu
-      //    haengen haelt Gespeichertes und Geprueftes zusammen — waere nur das Zeichnen
-      //    auf blur gezogen, koennte eine Warnzeile aus einem Text entstehen, der schon
-      //    gespeichert, aber noch nicht fertig ist.
-      ta.inputEl.addEventListener("blur", () => {
-        const v = ta.getValue();
-        if (v === ctx.settings.systemPromptOverride) return; // nichts geaendert, nichts anfassen
+      // ZWEI Ereignisse fuer zwei verschiedene Dinge — bitte nicht wieder zusammenlegen.
+      // Sie standen kurzzeitig beide auf `blur`; das kostete getippten Text, weil im
+      // echten Chromium kein `blur` feuert, wenn das Einstellungsfenster per Escape
+      // schliesst, waehrend die Textarea den Fokus haelt (Review-Befund Fix-Runde 4).
+      //  - SPEICHERN bei `onChange`: kein Datenverlust. Zwischenstaende in der data.json
+      //    sind der billigere Preis als ein verschluckter Absatz — der Wert ist ohnehin
+      //    erst beim naechsten Gespraech wirksam, ein halb getippter Prompt richtet also
+      //    keinen Schaden an.
+      //  - ZEICHNEN bei `blur`: die zwei Warnungen, die am getippten Text haengen
+      //    (`no-tools`, `missing-placeholder`), muessen sichtbar werden, sobald die
+      //    Abweichung entsteht — sie sind die einzige Absicherung dieses Entwurfs
+      //    („warnen statt verbieten", Spec E3/E5). Bei jedem Tastendruck zu zeichnen geht
+      //    nicht: das Neuzeichnen zerstoert den Cursor. Der Grund fuer `blur` war also
+      //    immer das Re-Render, nie das Speichern.
+      ta.onChange((v) => {
         ctx.settings.systemPromptOverride = v;
-        zeichneWarnungen(); // synchron und vor dem Speichern — s. Kommentar an der Funktion
         void ctx.save();
       });
+      ta.inputEl.addEventListener("blur", () => { zeichneWarnungen(); });
     })
     .addExtraButton((b) =>
       b.setIcon("rotate-ccw").setTooltip(t("settings.prompt.reset")).onClick(() => {
