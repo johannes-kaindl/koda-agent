@@ -72,7 +72,7 @@ export class VaultTools implements ToolRunner {
       // Koda-Ordner sogar ohne Rueckfrage. Die Oberflaeche verspricht „Was Koda tun darf";
       // gehalten wird das Versprechen hier (Spec E3: messen statt annehmen).
       const erlaubt = this.opts.allowed?.();
-      if (erlaubt !== undefined && !erlaubt.has(name)) {
+      if (erlaubt !== undefined && !erlaubt.has(name) && !this.fehltAusFremdemGrund(name)) {
         return { ok: false, error: `Werkzeug abgeschaltet: ${name} — der Nutzer hat es in den Einstellungen deaktiviert. Nutze ein anderes.` };
       }
       switch (name) {
@@ -100,6 +100,23 @@ export class VaultTools implements ToolRunner {
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : "Tool fehlgeschlagen" };
     }
+  }
+
+  /** Fehlt der Name aus einem Grund, den der Guard NICHT kennt? Dann schweigt er und laesst
+   *  durch — die Meldung soll von der Stelle kommen, die den Grund wirklich kennt.
+   *
+   *  Der Fall ist heute genau einer: `related_notes` fehlt in der angebotenen Liste aus
+   *  ZWEI Gruenden — der Nutzer hat es abgeschaltet, ODER vault-rag liefert keinen Index.
+   *  Der Guard sieht nur die Liste und kann die beiden nicht auseinanderhalten; `relatedNotes()`
+   *  fragt die Nachbar-API selbst und meldet Klartext. Ohne diese Ausnahme beschuldigte die
+   *  Antwort ans Modell den falschen Verursacher („der Nutzer hat es deaktiviert"), obwohl nur
+   *  das Nachbarplugin aus ist — genau die plausible, aber falsche Ursachenmeldung, die in
+   *  diesem Repo schon einmal teuer war.
+   *
+   *  Die bewusste Abschaltung durch den Nutzer bleibt gedeckt: laeuft vault-rag, ist der
+   *  fremde Grund nicht gegeben und der Guard greift wie fuer jedes andere Werkzeug. */
+  private fehltAusFremdemGrund(name: string): boolean {
+    return name === "related_notes" && (this.opts.retrieval?.() ?? null) === null;
   }
 
   private async search(query: string, cap: number): Promise<ToolOutcome> {
