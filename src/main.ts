@@ -105,6 +105,12 @@ export default class KodaPlugin extends Plugin {
     this.registerView(VIEW_TYPE_KODA, (leaf) => new KodaView(leaf, this));
     this.addRibbonIcon("dog", t("cmd.open"), () => void this.activateView());
     this.addCommand({ id: "open", name: t("cmd.open"), callback: () => void this.activateView() });
+    // Zweiter Zugang zu beiden Kopfzeilen-Aktionen. Nicht Bequemlichkeit, sondern Lehre aus
+    // dem Befund vom 2026-09-01: „Neues Gespraech" hing bis dahin an EINEM unsichtbaren Knopf,
+    // und damit war die Aktion fuer niemanden erreichbar. Ein Befehl ist von der Darstellung
+    // unabhaengig — er ueberlebt jede kuenftige Umgestaltung der Oberflaeche.
+    this.addCommand({ id: "new-chat", name: t("cmd.newChat"), callback: () => void this.runInView((v) => v.askNewChat()) });
+    this.addCommand({ id: "toggle-thinking", name: t("cmd.toggleThinking"), callback: () => void this.runInView((v) => v.toggleThinking()) });
     this.addSettingTab(new KodaSettingsTab(this.app, this));
 
     if (this.settings.openOnStartup) {
@@ -144,6 +150,15 @@ export default class KodaPlugin extends Plugin {
     // Der Settings-Tab schaltet denselben suppressThinking-Wert wie die Kopf-Aktion —
     // ein Zustand, zwei Zugaenge, also muss der zweite mitziehen.
     for (const v of this.views()) v.syncThinkAction();
+  }
+
+  /** Eine Kopfzeilen-Aktion aus der Befehlspalette ausfuehren. Ist die Sidebar zu, wird sie
+   *  erst geoeffnet: ein Befehl, der stillschweigend nichts tut, weil gerade keine View
+   *  offen ist, waere derselbe Fehler wie der unsichtbare Knopf — nur leiser. */
+  private async runInView(fn: (view: KodaView) => Promise<void>): Promise<void> {
+    if (this.views().length === 0) await this.activateView();
+    const view = this.views()[0];
+    if (view !== undefined) await fn(view);
   }
 
   async activateView(): Promise<void> {

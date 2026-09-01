@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **"New chat" and the thinking toggle are visible again — they were unreachable since
+  0.9.0.** Both sat in the view header, which Obsidian hides in *every* sidebar
+  (`.workspace-split.mod-right-split .view-header { display: none }` in its own `app.css`).
+  They existed in the DOM and nobody could see or click them; since "New chat" had no
+  command either, discarding a conversation was impossible from the sidebar for two
+  releases. They now live in a header row inside the view itself, which is what
+  `UI-STANDARD.md` §4 asks for anyway — and what every neighbouring plugin already did.
+- **Two new commands, `New chat` and `Toggle thinking`**, give both actions a second route
+  that does not depend on how the interface is drawn. If the sidebar is closed, the command
+  opens it first rather than silently doing nothing.
+- **The GUI smoke check now measures size, not existence.** Check 2 was green throughout the
+  outage because it counted elements; it now reads `getBoundingClientRect()` and additionally
+  asserts that the view really is in a sidebar while it measures — in the main area the header
+  is visible, so the broken version would have passed there too.
+
 ## [0.10.0] — 2026-09-01
 
 ### Added

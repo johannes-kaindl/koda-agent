@@ -107,10 +107,47 @@ erreichbar angezeigt · **Settings-Gruppe „Kontext & Verdichtung“** (Übersc
 Wikilink in der Antwort öffnet die Notiz · **Verdichtungs-Marken** (Stufe 1, Stufe 2
 aufklappbar mit Text, erzwungener Zusatz „Überlauf“/„overflow“) werden gerendert · **Statuszeile**
 über eine ganze Werkzeug-Runde · **Kontextfenster-Belegung** inkl. Warnschwelle · **Thinking-Schalter**
-im Kopf · **Rückfrage vor dem Verwerfen** eines Gesprächs · **Reset der Anweisung** stellt Override
+in der Kopfzeile · **Rückfrage vor dem Verwerfen** eines Gesprächs · **Reset der Anweisung** stellt Override
 und Textarea auf den Auslieferungsstand zurück · ein **abgeschaltetes Werkzeug** bleibt aus der
 **gesendeten** Werkzeugliste (`currentToolNames()`) und kehrt nach dem Zurückschreiben zurück ·
 das **Vorschau-Modal** führt Memory- und Skills-Abschnitt.
+
+⚠️ **Punkt 2 misst seit dem 2026-09-01 die Größe der Kopfzeilen-Aktionen, nicht ihre
+Existenz — und das ist der teuerste Fund dieser Runde.** Von 0.9.0 bis 0.10.0 hingen
+„Neues Gespräch" und der Thinking-Schalter an `addAction()`, also im echten View-Kopf. Den
+blendet Obsidian in **jeder** Seitenleiste per `app.css` aus
+(`.workspace-split.mod-right-split .view-header { display: none }`) — die beiden Knöpfe
+standen im DOM und **kein Nutzer konnte sie sehen**. „Neues Gespräch" war damit über zwei
+Releases hinweg für niemanden erreichbar, denn einen Befehl dafür gab es nicht. Der
+Prüfpunkt war die ganze Zeit grün, weil er `querySelectorAll(".view-action")` zählte.
+Gefunden hat es Johannes im Alltag, nicht der Automat.
+
+Zwei Lehren stecken darin, und die zweite ist die unbequemere:
+
+- **Existenz ist nicht Sichtbarkeit.** Gemessen wird jetzt `getBoundingClientRect()`; in der
+  Sidebar war die Höhe 0, im Hauptbereich 38 px (Gegenprobe am selben Element).
+- **Ein Sichtbarkeits-Test misst nur dann den Fall, wenn er unter dessen Bedingung läuft.**
+  Im Hauptbereich ist der View-Kopf sichtbar — dort wäre auch die kaputte Fassung grün
+  gewesen. Punkt 2 prüft deshalb zusätzlich `inSidebar` und ist sonst nicht entscheidbar.
+  Das ist dieselbe Falle wie die Lesson vom 2026-09-01 („ein Beleg-Test mit erfundenem Namen
+  belegt den Nachbarzweig"), nur mit dem *Ort* statt dem *Namen* als Achse.
+
+**Gegenprobe gefahren (2026-09-01) — und der erste Versuch war ungültig.** Der Punkt wurde
+gegen den Stand *vor* der Reparatur gehalten: erwartet rot, gemessen **18/18 grün**. Ursache
+war nicht der Prüfpunkt, sondern die Messung — der Treiber lädt das Plugin **nicht** neu,
+Obsidian hielt also weiter den reparierten Build im Speicher, während im Vault schon der alte
+lag. Punkt 1 merkt davon nichts: beide Builds tragen `manifest.version` 0.10.0. Nach
+`disablePlugin` → `loadManifests` → `enablePlugin` (Kopfzeile weg, nur noch ein Befehl
+registriert) lief derselbe Prüfpunkt **17/18, Punkt 2 rot** — und mit dem reparierten Build
+wieder 18/18. Erst damit ist belegt, dass er seinen Gegenstand bewegt.
+
+⚠️ **Merksatz für jeden künftigen Lauf: Dateien kopieren ist kein Deploy.** Wer den Build im
+Vault austauscht und sofort misst, misst den Stand im Speicher. Das ist dieselbe Gattung wie
+der Befund oben — nur dass hier der *Prüfling* nicht angekommen war statt der Blick.
+
+Die Reparatur ist eine Kopfzeile im View-**Inhalt** (`.koda-header`, wie UI-STANDARD §4 es
+ohnehin verlangt) plus zwei Befehle (`new-chat`, `toggle-thinking`) — ein zweiter Zugang, der
+von der Darstellung unabhängig ist.
 
 Die Punkte **9–12** (2026-08-30) kommen wie 7 ohne Modell aus — sie speisen den
 Aktivitäts-Zustandsautomaten mit derselben Ereignisfolge, die `main.ts` aus dem Agent-Loop
