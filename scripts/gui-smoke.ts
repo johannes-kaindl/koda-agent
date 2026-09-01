@@ -309,7 +309,11 @@ async function main(): Promise<void> {
       await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:open`)});
       return true;
     `);
-    const view = await pollUntil<{ leaves: number; input: boolean; buttons: string[]; cta: boolean; actions: string[]; hasThink: boolean; hasNewChat: boolean; status: boolean }>(
+    const view = await pollUntil<{
+      leaves: number; input: boolean; buttons: string[]; cta: boolean;
+      actions: { label: string; sichtbar: boolean; hoehe: number }[];
+      inSidebar: boolean; hasThink: boolean; hasNewChat: boolean; status: boolean;
+    }>(
       cdp,
       `
         const leaves = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)});
@@ -317,22 +321,36 @@ async function main(): Promise<void> {
         if (!el) return null;
         const buttons = [...el.querySelectorAll(".koda-buttons button")].map((b) => b.textContent.trim());
         if (buttons.length === 0) return null;
-        // Obsidian haengt eigene Aktionen in denselben Kopf (Lesezeichen, "Weitere Optionen"),
-        // und zwar VOR die des Plugins. Gezaehlt wird deshalb nicht, sondern gesucht: sind
-        // Kodas beide da? Der Thinking-Knopf wird ueber die Referenz der View identifiziert,
-        // nicht ueber die Position — genau daran ist Pruefpunkt 11 im Lauf vom 2026-08-30
-        // falsch-gruen vorbeigemessen (er nahm Obsidians "Lesezeichen").
         const view0 = leaves[0].view;
-        const actions = [...el.querySelectorAll(".view-action")].map((a) => a.getAttribute("aria-label") ?? "");
+        // ⚠️ Gemessen wird die GROESSE, nicht die Existenz — und das ist der ganze Punkt.
+        // Bis 0.10.0 hingen beide Aktionen an addAction(), also im echten View-Kopf. Den
+        // blendet Obsidian in JEDER Seitenleiste per app.css aus
+        // (.workspace-split.mod-right-split .view-header { display: none }), weshalb sie
+        // im DOM standen und niemand sie sehen konnte. Dieser Pruefpunkt war die ganze Zeit
+        // gruen, weil er querySelectorAll zaehlte. Ein Nutzer hat den Defekt gefunden,
+        // nicht der Automat (2026-09-01). Seither: getBoundingClientRect.
+        //
+        // Die zweite Haelfte ist inSidebar: im Hauptbereich IST der Kopf sichtbar, dort
+        // waere auch die alte Fassung gruen gewesen. Der Punkt muss also belegen, dass er
+        // unter der Bedingung misst, unter der der Defekt auftrat — sonst prueft er den
+        // Nachbarfall (Lesson 2026-09-01, „Beleg-Test mit erfundenem Namen").
+        const wurzel = leaves[0].getRoot();
+        const inSidebar = wurzel === app.workspace.leftSplit || wurzel === app.workspace.rightSplit;
+        const actions = [...el.querySelectorAll(".koda-header-action")].map((a) => {
+          const r = a.getBoundingClientRect();
+          return { label: a.getAttribute("aria-label") ?? "", sichtbar: r.width > 0 && r.height > 0, hoehe: Math.round(r.height) };
+        });
         const think = view0.thinkActionEl;
-        const hasThink = !!think && el.contains(think);
-        const hasNewChat = actions.some((a) => /Neues Gespräch|New chat/.test(a));
+        const hasThink = !!think && el.contains(think) && think.getBoundingClientRect().height > 0;
+        const neu = actions.find((a) => /Neues Gespräch|New chat/.test(a.label));
+        const hasNewChat = !!neu && neu.sichtbar;
         return {
           leaves: leaves.length,
           input: !!el.querySelector("textarea.koda-input"),
           buttons,
           cta: !!el.querySelector(".koda-buttons button.mod-cta"),
           actions,
+          inSidebar,
           hasThink,
           hasNewChat,
           status: !!el.querySelector(".koda-status"),
@@ -341,10 +359,11 @@ async function main(): Promise<void> {
       8000,
     );
     record(
-      "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen und zwei Kopf-Aktionen",
-      view !== null && view.input && view.buttons.length === 2 && view.cta && view.hasThink && view.hasNewChat && view.status,
+      "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen und zwei SICHTBAREN Kopfzeilen-Aktionen",
+      view !== null && view.input && view.buttons.length === 2 && view.cta &&
+        view.inSidebar && view.hasThink && view.hasNewChat && view.status,
       view
-        ? `${view.leaves} Leaf · Knoepfe: ${view.buttons.join(", ")} · Kopf: ${view.actions.join(" | ")} · Thinking-Aktion: ${view.hasThink} · Statuszeile: ${view.status}`
+        ? `${view.leaves} Leaf · in Seitenleiste: ${String(view.inSidebar)} · Knoepfe: ${view.buttons.join(", ")} · Kopfzeile: ${view.actions.map((a) => `${a.label}[${a.hoehe}px]`).join(" | ")} · Thinking sichtbar: ${view.hasThink} · Statuszeile: ${view.status}`
         : "keine View entstanden",
     );
 

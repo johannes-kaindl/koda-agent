@@ -50,6 +50,25 @@ export class KodaView extends ItemView {
     const root = this.contentEl;
     root.empty();
     root.addClass("koda-root");
+
+    // Kopfzeile IM INHALT, nicht ueber `addAction`. Obsidian blendet den View-Kopf in jeder
+    // Seitenleiste aus — `app.css`: `.workspace-split.mod-left-split .view-header,
+    // .workspace-split.mod-right-split .view-header { display: none }`. Eine Kopf-Aktion ist
+    // dort im DOM und trotzdem unsichtbar; bis 0.10.0 war „Neues Gespraech" deshalb fuer
+    // niemanden erreichbar (gemessen 2026-09-01: Hoehe 0 in der Sidebar, Gegenprobe im
+    // Hauptbereich 38 px). Das ist kein Theme- oder Einstellungsfall, sondern gilt immer.
+    // UI-STANDARD §4 verlangt den Kopf ohnehin im Inhalt — `addAction` war die Abweichung,
+    // und kein Nachbar-Plugin benutzt es. Ein Pruefpunkt, der nur DOM-Existenz misst, sieht
+    // den Defekt nicht: darum misst Pruefpunkt 2 seit heute die Groesse.
+    const header = root.createDiv({ cls: "koda-header" });
+    this.thinkActionEl = header.createEl("button", { cls: "clickable-icon koda-header-action" });
+    setIcon(this.thinkActionEl, "brain");
+    this.thinkActionEl.addEventListener("click", () => void this.toggleThinking());
+    const newChatEl = header.createEl("button", { cls: "clickable-icon koda-header-action" });
+    setIcon(newChatEl, "plus");
+    newChatEl.setAttribute("aria-label", t("view.newChat"));
+    newChatEl.addEventListener("click", () => void this.askNewChat());
+
     this.logEl = root.createDiv({ cls: "koda-log" });
     // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
     // registriert, damit jeder spaetere Redraw automatisch mitgedeckt ist.
@@ -67,13 +86,11 @@ export class KodaView extends ItemView {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
     });
     // Nur noch Senden und Stopp. „Neues Gespraech" sass hier daneben und wurde regelmaessig
-    // versehentlich getroffen — es steht jetzt im Kopf, hinter einer Bestaetigung.
+    // versehentlich getroffen — es steht jetzt in der Kopfzeile, hinter einer Bestaetigung.
     const buttons = bar.createDiv({ cls: "koda-buttons" });
     buttons.createEl("button", { text: t("view.send"), cls: "mod-cta" }).addEventListener("click", () => this.send());
     buttons.createEl("button", { text: t("view.stop") }).addEventListener("click", () => this.plugin.stopRun());
 
-    this.thinkActionEl = this.addAction("brain", t("view.thinkingOn"), () => void this.toggleThinking());
-    this.addAction("plus", t("view.newChat"), () => void this.askNewChat());
     this.syncThinkAction();
 
     this.renderLog();
@@ -92,11 +109,11 @@ export class KodaView extends ItemView {
     void this.app.workspace.openLinkText(href, "", e.ctrlKey || e.metaKey);
   }
 
-  // — Kopf-Aktionen —
+  // — Kopfzeile: Aktionen (auch ueber die Befehlspalette erreichbar, s. main.ts) —
 
   /** Verwerfen ist endgueltig: der Verlauf wandert nach archive.jsonl, aber ohne Trenner —
    *  zurueckholen kann ihn heute niemand. Deshalb die Rueckfrage (Kit-confirmAction, §8). */
-  private async askNewChat(): Promise<void> {
+  async askNewChat(): Promise<void> {
     if (this.plugin.busy) return;
     const ok = await confirmAction(this.app, {
       title: t("view.newChat.confirm"),
@@ -107,7 +124,7 @@ export class KodaView extends ItemView {
     if (ok) await this.plugin.newChat();
   }
 
-  private async toggleThinking(): Promise<void> {
+  async toggleThinking(): Promise<void> {
     // Bei einem Modell, das sich nicht abschalten laesst, tut der Schalter nichts — die
     // Sperre steht im Zustand, und der Handler prueft sie erneut: ein veralteter Klick auf
     // einen gerade gesperrten Knopf darf nicht durchschlagen (Muster canActivatePack).

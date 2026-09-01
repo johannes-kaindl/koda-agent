@@ -58,9 +58,24 @@
   .koda-status.is-checking .koda-status-icon svg { animation: none; }
 }
 
-/* Thinking-Schalter im View-Kopf: der Zustand steht in der Klasse, nicht nur in der Farbe. */
-.view-action.is-off { color: var(--text-faint); }
-.view-action.is-disabled { color: var(--text-faint); cursor: default; }
+/* Kopfzeile der Sidebar. Sie sitzt im View-INHALT, weil Obsidian den echten View-Kopf in
+   jeder Seitenleiste per app.css ausblendet (`display: none`) — ein `addAction` waere hier
+   unsichtbar. Rechtsbuendig wie Obsidians eigene Sidebar-Kopfzeilen. */
+.koda-header {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-4-1);
+  padding: var(--size-4-1) var(--size-4-2);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+/* `clickable-icon` bringt Obsidians Icon-Optik mit; die drei Zeilen loeschen nur das
+   Knopf-Chrome, das ein <button> sonst von der globalen button-Regel erbt. Ein <button>
+   (statt eines <div>) ist es, damit die Aktion auch mit der Tastatur fokussierbar bleibt. */
+.koda-header-action { background: transparent; box-shadow: none; padding: var(--size-4-1); }
+/* Zustand des Thinking-Schalters steht in der Klasse, nicht nur in der Farbe (WCAG 1.4.1;
+   die Aussage traegt zusaetzlich das aria-label aus syncThinkAction). */
+.koda-header-action.is-off { color: var(--text-faint); }
+.koda-header-action.is-disabled { color: var(--text-faint); cursor: default; }
 
 .koda-input-bar { border-top: 1px solid var(--background-modifier-border); padding: var(--size-4-2); }
 .koda-input { width: 100%; resize: vertical; }
