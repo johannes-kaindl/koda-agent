@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-09-01
+
 ### Added
 
 - **A new "Model control" settings group lets you replace Koda's instructions and turn
