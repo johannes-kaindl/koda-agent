@@ -1,6 +1,7 @@
 # Koda GUI-Smoke (manuell, pro Release)
 
-Vorbereitung: `npm run build`, Plugin in Test-Vault deployen, LM Studio mit Tool-faehigem Modell starten.
+Vorbereitung: `npm run build`, `npm run smoke:gui -- --setup` (baut den Staging-Vault aus
+`docs/images/fixture/`), LM Studio mit Tool-faehigem Modell starten.
 
 1. Sidebar öffnen (Ribbon-Hund) → Chat erscheint, Sprache folgt der UI-Sprache.
 2. Frage "Welche Notizen habe ich zu X?" → ⚙ search_notes-Schritt sichtbar, Antwort mit [[Links]].
@@ -94,9 +95,22 @@ bleibt:
 ```bash
 osascript -e 'quit app "Obsidian"'
 open -a Obsidian --args --remote-debugging-port=9222
-npm run build && cp main.js <vault>/.obsidian/plugins/koda-agent/
-npm run smoke:gui -- --vault <vault-name>
+npm run build
+npm run smoke:gui -- --setup            # Staging-Vault aus docs/images/fixture/ herstellen
+npm run smoke:gui -- --vault koda-agent
 ```
+
+⚠️ **Gefahren wird gegen den Staging-Vault `koda-agent`, nicht gegen den Arbeits-Vault** —
+`--setup` baut ihn seit dem 2026-09-01 aus dem getrackten Fixture (`docs/images/fixture/`,
+README dort). Zwei Gründe, beide gemessen: **Punkt 16 und 17 schreiben Einstellungen**
+(`systemPromptOverride`, `toolsDisabled`), und ein hart abgebrochener Lauf lässt sie stehen —
+im Arbeits-Vault wären das die echten. Und im Arbeits-Vault liegt der **Store-Build** statt des
+Repo-Stands, was `manifest.version` nicht verrät, weil beide dieselbe Nummer tragen (Dach-`AGENTS.md`
+§ Staging-Vaults; vier grüne Läufe im Workspace waren am 2026-08-30 aus genau diesem Grund unbelegt).
+
+⚠️ **Kopieren ist kein Deploy.** Ein laufendes Obsidian hält den alten Stand im Speicher; erst
+`disablePlugin` → `loadManifests` → `enablePlugin` lädt den neuen. Am 2026-09-01 meldete eine
+Gegenprobe deshalb 18/18 für einen Stand, der gar nicht geladen war.
 
 Geprüft werden: Plugin aktiv · **Retrieval-Andockung** (vault-rags Vertrag liegt in der
 Form vor, gegen die Koda gebaut ist) · **Frontmatter-Naht** (`metadataCache` liefert
@@ -591,11 +605,44 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-01, Fixture-Gegenprobe (18/18)
+
+Der Lauf, der das Fixture belegt — und er ist eine **Gegenprobe**, kein Wiederholungslauf: der
+Staging-Vault wurde vorher **gelöscht** (`rm -rf`), aus `docs/images/fixture/` neu gebaut
+(`npm run smoke:gui -- --setup`) und ohne einen einzigen Handgriff an seinem Inhalt geprüft.
+Das ist der Unterschied zum Lauf vom 2026-08-31 weiter unten: der lief gegen eine von Hand
+gebaute Kulisse, die bei Verlust die Arbeit erneut gekostet hätte.
+
+Drei Punkte belegen dabei, dass die Kulisse trägt, was die Prüfpunkte brauchen:
+
+- **1c** — „4 von 5 Notizen mit Frontmatter · Beispielfelder: status, area, tags".
+- **6** — `Notes/Tools.md`, aktiv vorher `Notes/Project plan.md` → nachher `Notes/Tools.md`;
+  kein Kandidat musste wegen eines fremden Widgets verworfen werden, weil im Fixture-Vault
+  **kein fremdes Plugin** aktiv ist.
+- **18** — „Memory: true · Skills: true", 1196 Zeichen. Beides kommt aus dem Fixture
+  (`Koda/Memory.md`, `Koda/Skills/tidy-up.md` mit `enabled: true`).
+
+⚠️ **Was der Lauf NICHT zeigt:** Punkt 1b meldete „vault-retrieval nicht installiert" und blieb
+grün — korrekt, denn die Kopplung ist weich. Der Fixture-Vault hat vault-rag bewusst nicht, also
+misst er die Andockung auch nicht. Wer die prüfen will, braucht einen Vault mit vault-rag; die
+Handpunkte 14–18 sagen das ohnehin.
+
+Ebenfalls belegt: `--setup` schreibt **keine** `data.json`, und der Lauf kam trotzdem durch —
+die Auslieferungs-Defaults reichen für alle 18 Punkte (der Endpunkt `http://127.0.0.1:1234` steht
+in `DEFAULT_SETTINGS`, die toten Ports und der erreichbare Fake-Endpunkt bringt der Treiber mit).
+
+Nebenbefund zum Öffnen: der frisch gebaute Vault war Obsidian unbekannt, und
+`obsidian://open?path=<Datei>` hat ihn **ohne Neustart** registriert und als zweites Fenster
+derselben Instanz geöffnet — die Instanz hing zu dem Zeitpunkt an zwei fremden Vaults.
+
 ## Belegter Lauf: 2026-08-31, Modell-Steuerung (18/18)
 
 Gefahren gegen den **Staging-Vault `koda-agent`**, der bis dahin nicht existierte — Koda war
-nur in `10_Pallas` installiert. Der Vault wurde für diesen Lauf angelegt (Notizen, `Koda/Memory.md`,
-ein Skill); ein getracktes Fixture fehlt weiterhin und bleibt offen. Der Grund, es nicht gegen
+nur in `10_Pallas` installiert. Der Vault wurde für diesen Lauf **von Hand** angelegt (Notizen,
+`Koda/Memory.md`, ein Skill). *Nachtrag 2026-09-01: das getrackte Fixture existiert seit diesem
+Tag (`docs/images/fixture/`, `--setup`) — der Lauf hier ist also gegen eine Kulisse gefahren, die
+so nicht mehr hergestellt wird; die Kulisse des Fixtures trägt dieselben vier Eigenschaften, die
+die Punkte brauchen (zwei Notizen, Frontmatter, Memory, aktiver Skill).* Der Grund, es nicht gegen
 den Arbeits-Vault zu fahren, steht in den Prüfpunkten selbst: **16 und 17 schreiben Einstellungen**
 (`systemPromptOverride`, `toolsDisabled`) — im Arbeits-Vault wären das die echten.
 

@@ -178,6 +178,12 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   gesperrter Thinking-Zustand; 16–18 seit 2026-08-31: Reset auf den Auslieferungsstand,
   ein abgeschaltetes Werkzeug fehlt in der gesendeten Liste, das Vorschau-Modal führt
   Memory und Skills).
+- `npm run smoke:gui -- --setup` — stellt den Staging-Vault `$STAGING_VAULTS_DIR/koda-agent`
+  aus dem getrackten Fixture `docs/images/fixture/` her (seit 2026-09-01; davor war der Vault
+  von Hand gebaut und ein Verlust kostete die Arbeit erneut). **Gefahren wird gegen diesen
+  Vault, nicht gegen den Arbeits-Vault:** Prüfpunkt 16 und 17 *schreiben* Einstellungen, und
+  im Arbeits-Vault liegt der Store-Build statt des Repo-Stands. Was die Kulisse mitbringen
+  muss, steht in `docs/images/fixture/README.md`.
 - `npm run gui:ask -- --vault <name> --ask "<Frage>" [--expect <text>] [--full]` —
   Praxistest: stellt Koda im laufenden Obsidian eine echte Frage und berichtet, **welche
   Werkzeuge er wählt**. Das Gegenstück zum Smoke — langsam und nicht deterministisch,

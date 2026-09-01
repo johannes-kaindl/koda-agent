@@ -63,6 +63,28 @@
  *
  * Erst wenn nichts laeuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
  *
+ * ## Der Vault, gegen den geprueft wird
+ *
+ * Nicht der Arbeits-Vault, sondern ein eigener Staging-Vault aus dem getrackten Fixture:
+ *
+ * ```bash
+ * npm run build                                  # der Vault soll den Stand zeigen, den du aenderst
+ * npm run smoke:gui -- --setup                   # $STAGING_VAULTS_DIR/koda-agent aus docs/images/fixture/
+ * ```
+ *
+ * Zwei Gruende, und beide sind gemessen. **Erstens schreiben die Pruefpunkte 16 und 17
+ * Einstellungen** (`systemPromptOverride`, `toolsDisabled`); sie sichern ihren Vorwert und
+ * schreiben ihn im `finally` zurueck, aber ein hart abgebrochener Lauf hinterlaesst trotzdem
+ * einen fremden Zustand — im Arbeits-Vault waeren das Johannes' echte Einstellungen.
+ * **Zweitens liegt im Arbeits-Vault der Store-Build, nicht der Repo-Stand**: vier gruene
+ * Laeufe im Workspace waren am 2026-08-30 aus genau diesem Grund unbelegt, und
+ * `manifest.version` verraet es nicht, weil beide Staende dieselbe Nummer tragen
+ * (Dach-`AGENTS.md` § Staging-Vaults).
+ *
+ * ⚠️ **Ein frisch gebauter Vault ist Obsidian unbekannt** — `obsidian://open?vault=koda-agent`
+ * tut dann schlicht nichts, was leicht als „ich muss Obsidian neu starten" gelesen wird. Der
+ * Weg ohne Neustart geht ueber den Pfad statt den Namen; `--setup` gibt die Zeile fertig aus.
+ *
  * ⚠️ Der Lauf leert das laufende Koda-Gespraech im Zielvault (Punkt 5 braucht ein frisches).
  * Der bisherige Verlauf wandert nach `.obsidian/plugins/koda-agent/sessions/archive.jsonl` und ist nicht verloren, aber
  * aus der Sidebar weg. Wer gerade an einem Verlauf misst, faehrt den Smoke davor oder danach.
@@ -75,16 +97,23 @@
  * Dann mit deployter Plugin-Version:
  *
  * ```bash
- * npm run smoke:gui -- --vault <vault-name>
+ * npm run smoke:gui -- --vault koda-agent
  * ```
  */
 
 import { execFileSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { join } from "node:path";
+import { cwd } from "node:process";
 import { Cdp, attachTo, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
 const PLUGIN_ID = "koda-agent";
+/** Repo- und Vault-Name sind hier dasselbe Wort — der Staging-Vault heisst wie das Repo. */
+const REPO_NAME = "koda-agent";
+const REPO_ROOT = cwd();
+const FIXTURE_DIR = join(REPO_ROOT, "docs/images/fixture");
 const VIEW_TYPE = "koda-agent-view";
 /** Garantiert tote Ports fuer die Fehlerfaelle — nichts hoert dort, und ein Tippfehler
  *  im Test darf nie versehentlich einen echten Endpunkt treffen. */
@@ -165,8 +194,46 @@ async function pollEither<T>(
   return null;
 }
 
+/**
+ * Staging-Vault aus dem getrackten Fixture herstellen (`--setup`).
+ *
+ * Der Vault ist Wegwerfware: sein Inhalt kommt vollstaendig aus `docs/images/fixture/`.
+ * Geht er verloren, ist der naechste Lauf trotzdem reproduzierbar — das ist der Unterschied
+ * zu dem von Hand angelegten Vault, den dieser Treiber bis zum 2026-09-01 vorausgesetzt hat.
+ *
+ * Plugin-Einstellungen schreibt `--setup` bewusst KEINE: `buildVault` entfernt `data.json`,
+ * und die Auslieferungs-Defaults bringen den Endpunkt `http://127.0.0.1:1234` bereits mit
+ * (`DEFAULT_SETTINGS` in src/core/settings-types.ts). Der Lauf misst damit den Zustand einer
+ * frischen Installation und nicht den einer nachgepflegten Konfiguration.
+ */
+function setup(): void {
+  const vaultDir = stagingVaultDir(REPO_NAME);
+  const log = buildVault({
+    repoRoot: REPO_ROOT,
+    vaultDir,
+    fixtureDir: FIXTURE_DIR,
+    pluginId: PLUGIN_ID,
+  });
+  console.log(`Staging-Vault: ${vaultDir}`);
+  for (const zeile of log) console.log(`  ${zeile}`);
+  console.log(
+    "\nJetzt den Vault oeffnen — NICHT Obsidian beenden, falls es laeuft (Single-Instance,\n" +
+      "siehe Dateikopf). Ein frisch gebauter Vault ist Obsidian unbekannt, `?vault=` tut dann\n" +
+      "nichts; der URI mit dem PFAD einer Datei registriert ihn und oeffnet ein zweites Fenster\n" +
+      "derselben Instanz:\n" +
+      `  open "obsidian://open?path=${encodeURIComponent(join(vaultDir, "Notes", "Project plan.md"))}"\n` +
+      "Ein frisch geoeffnetes Fenster fragt einmalig nach Vertrauen und beantwortet bis zum\n" +
+      "Wegklicken KEINEN Aufruf — das sieht wie ein haengender Renderer aus.\n" +
+      `Danach: npm run smoke:gui -- --vault ${REPO_NAME}`,
+  );
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
+  if (argv.includes("--setup")) {
+    setup();
+    return;
+  }
   const flag = (name: string): string | undefined => {
     const index = argv.indexOf(`--${name}`);
     return index === -1 ? undefined : argv[index + 1];
