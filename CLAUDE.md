@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.9.0 im Community-Store (Rescan „passed", zero warnings), Modell-Steuerung auf `feat/modell-steuerung`, Stand 2026-08-31
+## Status: 0.10.0 released (Tag auf Forgejo+GitHub), Rescan steht aus — main, Stand 2026-09-01
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
@@ -32,8 +32,8 @@ Thinking-Schalter im View-Kopf, Markdown waehrend des Streams, „Neues Gespraec
 Kopf-Aktion hinter einer Rueckfrage. Vier der fuenf Punkte kamen aus dem Bestand statt
 aus Eigenbau — der Kit-first-Check lief **vor** dem Entwurf, weil Johannes ihn eingefordert
 hatte, und korrigierte den ersten Entwurf in vier von fuenf Punkten.
-**Die Modell-Steuerung liegt fertig und mergefaehig auf `feat/modell-steuerung`, noch NICHT
-auf `main`** (Spec `2026-08-31-koda-modell-steuerung-design.md`) — der Regelblock des System-Prompts ist
+**Die Modell-Steuerung ist seit 2026-09-01 auf `main` und in 0.10.0 released**
+(Spec `2026-08-31-koda-modell-steuerung-design.md`) — der Regelblock des System-Prompts ist
 in den Einstellungen vollständig ersetzbar (mit Zurücksetzen und einer Warnung, die
 nichts verbietet), jedes der sieben Werkzeuge einzeln abschaltbar und umbeschreibbar, und
 die aktive Anweisung einsehbar: im Einstellungs-Modal für das nächste Gespräch, im
@@ -42,7 +42,12 @@ ein leeres Feld heißt „die ausgelieferte Fassung gilt", nie „leer", damit e
 Verbesserung des ausgelieferten Textes auch die Nutzer erreicht, die das Feld schon einmal
 geöffnet haben. Der Prompt-Bau (`buildSystemPrompt`) ist dabei aus `src/core/memory/` in
 ein eigenes, pures Modul `src/core/prompt/` umgezogen — er war dort nur zu Gast.
-Gate ist grün (493/493), `main.js` baut. Details zu Nutzung/Setup:
+Gate ist grün (493/493), `main.js` baut; 18/18 Prüfpunkte gegen ein laufendes Obsidian,
+Praxistest gegen `qwen/qwen3.8-27b` belegt beide Hälften (ein überschriebener Regelblock
+brachte das Modell dazu, kein Werkzeug mehr anzufassen; ein abgeschaltetes Werkzeug fehlt
+in der gesendeten Liste). ⚠️ **Der Store-Rescan für 0.10.0 steht noch aus** — und er darf
+erst laufen, wenn das GitHub-Release wirklich existiert: ein Scan ohne Release gilt als
+durchgefallen und nimmt das Plugin binnen 24 h aus der Suche. Details zu Nutzung/Setup:
 `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`. **Ein lokaler
 LLM-Server braucht CORS** (LM Studio „Enable CORS"/`lms server start --cors`): der Chat
 streamt als XHR aus dem Renderer, die Testen-Probe läuft über `requestUrl` — Koda benennt
