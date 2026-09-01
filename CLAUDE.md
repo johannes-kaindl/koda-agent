@@ -2,7 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.10.0 released (Tag auf Forgejo+GitHub), Rescan steht aus — main, Stand 2026-09-01
+## Status: 0.10.1 released (Tag auf Forgejo+GitHub), Rescan BLOCKIERT — main, Stand 2026-09-01
+
+⚠️ **0.10.1 ist ein Pflicht-Fix, kein Nachtrag: „Neues Gespräch" war seit 0.9.0 für niemanden
+sichtbar.** Beide Kopf-Aktionen (Verwerfen, Thinking) hingen an `addAction()`, und Obsidian
+blendet den View-Kopf in **jeder** Seitenleiste per `app.css` aus — die Knöpfe standen im DOM
+und waren null Pixel hoch, bei jedem Nutzer und mit jedem Theme. Da es für beide auch keinen
+Befehl gab, war die Aktion über zwei Releases hinweg nicht auslösbar. Reparatur: Kopfzeile im
+View-**Inhalt** (`.koda-header`, UI-STANDARD §4) plus die Befehle `new-chat`/`toggle-thinking`.
+Der automatisierte Prüfpunkt war die ganze Zeit grün, weil er Existenz zählte statt Größe zu
+messen; er misst jetzt `getBoundingClientRect()` und belegt zusätzlich, dass er dabei in einer
+Seitenleiste steht. Hintergrund: `_docs/docs/obsidian-api-gotchas.md`, Dach-`REGISTRY.md` (UI).
+
+⚠️ **Der Rescan ist nicht „offen", sondern blockiert** — und zwar von außen: das GitHub-Konto
+`johannes-kaindl` ist geflaggt. Am 2026-09-01 direkt nach dem Release gemessen: kein Release zu
+Tag 0.10.1 (404) und **kein einziger Actions-Lauf** im Repo. Ohne Release gilt ein Scan als
+durchgefallen und nimmt das *Plugin* binnen 24 h aus der Suche. Erst scannen, wenn das Konto
+wieder öffentlich ist und die Action für den Tag gelaufen ist.
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
