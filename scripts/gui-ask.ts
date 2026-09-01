@@ -293,6 +293,28 @@ async function main(): Promise<void> {
       seen.push(steps.filter((s) => s.kind === "tool-call").map((s) => s.label));
 
       console.log("");
+      // Der System-Prompt VOR den Werkzeug-Aufrufen: was gesendet wurde, nicht nur was
+      // danach geschah. `lastSystemPrompt` ist `null`, solange in dieser Sitzung noch
+      // nichts lief — die Abweichungs-Zeile kommt bewusst aus dem Einstellungswert, nicht
+      // aus einem Textvergleich (der Auslieferungsstand selbst liegt hier nicht vor).
+      const promptInfo = await cdp.evaluate<{ prompt: string | null; overridden: boolean }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        return {
+          prompt: p.lastSystemPrompt,
+          overridden: (p.settings?.systemPromptOverride ?? "").trim() !== "",
+        };
+      `);
+      if (promptInfo.prompt === null) {
+        console.log("=== Aktiver System-Prompt: noch nichts gesendet ===");
+      } else {
+        const stand = promptInfo.overridden ? "abweichend vom Auslieferungsstand" : "Auslieferungsstand";
+        console.log(`=== Aktiver System-Prompt (${promptInfo.prompt.length} Zeichen, ${stand}) ===`);
+        console.log(full
+          ? promptInfo.prompt
+          : `${promptInfo.prompt.slice(0, 400)}${promptInfo.prompt.length > 400 ? "…" : ""}`);
+      }
+      console.log("");
+
       for (const s of steps) {
         if (s.kind === "tool-call") console.log(`  → ${s.label}(${clip(s.body, 160)})`);
         else if (s.kind === "tool-result") {

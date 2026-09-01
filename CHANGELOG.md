@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A new "Model control" settings group lets you replace Koda's instructions and turn
+  individual tools off.** The instructions textarea starts empty — empty means "the shipped
+  version applies", shown greyed out as a placeholder — and a reset button restores that
+  state at any time. Because only the deviation is ever saved, a later improvement to the
+  shipped instructions still reaches everyone who never touched the field, and reaches no
+  one who wrote their own.
+- **Every tool, including the reading ones, can be switched off**, and each can be given its
+  own description (again: empty means the shipped one). Turning off all four tools that look
+  into the vault (`search_notes`, `read_note`, `list_notes`, `related_notes`) shows a warning
+  — it names the consequence and does not block it, the same stance the write rule already
+  takes. Two more checks share that warning line: no mention of tools at all, and a missing
+  `{{sprache}}`/`{{ordner}}` placeholder (which would silently stop following a later
+  language or folder change).
+- **"Show active instructions"** opens a preview of the exact prompt the next conversation
+  will start with, memory and skills included. `npm run gui:ask -- --full` shows the prompt
+  that was actually sent for the last question, and marks whether it deviated from the
+  shipped version.
+
 ## [0.9.0] — 2026-08-30
 
 ### Added

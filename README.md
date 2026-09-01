@@ -123,6 +123,8 @@ The full settings list:
 | Keep tool results verbatim | 3 (0–20) | How many of the most recent tool results stay in full; older ones become a one-line stub |
 | Summarize with the model (stage 2) | on | If stubs are not enough, Koda asks the model to summarize completed turns; your own messages are never summarized |
 | Summary length (% of window) | 10 (3–30) | Upper bound for the summary text |
+| Instructions for Koda | *(empty)* | Replaces the shipped rule block — see [Model control](#model-control) |
+| Tools | all enabled | Turns individual tools off and rewords their descriptions — see [Model control](#model-control) |
 
 ## How it works
 
@@ -201,6 +203,35 @@ currently in effect is shown at the top of the conversation.
 **Skills always require confirmation**, even inside the Koda folder where Koda can
 otherwise write freely. The reason: a skill isn't a draft — it changes what Koda does
 going forward.
+
+## Model control
+
+**Settings → Koda → Model control** lets you replace the instructions Koda follows and
+turn individual tools off — useful for a weaker or smaller model that needs more explicit
+guidance and fewer tools to choose from.
+
+The instructions textarea starts **empty**, with the shipped version shown greyed out as
+a placeholder. An empty field always means "the shipped version applies" — never "no
+instructions". This matters beyond the moment you open the field: because nothing is
+copied in until you actually type something, a later improvement to the shipped
+instructions still reaches you if you never touched the field, and the "Restore the
+shipped version" button (↺) puts you back on that state at any time. Two placeholders,
+`{{sprache}}` and `{{ordner}}`, stand in for your language and Koda folder settings and
+are filled in on every run — keep them in a rewritten version so it keeps following you
+if you change either setting later.
+
+Below the textarea, a warning appears (without blocking anything) if the instructions
+never mention tools, drop one of the two placeholders, or if every tool that looks into
+the vault has been turned off. **Show active instructions** opens a preview of the exact
+prompt the next conversation will start with, including the current memory and skills
+blocks.
+
+Each tool — including the reading ones (`search_notes`, `read_note`, `list_notes`,
+`related_notes`) — has its own switch and its own description field, which follows the
+same empty-means-shipped rule as the instructions. A tool that is switched off is left
+out of what is sent to the model entirely; it does not just get ignored. `related_notes`
+stays visible even without vault-rag installed, greyed out with a note why, so it never
+looks like a setting that quietly disappeared.
 
 ## Development
 

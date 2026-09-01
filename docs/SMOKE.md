@@ -82,11 +82,14 @@ CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den Port wartet.
 
 Erst wenn nichts läuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
 
-Fünfzehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+Achtzehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
 laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
 2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
 erweitert, 2026-08-30 um 9–12 für die umgebaute Sidebar und um 13, den gesperrten Zustand des
-Thinking-Schalters). Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
+Thinking-Schalters, 2026-08-31 um 16–18 für die Modell-Steuerung: Reset auf den
+Auslieferungsstand, die GESENDETE Werkzeugliste bei einem abgeschalteten Werkzeug, das
+Vorschau-Modal mit Memory und Skills). Voraussetzung ist der eine Handgriff, der Handarbeit
+bleibt:
 
 ```bash
 osascript -e 'quit app "Obsidian"'
@@ -104,7 +107,10 @@ erreichbar angezeigt · **Settings-Gruppe „Kontext & Verdichtung“** (Übersc
 Wikilink in der Antwort öffnet die Notiz · **Verdichtungs-Marken** (Stufe 1, Stufe 2
 aufklappbar mit Text, erzwungener Zusatz „Überlauf“/„overflow“) werden gerendert · **Statuszeile**
 über eine ganze Werkzeug-Runde · **Kontextfenster-Belegung** inkl. Warnschwelle · **Thinking-Schalter**
-im Kopf · **Rückfrage vor dem Verwerfen** eines Gesprächs.
+im Kopf · **Rückfrage vor dem Verwerfen** eines Gesprächs · **Reset der Anweisung** stellt Override
+und Textarea auf den Auslieferungsstand zurück · ein **abgeschaltetes Werkzeug** bleibt aus der
+**gesendeten** Werkzeugliste (`currentToolNames()`) und kehrt nach dem Zurückschreiben zurück ·
+das **Vorschau-Modal** führt Memory- und Skills-Abschnitt.
 
 Die Punkte **9–12** (2026-08-30) kommen wie 7 ohne Modell aus — sie speisen den
 Aktivitäts-Zustandsautomaten mit derselben Ereignisfolge, die `main.ts` aus dem Agent-Loop
@@ -118,6 +124,20 @@ Punkt **10 schließt zugleich eine der beiden Messlücken vom 2026-08-28** von d
 gemessen wird nicht mehr nur, dass das Settings-Feld existiert, sondern dass seine Zahl in der
 Sidebar ankommt. Offen bleibt `hide()` (Cache-Verwurf beim Schließen des Tabs) — dafür braucht es
 einen Endpunkt, der während des Laufs an- und ausgeht.
+
+Die Punkte **16–18** (2026-08-31, Modell-Steuerung) kommen ebenfalls ohne Modell aus. Punkt 16
+schreibt eine eigene Anweisung, drückt den `rotate-ccw`-Knopf mit `clickReal` und prüft **drei**
+Dinge zugleich: `settings.systemPromptOverride` leer, die Textarea leer, ihr Platzhalter weiterhin
+gesetzt — der Vorwert wird vor dem Punkt gesichert und danach zurückgeschrieben, wie beim
+Thinking-Schalter (Punkt 13). Punkt 17 ist die Gegenprobe zum Trugschluss „ein Punkt, der nur den
+Schalter anfasst, hätte seinen Gegenstand nie berührt": gemessen wird `plugin.currentToolNames()`
+— dieselbe Methode, die `ask()` beim Zusammenbau der Werkzeugliste ruft —, mit einer dritten
+Bedingung, die belegt, dass das Zurückschreiben wirklich griff (`write_note` steht danach wieder in
+der Liste). Punkt 18 öffnet das Vorschau-Modal über den Knopf „Aktive Anweisung ansehen" und prüft,
+dass `## Memory` **und** `## Skills` im Text stehen — beides trägt der Staging-Vault über sein
+Fixture. **Ungeklärt von hier aus:** ob das Modal im Haupt- oder im Einstellungsfenster entsteht
+(die Settings-Bruecke hat kein `window.app`, s. Kopfkommentar von `attachTo`) — der Punkt pollt
+deshalb auf beiden und vermerkt im Detailtext, welches Fenster geliefert hat.
 
 Prüfpunkt **7** und **8** kommen ohne Modell und ohne Persistenz aus: Punkt 7 haengt zwei
 `CompactionRecord`s nur im Speicher an `p.chatLog`, ruft `renderLog()`, prueft die drei
@@ -154,6 +174,12 @@ zwei Läufe derselben Frage können verschieden ausfallen), macht sie aber prüf
 nur zu behaupten: die Messgröße ist der Tool-Aufruf aus `chatLog`, nicht der Antworttext.
 Bei einer Gegenprobe immer `--full` — ohne das belegt ein Treffer nur, *dass* ein Werkzeug
 lief, nicht dass ein genannter Pfad daher stammt.
+
+**Seit 2026-08-31 fuehrt der Bericht vor den Werkzeug-Aufrufen den zuletzt gesendeten
+System-Prompt** (`plugin.lastSystemPrompt`) — Laenge in Zeichen plus, ob er vom
+Auslieferungsstand abweicht (`settings.systemPromptOverride.trim() !== ""`, kein
+Textvergleich). Ohne `--full` stehen nur die ersten 400 Zeichen da; `null` (noch keine
+Frage in dieser Sitzung) zeigt „noch nichts gesendet" statt eines leeren Blocks.
 
 **Seit 2026-08-21 weist der Bericht auch Verdichtungs-Marken aus** — `⇢ Verlauf verdichtet
 (Stufe 1: n Tool-Ergebnisse gekürzt, x KB)` bzw. `(Stufe 2: n Runden zusammengefasst)`, die
@@ -526,3 +552,42 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   (frisch gestartete App, Plugin per `disablePlugin/enablePlugin` geladen; echter *und*
   synthetischer Mausklick probiert). **Prüfpunkt 3 ist damit unbewiesen** — er war noch nie
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
+
+
+## Belegter Lauf: 2026-08-31, Modell-Steuerung (18/18)
+
+Gefahren gegen den **Staging-Vault `koda-agent`**, der bis dahin nicht existierte — Koda war
+nur in `10_Pallas` installiert. Der Vault wurde für diesen Lauf angelegt (Notizen, `Koda/Memory.md`,
+ein Skill); ein getracktes Fixture fehlt weiterhin und bleibt offen. Der Grund, es nicht gegen
+den Arbeits-Vault zu fahren, steht in den Prüfpunkten selbst: **16 und 17 schreiben Einstellungen**
+(`systemPromptOverride`, `toolsDisabled`) — im Arbeits-Vault wären das die echten.
+
+Die drei neuen Punkte klären die drei Zweifel, mit denen sie geschrieben wurden:
+
+- **16** findet den `rotate-ccw`-Knopf über sein `aria-label` (`geklickt: true`) — der Verdacht,
+  `setTooltip()` schreibe es nicht aufs Element, war unbegründet.
+- **17** misst die gesendete Liste über `currentToolNames()`: `write_note` fehlt bei
+  abgeschaltetem Schalter und ist nach dem Zurückschreiben wieder da. Beide Hälften nötig — ohne
+  die zweite wäre eine Liste, die es nie enthielt, ebenso grün.
+- **18** rendert im **Einstellungsfenster**, nicht im Hauptfenster (1165 Zeichen, Memory und
+  Skills beide vorhanden).
+
+### Praxistest (`gui:ask`, qwen/qwen3.8-27b)
+
+Drei Läufe, jeder belegt eine Hälfte des Features:
+
+1. **Ausgelieferter Stand:** `search_notes` → `read_note`, Antwort mit `[[wikilinks]]`. Der
+   Bericht führt den gesendeten Prompt inklusive Memory- und Skills-Block.
+2. **Überschriebene Anweisung** („Benutze KEINE Werkzeuge, sage nur: Ich sehe nicht nach."):
+   **kein einziger Werkzeugaufruf**, Antwort wörtlich wie angewiesen. Der Override wirkt.
+3. **`read_note` abgeschaltet**, Frage nach dem Inhalt einer Notiz: das Werkzeug fehlt in der
+   gesendeten Liste, und das Modell **dreht Suchschleifen bis ins Runden-Limit** (`search_notes`
+   mit „a", „e", „Ziel"), statt den Mangel zu benennen.
+
+⚠️ **Punkt 3 ist kein Defekt, sondern der Preis einer bewussten Entscheidung** — abgeschaltet
+heißt „das Modell erfährt nichts davon" (Spec E3). Die Folge ist trotzdem wissenswert: wer ein
+**einzelnes** lesendes Werkzeug abschaltet, bekommt keine Fehlermeldung, sondern Rundenverschleiß.
+Die Warnung in den Einstellungen deckt nur den Totalfall ab („kein lesendes Werkzeug aktiv"),
+nicht das Abschalten eines von vieren. Wer hier nachbessern will, hat zwei Wege: die Warnung
+verfeinern, oder dem Modell das Fehlen im Prompt mitteilen — Letzteres widerspricht E3 und wäre
+eine Design-Änderung, keine Reparatur.

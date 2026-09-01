@@ -14,9 +14,9 @@ import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
 import { isCompactionRecord, type ChatMessage, type LogEntry } from "./core/agent/types";
-import { toolDefs, toWireTools } from "./core/tools/defs";
+import { toolDefs, toWireTools, type ToolDef } from "./core/tools/defs";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
-import { buildSystemPrompt } from "./core/memory/memory";
+import { buildSystemPrompt } from "./core/prompt/build";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
 import { selectSkills, type Selection } from "./core/skills/select";
@@ -48,6 +48,9 @@ export default class KodaPlugin extends Plugin {
    *  gezeichnet. Ueber lastNotice zu laufen hiesse, dass jeder Fehler im selben Turn
    *  die Zeile ueberschreibt: sie waere genau dann weg, wenn etwas schiefgeht. */
   skillNotice: string | null = null;
+  /** Zuletzt GESENDETER Prompt. `null`, solange in dieser Sitzung nichts gefragt wurde.
+   *  Nur im Speicher — er traegt Memory-Zeilen und gehoert nicht auf Platte (Spec E6). */
+  lastSystemPrompt: string | null = null;
   private abort: AbortController | null = null;
   private readonly transport = new XhrSseTransport();
 
@@ -156,12 +159,42 @@ export default class KodaPlugin extends Plugin {
    *  dieselbe Schwelle. Eine Anzeige, die davon abweicht, waere schlimmer als keine. */
   contextUsage(): ContextUsage | null {
     const s = this.settings;
-    const defs = toolDefs({ related: readRetrievalApi(this.app)?.status().indexed === true });
     const used = estimateTokens(
       this.chatLog.filter((m): m is ChatMessage => !isCompactionRecord(m)),
-      JSON.stringify(toWireTools(defs)).length,
+      JSON.stringify(toWireTools(this.currentToolDefs())).length,
     );
     return contextUsage(used, s.contextWindowTokens, s.compactAtPercent);
+  }
+
+  /** Die Werkzeuge, die beim naechsten Gespraech gesendet werden. `ask()` ruft diese Methode;
+   *  jeder Messpunkt darf sie ebenfalls rufen und misst damit die WIRKLICHE Liste — es gibt
+   *  keinen zweiten Weg, auf dem die gesendete Liste entsteht. */
+  currentToolDefs(): ToolDef[] {
+    return toolDefs({
+      related: readRetrievalApi(this.app)?.status().indexed === true,
+      disabled: this.settings.toolsDisabled,
+      descriptions: this.settings.toolDescriptions,
+    });
+  }
+
+  /** Nur die Namen — was der GUI-Smoke braucht (Pruefpunkt 17). */
+  currentToolNames(): string[] {
+    return this.currentToolDefs().map((d) => d.name);
+  }
+
+  /** Der Prompt, wie er beim NAECHSTEN Gespraech aussehen wird — inklusive Memory und
+   *  Skills. Fuer das Ansehen-Modal (Spec E6). Ruft dieselbe `buildSystemPrompt` wie
+   *  `ask()`, kein Nachbau: zwei Wege zu einem Text waeren zwei Wahrheiten. */
+  async previewSystemPrompt(): Promise<string> {
+    const memory = await this.readMemory();
+    const { selection } = await this.readSkills();
+    return buildSystemPrompt({
+      lang: this.promptLang(),
+      memory,
+      kodaFolder: this.settings.kodaFolder,
+      skills: selection,
+      rulesOverride: this.settings.systemPromptOverride,
+    });
   }
 
   private views(): KodaView[] {
@@ -204,15 +237,23 @@ export default class KodaPlugin extends Plugin {
       const lang = this.promptLang();
       const system: ChatMessage = {
         role: "system",
-        content: buildSystemPrompt({ lang, memory, kodaFolder: s.kodaFolder, skills: selection }),
+        content: buildSystemPrompt({
+          lang, memory, kodaFolder: s.kodaFolder, skills: selection,
+          rulesOverride: s.systemPromptOverride,
+        }),
       };
+      // Fuer `gui:ask`: der Treiber liest chatLog, und dort steht der System-Prompt nicht.
+      // Nur im Speicher — er traegt Memory-Zeilen und gehoert nicht auf Platte (Spec E6).
+      this.lastSystemPrompt = system.content;
 
       // Werkzeugliste je Lauf: related_notes gibt es nur, wenn vault-rag einen Index
-      // bereitstellt. `status()` ist synchron und netzfrei — deshalb darf die Pruefung
-      // hier stehen, wo ein Netzaufruf nicht vertretbar waere. Achtung: `indexed` sagt
-      // NICHTS ueber die Erreichbarkeit des Embedding-Endpunkts; ein `search` kann
-      // trotzdem jederzeit `offline` liefern (Spec E3/E6).
-      const defs = toolDefs({ related: readRetrievalApi(this.app)?.status().indexed === true });
+      // bereitstellt, dazu Abschaltung und eigene Beschreibungen aus den Einstellungen.
+      // `status()` ist synchron und netzfrei — deshalb darf die Pruefung hier stehen, wo
+      // ein Netzaufruf nicht vertretbar waere. Achtung: `indexed` sagt NICHTS ueber die
+      // Erreichbarkeit des Embedding-Endpunkts; ein `search` kann trotzdem jederzeit
+      // `offline` liefern (Spec E3/E6). Dieselbe Methode, die auch der GUI-Smoke misst —
+      // kein zweiter Weg zur gesendeten Liste.
+      const defs = this.currentToolDefs();
 
       // Client pro Lauf: der Idle-Timeout ist eine Einstellung und darf ohne
       // Plugin-Neustart wirken.
@@ -318,6 +359,10 @@ export default class KodaPlugin extends Plugin {
         // meldet Klartext, statt zu werfen.
         retrieval: () => readRetrievalApi(this.app),
         listMaxRows: () => this.settings.listNotesMaxRows,
+        // Aus derselben Quelle wie die gesendete Liste — es gibt keinen zweiten Weg, auf
+        // dem sie entsteht. Ebenfalls als Callback: eine Aenderung in den Einstellungen
+        // wirkt damit ab dem naechsten Werkzeug-Aufruf, nicht erst im naechsten Gespraech.
+        allowed: () => new Set(this.currentToolNames()),
       });
 
       const appended = await runAgent(

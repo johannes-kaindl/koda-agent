@@ -171,3 +171,42 @@ describe("related_notes — not-indexed ist nicht immer voruebergehend", () => {
     expect(reads).toBe(0);
   });
 });
+
+/** Der Guard aus der Werkzeug-Sperre und die Auskunft ueber das Nachbarplugin greifen
+ *  beide bei `related_notes` — der Test klemmt fest, WELCHE Meldung bei welcher Ursache
+ *  kommt. Eine plausible, aber falsche Ursachenmeldung schickt den naechsten Leser (hier:
+ *  das Modell) in die falsche Richtung. */
+describe("related_notes — wer die Ablehnung begruendet", () => {
+  it("meldet das fehlende Nachbarplugin, nicht eine Abschaltung durch den Nutzer", async () => {
+    // vault-rag ist aus, deshalb steht related_notes nicht in der angebotenen Liste. Der
+    // Guard kennt den Grund nicht und laesst durch; `relatedNotes()` kennt ihn.
+    const t = new VaultTools(vault({}), async () => true, {
+      ...opts(() => null),
+      allowed: () => new Set(["search_notes", "read_note"]),
+    });
+    const r = await t.run("related_notes", { path: "a.md" });
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("Vault Retrieval");
+    expect(r.ok === false && r.error).not.toContain("abgeschaltet");
+  });
+
+  it("meldet die Abschaltung, wenn der Nutzer es bei LAUFENDEM vault-rag ausschaltet", async () => {
+    // Die Haelfte, die die Ausnahme nicht verschlucken darf: hier ist der Nutzer der Grund.
+    const t = new VaultTools(vault({}), async () => true, {
+      ...opts(() => api()),
+      allowed: () => new Set(["search_notes", "read_note"]),
+    });
+    const r = await t.run("related_notes", { path: "a.md" });
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("abgeschaltet");
+  });
+
+  it("laeuft normal, solange related_notes angeboten wird", async () => {
+    const t = new VaultTools(vault({}), async () => true, {
+      ...opts(() => api()),
+      allowed: () => new Set(["related_notes"]),
+    });
+    const r = await t.run("related_notes", { path: "a.md" });
+    expect(r.ok).toBe(true);
+  });
+});

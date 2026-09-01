@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.9.0 im Community-Store (Rescan „passed", zero warnings), main, Stand 2026-08-30
+## Status: 0.9.0 im Community-Store (Rescan „passed", zero warnings), Modell-Steuerung auf `feat/modell-steuerung`, Stand 2026-08-31
 
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
@@ -32,7 +32,17 @@ Thinking-Schalter im View-Kopf, Markdown waehrend des Streams, „Neues Gespraec
 Kopf-Aktion hinter einer Rueckfrage. Vier der fuenf Punkte kamen aus dem Bestand statt
 aus Eigenbau — der Kit-first-Check lief **vor** dem Entwurf, weil Johannes ihn eingefordert
 hatte, und korrigierte den ersten Entwurf in vier von fuenf Punkten.
-Gate ist grün (405/405), `main.js` baut. Details zu Nutzung/Setup:
+**Die Modell-Steuerung liegt fertig und mergefaehig auf `feat/modell-steuerung`, noch NICHT
+auf `main`** (Spec `2026-08-31-koda-modell-steuerung-design.md`) — der Regelblock des System-Prompts ist
+in den Einstellungen vollständig ersetzbar (mit Zurücksetzen und einer Warnung, die
+nichts verbietet), jedes der sieben Werkzeuge einzeln abschaltbar und umbeschreibbar, und
+die aktive Anweisung einsehbar: im Einstellungs-Modal für das nächste Gespräch, im
+`gui:ask`-Bericht für das letzte. Gespeichert wird dabei immer nur die **Abweichung** —
+ein leeres Feld heißt „die ausgelieferte Fassung gilt", nie „leer", damit eine spätere
+Verbesserung des ausgelieferten Textes auch die Nutzer erreicht, die das Feld schon einmal
+geöffnet haben. Der Prompt-Bau (`buildSystemPrompt`) ist dabei aus `src/core/memory/` in
+ein eigenes, pures Modul `src/core/prompt/` umgezogen — er war dort nur zu Gast.
+Gate ist grün (493/493), `main.js` baut. Details zu Nutzung/Setup:
 `README.md`; Smoke-Checkliste vor jedem Release: `docs/SMOKE.md`. **Ein lokaler
 LLM-Server braucht CORS** (LM Studio „Enable CORS"/`lms server start --cors`): der Chat
 streamt als XHR aus dem Renderer, die Testen-Probe läuft über `requestUrl` — Koda benennt
@@ -138,13 +148,15 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (405/405).
+- `npm test` — `check-no-abs-paths` + vitest (493/493).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 15 Punkte (9–13 seit
+  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 18 Punkte (9–13 seit
   2026-08-30: Statuszeile, Kontext-Belegung, Thinking-Schalter, Rückfrage vorm Verwerfen,
-  gesperrter Thinking-Zustand).
+  gesperrter Thinking-Zustand; 16–18 seit 2026-08-31: Reset auf den Auslieferungsstand,
+  ein abgeschaltetes Werkzeug fehlt in der gesendeten Liste, das Vorschau-Modal führt
+  Memory und Skills).
 - `npm run gui:ask -- --vault <name> --ask "<Frage>" [--expect <text>] [--full]` —
   Praxistest: stellt Koda im laufenden Obsidian eine echte Frage und berichtet, **welche
   Werkzeuge er wählt**. Das Gegenstück zum Smoke — langsam und nicht deterministisch,
@@ -156,6 +168,12 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 
 - `src/core/` — rein (kein Obsidian-Import, `check:pure` erzwingt das): Agent-Loop,
   Tool-Policy/-Defs, Memory, Sessions, Diff.
+- `src/core/prompt/` — der Prompt-Bau, **umgezogen aus `src/core/memory/`**: er war dort
+  nur zu Gast (`rules.ts`: `DEFAULT_RULES`/`renderRules`/`checkRules` — der ersetzbare
+  Regelblock samt Platzhaltern `{{sprache}}`/`{{ordner}}` und der Warn-Heuristik aus E5;
+  `build.ts`: `buildSystemPrompt()`, drei Schichten — Regelblock (ersetzbar), Memory,
+  Skills — dieselbe Funktion, die auch die Modal-Vorschau und `gui:ask --full` speisen,
+  kein Nachbau). Pur wie der Rest von `core/`.
 - `src/core/skills/` — Skill-Parser, Budget-Auswahl, Pfad-Bau (obsidian-frei wie der
   Rest von `core/`).
 - `src/core/chat/` — die Sidebar-Logik, pure (seit 2026-08-30): `activity.ts` (was Koda
@@ -177,6 +195,10 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   kommt aus Obsidians `metadataCache`, kein Datei-Lesen je Notiz.
 - `src/llm/` — `KodaChatClient` + `XhrSseTransport` (Streaming-Chat-Client).
 - `src/obsidian/` — View, Vault-Tools-Adapter, Bestätigungs-Modal, Settings-Tab.
+  `model-control.ts` hängt die zwei Hatch-Zeilen der Modell-Steuerung in die deklarative
+  Settings-Tabelle (Anweisungs-Textarea mit Reset und Warnzeile, Werkzeug-Liste mit Schalter
+  und eigener Beschreibung je Zeile); `prompt-modal.ts` zeigt die aktive Anweisung — ruft
+  dieselbe `buildSystemPrompt` wie `ask()`, kein zweiter Weg zu demselben Text.
 - `src/obsidian/settings.ts` — Settings-Tab. Die **Endpunkt-Liste kommt seit 2026-08-28 aus
   dem Kit** (`buildEndpointList`), nicht mehr aus Eigenbau; Kodas Kontextfenster-Uebernahme
   haengt im `clientFor().probe()` der Zeile. Das CSS liegt nach Kit-Vertrag in `styles.css`

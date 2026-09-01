@@ -119,9 +119,23 @@ const RELATED_DEF: ToolDef = {
   },
 };
 
-/** Die Werkzeugliste haengt am Zustand der Nachbarplugins und wird deshalb je Gespraech
- *  gebaut statt als Konstante ausgeliefert. Die Kopie ist Absicht: ein Aufrufer soll
- *  TOOL_DEFS nicht versehentlich veraendern koennen. */
-export function toolDefs(opts: { related: boolean }): ToolDef[] {
-  return opts.related ? [...TOOL_DEFS, RELATED_DEF] : [...TOOL_DEFS];
+/** Die Werkzeugliste haengt am Zustand der Nachbarplugins UND an der Wahl des Nutzers und
+ *  wird deshalb je Gespraech gebaut statt als Konstante ausgeliefert. Sie ist der einzige
+ *  Ort, an dem sie entsteht — abgeschaltet heisst hier: nicht gesendet, das Modell erfaehrt
+ *  nichts davon (Spec E3). Die Kopie ist Absicht: ein Aufrufer soll TOOL_DEFS nicht
+ *  versehentlich veraendern koennen. */
+export function toolDefs(opts: {
+  related: boolean;
+  disabled?: string[];
+  descriptions?: Record<string, string>;
+}): ToolDef[] {
+  const alle = opts.related ? [...TOOL_DEFS, RELATED_DEF] : [...TOOL_DEFS];
+  const aus = new Set(opts.disabled ?? []);
+  const eigen = opts.descriptions ?? {};
+  return alle
+    .filter((d) => !aus.has(d.name))
+    .map((d) => {
+      const text = (eigen[d.name] ?? "").trim();
+      return text === "" ? { ...d } : { ...d, description: text };
+    });
 }
