@@ -84,8 +84,11 @@ into `<vault>/.obsidian/plugins/koda-agent/`.
 4. **Approve writes outside the Koda folder.** A modal shows the new text (create and
    append) or a line diff (replace) before anything is written — see
    [The write rule](#the-write-rule).
-5. **New chat** starts a fresh session log. Old sessions are restored after an Obsidian
-   restart; they are plain JSONL in the plugin folder.
+5. **New chat** starts a fresh session log, after a confirmation — discarding is final.
+   The button sits in the header row at the top of the sidebar, next to the thinking
+   toggle. Both are also commands (`Koda: New chat`, `Koda: Toggle thinking`), so you can
+   reach them from the command palette or bind a hotkey. Old sessions are restored after an
+   Obsidian restart; they are plain JSONL in the plugin folder.
 
 Ask Koda to remember something and it appends a dated line to
 `<Koda folder>/Memory.md` — an ordinary note you can open, edit or delete.
