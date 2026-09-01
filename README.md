@@ -7,7 +7,7 @@ configure (a local server such as [LM Studio](https://lmstudio.ai), or a hosted
 provider if you add an API key) and keeps its own memory in a plain Markdown note you
 can read and edit yourself.
 
-*Status: 0.4.0 — listed in the Obsidian Community Plugin store, no signed builds.
+*Status: 0.10.1 — listed in the Obsidian Community Plugin store, no signed builds.
 See `CLAUDE.md` for the current scope and design decisions.*
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
