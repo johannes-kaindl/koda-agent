@@ -83,14 +83,14 @@ CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den Port wartet.
 
 Erst wenn nichts läuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
 
-Achtzehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+Neunzehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
 laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
 2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
 erweitert, 2026-08-30 um 9–12 für die umgebaute Sidebar und um 13, den gesperrten Zustand des
 Thinking-Schalters, 2026-08-31 um 16–18 für die Modell-Steuerung: Reset auf den
 Auslieferungsstand, die GESENDETE Werkzeugliste bei einem abgeschalteten Werkzeug, das
-Vorschau-Modal mit Memory und Skills). Voraussetzung ist der eine Handgriff, der Handarbeit
-bleibt:
+Vorschau-Modal mit Memory und Skills; 2026-09-02 um 19, den Kit-Vertrag `hide()` → Cache
+verwerfen). Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
 
 ```bash
 osascript -e 'quit app "Obsidian"'
@@ -124,7 +124,8 @@ aufklappbar mit Text, erzwungener Zusatz „Überlauf“/„overflow“) werden 
 in der Kopfzeile · **Rückfrage vor dem Verwerfen** eines Gesprächs · **Reset der Anweisung** stellt Override
 und Textarea auf den Auslieferungsstand zurück · ein **abgeschaltetes Werkzeug** bleibt aus der
 **gesendeten** Werkzeugliste (`currentToolNames()`) und kehrt nach dem Zurückschreiben zurück ·
-das **Vorschau-Modal** führt Memory- und Skills-Abschnitt.
+das **Vorschau-Modal** führt Memory- und Skills-Abschnitt · **`hide()` verwirft den
+Modell-Cache**, ein tot gemessener Endpunkt bleibt also nicht die ganze Sitzung tot.
 
 ⚠️ **Punkt 2 misst seit dem 2026-09-01 die Größe der Kopfzeilen-Aktionen, nicht ihre
 Existenz — und das ist der teuerste Fund dieser Runde.** Von 0.9.0 bis 0.10.0 hingen
@@ -604,6 +605,40 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   synthetischer Mausklick probiert). **Prüfpunkt 3 ist damit unbewiesen** — er war noch nie
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
+
+## Belegter Lauf: 2026-09-02, zwei Messlücken geschlossen (19/19)
+
+**Prüfpunkt 3 mass zu früh.** Er endete, sobald `is-ok` erschien (1035 ms) — ein Freeze, der erst
+beim Zurückkommen des Netzabrufs eintritt, wäre damit unsichtbar gewesen. Er beobachtet jetzt
+9 Sekunden nach und pingt danach **beide** Fenster. Der Hinweis ist eine Weitergabe aus der Session
+`anysource-sideloader` (2026-09-01), die einen gleich aussehenden Freeze jagte; ⚠️ ihr Fall ist
+ausdrücklich **kein zweiter Beleg** für die `setDisabled`-Hypothese (sie hat zwei Verdächtige
+zugleich entfernt), er erklärt nur, warum unsere Gegenprobe vom 2026-08-07 scheitern konnte.
+
+**Prüfpunkt 19 ist neu und misst den Kit-Vertrag `hide()` → `cache.clear()`** — seit 2026-08-28 im
+Code, nie gemessen. Drei Werte statt zwei, und die mittlere ist der Grund, warum der Punkt etwas
+belegt:
+
+| | Zustand | erwartet | gemessen |
+|---|---|---|---|
+| A | Server tot, Tab frisch geöffnet | Picker gesperrt | `gesperrt` |
+| B | Server lebt wieder, **nur** Tab-Neuaufbau | Picker weiter gesperrt (Cache hält) | `gesperrt` |
+| C | Server lebt, Fenster zu und wieder auf | Liste da (`hide()` hat geräumt) | `liste:2` |
+
+⚠️ **Der Punkt war zweimal rot, bevor er etwas belegte — beide Male, weil er am Falschen mass.**
+Erst gegen `.okit-ep-status`: das Status-Icon hängt an einer eigenen Probe je Zeilen-Render und
+läuft gar nicht über den Cache (B meldete `is-ok`, also „Cache hat nicht gegriffen"). Dann gegen
+select-gegen-input: ein toter Endpunkt rendert kein Freitextfeld, sondern ein **gesperrtes**
+Dropdown mit einer Option — an der laufenden App gemessen, nicht abgeleitet. Gerettet hat den Punkt
+beide Male die Kontrollmessung B: ohne sie wäre „am Ende grün" auch dann erreicht worden, wenn nie
+etwas gecacht wurde. Dieselbe Falle wie beim Beleg-Test mit erfundenem Namen (Lesson 2026-09-01),
+nur andersherum — hier hat die eingebaute Gegenprobe sie gefangen.
+
+Nebenbei mitgemessen (Task „clickReal-Klick ohne Haltedauer"): **40 Klicks ohne Haltedauer, 40 mit
+150 ms — kein einziger Ausfall**, an zwei Stellen mit Rerender (Thinking-Schalter im Hauptfenster,
+rotate-ccw im Einstellungsfenster). Für koda-agent ist die Schwelle also nicht messbar; der
+epub-exporter-Befund überträgt sich nicht. Was das **nicht** heißt: dass es kein Rennen gibt — es
+heißt, dass es in 40 Versuchen je Stelle nicht auftrat.
 
 ## Belegter Lauf: 2026-09-01, Fixture-Gegenprobe (18/18)
 

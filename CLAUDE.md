@@ -173,11 +173,15 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 18 Punkte (9–13 seit
+  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 19 Punkte (9–13 seit
   2026-08-30: Statuszeile, Kontext-Belegung, Thinking-Schalter, Rückfrage vorm Verwerfen,
   gesperrter Thinking-Zustand; 16–18 seit 2026-08-31: Reset auf den Auslieferungsstand,
   ein abgeschaltetes Werkzeug fehlt in der gesendeten Liste, das Vorschau-Modal führt
-  Memory und Skills).
+  Memory und Skills; 19 seit 2026-09-02: der Kit-Vertrag `hide()` → Modell-Cache verwerfen,
+  in drei Werten gemessen — die mittlere Messung belegt, dass der Cache überhaupt gegriffen
+  hat, sonst wäre der Punkt grün, ohne seinen Gegenstand zu berühren). Prüfpunkt 3
+  beobachtet seit 2026-09-02 **9 Sekunden nach**, statt sofort nach dem Klick zu melden:
+  ein verzögert eintretender Freeze wäre vorher unsichtbar gewesen.
 - `npm run smoke:gui -- --setup` — stellt den Staging-Vault `$STAGING_VAULTS_DIR/koda-agent`
   aus dem getrackten Fixture `docs/images/fixture/` her (seit 2026-09-01; davor war der Vault
   von Hand gebaut und ein Verlust kostete die Arbeit erneut). **Gefahren wird gegen diesen

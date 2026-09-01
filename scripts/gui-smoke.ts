@@ -119,6 +119,10 @@ const VIEW_TYPE = "koda-agent-view";
  *  im Test darf nie versehentlich einen echten Endpunkt treffen. */
 const DEAD_A = "http://127.0.0.1:9999";
 const DEAD_B = "http://127.0.0.1:9998";
+/** Wie lange Pruefpunkt 3 NACH dem erfolgreichen Status weiter zusieht, bevor er gruen
+ *  meldet. Begruendung an der Stelle selbst — kurz: ein verzoegert eintretender Freeze
+ *  war vorher unsichtbar. */
+const NACHBEOBACHTUNG_MS = 9000;
 
 // --- Prüfpunkte -------------------------------------------------------------
 
@@ -155,7 +159,7 @@ interface Settings {
  *
  * `requestUrl` umgeht CORS, deshalb genuegen hier nackte JSON-Antworten.
  */
-async function startFakeEndpoint(): Promise<{ url: string; close: () => void }> {
+async function startFakeEndpoint(wunschPort = 0): Promise<{ url: string; port: number; close: () => Promise<void> }> {
   const server: Server = createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
@@ -164,9 +168,16 @@ async function startFakeEndpoint(): Promise<{ url: string; close: () => void }> 
         : JSON.stringify({ ok: true }),
     );
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => server.listen(wunschPort, "127.0.0.1", resolve));
   const port = (server.address() as AddressInfo).port;
-  return { url: `http://127.0.0.1:${port}`, close: () => server.close() };
+  // `close()` gibt ein Promise: Punkt 19 startet denselben Port wieder und braucht die
+  // Zusage, dass er wirklich frei ist — ein `server.close()` ohne Warten laesst das
+  // erneute `listen` mit EADDRINUSE scheitern, und der Punkt waere rot am Falschen.
+  return {
+    url: `http://127.0.0.1:${port}`,
+    port,
+    close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }),
+  };
 }
 
 /**
@@ -255,7 +266,7 @@ async function main(): Promise<void> {
   // Ausserhalb des try, damit das `finally` sie auch nach einem Abbruch mitten im Lauf
   // zurueckschreiben kann — sonst bliebe der Vault mit toten Endpunkten stehen.
   let previous: Settings | null = null;
-  let fake: { url: string; close: () => void } | null = null;
+  let fake: { url: string; port: number; close: () => Promise<void> } | null = null;
 
   try {
     // Ohne Fokus drosselt Chromium den Renderer. `Page.bringToFront` allein genuegt auf
@@ -540,11 +551,30 @@ async function main(): Promise<void> {
             // Zeitueberschreitung, das `catch` unten greift und der Punkt wird rot. Ein
             // Ping, kein Vergleich — vermerkt, weil die Zeile beim Lesen wie der Fehler
             // aussieht, den sie gerade nicht macht.
+            // ⚠️ NACHBEOBACHTUNG, seit 2026-09-02 — der Punkt mass vorher zu frueh.
+            // Bis dahin endete er, sobald `is-ok` erschien (im Lauf vom 01.09. nach 1031 ms).
+            // Ein Freeze, der ERST beim Zurueckkommen des Netzabrufs eintritt, waere damit
+            // unsichtbar gewesen: der Punkt haette laengst gruen gemeldet. Der Hinweis kam
+            // aus der Session `anysource-sideloader` (2026-09-01), die einen gleich
+            // aussehenden Freeze jagte — bei ihr trat er verzoegert ein, ihr eigener
+            // Pruefpunkt blieb deshalb im Defektzustand gruen, und erst das Zurueckschreiben
+            // der Einstellungen am Laufende scheiterte an einem toten Renderer. Es ist eine
+            // WEITERGABE, keine eigene Messung, und ihr Fall ist ausdruecklich kein zweiter
+            // Beleg fuer die `setDisabled`-Hypothese (sie hat zwei Verdaechtige zugleich
+            // entfernt) — er erklaert aber, warum unsere Gegenprobe vom 2026-08-07 scheitern
+            // konnte, ohne dass der Defekt weg war.
+            //
+            // Gewartet wird auf der NODE-Seite: im Renderer kommt bei genau diesem Defekt
+            // kein `setTimeout` mehr zurueck, eine Wartezeit dort waere also selbst Teil
+            // des Haengers. Die 9 s sind der Wert, bei dem der fremde Fall sichtbar wurde —
+            // ein Anhaltspunkt, keine gemessene Schwelle fuer Koda.
+            await new Promise((resolve) => setTimeout(resolve, NACHBEOBACHTUNG_MS));
             const hauptfensterLebt = await cdp.evaluate<boolean>(`return true;`);
-            survived = status === "is-ok" && hauptfensterLebt;
+            const settingsLebt = await settings.evaluate<boolean>(`return true;`);
+            survived = status === "is-ok" && hauptfensterLebt && settingsLebt;
             detail =
               status === "is-ok"
-                ? `beide Fenster antworten nach ${Date.now() - t0} ms · Status is-ok`
+                ? `Status is-ok nach ${Date.now() - t0 - NACHBEOBACHTUNG_MS} ms · beide Fenster antworten auch ${NACHBEOBACHTUNG_MS} ms spaeter`
                 : `Status ${status ?? "(keiner)"} statt is-ok — erreichbarer Endpunkt nicht als solcher erkannt`;
           } catch (error) {
             survived = false;
@@ -1094,6 +1124,128 @@ async function main(): Promise<void> {
       settings18?.close();
       await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
     }
+
+    // --- 19. `hide()` verwirft den Modell-Cache ------------------------------
+    // Der Kit-Vertrag verlangt `cache.clear()` beim SCHLIESSEN des Settings-Tabs
+    // (`ModelListCache.clear`, src/vendor/kit/model-list-cache.ts). Der Aufruf steht seit
+    // 2026-08-28 in `KodaSettingsTab.hide()` — gemessen hatte ihn nie jemand, und sein
+    // Fehlen ist unsichtbar: der Cache haelt Promises je Endpunkt-URL und ueberlebt jeden
+    // Tab-NEUAUFBAU bewusst. Ohne `clear()` bleibt ein einmal als „nicht erreichbar"
+    // gemessener Endpunkt die RESTLICHE SITZUNG so stehen — wer seinen LLM-Server danach
+    // startet und die Einstellungen neu oeffnet, saehe dauerhaft den alten Zustand.
+    //
+    // Dass das ueberhaupt cachebar ist, haengt an einer Eigenschaft von `probeModels`:
+    // es wirft NICHT, sondern liefert `{ status, models: [] }`. Der Cache sieht also kein
+    // abgelehntes Promise (das seinen Eintrag selbst verwirft), sondern ein erfolgreiches
+    // mit `reachable: false` — und behaelt es.
+    //
+    // Gemessen wird in DREI Werten, nicht in zwei. Die mittlere Messung ist der Grund,
+    // warum der Punkt etwas belegt: sie zeigt, dass der Cache ueberhaupt gegriffen hat.
+    // Ohne sie waere „am Ende gruen" auch dann erreicht, wenn nie etwas gecacht wurde —
+    // ein Punkt, der seinen Gegenstand nie beruehrt (dieselbe Falle wie beim Beleg-Test
+    // mit erfundenem Namen, Lesson 2026-09-01).
+    //
+    //   A  Server tot, Tab frisch geoeffnet          -> gesperrt   (wird gecacht)
+    //   B  Server LEBT wieder, nur Tab-Neuaufbau     -> gesperrt   (Cache haelt)
+    //   C  Server lebt, Fenster zu und wieder auf    -> liste:2    (hide() hat geraeumt)
+    let hidePunkt = "nicht gelaufen";
+    let hideOk = false;
+    let settings19: Cdp | null = null;
+    try {
+      const port19 = fake?.port;
+      if (port19 === undefined) throw new Error("kein Fake-Endpunkt aus Punkt 3 vorhanden");
+      const url19 = `http://127.0.0.1:${port19}`;
+      await fake?.close();
+      fake = null;
+
+      const oeffneTab = async (): Promise<void> => {
+        await cdp.evaluate(`
+          app.setting.open();
+          app.setting.openTabById(${JSON.stringify(PLUGIN_ID)});
+          return true;
+        `);
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      };
+      // Gemessen wird der MODELL-PICKER der Zeile, nicht das Status-Icon — der erste
+      // Anlauf dieses Punktes (2026-09-02) hat genau daran gemerkt, dass er am Falschen
+      // mass: `.okit-ep-status` haengt an einer eigenen Probe, die der Baustein bei jedem
+      // Zeilen-Render frisch faehrt und die deshalb NICHT ueber `ModelListCache` laeuft.
+      // Der Cache speist `cache.load(listKey, …)` → `resolveModelChoice` → den Picker:
+      // `reachable: false` ergibt `mode: "freetext"` (ein `<input>`), eine erreichbare
+      // Liste ein `<select>`. Das ist die Anzeige, fuer die der `clear()`-Vertrag gilt.
+      // Die erste Fassung war gruen-faehig ueber etwas anderes; gerettet hat sie die
+      // Kontrollmessung B, die „Cache hat nicht gegriffen" meldete statt still zu bestehen.
+      // ⚠️ Der Diskriminator ist `select.disabled`, NICHT select-gegen-input. Am 2026-09-02
+      // an der laufenden App gemessen: ein toter Endpunkt rendert kein Freitextfeld, sondern
+      // ein **gesperrtes** Dropdown mit einer einzigen Option („globales Modell (keins
+      // gesetzt)") — `resolveModelChoice` liefert bei `reachable: false` mit erlaubter
+      // Leer-Option `mode: "locked"`, und `renderModelPicker` setzt darauf `setDisabled(true)`.
+      // Die Fassung davor prueft select-gegen-input und war deshalb dreimal „select": sie
+      // konnte die Zustaende gar nicht unterscheiden.
+      const pickerZeile0 = async (verbindung: Cdp): Promise<string | null> =>
+        pollUntil<string>(
+          verbindung,
+          `
+            const slot = document.querySelector(".okit-ep-row .okit-model-slot");
+            if (!slot) return null;
+            const sel = slot.querySelector("select");
+            if (sel) return sel.disabled ? "gesperrt" : "liste:" + sel.options.length;
+            if (slot.querySelector("input")) return "freitext";
+            return null;
+          `,
+          12_000,
+        );
+
+      // Genau EINE Zeile, damit `rows[0]` eindeutig der geprobte Endpunkt ist.
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.endpoints = [{ url: ${JSON.stringify(url19)} }];
+        await p.saveSettings();
+        return true;
+      `);
+      await oeffneTab();
+      settings19 = await attachTo("settings", port, vault);
+      if (!settings19) throw new Error("Einstellungsfenster nicht gefunden");
+      await settings19.send("Page.bringToFront");
+      const a = await pickerZeile0(settings19);
+
+      // Server auf DEMSELBEN Port zurueckholen — die URL im Endpunkt bleibt unveraendert,
+      // sonst waere der Cache-Schluessel ein anderer und der Punkt maesse nichts.
+      fake = await startFakeEndpoint(port19);
+
+      // B: Neuaufbau OHNE Schliessen. `display()` direkt auf dem aktiven Tab, weil ein
+      // `openTabById` auf denselben Tab je nach Obsidian-Fassung `hide()` mitnehmen kann —
+      // dann waere die Kontrolle stillschweigend derselbe Fall wie C.
+      await cdp.evaluate(`app.setting.activeTab.display(); return true;`);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const b = await pickerZeile0(settings19);
+
+      // C: Fenster zu (das ist der `hide()`-Aufruf) und wieder auf.
+      settings19.close();
+      settings19 = null;
+      await cdp.evaluate(`app.setting.close(); return true;`);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      await oeffneTab();
+      settings19 = await attachTo("settings", port, vault);
+      if (!settings19) throw new Error("Einstellungsfenster nach dem Wiederoeffnen nicht gefunden");
+      await settings19.send("Page.bringToFront");
+      const c = await pickerZeile0(settings19);
+
+      // C muss eine echte Liste zeigen: der Fake-Endpunkt meldet `smoke-model`, das Dropdown
+      // traegt danach Leer-Option + Modell = 2 Optionen. „gesperrt" waere zu schwach —
+      // ein entsperrtes, aber leeres Dropdown gaebe es bei erreichbarem Endpunkt ohne Liste.
+      hideOk = a === "gesperrt" && b === "gesperrt" && c === "liste:2";
+      hidePunkt =
+        `Picker bei totem Server: ${a ?? "(keiner)"} · Server zurueck, nur Neuaufbau: ${b ?? "(keiner)"} · nach Schliessen+Oeffnen: ${c ?? "(keiner)"}` +
+        (a === "gesperrt" && b !== "gesperrt" ? " — ⚠️ Cache hat nicht gegriffen, der Punkt belegt hide() dann NICHT" : "") +
+        (a !== "gesperrt" ? " — ⚠️ toter Server wurde nicht als unerreichbar gelesen, Ausgangslage nicht hergestellt" : "");
+    } catch (error) {
+      hidePunkt = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      settings19?.close();
+      await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+    }
+    record("19. `hide()` verwirft den Modell-Cache (toter Endpunkt bleibt nicht tot)", hideOk, hidePunkt);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
@@ -1125,7 +1277,7 @@ async function main(): Promise<void> {
         )
         .catch(() => undefined);
     }
-    fake?.close();
+    await fake?.close();
     cdp.close();
   }
 
