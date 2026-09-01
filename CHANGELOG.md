@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-09-01
+
 ### Fixed
 
 - **"New chat" and the thinking toggle are visible again — they were unreachable since
