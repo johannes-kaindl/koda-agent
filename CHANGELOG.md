@@ -12,7 +12,9 @@ All notable changes to this project are documented here. The format follows
   note (with its properties and cursor line), the selection and the open tabs — pointers,
   no contents. Mode *Off* / *Workspace* per question via a dropdown next to Send, three
   commands (`Context mode: Off`, `Context mode: Workspace`, `Ask Koda about the selection`) and a right-click entry on
-  selected text. The block is stored with the message and shown under it, collapsible.
+  selected text. The block is stored with the message and shown under it, collapsible. The
+  Workspace mode is on by default after the update; set "Context mode on startup" to Off to
+  opt out.
 - **Two tools:** `get_workspace` (full selection, cursor surroundings, every tab) and
   `edit_active_note` (replace the selection or insert at the cursor, after approval; refuses
   if the selection or the active note changed since the preview).

@@ -27,7 +27,7 @@ const workspace: WorkspacePort = {
     active: { path: "Notes/Plan.md", frontmatter: { status: "active" }, selection: "Model control", cursorLine: 9, lineCount: 11 },
     tabs: [{ path: "Notes/Plan.md", viewType: "markdown" }],
   }),
-  linesAround: (radius) => ({ from: Math.max(1, 9 - radius), lines: ["a", "b", "c"] }),
+  linesAround: (radius) => ({ from: Math.max(1, 9 - radius), lines: radius === 0 ? ["c"] : ["a", "b", "c"] }),
 };
 
 const base = { kodaFolder: () => "Koda", today: () => "2026-09-02", listMaxRows: () => 150, lang: () => "de" as const };
@@ -48,6 +48,22 @@ describe("get_workspace", () => {
     const tools = new VaultTools(fakeVault({}), yes, base);
     expect(await tools.run("get_workspace", {})).toEqual({ ok: false, error: "Arbeitsplatz nicht verfügbar: kein Zugriff auf den Workspace." });
   });
+  it("around_cursor: 0 deckt genau die Cursor-Zeile ab (0 ist ein gueltiger Wert, kein Fehlen)", async () => {
+    const tools = new VaultTools(fakeVault({}), yes, { ...base, workspace });
+    const r = await tools.run("get_workspace", { around_cursor: 0 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.content).toContain("Cursor-Umgebung (Zeilen 9–9):\n   9 | c");
+  });
+  it("around_cursor jenseits von 200 wird auf 200 gekappt", async () => {
+    const seen: number[] = [];
+    const spy: WorkspacePort = {
+      snapshot: workspace.snapshot,
+      linesAround: (radius) => { seen.push(radius); return workspace.linesAround(radius); },
+    };
+    const tools = new VaultTools(fakeVault({}), yes, { ...base, workspace: spy });
+    await tools.run("get_workspace", { around_cursor: 500 });
+    expect(seen).toEqual([200]);
+  });
 });
 
 describe("edit_active_note", () => {
@@ -60,6 +76,15 @@ describe("edit_active_note", () => {
     expect(calls).toEqual([{ path: "Notes/Plan.md", mode: "replace", oldText: "Model control", newText: "Model steering" }]);
     expect(state.doc).toBe("Model steering makes");
   });
+  it("insert_at_cursor ausserhalb des Koda-Ordners: die Bestaetigung nennt den Cursor-Effekt zusaetzlich zur Vorschau", async () => {
+    const state = { path: "Notes/Plan.md", selection: "Model control", doc: "Model control makes" };
+    const calls: WriteRequest[] = [];
+    const tools = new VaultTools(fakeVault({}), async (req) => { calls.push(req); return true; }, { ...base, editor: fakeEditor(state) });
+    const r = await tools.run("edit_active_note", { path: "Notes/Plan.md", mode: "insert_at_cursor", text: " Welt" });
+    expect(r.ok).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].effect).toContain("Cursor");
+  });
   it("Invariante: aendert sich die Markierung zwischen Aufruf und Bestaetigung, wird NICHT geschrieben", async () => {
     const state = { path: "Notes/Plan.md", selection: "Model control", doc: "Model control makes" };
     const confirm = async (): Promise<boolean> => { state.selection = "Model"; return true; };
@@ -68,11 +93,26 @@ describe("edit_active_note", () => {
     expect(r).toEqual({ ok: false, error: "Die Markierung hat sich seit dem Aufruf geändert — nichts geschrieben. Erneut aufrufen." });
     expect(state.doc).toBe("Model control makes");
   });
+  it("Invariante: wechselt die aktive Notiz zwischen Aufruf und Bestaetigung, wird NICHT geschrieben", async () => {
+    const state = { path: "Notes/Plan.md", selection: "Model control", doc: "Model control makes" };
+    const confirm = async (): Promise<boolean> => { state.path = "Notes/Other.md"; return true; };
+    const tools = new VaultTools(fakeVault({}), confirm, { ...base, editor: fakeEditor(state) });
+    const r = await tools.run("edit_active_note", { path: "Notes/Plan.md", mode: "replace_selection", text: "X" });
+    expect(r).toEqual({ ok: false, error: "Aktiv ist inzwischen Notes/Other.md, nicht Notes/Plan.md — nichts geschrieben." });
+    expect(state.doc).toBe("Model control makes");
+  });
   it("falscher Pfad: eine andere Notiz ist aktiv", async () => {
     const state = { path: "Notes/Other.md", selection: "x", doc: "x" };
     const tools = new VaultTools(fakeVault({}), yes, { ...base, editor: fakeEditor(state) });
     const r = await tools.run("edit_active_note", { path: "Notes/Plan.md", mode: "insert_at_cursor", text: "!" });
     expect(r).toEqual({ ok: false, error: "Aktiv ist inzwischen Notes/Other.md, nicht Notes/Plan.md — nichts geschrieben." });
+  });
+  it("Pfadvergleich ohne Gross-/Kleinschreibung: 'notes/plan.md' trifft die aktive 'Notes/Plan.md'", async () => {
+    const state = { path: "Notes/Plan.md", selection: "Model control", doc: "Model control makes" };
+    const tools = new VaultTools(fakeVault({}), yes, { ...base, editor: fakeEditor(state) });
+    const r = await tools.run("edit_active_note", { path: "notes/plan.md", mode: "replace_selection", text: "Model steering" });
+    expect(r.ok).toBe(true);
+    expect(state.doc).toBe("Model steering makes");
   });
   it("replace_selection ohne Markierung ist ein Fehler; insert_at_cursor im Koda-Ordner schreibt ohne Rueckfrage", async () => {
     const state = { path: "Koda/Entwurf.md", selection: "", doc: "Hallo" };

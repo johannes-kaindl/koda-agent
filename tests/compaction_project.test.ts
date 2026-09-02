@@ -181,11 +181,27 @@ describe("projectForModel mit Kontextbloecken", () => {
     expect(out[1].content).toContain("1. Frage 1");
     expect(out[1].content).not.toContain("Arbeitskontext");
   });
+
+  it("Stufe 1 gefolgt von Stufe 2: der gemergte Block bleibt reiner Text, der noch offene Kontextblock bleibt gewoben", () => {
+    const h: LogEntry[] = [sys, uc("F1", "A", STUB_MIN_CHARS + 40), a("A1"), uc("F2", "B", 20)];
+    const out = projectForModel([...h, s1(0), s2("ZUSAMMENFASSUNG", 1)]);
+    expect(out[1]).toMatchObject({ role: "user", merged: true });
+    expect(out[1].content).toContain("1. F1");
+    expect(out[1].content).not.toContain("Arbeitskontext");
+    expect(out[2]).toEqual({ role: "assistant", content: "ZUSAMMENFASSUNG" });
+    // F2 ist die laufende Runde — Stufe 2 lässt sie unangetastet, ihr Block bleibt gewoben.
+    expect(out[3].content).toContain("[Arbeitskontext");
+    expect(out[3].content.endsWith("\n\nF2")).toBe(true);
+  });
 });
 
 describe("formatContextStub", () => {
-  it("nennt Modus, Anzahl, Groesse und den Rueckweg", () => {
+  it("nennt Modus, Anzahl, Groesse und den Rueckweg — Arbeitsplatz hat kein Gegenstueck bei read_note", () => {
     const text = formatContextStub({ mode: "workspace", items: [{ source: "active", path: "A.md", kind: "pointer", chars: 1 }, { source: "tab", path: "B.md", kind: "pointer", chars: 1 }], text: "x".repeat(2048) });
-    expect(text).toBe("[Arbeitskontext · Arbeitsplatz — 2 Einträge, 2,0 KB, verdichtet; bei Bedarf über read_note erneut lesen]");
+    expect(text).toBe("[Arbeitskontext · Arbeitsplatz — 2 Einträge, 2,0 KB, verdichtet; bei Bedarf über get_workspace erneut lesen]");
+  });
+  it("andere Modi verweisen auf read_note — der Block gehoert zu genau einer Notiz", () => {
+    const text = formatContextStub({ mode: "note", items: [{ source: "active", path: "A.md", kind: "pointer", chars: 1 }], text: "x".repeat(1024) });
+    expect(text).toBe("[Arbeitskontext · Notiz — 1 Einträge, 1,0 KB, verdichtet; bei Bedarf über read_note erneut lesen]");
   });
 });

@@ -32,9 +32,12 @@ export function stubbableChars(m: ChatMessage): number {
 }
 
 /** Stub-Text fuer einen Kontextblock: WAS weg ist und WIE es zurueckkommt. Deutsch wie
- *  `formatStub` — der Prompt-Regelblock ist englisch, die Stubs sind es im Bestand nicht. */
+ *  `formatStub` — der Prompt-Regelblock ist englisch, die Stubs sind es im Bestand nicht.
+ *  Der Rueckweg haengt vom Modus ab: der Arbeitsplatz-Block hat kein Gegenstueck bei
+ *  `read_note` (er ist keine einzelne Notiz) — sein Weg zurueck ist `get_workspace`. */
 export function formatContextStub(ctx: ContextAttachment): string {
-  return `[Arbeitskontext · ${modeLabel(ctx.mode, "de")} — ${ctx.items.length} Einträge, ${formatKb(ctx.text.length)}, verdichtet; bei Bedarf über read_note erneut lesen]`;
+  const recover = ctx.mode === "workspace" ? "get_workspace" : "read_note";
+  return `[Arbeitskontext · ${modeLabel(ctx.mode, "de")} — ${ctx.items.length} Einträge, ${formatKb(ctx.text.length)}, verdichtet; bei Bedarf über ${recover} erneut lesen]`;
 }
 
 function coreArgument(args: string): string | null {

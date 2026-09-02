@@ -103,7 +103,15 @@ export class VaultTools implements ToolRunner {
           // ausserhalb dieses try/catch ergibt (Traversal wuerde nicht als Fehler-Result
           // gemeldet, sondern als unbehandelte Ablehnung durchschlagen).
           return await this.listNotes(str(a.folder), bool(a.recursive), strArray(a.fields));
-        case "get_workspace": return this.getWorkspace(num(a.around_cursor, 20));
+        case "get_workspace": {
+          // Eigene Spanne statt num(): num() kappt bei 25 (fuer max_results gedacht) und
+          // behandelt 0 als "fehlt" — around_cursor: 0 ("nur die Cursor-Zeile") ist aber ein
+          // gueltiger, ausdruecklicher Wert.
+          const radius = typeof a.around_cursor === "number" && Number.isFinite(a.around_cursor)
+            ? Math.min(Math.max(Math.trunc(a.around_cursor), 0), 200)
+            : 20;
+          return this.getWorkspace(radius);
+        }
         case "edit_active_note": return await this.editActiveNote(str(a.path), str(a.mode), str(a.text));
         default: return { ok: false, error: `unbekanntes Tool: ${name}` };
       }
@@ -277,7 +285,7 @@ export class VaultTools implements ToolRunner {
     const ws = this.opts.workspace;
     if (ws === undefined) return { ok: false, error: "Arbeitsplatz nicht verfügbar: kein Zugriff auf den Workspace." };
     const snap = ws.snapshot();
-    return { ok: true, content: renderWorkspaceReport(snap, ws.linesAround(Math.max(0, radius)), this.opts.lang?.() ?? "de") };
+    return { ok: true, content: renderWorkspaceReport(snap, ws.linesAround(radius), this.opts.lang?.() ?? "de") };
   }
 
   /** Invariante „Vorschau == geschriebener Inhalt": Pfad und Markierung werden VOR dem Modal
@@ -291,15 +299,32 @@ export class VaultTools implements ToolRunner {
     const target = resolveNotePath(path);
     const active = ed.path();
     if (active === null) return { ok: false, error: "Keine aktive Notiz mit Editor im Hauptbereich — nichts geschrieben." };
-    if (active !== target) return { ok: false, error: `Aktiv ist inzwischen ${active}, nicht ${target} — nichts geschrieben.` };
+    // Case-insensitiv wie writePolicy: ein vom Modell leicht anders grossgeschriebener Pfad
+    // ("notes/plan.md" gegen "Notes/Plan.md") ist dieselbe Notiz, kein Wechsel.
+    if (active.toLowerCase() !== target.toLowerCase()) {
+      return { ok: false, error: `Aktiv ist inzwischen ${active}, nicht ${target} — nichts geschrieben.` };
+    }
     const old = mode === "replace_selection" ? ed.selection() : "";
     if (mode === "replace_selection" && old === "") {
       return { ok: false, error: "Keine Markierung im Editor — für replace_selection muss Text markiert sein." };
     }
     if (writePolicy(target, this.opts.kodaFolder()) === "confirm") {
-      const ok = await this.confirm({ path: target, mode: mode === "replace_selection" ? "replace" : "append", oldText: old, newText: text });
+      const req: WriteRequest = { path: target, mode: mode === "replace_selection" ? "replace" : "append", oldText: old, newText: text };
+      // Additiv, nur bei insert_at_cursor: WriteRequest.mode bleibt "append" (Wortlaut fuer
+      // append-artiges Verhalten), aber das Modal zeigte dafuer "append" an — irrefuehrend fuer
+      // eine Einfuegung an der Cursor-Position. Die effect-Zeile steht ZUSAETZLICH ueber der
+      // Vorschau, ersetzt sie nicht.
+      if (mode === "insert_at_cursor") {
+        req.effect = (this.opts.lang?.() ?? "de") === "de"
+          ? "wird an der Cursor-Position eingefügt, nicht angehängt"
+          : "will be inserted at the cursor position, not appended";
+      }
+      const ok = await this.confirm(req);
       if (!ok) return { ok: false, error: "vom Nutzer abgelehnt" };
-      if (ed.path() !== target) return { ok: false, error: `Aktiv ist inzwischen ${ed.path() ?? "keine Notiz"}, nicht ${target} — nichts geschrieben.` };
+      const activeAfter = ed.path();
+      if (activeAfter === null || activeAfter.toLowerCase() !== target.toLowerCase()) {
+        return { ok: false, error: `Aktiv ist inzwischen ${activeAfter ?? "keine Notiz"}, nicht ${target} — nichts geschrieben.` };
+      }
       if (mode === "replace_selection" && ed.selection() !== old) {
         return { ok: false, error: "Die Markierung hat sich seit dem Aufruf geändert — nichts geschrieben. Erneut aufrufen." };
       }

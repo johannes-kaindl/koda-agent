@@ -85,6 +85,9 @@ export default class KodaPlugin extends Plugin {
    *  dem Editor-Kontextmenue und der Befehlspalette. */
   async askWithSelection(): Promise<void> {
     if (this.contextMode === "off") this.setContextMode("workspace");
+    // activateView statt nur runInView: eine eingeklappte Seitenleiste hat eine View und
+    // wuerde sonst nicht aufgeklappt — dieselbe Lehre wie 0.10.1 (Aktion ohne sichtbare Wirkung).
+    await this.activateView();
     await this.runInView((v) => { v.focusInput(); return Promise.resolve(); });
   }
 
@@ -226,9 +229,11 @@ export default class KodaPlugin extends Plugin {
     await this.app.workspace.revealLeaf(leaf);
   }
 
-  /** Belegung des Kontextfensters fuer die Statuszeile. Dieselben Zutaten wie die
-   *  Verdichtungs-Entscheidung in ask(): dieselbe Schaetzung, derselbe Tool-Overhead,
-   *  dieselbe Schwelle. Eine Anzeige, die davon abweicht, waere schlimmer als keine. */
+  /** Belegung des Kontextfensters fuer die Statuszeile. Dieselbe Schaetzung, derselbe
+   *  Tool-Overhead und dieselbe Schwelle wie die Verdichtungs-Entscheidung in ask() — aber
+   *  OHNE den System-Prompt (Memory + Skills): der steht ohne einen Lauf nicht zur Verfuegung.
+   *  Die Anzeige liegt dadurch um ein paar Prozent NIEDRIGER als die tatsaechliche Belegung,
+   *  nie hoeher. */
   contextUsage(): ContextUsage | null {
     const s = this.settings;
     const used = estimateTokens(
@@ -356,15 +361,17 @@ export default class KodaPlugin extends Plugin {
     this.abort = new AbortController();
     for (const v of this.views()) v.activity({ kind: "ask" });
 
-    const userMsg: ChatMessage = { role: "user", content: question };
-    // Der Block ist ein FELD, nie Teil von content: Nutzertext bleibt unantastbar (Spec E2).
-    const ctx = this.currentContext();
-    if (ctx !== null) userMsg.context = ctx;
-    this.chatLog.push(userMsg);
-    await this.store.appendMessages([userMsg]);
-    for (const v of this.views()) v.renderLog();
-
     try {
+      // Der Block ist ein FELD, nie Teil von content: Nutzertext bleibt unantastbar (Spec E2).
+      // Innerhalb des try: currentContext() kann werfen (z. B. ein Workspace-Adapter-Fehler),
+      // und ausserhalb des try bliebe busy dann haengen — derselbe Fehler wie ein Wurf im Loop.
+      const userMsg: ChatMessage = { role: "user", content: question };
+      const ctx = this.currentContext();
+      if (ctx !== null) userMsg.context = ctx;
+      this.chatLog.push(userMsg);
+      await this.store.appendMessages([userMsg]);
+      for (const v of this.views()) v.renderLog();
+
       const s = this.settings;
       const memory = await this.readMemory();
       const { selection, failed } = await this.readSkills();

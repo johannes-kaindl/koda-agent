@@ -30,7 +30,7 @@ import {
 } from "obsidian";
 import { t, getLang } from "../vendor/kit/i18n";
 import { modeLabel } from "../core/context/labels";
-import { CONTEXT_MODES } from "../core/context/types";
+import { AVAILABLE_MODES } from "../core/context/types";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
 import { buildEndpointList, type EndpointListStrings } from "../vendor/kit-obsidian/endpoint-list";
@@ -197,7 +197,11 @@ export class KodaSettingsTab extends PluginSettingTab {
               type: "dropdown",
               key: "contextModeDefault",
               // Dieselben Labels wie das Dropdown im Chat — ein Wortlaut, zwei Bedienstellen.
-              options: Object.fromEntries(CONTEXT_MODES.map((m) => [m, modeLabel(m, getLang() === "de" ? "de" : "en")])),
+              // AVAILABLE_MODES statt CONTEXT_MODES: angeboten wird nur, was auch gebaut ist
+              // (Spec E6: „ein Eintrag, der nie geht, ist kein Versprechen"). Das Schema in
+              // settings-types.ts akzeptiert weiterhin alle fuenf Modi — ein gespeicherter
+              // Default aus einer spaeteren Etappe bleibt gueltig, siehe onload()-Guard.
+              options: Object.fromEntries(AVAILABLE_MODES.map((m) => [m, modeLabel(m, getLang() === "de" ? "de" : "en")])),
             },
           },
           {

@@ -21,11 +21,22 @@ describe("contextSummary", () => {
     ],
     text: "…",
   };
-  it("eine Zeile: Modus, aktive Notiz ohne Pfad und Endung, Markierung, Tab-Zahl", () => {
-    expect(contextSummary(ctx, "de")).toBe("Arbeitsplatz · Project plan · Markierung 312 Z. · 2 Tabs");
-    expect(contextSummary(ctx, "en")).toBe("Workspace · Project plan · selection 312 chars · 2 tabs");
+  it("eine Zeile: Modus, aktive Notiz ohne Pfad und Endung, Markierung (Originallaenge, gekuerzt-Hinweis), Tab-Zahl", () => {
+    // sel.chars ist 312 (nach Kuerzung), fullChars 1240 (davor) — die Zeile nennt die
+    // ORIGINALLAENGE: was der Nutzer markiert hat, nicht was im Block ankam.
+    expect(contextSummary(ctx, "de")).toBe("Arbeitsplatz · Project plan · Markierung 1240 Z. (gekürzt) · 2 Tabs");
+    expect(contextSummary(ctx, "en")).toBe("Workspace · Project plan · selection 1240 chars (cut) · 2 tabs");
   });
   it("ohne aktive Notiz und ohne Tabs bleibt nur der Modus", () => {
     expect(contextSummary({ mode: "workspace", items: [], text: "" }, "de")).toBe("Arbeitsplatz");
+  });
+  it("genau ein Tab: Singular statt '1 Tabs'", () => {
+    const one: ContextAttachment = {
+      mode: "workspace",
+      items: [{ source: "tab", path: "Notes/Tools.md", kind: "pointer", chars: 14 }],
+      text: "…",
+    };
+    expect(contextSummary(one, "de")).toBe("Arbeitsplatz · 1 Tab");
+    expect(contextSummary(one, "en")).toBe("Workspace · 1 tab");
   });
 });
