@@ -27,11 +27,11 @@ describe("promptRow", () => {
       .toEqual(["no-tools"]);
   });
   it("warnt, wenn kein lesendes Werkzeug uebrig ist", () => {
-    const m = promptRow({ systemPromptOverride: "", toolsDisabled: ["search_notes", "read_note", "list_notes"] }, false);
+    const m = promptRow({ systemPromptOverride: "", toolsDisabled: ["search_notes", "read_note", "list_notes", "get_workspace"] }, false);
     expect(m.warnings).toEqual(["no-reading-tool"]);
   });
   it("zaehlt related_notes nur als lesendes Werkzeug, wenn ein Index da ist", () => {
-    const aus = { systemPromptOverride: "", toolsDisabled: ["search_notes", "read_note", "list_notes"] };
+    const aus = { systemPromptOverride: "", toolsDisabled: ["search_notes", "read_note", "list_notes", "get_workspace"] };
     expect(promptRow(aus, true).warnings).toEqual([]);
     expect(promptRow(aus, false).warnings).toEqual(["no-reading-tool"]);
   });
@@ -42,7 +42,7 @@ describe("toolRows", () => {
 
   it("fuehrt jedes Werkzeug, auch related_notes ohne Index", () => {
     const rows = toolRows(leer, false);
-    expect(rows).toHaveLength(7);
+    expect(rows).toHaveLength(9);
     expect(rows.map((r) => r.name)).toContain("related_notes");
   });
   it("markiert related_notes ohne Index als nicht verfuegbar — und sonst nichts", () => {
