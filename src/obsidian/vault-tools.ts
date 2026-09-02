@@ -11,6 +11,8 @@ import {
 import {
   collectFolderNotes, pickFields, formatListResult, suggestFolders, formatEmptyFolder,
 } from "../core/tools/list";
+import type { EditorPort, WorkspacePort } from "../core/context/ports";
+import { renderWorkspaceReport } from "../core/context/workspace-line";
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
@@ -60,6 +62,12 @@ export class VaultTools implements ToolRunner {
        *  Fehlt das Feld ganz, ist alles erlaubt — Altaufrufer und Tests, die nur den
        *  Werkzeug-Kern messen, sollen keine Liste mitfuehren muessen. */
       allowed?: () => Set<string>;
+      /** Arbeitsplatz fuer `get_workspace` — fehlt in Tests, die nur den Vault-Kern messen. */
+      workspace?: WorkspacePort;
+      /** Editor fuer `edit_active_note`; jede Methode liest frisch (Invariante, Spec E5). */
+      editor?: EditorPort;
+      /** Sprache der Werkzeug-Texte; fehlt → deutsch wie die Stubs. */
+      lang?: () => "de" | "en";
     },
   ) {}
 
@@ -95,6 +103,8 @@ export class VaultTools implements ToolRunner {
           // ausserhalb dieses try/catch ergibt (Traversal wuerde nicht als Fehler-Result
           // gemeldet, sondern als unbehandelte Ablehnung durchschlagen).
           return await this.listNotes(str(a.folder), bool(a.recursive), strArray(a.fields));
+        case "get_workspace": return this.getWorkspace(num(a.around_cursor, 20));
+        case "edit_active_note": return await this.editActiveNote(str(a.path), str(a.mode), str(a.text));
         default: return { ok: false, error: `unbekanntes Tool: ${name}` };
       }
     } catch (e) {
@@ -261,6 +271,45 @@ export class VaultTools implements ToolRunner {
     const shown = paths.slice(0, Math.max(1, this.opts.listMaxRows()));
     const rows = shown.map((p) => ({ path: p, fields: pickFields(this.vault.frontmatterOf(p), fields) }));
     return { ok: true, content: formatListResult({ folder: norm, recursive, total: paths.length, rows }) };
+  }
+
+  private getWorkspace(radius: number): ToolOutcome {
+    const ws = this.opts.workspace;
+    if (ws === undefined) return { ok: false, error: "Arbeitsplatz nicht verfügbar: kein Zugriff auf den Workspace." };
+    const snap = ws.snapshot();
+    return { ok: true, content: renderWorkspaceReport(snap, ws.linesAround(Math.max(0, radius)), this.opts.lang?.() ?? "de") };
+  }
+
+  /** Invariante „Vorschau == geschriebener Inhalt": Pfad und Markierung werden VOR dem Modal
+   *  gelesen und NACH der Bestaetigung erneut geprueft. Zwischen beiden liegt Nutzerzeit. */
+  private async editActiveNote(path: string, mode: string, text: string): Promise<ToolOutcome> {
+    const ed = this.opts.editor;
+    if (ed === undefined) return { ok: false, error: "Kein Editor verfügbar." };
+    if (mode !== "replace_selection" && mode !== "insert_at_cursor") {
+      return { ok: false, error: `unbekannter Modus: ${mode} — erlaubt sind replace_selection und insert_at_cursor` };
+    }
+    const target = resolveNotePath(path);
+    const active = ed.path();
+    if (active === null) return { ok: false, error: "Keine aktive Notiz mit Editor im Hauptbereich — nichts geschrieben." };
+    if (active !== target) return { ok: false, error: `Aktiv ist inzwischen ${active}, nicht ${target} — nichts geschrieben.` };
+    const old = mode === "replace_selection" ? ed.selection() : "";
+    if (mode === "replace_selection" && old === "") {
+      return { ok: false, error: "Keine Markierung im Editor — für replace_selection muss Text markiert sein." };
+    }
+    if (writePolicy(target, this.opts.kodaFolder()) === "confirm") {
+      const ok = await this.confirm({ path: target, mode: mode === "replace_selection" ? "replace" : "append", oldText: old, newText: text });
+      if (!ok) return { ok: false, error: "vom Nutzer abgelehnt" };
+      if (ed.path() !== target) return { ok: false, error: `Aktiv ist inzwischen ${ed.path() ?? "keine Notiz"}, nicht ${target} — nichts geschrieben.` };
+      if (mode === "replace_selection" && ed.selection() !== old) {
+        return { ok: false, error: "Die Markierung hat sich seit dem Aufruf geändert — nichts geschrieben. Erneut aufrufen." };
+      }
+    }
+    if (mode === "replace_selection") {
+      ed.replaceSelection(text);
+      return { ok: true, content: `Markierung ersetzt (${old.length} → ${text.length} Zeichen) in ${target}` };
+    }
+    ed.insertAtCursor(text);
+    return { ok: true, content: `${text.length} Zeichen am Cursor eingefügt in ${target}` };
   }
 }
 
