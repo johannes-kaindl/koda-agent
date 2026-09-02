@@ -617,6 +617,39 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-02, Arbeitskontext Etappe 1 (23/23) + Praxistest
+
+Treiber `cb4ea23`, Plugin-Build aus `feat/arbeitskontext` (Version noch 0.10.1, unveröffentlicht),
+Obsidian 1.13.7, Staging-Vault `koda-agent` frisch aus dem Fixture, Fenster per Pfad-URI in der
+laufenden Instanz, Lock `--exclusive focus`; fremde Fenster (`10_Pallas`, zeitweise
+`anysource-sideloader`) unberührt. Vier Läufe bis grün — die drei roten davor waren alle
+**Treiber**-Defekte, nie das Plugin:
+
+- **Lauf 1 (21/23):** 20 und 23 rot. Ursache gemessen: `getLeaf(false)` öffnete die Notiz nach dem
+  Fokus in die Sidebar in Kodas eigenem Leaf, und `app.vault.modify()` bei offenem Editor mit
+  ungespeicherter Änderung erzeugt ein Merge-Artefakt (`Model steeringl`, verschobene Leerzeile);
+  `editor.setValue()` kommt dagegen sauber an. Fix: Leaf im Hauptbereich, Kulisse aus dem Fixture
+  per `setValue`, Rückschreibung über den Editor.
+- **Lauf 2 (22/23):** 23 rot, `No tab group found` — die Kulisse hatte den letzten Root-Leaf
+  detacht. Fix: einen Root-Leaf behalten.
+- **Lauf 3 (22/23):** 23 rot mit „geschrieben", weil die Kulisse die Markierung nicht selbst setzte
+  und 23-B mit der auf fünf Zeichen verkleinerten Rest-Markierung aus 23-A lief. Gefunden durch
+  Nachstellen mit allen Zwischenwerten; die Meldung nannte ihre Messwerte nicht — sie tut es jetzt.
+- **Lauf 4 (23/23):** 20 misst `Zeile 9 von 12 · Kopfdaten · Markierung 13 Zeichen`, aktiver Leaf
+  ist Koda — **die Markierung überlebt den Fokuswechsel in die Sidebar** (offene Frage der Spec E3,
+  damit belegt). 21: Aus → `null`, Befehl und Dropdown ein Zustand. 22: beide Werkzeuge in der
+  gesendeten Liste, abschaltbar. 23: veraltete Markierung verweigert mit Klartext, gültige
+  ersetzt `13 → 14 Zeichen`, Fixture-Notiz danach byte-identisch.
+
+**Praxistest (Handpunkt 23), `gui:ask --full`, `qwen/qwen3.8-27b`:** Frage „Worum geht es in der
+Notiz, die ich gerade offen habe?" bei geöffneter `Notes/Project plan.md` im Hauptbereich,
+Modus Arbeitsplatz. Bericht: `⊕ Arbeitskontext (workspace · Notes/Project plan.md · 2 Einträge ·
+275 Zeichen)`, genau **ein** Werkzeugaufruf `read_note({"path":"Notes/Project plan.md"})`, kein
+`search_notes`; Antwort beschreibt korrekt die Modell-Steuerung aus der Notiz. Beide `--expect`
+grün — und seit dem Fix an `gui-ask` zählt der Kontextblock selbst nicht mehr als Treffer.
+**Handpunkt 24** (Markierung ersetzen mit Modal) bleibt Handarbeit: das Modal braucht einen Klick,
+den `gui:ask` nicht bedient; die Invariante dahinter misst Prüfpunkt 23 automatisiert.
+
 ## Baseline vor Arbeitskontext Etappe 1: 2026-09-02, 12:15 (19/19)
 
 Treiber `7c5291a` (unverändert), Plugin-Build aus `main` = `655b250` (kein Code-Commit seit

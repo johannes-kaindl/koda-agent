@@ -169,7 +169,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (493/493).
+- `npm test` — `check-no-abs-paths` + vitest (533/533).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
