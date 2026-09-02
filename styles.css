@@ -80,6 +80,12 @@
 .koda-input-bar { border-top: 1px solid var(--background-modifier-border); padding: var(--size-4-2); }
 .koda-input { width: 100%; resize: vertical; }
 .koda-buttons { display: flex; gap: var(--size-4-1); margin-top: var(--size-4-1); }
+/* Modus-Dropdown: Obsidians `dropdown`-Optik, nimmt nur so viel Platz wie sein Label. */
+.koda-mode { flex: 0 1 auto; max-width: 45%; }
+/* Kontextzeile unter der Nutzer-Blase: leise wie die Marken, aufklappbar mit dem Block. */
+.koda-context { font-size: var(--font-ui-smaller); color: var(--text-muted); margin: calc(-1 * var(--size-4-1)) 0 var(--size-4-2) 0; }
+.koda-context summary { cursor: pointer; }
+.koda-context pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
 .koda-effect { background: var(--background-modifier-hover); border-left: 3px solid var(--interactive-accent); border-radius: var(--radius-s); padding: var(--size-4-2); margin-bottom: var(--size-4-2); }
 .koda-preview { max-height: 40vh; overflow-y: auto; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: var(--size-4-2); margin-bottom: var(--size-4-2); }
 .koda-preview pre { white-space: pre-wrap; margin: 0; }

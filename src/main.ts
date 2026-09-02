@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf, normalizePath } from "obsidian";
+import { Plugin, WorkspaceLeaf, normalizePath, type Editor, type Menu } from "obsidian";
 import "./i18n/strings";
 import { getLanguage } from "obsidian";
 import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
@@ -13,7 +13,7 @@ import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
-import { isCompactionRecord, type ChatMessage, type LogEntry } from "./core/agent/types";
+import { type ChatMessage, type LogEntry } from "./core/agent/types";
 import { toolDefs, toWireTools, type ToolDef } from "./core/tools/defs";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/prompt/build";
@@ -28,6 +28,11 @@ import { estimateTokens } from "./core/agent/compaction/estimate";
 import { contextUsage, type ContextUsage } from "./core/chat/context-usage";
 import { KodaView, VIEW_TYPE_KODA } from "./obsidian/view";
 import { KodaSettingsTab } from "./obsidian/settings";
+import { projectForModel } from "./core/agent/compaction/project";
+import { AVAILABLE_MODES, type ContextAttachment, type ContextMode } from "./core/context/types";
+import { modeLabel } from "./core/context/labels";
+import { renderWorkspaceContext } from "./core/context/workspace-line";
+import { editorPort, linesAround, readWorkspace } from "./obsidian/workspace";
 
 /** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
  *  "read-error" (Datei liess sich nicht lesen) und "no-description" (Frontmatter ohne
@@ -51,6 +56,38 @@ export default class KodaPlugin extends Plugin {
   /** Zuletzt GESENDETER Prompt. `null`, solange in dieser Sitzung nichts gefragt wurde.
    *  Nur im Speicher — er traegt Memory-Zeilen und gehoert nicht auf Platte (Spec E6). */
   lastSystemPrompt: string | null = null;
+
+  /** Der Modus fuer die NAECHSTE Nachricht. Beim Laden der Default aus den Einstellungen;
+   *  danach ueberstimmt der Chat (Dropdown, Befehle), bis das Plugin neu laedt (Spec E1).
+   *  „Neues Gespraech" aendert ihn nicht. */
+  contextMode: ContextMode = "workspace";
+
+  setContextMode(mode: ContextMode): void {
+    if (!AVAILABLE_MODES.includes(mode)) return;
+    this.contextMode = mode;
+    for (const v of this.views()) v.syncContextMode();
+  }
+
+  /** Der Kontext, der mit der naechsten Nachricht geht — `ask()` ruft DIESE Methode, der
+   *  GUI-Smoke misst sie: es gibt keinen zweiten Weg, auf dem der Block entsteht. */
+  currentContext(): ContextAttachment | null {
+    if (this.contextMode === "off") return null;
+    const s = this.settings;
+    return renderWorkspaceContext(readWorkspace(this.app, VIEW_TYPE_KODA), {
+      lang: this.promptLang(),
+      selectionMax: s.contextSelectionChars,
+      tabsMax: s.contextTabsMax,
+      frontmatterMax: s.contextFrontmatterChars,
+    });
+  }
+
+  /** Sidebar oeffnen, Modus mindestens Arbeitsplatz, Eingabefeld fokussieren — der Weg aus
+   *  dem Editor-Kontextmenue und der Befehlspalette. */
+  async askWithSelection(): Promise<void> {
+    if (this.contextMode === "off") this.setContextMode("workspace");
+    await this.runInView((v) => { v.focusInput(); return Promise.resolve(); });
+  }
+
   private abort: AbortController | null = null;
   private readonly transport = new XhrSseTransport();
 
@@ -82,6 +119,11 @@ export default class KodaPlugin extends Plugin {
 
   async onload(): Promise<void> {
     this.settings = validateKodaSettings(await this.loadData());
+    this.contextMode = this.settings.contextModeDefault;
+    // Ein gespeicherter Default aus einer spaeteren Etappe (z. B. "note") ist hier noch
+    // nicht angeboten — dann faellt der Start auf Arbeitsplatz zurueck, statt den Chat in
+    // einem Modus zu starten, den er gar nicht anbietet.
+    if (!AVAILABLE_MODES.includes(this.contextMode)) this.contextMode = "workspace";
     this.applyLanguage();
 
     const dir = normalizePath(`${this.manifest.dir ?? ""}/sessions`);
@@ -111,6 +153,21 @@ export default class KodaPlugin extends Plugin {
     // unabhaengig — er ueberlebt jede kuenftige Umgestaltung der Oberflaeche.
     this.addCommand({ id: "new-chat", name: t("cmd.newChat"), callback: () => void this.runInView((v) => v.askNewChat()) });
     this.addCommand({ id: "toggle-thinking", name: t("cmd.toggleThinking"), callback: () => void this.runInView((v) => v.toggleThinking()) });
+    for (const mode of AVAILABLE_MODES) {
+      this.addCommand({
+        id: `context-mode-${mode}`,
+        name: t("cmd.contextMode", modeLabel(mode, this.promptLang())),
+        callback: () => this.setContextMode(mode),
+      });
+    }
+    this.addCommand({ id: "ask-with-selection", name: t("cmd.askWithSelection"), callback: () => void this.askWithSelection() });
+    // Rechtsklick auf markierten Text: nur dann, sonst ist der Eintrag Rauschen.
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor) => {
+        if (editor.getSelection() === "") return;
+        menu.addItem((item) => item.setTitle(t("menu.askKoda")).setIcon("dog").onClick(() => void this.askWithSelection()));
+      }),
+    );
     this.addSettingTab(new KodaSettingsTab(this.app, this));
 
     if (this.settings.openOnStartup) {
@@ -175,7 +232,9 @@ export default class KodaPlugin extends Plugin {
   contextUsage(): ContextUsage | null {
     const s = this.settings;
     const used = estimateTokens(
-      this.chatLog.filter((m): m is ChatMessage => !isCompactionRecord(m)),
+      // Die PROJEKTION, nicht der rohe Verlauf: gestubbte Tool-Ergebnisse zaehlen so mit ihrer
+      // Stub-Laenge, und der Kontextblock zaehlt ueberhaupt (er steht nur dort in content).
+      projectForModel(this.chatLog),
       JSON.stringify(toWireTools(this.currentToolDefs())).length,
     );
     return contextUsage(used, s.contextWindowTokens, s.compactAtPercent);
@@ -195,6 +254,64 @@ export default class KodaPlugin extends Plugin {
   /** Nur die Namen — was der GUI-Smoke braucht (Pruefpunkt 17). */
   currentToolNames(): string[] {
     return this.currentToolDefs().map((d) => d.name);
+  }
+
+  /** Die Werkzeuge, wie `ask()` sie baut. Oeffentlich, weil der GUI-Smoke `edit_active_note`
+   *  ueber DENSELBEN Weg ruft (Pruefpunkt 23) — ein zweiter Aufbau waere eine zweite Wahrheit. */
+  buildTools(): VaultTools {
+    const vaultPort: VaultPort = {
+      listMarkdownPaths: () => this.app.vault.getMarkdownFiles().map((f) => f.path),
+      read: async (p) => {
+        const f = this.app.vault.getFileByPath(p);
+        if (f === null) throw new Error(`nicht gefunden: ${p}`);
+        return this.app.vault.cachedRead(f);
+      },
+      exists: async (p) => this.app.vault.getFileByPath(p) !== null,
+      create: async (p, c) => {
+        await this.ensureParents(p);
+        await this.app.vault.create(p, c);
+      },
+      append: async (p, c) => {
+        const f = this.app.vault.getFileByPath(p);
+        if (f === null) throw new Error(`nicht gefunden: ${p}`);
+        await this.app.vault.append(f, c);
+      },
+      overwrite: async (p, c) => {
+        const f = this.app.vault.getFileByPath(p);
+        if (f === null) {
+          await this.ensureParents(p);
+          await this.app.vault.create(p, c);
+        } else {
+          await this.app.vault.modify(f, c);
+        }
+      },
+      /** Obsidians Cache ist die Wahrheit, an der sich auch Bases und Board-Filter im
+       *  Vault orientieren — wer hier selbst parst, beantwortet eine andere Frage als
+       *  die, die der Nutzer sieht. `getFileCache` ist synchron und ohne Dateizugriff. */
+      frontmatterOf: (p) => {
+        const f = this.app.vault.getFileByPath(p);
+        return f === null ? null : this.app.metadataCache.getFileCache(f)?.frontmatter ?? null;
+      },
+    };
+    return new VaultTools(vaultPort, (req) => confirmWrite(this.app, req), {
+      kodaFolder: () => this.settings.kodaFolder,
+      today: () => new Date().toISOString().slice(0, 10),
+      // Bewusst als Callback, nicht als Wert: zwischen Prompt-Bau und Tool-Aufruf
+      // kann vault-rag deaktiviert worden sein. Der Adapter prueft dann erneut und
+      // meldet Klartext, statt zu werfen.
+      retrieval: () => readRetrievalApi(this.app),
+      listMaxRows: () => this.settings.listNotesMaxRows,
+      // Aus derselben Quelle wie die gesendete Liste — es gibt keinen zweiten Weg, auf
+      // dem sie entsteht. Ebenfalls als Callback: eine Aenderung in den Einstellungen
+      // wirkt damit ab dem naechsten Werkzeug-Aufruf, nicht erst im naechsten Gespraech.
+      allowed: () => new Set(this.currentToolNames()),
+      workspace: {
+        snapshot: () => readWorkspace(this.app, VIEW_TYPE_KODA),
+        linesAround: (r) => linesAround(this.app, r),
+      },
+      editor: editorPort(this.app),
+      lang: () => this.promptLang(),
+    });
   }
 
   /** Der Prompt, wie er beim NAECHSTEN Gespraech aussehen wird — inklusive Memory und
@@ -240,6 +357,9 @@ export default class KodaPlugin extends Plugin {
     for (const v of this.views()) v.activity({ kind: "ask" });
 
     const userMsg: ChatMessage = { role: "user", content: question };
+    // Der Block ist ein FELD, nie Teil von content: Nutzertext bleibt unantastbar (Spec E2).
+    const ctx = this.currentContext();
+    if (ctx !== null) userMsg.context = ctx;
     this.chatLog.push(userMsg);
     await this.store.appendMessages([userMsg]);
     for (const v of this.views()) v.renderLog();
@@ -332,53 +452,7 @@ export default class KodaPlugin extends Plugin {
         now: () => new Date().toISOString(),
       };
 
-      const vaultPort: VaultPort = {
-        listMarkdownPaths: () => this.app.vault.getMarkdownFiles().map((f) => f.path),
-        read: async (p) => {
-          const f = this.app.vault.getFileByPath(p);
-          if (f === null) throw new Error(`nicht gefunden: ${p}`);
-          return this.app.vault.cachedRead(f);
-        },
-        exists: async (p) => this.app.vault.getFileByPath(p) !== null,
-        create: async (p, c) => {
-          await this.ensureParents(p);
-          await this.app.vault.create(p, c);
-        },
-        append: async (p, c) => {
-          const f = this.app.vault.getFileByPath(p);
-          if (f === null) throw new Error(`nicht gefunden: ${p}`);
-          await this.app.vault.append(f, c);
-        },
-        overwrite: async (p, c) => {
-          const f = this.app.vault.getFileByPath(p);
-          if (f === null) {
-            await this.ensureParents(p);
-            await this.app.vault.create(p, c);
-          } else {
-            await this.app.vault.modify(f, c);
-          }
-        },
-        /** Obsidians Cache ist die Wahrheit, an der sich auch Bases und Board-Filter im
-         *  Vault orientieren — wer hier selbst parst, beantwortet eine andere Frage als
-         *  die, die der Nutzer sieht. `getFileCache` ist synchron und ohne Dateizugriff. */
-        frontmatterOf: (p) => {
-          const f = this.app.vault.getFileByPath(p);
-          return f === null ? null : this.app.metadataCache.getFileCache(f)?.frontmatter ?? null;
-        },
-      };
-      const tools = new VaultTools(vaultPort, (req) => confirmWrite(this.app, req), {
-        kodaFolder: () => this.settings.kodaFolder,
-        today: () => new Date().toISOString().slice(0, 10),
-        // Bewusst als Callback, nicht als Wert: zwischen Prompt-Bau und Tool-Aufruf
-        // kann vault-rag deaktiviert worden sein. Der Adapter prueft dann erneut und
-        // meldet Klartext, statt zu werfen.
-        retrieval: () => readRetrievalApi(this.app),
-        listMaxRows: () => this.settings.listNotesMaxRows,
-        // Aus derselben Quelle wie die gesendete Liste — es gibt keinen zweiten Weg, auf
-        // dem sie entsteht. Ebenfalls als Callback: eine Aenderung in den Einstellungen
-        // wirkt damit ab dem naechsten Werkzeug-Aufruf, nicht erst im naechsten Gespraech.
-        allowed: () => new Set(this.currentToolNames()),
-      });
+      const tools = this.buildTools();
 
       const appended = await runAgent(
         { llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback, compaction },

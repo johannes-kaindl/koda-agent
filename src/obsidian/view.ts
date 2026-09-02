@@ -1,10 +1,12 @@
 import { Component, ItemView, MarkdownRenderer, setIcon, type WorkspaceLeaf } from "obsidian";
-import { t } from "../vendor/kit/i18n";
+import { t, getLang } from "../vendor/kit/i18n";
 import { confirmAction } from "../vendor/kit-obsidian/confirm";
 import { isCompactionRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
 import { splitStable } from "../core/chat/stream-blocks";
 import { thinkToggleView } from "../core/chat/reasoning-toggle";
+import { AVAILABLE_MODES, isContextMode } from "../core/context/types";
+import { contextSummary, modeLabel } from "../core/context/labels";
 import type KodaPlugin from "../main";
 
 export const VIEW_TYPE_KODA = "koda-agent-view";
@@ -37,6 +39,8 @@ export class KodaView extends ItemView {
 
   /** Kopf-Aktion des Thinking-Schalters — Zustand kommt aus thinkToggleView. */
   private thinkActionEl: HTMLElement | null = null;
+  /** Modus-Dropdown in der Knopfzeile — null vor onOpen. */
+  private modeEl: HTMLSelectElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: KodaPlugin) {
     super(leaf);
@@ -88,6 +92,15 @@ export class KodaView extends ItemView {
     // Nur noch Senden und Stopp. „Neues Gespraech" sass hier daneben und wurde regelmaessig
     // versehentlich getroffen — es steht jetzt in der Kopfzeile, hinter einer Bestaetigung.
     const buttons = bar.createDiv({ cls: "koda-buttons" });
+    // Modus-Dropdown links vom Senden: fuenf Zustaende sind kein Schalter. Ein Zustand, zwei
+    // Bedienstellen (Befehle setzen denselben Wert) — syncContextMode zieht nach.
+    this.modeEl = buttons.createEl("select", { cls: "dropdown koda-mode", attr: { "aria-label": t("context.dropdownAria") } });
+    for (const m of AVAILABLE_MODES) this.modeEl.createEl("option", { value: m, text: modeLabel(m, this.lang()) });
+    this.modeEl.addEventListener("change", () => {
+      const v = this.modeEl?.value;
+      if (isContextMode(v)) this.plugin.setContextMode(v);
+    });
+    this.syncContextMode();
     buttons.createEl("button", { text: t("view.send"), cls: "mod-cta" }).addEventListener("click", () => this.send());
     buttons.createEl("button", { text: t("view.stop") }).addEventListener("click", () => this.plugin.stopRun());
 
@@ -96,6 +109,17 @@ export class KodaView extends ItemView {
     this.renderLog();
     this.paintStatus();
     return Promise.resolve();
+  }
+
+  // — Arbeitskontext: Dropdown-Sync, Fokus aus main.ts (Editor-Kontextmenue, Befehlspalette) —
+  private lang(): "de" | "en" { return getLang() === "de" ? "de" : "en"; }
+
+  syncContextMode(): void {
+    if (this.modeEl !== null) this.modeEl.value = this.plugin.contextMode;
+  }
+
+  focusInput(): void {
+    this.inputEl.focus();
   }
 
   private onLogClick(e: MouseEvent): void {
@@ -212,7 +236,8 @@ export class KodaView extends ItemView {
       // `parseLines` prueft nur, dass `stats` ein Objekt ist — nicht, dass die Felder
       // Zahlen sind. Defensiv rendern statt einer NaN-Marke im Chat.
       const kb = ((rec.stats.bytes ?? 0) / 1024).toFixed(1);
-      host.createDiv({ cls: "koda-msg koda-notice koda-compaction", text: t("view.compaction.stage1", rec.stats.stubbed ?? 0, kb) + forced });
+      const ctxs = rec.stats.contexts ?? 0;
+      host.createDiv({ cls: "koda-msg koda-notice koda-compaction", text: t("view.compaction.stage1", rec.stats.stubbed ?? 0, kb) + (ctxs > 0 ? t("view.compaction.contexts", ctxs) : "") + forced });
       return;
     }
     const d = host.createEl("details", { cls: "koda-compaction koda-compaction-summary" });
@@ -247,6 +272,13 @@ export class KodaView extends ItemView {
       if (isCompactionRecord(m)) { this.renderCompaction(this.logEl, m); continue; }
       if (m.role === "user") {
         this.logEl.createDiv({ cls: "koda-msg koda-user", text: m.content });
+        // Unter der Blase, aufklappbar: was Koda zu dieser Frage vor sich hatte. Persistiert,
+        // also auch nach einem Neustart nachlesbar (Spec E2, E6).
+        if (m.context !== undefined) {
+          const d = this.logEl.createEl("details", { cls: "koda-context" });
+          d.createEl("summary", { text: t("context.line", contextSummary(m.context, this.lang())) });
+          d.createEl("pre", { text: m.context.text });
+        }
       } else if (m.role === "assistant") {
         if (m.toolCalls && m.toolCalls.length > 0) {
           toolNames = new Map(m.toolCalls.map((c) => [c.id, c.name]));
