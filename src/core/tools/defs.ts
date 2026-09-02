@@ -46,6 +46,32 @@ export const TOOL_DEFS: ToolDef[] = [
     },
   },
   {
+    name: "get_workspace",
+    description:
+      "What the user is looking at right now: the active note with its properties, the full selection, the lines around the cursor, and every open tab. A user message may start with a short [Working context] block that summarises this; call get_workspace when you need the full selection, the cursor surroundings, or the complete tab list.",
+    parameters: {
+      type: "object",
+      properties: {
+        around_cursor: { type: "integer", description: "Lines of context above and below the cursor, default 20" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "edit_active_note",
+    description:
+      "Edit the note the user is working in: replace the current selection or insert at the cursor. Always shows the change and asks the user first. Pass the path of the active note exactly as given in the working context; the call fails if another note became active or the selection changed since.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Vault-relative path of the active note, as shown in the working context" },
+        mode: { type: "string", enum: ["replace_selection", "insert_at_cursor"], description: "replace_selection needs a selection; insert_at_cursor inserts at the caret" },
+        text: { type: "string", description: "The replacement or the text to insert" },
+      },
+      required: ["path", "mode", "text"],
+    },
+  },
+  {
     name: "write_note",
     description:
       "Create, append to, or replace a Markdown note. Writing outside the Koda folder requires the user's approval; a rejected write is reported back to you.",

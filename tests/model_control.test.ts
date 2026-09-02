@@ -125,7 +125,7 @@ describe("renderPromptRow", () => {
   });
   it("zeigt drei Warnzeilen, wenn drei Befunde vorliegen", () => {
     const s = new Setting(makeFakeEl());
-    renderPromptRow(s, ctx({ systemPromptOverride: "nichts", toolsDisabled: ["search_notes", "read_note", "list_notes"] }));
+    renderPromptRow(s, ctx({ systemPromptOverride: "nichts", toolsDisabled: ["search_notes", "read_note", "list_notes", "get_workspace"] }));
     expect(s.settingEl.querySelectorAll(".koda-warn").length).toBe(3);
   });
   it("reicht den Ansehen-Knopf an den Kontext durch", () => {
@@ -150,7 +150,7 @@ describe("renderToolList", () => {
   it("fuehrt jedes Werkzeug mit einer eigenen Zeile", () => {
     const s = new Setting(makeFakeEl());
     renderToolList(s, ctx());
-    expect(zeilen(s)).toHaveLength(7); // sechs feste plus related_notes
+    expect(zeilen(s)).toHaveLength(9); // acht feste plus related_notes
   });
   it("zeigt related_notes ausgegraut statt es zu verschweigen, wenn vault-rag fehlt", () => {
     const s = new Setting(makeFakeEl());

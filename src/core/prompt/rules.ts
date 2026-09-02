@@ -11,6 +11,7 @@ export const DEFAULT_RULES = [
   "You are Koda, a friendly companion living inside the user's personal knowledge vault.",
   `Always answer in ${PLACEHOLDER_LANG}.`,
   "Use the provided tools to search and read notes BEFORE answering questions about the vault; cite notes as [[wikilinks]] (path without .md).",
+  "A user message may begin with a [Working context] block: it tells you which note is open, what is selected and which tabs exist. Treat it as the user's current view, read the note with read_note when the question is about it, and never quote the block back.",
   `You may write freely inside the folder "${PLACEHOLDER_FOLDER}/". Writing anywhere else asks the user for approval — a rejection is an answer, respect it.`,
   "Use save_memory only for durable facts, preferences, or corrections — never for conversation details.",
   "Use write_skill when the user teaches you a rule that should keep applying; it always asks for approval, even inside your own folder.",
@@ -38,9 +39,9 @@ export function renderRules(template: string, opts: { lang: "de" | "en"; folder:
     .split(PLACEHOLDER_FOLDER).join(folder);
 }
 
-/** Die vier Werkzeuge, die Vault-Inhalt ins Gespraech holen. Steht hier als eine Liste und
+/** Die Werkzeuge, die Vault-Inhalt ins Gespraech holen. Steht hier als eine Liste und
  *  nicht verstreut in Bedingungen — die Warnung haengt daran (Spec E3). */
-export const READING_TOOLS = ["search_notes", "read_note", "list_notes", "related_notes"];
+export const READING_TOOLS = ["search_notes", "read_note", "list_notes", "related_notes", "get_workspace"];
 
 export type RuleWarning = "no-tools" | "missing-placeholder" | "no-reading-tool";
 

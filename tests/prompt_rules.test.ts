@@ -17,6 +17,10 @@ describe("DEFAULT_RULES", () => {
     // Bis 0.9.0 fehlte write_skill im Prompt vollstaendig — der Anlass dieser Task.
     expect(DEFAULT_RULES).toContain("write_skill");
   });
+  it("erklaert den Arbeitskontext-Block und zaehlt get_workspace zu den lesenden Werkzeugen", () => {
+    expect(DEFAULT_RULES).toContain("[Working context]");
+    expect(READING_TOOLS).toContain("get_workspace");
+  });
 });
 
 /** Die Warnungen haengen an Namen, die woanders definiert sind. Ein Rename in

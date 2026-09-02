@@ -74,3 +74,23 @@ describe("list_notes in den Tool-Defs", () => {
     expect(search?.description).toContain("list_notes");
   });
 });
+
+describe("Arbeitskontext-Werkzeuge", () => {
+  it("get_workspace und edit_active_note stehen in TOOL_DEFS, englisch und ASCII", () => {
+    for (const name of ["get_workspace", "edit_active_note"]) {
+      const d = TOOL_DEFS.find((t) => t.name === name);
+      expect(d?.description).toMatch(/^[\x20-\x7E]+$/);
+    }
+  });
+  it("edit_active_note verlangt Pfad, Modus und Text; der Modus ist ein Enum", () => {
+    const d = TOOL_DEFS.find((t) => t.name === "edit_active_note")!;
+    const p = d.parameters as { required: string[]; properties: { mode: { enum: string[] } } };
+    expect(p.required).toEqual(["path", "mode", "text"]);
+    expect(p.properties.mode.enum).toEqual(["replace_selection", "insert_at_cursor"]);
+  });
+  it("beide sind abschaltbar wie alle anderen", () => {
+    const names = toolDefs({ related: false, disabled: ["get_workspace", "edit_active_note"] }).map((d) => d.name);
+    expect(names).not.toContain("get_workspace");
+    expect(names).not.toContain("edit_active_note");
+  });
+});
