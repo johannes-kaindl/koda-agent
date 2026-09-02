@@ -36,6 +36,11 @@
  * Die Stufe-2-Zusammenfassung steht nur mit `--full` vollstaendig da; sie ist der Beleg
  * dafuer, WAS in die Verdichtung gerettet wurde.
  *
+ * Seit Etappe 1 des Arbeitskontexts weist der Bericht je Nutzer-Nachricht den mitgesendeten
+ * Block aus (`⊕`); ohne `--full` gekuerzt. Ohne diese Zeile waere der Praxistest blind fuer
+ * den Kontext — ein `read_note` auf den richtigen Pfad liesse sich nicht von einem geratenen
+ * unterscheiden.
+ *
  * ## Nicht deterministisch — bewusst
  *
  * Zwei Laeufe derselben Frage koennen verschiedene Werkzeuge waehlen. Ein einzelner Lauf
@@ -96,6 +101,7 @@ interface ChatMessage {
   content: string;
   toolCalls?: ToolCall[];
   toolCallId?: string;
+  context?: { mode: string; items: { source: string; path: string }[]; text: string };
 }
 
 /** Verdichtungs-Marke (`CompactionRecord` in `src/core/agent/types.ts`) — der zweite Shape
@@ -116,7 +122,7 @@ type LogEntry = ChatMessage | CompactionRecord;
 
 /** Eine Zeile Bericht je Schritt, den Koda tatsaechlich gegangen ist. */
 interface Step {
-  kind: "tool-call" | "tool-result" | "answer" | "compaction";
+  kind: "tool-call" | "tool-result" | "answer" | "compaction" | "context";
   label: string;
   body: string;
 }
@@ -149,6 +155,14 @@ function toSteps(entries: LogEntry[]): Step[] {
       continue;
     }
     const m = entry as ChatMessage;
+    if (m.role === "user" && m.context !== undefined) {
+      const active = m.context.items.find((i) => i.source === "active")?.path ?? "(keine aktive Notiz)";
+      steps.push({
+        kind: "context",
+        label: `${m.context.mode} · ${active} · ${m.context.items.length} Einträge · ${m.context.text.length} Zeichen`,
+        body: m.context.text,
+      });
+    }
     if (m.role === "assistant") {
       for (const c of m.toolCalls ?? []) {
         nameById.set(c.id, c.name);
@@ -329,6 +343,10 @@ async function main(): Promise<void> {
               ? s.body.split("\n").map((l) => `      ${l}`).join("\n")
               : `      ${clip(s.body, 400)}`);
           }
+        }
+        else if (s.kind === "context") {
+          console.log(`  ⊕ Arbeitskontext (${s.label})`);
+          console.log(full ? s.body.split("\n").map((l) => `      ${l}`).join("\n") : `      ${clip(s.body, 400)}`);
         }
         else console.log(`\n  Antwort:\n${s.body.split("\n").map((l) => `    ${l}`).join("\n")}`);
       }
