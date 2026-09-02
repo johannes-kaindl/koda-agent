@@ -164,8 +164,13 @@ const FIXTURE_NOTE = readFileSync(join(FIXTURE_DIR, "notes", "Notes", "Project p
  * offen, mit einem zweiten, unabhaengigen Editor fuer dieselbe Datei (gemessen 2026-09-02:
  * der Hauptbereichs-Editor, den `getMostRecentLeaf(rootSplit)` andernorts liest, sah davon
  * nichts). Der Weg hier ist derselbe wie in `openNote` der CDP-Bruecke:
- * `getMostRecentLeaf(rootSplit) ?? getLeaf(true)` — und davor werden alle Leaves geschlossen,
- * die dieselbe Datei zeigen: gesammelt vor dem Schliessen, nie waehrend der Iteration.
+ * `getMostRecentLeaf(rootSplit) ?? getLeaf(true)` als Fallback. Duplikate werden vorher
+ * eingesammelt (nie waehrend der Iteration) — aber NIE der letzte Root-Leaf: zeigt schon ein
+ * Root-Leaf die Notiz, bleibt GENAU der stehen (`getRoot() === root`), alle anderen werden
+ * geschlossen. Grund, zweite Fix-Runde 2026-09-02: laeuft Punkt 23 direkt nach Punkt 20 und
+ * der einzige Root-Leaf ist ausgerechnet der, der die Notiz schon zeigt, detachte die alte
+ * Fassung genau ihn — der Root-Split stand leer, und `getLeaf(true)` schlug mit „No tab group
+ * found" fehl, weil keine Tab-Gruppe mehr da war, in die er haette oeffnen koennen.
  *
  * Der Text kommt IMMER aus `FIXTURE_NOTE`, nie aus dem, was im Editor oder auf der Platte
  * gerade steht — `editor.setValue()`, nicht `vault.modify()` (dazu mehr bei Punkt 23s
@@ -179,13 +184,18 @@ const FIXTURE_NOTE = readFileSync(join(FIXTURE_DIR, "notes", "Notes", "Project p
  */
 const SCENE_JS = `
       const path = ${JSON.stringify("Notes/Project plan.md")};
-      const dups = [];
-      app.workspace.iterateAllLeaves((l) => { if (l.view?.file?.path === path) dups.push(l); });
-      for (const dup of dups) dup.detach();
-      const leaf = app.workspace.getMostRecentLeaf(app.workspace.rootSplit) ?? app.workspace.getLeaf(true);
       const file = app.vault.getFileByPath(path);
       if (!file) return -2;
+      const root = app.workspace.rootSplit;
+      const showing = [];
+      app.workspace.iterateAllLeaves((l) => { if (l.view?.file?.path === path) showing.push(l); });
+      // Einen Root-Leaf mit der Datei behalten (wenn es einen gibt), alle anderen Duplikate schliessen —
+      // nie den letzten Root-Leaf detachen, sonst gibt es keine Tab-Gruppe mehr ("No tab group found").
+      let leaf = showing.find((l) => l.getRoot() === root) ?? null;
+      for (const l of showing) if (l !== leaf) l.detach();
+      if (leaf === null) leaf = app.workspace.getMostRecentLeaf(root) ?? app.workspace.getLeaf(true);
       await leaf.openFile(file);
+      app.workspace.setActiveLeaf(leaf, { focus: true });
       await new Promise((r) => setTimeout(r, 500));
       const ed = leaf.view.editor;
       ed.setValue(${JSON.stringify(FIXTURE_NOTE)});
