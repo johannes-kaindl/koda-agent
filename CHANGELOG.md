@@ -10,8 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 - **Working context, stage 1.** A user message can carry a short block naming the active
   note (with its properties and cursor line), the selection and the open tabs — pointers,
-  no contents. Mode *Off* / *Workspace* per question via a dropdown next to Send, five
-  commands (`Context mode: …`, `Ask Koda about the selection`) and a right-click entry on
+  no contents. Mode *Off* / *Workspace* per question via a dropdown next to Send, three
+  commands (`Context mode: Off`, `Context mode: Workspace`, `Ask Koda about the selection`) and a right-click entry on
   selected text. The block is stored with the message and shown under it, collapsible.
 - **Two tools:** `get_workspace` (full selection, cursor surroundings, every tab) and
   `edit_active_note` (replace the selection or insert at the cursor, after approval; refuses
