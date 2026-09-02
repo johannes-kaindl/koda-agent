@@ -81,7 +81,7 @@ export function renderWorkspaceContext(snap: WorkspaceSnapshot, opts: WorkspaceL
     if (a.selection !== "") {
       const cut = a.selection.length > opts.selectionMax;
       const shown = cut ? a.selection.slice(0, opts.selectionMax) : a.selection;
-      lines.push(`${cut ? t.selCut(a.selection.length, opts.selectionMax) : t.sel(a.selection.length)}: „${shown}”`);
+      lines.push(`${cut ? t.selCut(a.selection.length, opts.selectionMax) : t.sel(a.selection.length)}: „${shown}“`);
       const item: ContextItem = { source: "selection", path: a.path, kind: "pointer", chars: shown.length };
       if (cut) item.fullChars = a.selection.length;
       items.push(item);

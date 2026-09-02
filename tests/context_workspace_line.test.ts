@@ -25,7 +25,7 @@ describe("renderWorkspaceContext", () => {
     expect(ctx.text).toContain("Aktive Notiz: Notes/Project plan.md · Zeile 9 von 11");
     expect(ctx.text).toContain("Kopfdaten: status: active · area: plugin · tags: koda, plan");
     expect(ctx.text).not.toContain("position");
-    expect(ctx.text).toContain("Markierung (13 Zeichen): „Model control”");
+    expect(ctx.text).toContain("Markierung (13 Zeichen): „Model control“");
     expect(ctx.text).toContain("Offene Tabs (3): Notes/Project plan.md · Notes/Tools.md · Board.canvas");
     expect(ctx.text).toContain("get_workspace()");
     expect(ctx.items).toEqual([
