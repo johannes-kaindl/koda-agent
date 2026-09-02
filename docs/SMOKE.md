@@ -37,6 +37,12 @@ Vorbereitung: `npm run build`, `npm run smoke:gui -- --setup` (baut den Staging-
     Editor. Modus „Aus" als Gegenprobe: Koda kennt die Markierung dann nicht und muss nachfragen.
 
     → die Invariante misst der automatisierte Prüfpunkt 23 mit einem Fake-Ersatz; dieser Handpunkt misst, ob das Modell das Werkzeug wählt.
+25. **Restaurierte Tabs beim Neustart:** Obsidian mit mehreren Tabs neu starten (oder das
+    Vault-Fenster schließen und per URI neu öffnen), keinen Tab anfassen, im Modus
+    „Arbeitsplatz" `currentContext()` lesen → „Offene Tabs (N)" nennt alle N restaurierten
+    Tabs, keine Seitenleisten-Ansichten (Backlinks, Gliederung). Gemessen 2026-09-02: vor dem
+    Fix 1 von 4 Tabs plus drei Seitenleisten-Ansichten.
+
 ### Semantisches Retrieval (nur mit aktivem „Vault Retrieval")
 
 14. Frage mit einem Begriff, der **nicht wörtlich** im Vault steht, aber inhaltlich passt

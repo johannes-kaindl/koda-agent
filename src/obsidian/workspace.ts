@@ -34,10 +34,21 @@ export function readWorkspace(app: App, ownViewType: string): WorkspaceSnapshot 
     };
   }
   const tabs: WorkspaceSnapshot["tabs"] = [];
-  app.workspace.iterateAllLeaves((l) => {
+  const ws = app.workspace;
+  ws.iterateAllLeaves((l) => {
+    // Seitenleisten sind keine Tabs des Nutzers — dort haengen backlink/outline/outgoing-link
+    // mit `view.file` der aktiven Notiz (gemessen 2026-09-02: viermal derselbe Pfad).
+    const root = l.getRoot();
+    if (root === ws.leftSplit || root === ws.rightSplit) return;
+    const st = l.getViewState();
+    if (st.type === ownViewType) return;
     const v = l.view;
-    if (v.getViewType() === ownViewType) return;
-    if (v instanceof FileView && v.file !== null) tabs.push({ path: v.file.path, viewType: v.getViewType() });
+    if (v instanceof FileView && v.file !== null) { tabs.push({ path: v.file.path, viewType: v.getViewType() }); return; }
+    // Restaurierte, noch nicht besuchte Tabs sind DeferredViews (Obsidian >= 1.7.2): kein
+    // `view.file`, aber der Pfad steht im View-State. Ohne diesen Zweig fehlten nach jedem
+    // Neustart alle nicht angefassten Tabs (gemessen 2026-09-02: 4 von 4).
+    const f = (st.state as { file?: unknown } | undefined)?.file;
+    if (typeof f === "string" && f !== "") tabs.push({ path: f, viewType: st.type });
   });
   return { active, tabs };
 }
