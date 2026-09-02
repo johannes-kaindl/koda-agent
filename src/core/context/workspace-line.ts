@@ -51,7 +51,9 @@ function scalar(v: unknown): string {
   if (v === null || v === undefined) return "";
   if (Array.isArray(v)) return v.map(scalar).join(", ");
   if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean" || typeof v === "bigint") return String(v);
+  return JSON.stringify(v) ?? "";
 }
 
 /** `position` ist Obsidians Cache-Zusatz, kein Feld des Nutzers. */
