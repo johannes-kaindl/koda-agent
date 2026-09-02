@@ -26,7 +26,7 @@ See `CLAUDE.md` for the current scope and design decisions.*
   step shown inline in the chat. `list_notes` returns every note under a vault folder,
   optionally recursive, together with whichever frontmatter fields were asked for, in
   one call; a folder note (a note named like its folder) is marked as one, so it is not
-  counted as ordinary content. A seventh, `related_notes`, appears when semantic retrieval is available
+  counted as ordinary content. A ninth, `related_notes`, appears when semantic retrieval is available
   (see below).
 - **Semantic retrieval, if you already have it** *(optional)* — if the
   [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) plugin is installed
@@ -131,7 +131,10 @@ The full settings list:
 | Text tool-call fallback | off | For models without native tool calling |
 | UI language | auto | Follows Obsidian, or force German/English |
 | Open on startup | off | Opt-in; the sidebar stays closed unless you ask for it |
-| Working context | *startup mode / Workspace, selection / tabs / properties cutoffs* | Startup mode (Off / Workspace), selection character count, number of open tabs, and number of properties to include in the context block — all configurable per question and in settings.
+| Context mode on startup | Workspace | Off / Workspace (Note, All tabs, Vault reserved for later stages) |
+| Selection in the context | 600 chars (100–5000) | How many characters of the selected text to include in the context block |
+| Open tabs in the context | 12 (1–100) | How many open tabs to list in the context block |
+| Properties in the context | 300 chars (0–2000) | How many characters of the frontmatter properties to include (0 = none) |
 | Context window (tokens) | 8192 (2048–1000000) | Size of the model's context window; one number for all endpoints. "Test" on an endpoint row fills it in when the server reports it (LM Studio, Ollama) and the field is still on its default |
 | Compact at (% of window) | 75 (40–95) | Koda compacts the conversation before a model call once the estimate exceeds this share of the window |
 | Keep tool results verbatim | 3 (0–20) | How many of the most recent tool results stay in full; older ones become a one-line stub |

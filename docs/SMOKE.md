@@ -31,10 +31,12 @@ Vorbereitung: `npm run build`, `npm run smoke:gui -- --setup` (baut den Staging-
     → der Bericht zeigt den `⊕ Arbeitskontext`-Block mit dem Pfad, und Koda ruft `read_note`
     **auf genau diesen Pfad**, nicht `search_notes`. Ein `read_note` auf einen anderen Pfad ist
     rot, auch wenn die Antwort inhaltlich stimmt.
+    → die Naht dazu messen die automatisierten Prüfpunkte 20–22 (Block, Modus, Werkzeugliste); dieser Handpunkt misst das Modellverhalten.
 24. **Markierung ersetzen:** einen Satz markieren, „Verbessere den markierten Satz" → ⚙
     `edit_active_note` mit Modal (Markierung gegen Ersatz), nach „Schreiben" steht der Ersatz im
     Editor. Modus „Aus" als Gegenprobe: Koda kennt die Markierung dann nicht und muss nachfragen.
 
+    → die Invariante misst der automatisierte Prüfpunkt 23 mit einem Fake-Ersatz; dieser Handpunkt misst, ob das Modell das Werkzeug wählt.
 ### Semantisches Retrieval (nur mit aktivem „Vault Retrieval")
 
 14. Frage mit einem Begriff, der **nicht wörtlich** im Vault steht, aber inhaltlich passt
