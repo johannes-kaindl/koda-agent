@@ -2,10 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: Arbeitskontext Etappe 1 auf `feat/arbeitskontext` (ungemergt, 28 Commits) · 0.10.1 im Store, Rescan BLOCKIERT — Stand 2026-09-02
+## Status: 0.11.0 released (Tag auf Forgejo+GitHub, Forgejo-Release da, GitHub-Release AUSSTEHEND), Rescan BLOCKIERT — main, Stand 2026-09-02 abends
 
-**Arbeitskontext, Etappe 1 ist gebaut, reviewt und belegt — der Merge nach `main` ist Johannes'
-Entscheidung.** Spec `docs/superpowers/specs/2026-09-02-koda-arbeitskontext-design.md` (drei
+**Arbeitskontext, Etappe 1 ist gebaut, reviewt, belegt und als 0.11.0 released** (Merge per
+Fast-Forward nach `main`, Johannes' Entscheidung 18:06; Release-Commit `2dc5d2c`, Tag auf beiden
+Remotes). ⚠️ Beim Release-Lauf erschien das **GitHub-Release nicht binnen drei Minuten** — das
+Konto ist weiter geflaggt, die Action läuft nicht. **Nicht rescannen, bis
+`releases/tags/0.11.0` existiert.** Spec `docs/superpowers/specs/2026-09-02-koda-arbeitskontext-design.md` (drei
 Etappen), Plan `docs/superpowers/plans/2026-09-02-koda-arbeitskontext-etappe-1.md` (16 Tasks,
 subagent-getrieben, je Task ein Review). Inhalt: Modi **Aus/Arbeitsplatz** je Nachricht (Dropdown
 neben Senden, drei Befehle, Rechtsklick „Koda fragen"), der Block hängt als Feld `context` an der
