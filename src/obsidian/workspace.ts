@@ -9,9 +9,13 @@ function mainLeaf(app: App): WorkspaceLeaf | null {
   return app.workspace.getMostRecentLeaf();
 }
 
+/** Ohne Datei zaehlt eine Ansicht nicht als Notiz — dieselbe Regel wie in readWorkspace,
+ *  sonst meldete get_workspace eine Cursor-Umgebung fuer eine Notiz, die es laut Snapshot
+ *  nicht gibt. */
 function markdownView(app: App): MarkdownView | null {
   const leaf = mainLeaf(app);
-  return leaf !== null && leaf.view instanceof MarkdownView ? leaf.view : null;
+  const view = leaf !== null && leaf.view instanceof MarkdownView ? leaf.view : null;
+  return view !== null && view.file !== null ? view : null;
 }
 
 export function readWorkspace(app: App, ownViewType: string): WorkspaceSnapshot {
