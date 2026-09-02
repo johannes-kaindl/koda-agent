@@ -2,7 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.10.1 released (Tag auf Forgejo+GitHub), Rescan BLOCKIERT — main, Stand 2026-09-01
+## Status: Arbeitskontext Etappe 1 auf `feat/arbeitskontext` (ungemergt, 28 Commits) · 0.10.1 im Store, Rescan BLOCKIERT — Stand 2026-09-02
+
+**Arbeitskontext, Etappe 1 ist gebaut, reviewt und belegt — der Merge nach `main` ist Johannes'
+Entscheidung.** Spec `docs/superpowers/specs/2026-09-02-koda-arbeitskontext-design.md` (drei
+Etappen), Plan `docs/superpowers/plans/2026-09-02-koda-arbeitskontext-etappe-1.md` (16 Tasks,
+subagent-getrieben, je Task ein Review). Inhalt: Modi **Aus/Arbeitsplatz** je Nachricht (Dropdown
+neben Senden, drei Befehle, Rechtsklick „Koda fragen"), der Block hängt als Feld `context` an der
+Nutzer-Nachricht (persistiert, nur in der Projektion eingewoben, Stufe 1 stubbt ihn wie
+Tool-Ergebnisse, Kontextzeile unter der Blase), Werkzeuge `get_workspace` und `edit_active_note`
+(Invariante „Vorschau == geschriebener Inhalt", Pfad muss zur aktiven Notiz passen), vier
+Einstellungen „Arbeitskontext" (Modus-Default und drei Kappungen — **jeder Wert mit Einfluss ist
+einstellbar**, Johannes' Grundsatz vom 2026-09-02), `contextUsage` misst die Projektion.
+Gate 541/541; GUI-Smoke **23/23** (fünf Läufe: die vier roten davor waren ausnahmslos
+Treiber-Defekte, dokumentiert in `docs/SMOKE.md`); Praxistest gegen `qwen/qwen3.8-27b`: Koda liest
+die offene Notiz per `read_note` auf den Kontext-Pfad statt zu suchen. ⚠️ **Zwei gemessene
+Obsidian-Fallen aus dieser Arbeit:** (1) `activeEditor` ist aus der Seitenleiste heraus leer —
+die aktive Notiz kommt über `getMostRecentLeaf()`; (2) restaurierte, nicht besuchte Tabs sind
+`DeferredView`s ohne `view.file` — der Pfad steht in `getViewState().state.file`, und
+Seitenleisten-Ansichten (Backlinks, Gliederung) tragen `view.file` der aktiven Notiz und sind
+KEINE Tabs (Handpunkt 25). Offen für Etappe 2 (Spec § Etappen): Hub mit Kontext-Tab, Modi
+Notiz/Alle Tabs, Chips, Budget; davor `move_note` (Arbeits-Vault-Task). Der Adapter
+`src/obsidian/workspace.ts` hat keinen Unit-Test, weil der vendorte Mock kein `FileView` kennt —
+erster Punkt für Etappe 2, nicht der Hub.
 
 ⚠️ **0.10.1 ist ein Pflicht-Fix, kein Nachtrag: „Neues Gespräch" war seit 0.9.0 für niemanden
 sichtbar.** Beide Kopf-Aktionen (Verwerfen, Thinking) hingen an `addAction()`, und Obsidian

@@ -623,6 +623,22 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-02, 17:00 — nach der Fix-Welle des Gesamt-Reviews (23/23) + Handpunkt 25
+
+Treiber `d23661d`, Plugin-Build aus `feat/arbeitskontext` (`d23661d`), Obsidian 1.13.7, Staging-Vault
+`koda-agent` frisch aus dem Fixture, Lock `--exclusive focus`. **23/23**, Fixture-Notiz danach
+byte-identisch. Zusätzlich **Handpunkt 25 gemessen**, weil der Gesamt-Review die Tab-Liste als
+vermutlich falsch flaggte und die Messung es bestätigte: vor dem Fix meldete `currentContext()` nach
+dem Neuöffnen des Vault-Fensters mit vier restaurierten, nicht angefassten Tabs „Offene Tabs (4)"
+mit **viermal derselben Datei** — der eine geladene Tab plus die Seitenleisten-Ansichten Backlinks,
+Ausgehende Links und Gliederung, die `view.file` der aktiven Notiz tragen; die drei restaurierten
+Tabs fehlten, weil sie `DeferredView`s ohne `view.file` sind (Obsidian ≥ 1.7.2). Nach dem Fix
+(Pfad aus `view.file` **oder** `getViewState().state.file`, Seitenleisten ausgeschlossen) nennt die
+Zeile genau die restaurierten Root-Tabs (9 von 9 im Messfenster, darunter Duplikate aus mehrfachem
+Öffnen — Duplikate sind echte Tabs), keine Seitenleisten-Ansicht. Messrezept: vier Notizen in Tabs
+öffnen, `requestSaveLayout()`, das Vault-Fenster schließen, per Pfad-URI neu öffnen, nichts anfassen,
+`currentContext()` lesen — ohne Quit der Instanz, fremde Fenster unberührt.
+
 ## Belegter Lauf: 2026-09-02, Arbeitskontext Etappe 1 (23/23) + Praxistest
 
 Treiber `cb4ea23`, Plugin-Build aus `feat/arbeitskontext` (Version noch 0.10.1, unveröffentlicht),
