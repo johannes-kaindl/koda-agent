@@ -111,9 +111,22 @@
  * 23 die Invariante von `edit_active_note` — eine seit dem Aufruf veraltete Markierung
  * schreibt nicht, eine gueltige schreibt, und erst die Gegenprobe ohne Aenderung belegt,
  * dass der Punkt seinen Gegenstand ueberhaupt beruehrt.
+ *
+ * Mechanik von 20 und 23 (Review-Runde 2026-09-02, `SCENE_JS`): die Notiz wird nie ueber
+ * `app.workspace.getLeaf(false)` geoeffnet — das liefert nach Punkt 20s Fokus auf
+ * `.koda-input` den Sidebar-Leaf statt den Hauptbereich, mit einem ZWEITEN Editor auf
+ * derselben Datei. Aufgeloest wird stattdessen wie in der CDP-Bruecke selbst (`openNote`):
+ * `getMostRecentLeaf(rootSplit) ?? getLeaf(true)`, nachdem alle anderen Leaves mit derselben
+ * Datei geschlossen wurden. Die Kulisse kommt IMMER per `editor.setValue()` aus dem
+ * getrackten Fixture, nie aus dem, was gerade im Vault liegt. Punkt 23 schreibt beim
+ * Aufraeumen genauso zurueck, ueber denselben Editor: `app.vault.modify()` neben einem
+ * offenen, ungespeicherten Editor-Puffer divergiert, und Obsidian fuehrt beide Staende
+ * spaeter zu Artefakten zusammen — gemessen 2026-09-02 als `Model steeringl makes` mit einer
+ * verschobenen Leerzeile, nicht als Abbruch.
  */
 
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
@@ -135,6 +148,51 @@ const DEAD_B = "http://127.0.0.1:9998";
  *  meldet. Begruendung an der Stelle selbst — kurz: ein verzoegert eintretender Freeze
  *  war vorher unsichtbar. */
 const NACHBEOBACHTUNG_MS = 9000;
+
+/** Die Fixture-Notiz, wie sie im Repo getrackt ist. Pruefpunkte 20 und 23 STELLEN SIE HER
+ *  (per `editor.setValue()`, s. `SCENE_JS`), statt anzunehmen, dass der Vault noch den
+ *  Auslieferungsstand zeigt — gemessen 2026-09-02: nach einem vorherigen Lauf tat er das
+ *  nicht mehr, und ein hartcodierter Zeilenindex traf die falsche Zeile. */
+const FIXTURE_NOTE = readFileSync(join(FIXTURE_DIR, "notes", "Notes", "Project plan.md"), "utf8");
+
+/**
+ * Kulissenbau fuer Pruefpunkt 20 und 23 — EIN String fuer beide (Review-Runde 2026-09-02,
+ * Punkt 5), sonst laufen sie auseinander, wie es hier schon einmal geschehen ist.
+ *
+ * Nie `app.workspace.getLeaf(false)`: das liefert den zuletzt AKTIVEN Leaf, und nach Punkt
+ * 20s Fokus auf `.koda-input` ist das Koda selbst — die Notiz waere dann in der SIDEBAR
+ * offen, mit einem zweiten, unabhaengigen Editor fuer dieselbe Datei (gemessen 2026-09-02:
+ * der Hauptbereichs-Editor, den `getMostRecentLeaf(rootSplit)` andernorts liest, sah davon
+ * nichts). Der Weg hier ist derselbe wie in `openNote` der CDP-Bruecke:
+ * `getMostRecentLeaf(rootSplit) ?? getLeaf(true)` — und davor werden alle Leaves geschlossen,
+ * die dieselbe Datei zeigen: gesammelt vor dem Schliessen, nie waehrend der Iteration.
+ *
+ * Der Text kommt IMMER aus `FIXTURE_NOTE`, nie aus dem, was im Editor oder auf der Platte
+ * gerade steht — `editor.setValue()`, nicht `vault.modify()` (dazu mehr bei Punkt 23s
+ * `finally`). Die Zielzeile wird ueber ihren INHALT gesucht (`startsWith("Model control
+ * makes")`), nie ueber eine angenommene Zeilennummer.
+ *
+ * Endet mit `leaf`, `ed`, `idx`, `path` in Scope — ausser die Funktion hat schon per `return`
+ * verlassen: `-2` wenn die Datei fehlt, `-1` wenn die Zeile nicht gefunden wurde. Der Aufrufer
+ * sieht das nur am GESAMT-Rueckgabewert seines eigenen `evaluate()`-Aufrufs, nicht an einer
+ * eigenen Zwischenpruefung.
+ */
+const SCENE_JS = `
+      const path = ${JSON.stringify("Notes/Project plan.md")};
+      const dups = [];
+      app.workspace.iterateAllLeaves((l) => { if (l.view?.file?.path === path) dups.push(l); });
+      for (const dup of dups) dup.detach();
+      const leaf = app.workspace.getMostRecentLeaf(app.workspace.rootSplit) ?? app.workspace.getLeaf(true);
+      const file = app.vault.getFileByPath(path);
+      if (!file) return -2;
+      await leaf.openFile(file);
+      await new Promise((r) => setTimeout(r, 500));
+      const ed = leaf.view.editor;
+      ed.setValue(${JSON.stringify(FIXTURE_NOTE)});
+      await new Promise((r) => setTimeout(r, 300));
+      const idx = ed.getValue().split("\\n").findIndex((l) => l.startsWith("Model control makes"));
+      if (idx < 0) return -1;
+    `;
 
 // --- Prüfpunkte -------------------------------------------------------------
 
@@ -1263,53 +1321,81 @@ async function main(): Promise<void> {
     // Die offene Frage der Spec (E3): bleibt `editor.getSelection()` erhalten, wenn der Fokus ins
     // Eingabefeld wechselt? Gemessen, nicht angenommen. Drei Bedingungen: der aktive Leaf ist
     // Koda (sonst misst der Punkt nicht die Sidebar-Situation), der Block nennt die Notiz mit
-    // Kopfdaten, und die Markierung steht drin.
+    // Kopfdaten, und die Markierung steht drin. Kulisse und Leaf-Aufloesung: `SCENE_JS` oben.
+    // Eigener try/catch/finally seit der Review-Runde vom 2026-09-02 (Punkt 4) — sonst haette
+    // eine Ausnahme hier den Rest des Laufs mitgerissen, ohne dass dieser Punkt rot gemeldet
+    // haette, UND den Modus mutiert zurueckgelassen.
     const vorherMode = await cdp.evaluate<string>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].contextMode;`);
-    const punkt20 = await cdp.evaluate<{ aktivIstKoda: boolean; text: string; items: { source: string; path: string; chars: number }[] } | null>(`
-      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-      p.setContextMode("workspace");
-      const file = app.vault.getFileByPath("Notes/Project plan.md");
-      if (!file) return null;
-      const leaf = app.workspace.getLeaf(false);
-      await leaf.openFile(file);
-      await new Promise((r) => setTimeout(r, 500));
-      // Zeile 9 (0-basiert 8) beginnt mit "Model control" — 13 Zeichen.
-      leaf.view.editor.setSelection({ line: 8, ch: 0 }, { line: 8, ch: 13 });
-      document.querySelector(".koda-input")?.focus();
-      await new Promise((r) => setTimeout(r, 300));
-      const ctx = p.currentContext();
-      return {
-        aktivIstKoda: app.workspace.activeLeaf?.view?.getViewType() === ${JSON.stringify(VIEW_TYPE)},
-        text: ctx?.text ?? "",
-        items: ctx?.items ?? [],
-      };
-    `);
-    const sel20 = punkt20?.items.find((i) => i.source === "selection");
-    record(
-      "20. Arbeitsplatz-Block nennt aktive Notiz, Kopfdaten und Markierung — aus der Sidebar heraus",
-      punkt20 !== null && punkt20.aktivIstKoda && punkt20.text.includes("Notes/Project plan.md") && punkt20.text.includes("status: active") && punkt20.text.includes("Model control") && sel20?.chars === 13,
-      punkt20 === null
-        ? "Fixture-Notiz Notes/Project plan.md fehlt"
-        : `aktiv ist Koda: ${String(punkt20.aktivIstKoda)} · Markierung: ${sel20 ? `${sel20.chars} Zeichen` : "fehlt"} · ${punkt20.text.split("\n")[1] ?? ""}`,
-    );
+    try {
+      const punkt20 = await cdp.evaluate<{ aktivIstKoda: boolean; text: string; items: { source: string; path: string; chars: number }[] } | -1 | -2>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.setContextMode("workspace");
+        ${SCENE_JS}
+        ed.setSelection({ line: idx, ch: 0 }, { line: idx, ch: 13 });
+        document.querySelector(".koda-input")?.focus();
+        await new Promise((r) => setTimeout(r, 300));
+        const ctx = p.currentContext();
+        return {
+          aktivIstKoda: app.workspace.activeLeaf?.view?.getViewType() === ${JSON.stringify(VIEW_TYPE)},
+          text: ctx?.text ?? "",
+          items: ctx?.items ?? [],
+        };
+      `);
+      const sel20 = typeof punkt20 === "object" ? punkt20.items.find((i) => i.source === "selection") : undefined;
+      record(
+        "20. Arbeitsplatz-Block nennt aktive Notiz, Kopfdaten und Markierung — aus der Sidebar heraus",
+        typeof punkt20 === "object" && punkt20.aktivIstKoda && punkt20.text.includes("Notes/Project plan.md") && punkt20.text.includes("status: active") && punkt20.text.includes("Model control") && sel20?.chars === 13,
+        punkt20 === -2
+          ? "Fixture-Notiz Notes/Project plan.md fehlt"
+          : punkt20 === -1
+            ? "Kulisse nicht hergestellt"
+            : `aktiv ist Koda: ${String(punkt20.aktivIstKoda)} · Markierung: ${sel20 ? `${sel20.chars} Zeichen` : "fehlt"} · ${punkt20.text.split("\n")[1] ?? ""}`,
+      );
+    } catch (error) {
+      record(
+        "20. Arbeitsplatz-Block nennt aktive Notiz, Kopfdaten und Markierung — aus der Sidebar heraus",
+        false,
+        `Abbruch: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      await cdp.evaluate(`
+        app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].setContextMode(${JSON.stringify(vorherMode)});
+        return true;
+      `).catch(() => undefined);
+    }
 
     // --- 21. Modus Aus sendet nichts; Befehl und Dropdown sind EIN Zustand ---------------
-    const punkt21 = await cdp.evaluate<{ ausNull: boolean; dropdownNachBefehl: string; modeNachDropdown: string; anObjekt: boolean }>(`
-      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-      app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:context-mode-off`)});
-      await new Promise((r) => setTimeout(r, 200));
-      const ausNull = p.currentContext() === null;
-      const sel = document.querySelector(".koda-mode");
-      const dropdownNachBefehl = sel ? sel.value : "(kein Dropdown)";
-      if (sel) { sel.value = "workspace"; sel.dispatchEvent(new Event("change")); }
-      await new Promise((r) => setTimeout(r, 200));
-      return { ausNull, dropdownNachBefehl, modeNachDropdown: p.contextMode, anObjekt: p.currentContext() !== null };
-    `);
-    record(
-      "21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand",
-      punkt21.ausNull && punkt21.dropdownNachBefehl === "off" && punkt21.modeNachDropdown === "workspace" && punkt21.anObjekt,
-      `aus → null: ${String(punkt21.ausNull)} · Dropdown nach Befehl: ${punkt21.dropdownNachBefehl} · Modus nach Dropdown: ${punkt21.modeNachDropdown}`,
-    );
+    // Eigener try/catch/finally aus demselben Grund wie Punkt 20 (Review-Runde 2026-09-02,
+    // Punkt 4): `vorherMode` von oben, nicht neu gelesen.
+    try {
+      const punkt21 = await cdp.evaluate<{ ausNull: boolean; dropdownNachBefehl: string; modeNachDropdown: string; anObjekt: boolean }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:context-mode-off`)});
+        await new Promise((r) => setTimeout(r, 200));
+        const ausNull = p.currentContext() === null;
+        const sel = document.querySelector(".koda-mode");
+        const dropdownNachBefehl = sel ? sel.value : "(kein Dropdown)";
+        if (sel) { sel.value = "workspace"; sel.dispatchEvent(new Event("change")); }
+        await new Promise((r) => setTimeout(r, 200));
+        return { ausNull, dropdownNachBefehl, modeNachDropdown: p.contextMode, anObjekt: p.currentContext() !== null };
+      `);
+      record(
+        "21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand",
+        punkt21.ausNull && punkt21.dropdownNachBefehl === "off" && punkt21.modeNachDropdown === "workspace" && punkt21.anObjekt,
+        `aus → null: ${String(punkt21.ausNull)} · Dropdown nach Befehl: ${punkt21.dropdownNachBefehl} · Modus nach Dropdown: ${punkt21.modeNachDropdown}`,
+      );
+    } catch (error) {
+      record(
+        "21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand",
+        false,
+        `Abbruch: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      await cdp.evaluate(`
+        app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].setContextMode(${JSON.stringify(vorherMode)});
+        return true;
+      `).catch(() => undefined);
+    }
 
     // --- 22. get_workspace und edit_active_note werden gesendet und sind abschaltbar --------
     const vorher22 = await cdp.evaluate<string[]>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.toolsDisabled;`);
@@ -1338,55 +1424,59 @@ async function main(): Promise<void> {
     // Der Aufruf laeuft im Renderer als Promise (das Modal blockiert ihn), das Ergebnis landet in
     // window.__koda23. Erst die Gegenprobe (ohne Aenderung) belegt, dass der Punkt seinen
     // Gegenstand beruehrt — sonst waere „nichts geschrieben" auch bei kaputtem Werkzeug gruen.
-    const original23 = await cdp.evaluate<string | null>(`
-      const f = app.vault.getFileByPath("Notes/Project plan.md");
-      return f ? await app.vault.read(f) : null;
-    `);
+    // Rueckschreibung im `finally` laeuft ueber den EDITOR, nicht `vault.modify()`: Letzteres
+    // divergiert von einem offenen, ungespeicherten Editor-Puffer, und Obsidian fuehrt beide
+    // Staende spaeter zu Artefakten zusammen — gemessen 2026-09-02 als `Model steeringl makes`
+    // mit einer verschobenen Leerzeile. `original23` faellt deshalb weg: `FIXTURE_NOTE` oben
+    // ist der bekannt gute Zustand, nichts, das dieser Lauf erst lesen muesste.
     let detail23 = "nicht gelaufen";
     let ok23 = false;
     try {
-      const starte = async (ersatz: string): Promise<void> => {
-        await cdp.evaluate(`
+      const starte = async (ersatz: string): Promise<number> => {
+        const idx = await cdp.evaluate<number>(`
           const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-          const file = app.vault.getFileByPath("Notes/Project plan.md");
-          const leaf = app.workspace.getLeaf(false);
-          await leaf.openFile(file);
-          await new Promise((r) => setTimeout(r, 400));
-          leaf.view.editor.setSelection({ line: 8, ch: 0 }, { line: 8, ch: 13 });
+          ${SCENE_JS}
           window.__koda23 = null;
-          p.buildTools().run("edit_active_note", { path: "Notes/Project plan.md", mode: "replace_selection", text: ${JSON.stringify(ersatz)} }).then((r) => { window.__koda23 = r; });
-          return true;
+          p.buildTools().run("edit_active_note", { path, mode: "replace_selection", text: ${JSON.stringify(ersatz)} }).then((r) => { window.__koda23 = r; });
+          return idx;
         `);
+        if (idx < 0) throw new Error(idx === -2 ? "Fixture-Notiz Notes/Project plan.md fehlt" : "Kulisse nicht hergestellt");
         const modal = await pollUntil<boolean>(cdp, `return !!document.querySelector(".modal-container .koda-preview");`, 8000);
         if (!modal) throw new Error("Bestaetigungs-Modal erschien nicht");
+        return idx;
       };
       const bestaetige = async (): Promise<unknown> => {
         await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:last-child") ?? null`);
         return pollUntil<unknown>(cdp, `return window.__koda23;`, 8000);
       };
       // A: Markierung nach dem Aufruf verkleinern, dann bestaetigen → Fehler, Datei unveraendert.
-      await starte("Model steering");
-      await cdp.evaluate(`app.workspace.getMostRecentLeaf().view.editor.setSelection({ line: 8, ch: 0 }, { line: 8, ch: 5 }); return true;`);
+      const idxA = await starte("Model steering");
+      await cdp.evaluate(`app.workspace.getMostRecentLeaf(app.workspace.rootSplit).view.editor.setSelection({ line: ${idxA}, ch: 0 }, { line: ${idxA}, ch: 5 }); return true;`);
       const a = (await bestaetige()) as { ok: boolean; error?: string } | null;
-      const inhaltA = await cdp.evaluate<string>(`return app.workspace.getMostRecentLeaf().view.editor.getValue();`);
+      const inhaltA = await cdp.evaluate<string>(`return app.workspace.getMostRecentLeaf(app.workspace.rootSplit).view.editor.getValue();`);
       // B: Gegenprobe ohne Aenderung → geschrieben.
       await starte("Model steering");
       const b = (await bestaetige()) as { ok: boolean } | null;
-      const inhaltB = await cdp.evaluate<string>(`return app.workspace.getMostRecentLeaf().view.editor.getValue();`);
+      const inhaltB = await cdp.evaluate<string>(`return app.workspace.getMostRecentLeaf(app.workspace.rootSplit).view.editor.getValue();`);
       ok23 = a?.ok === false && /geändert|changed/.test(a?.error ?? "") && inhaltA.includes("Model control makes") && b?.ok === true && inhaltB.includes("Model steering makes");
       detail23 = `veraltet: ${a?.ok === false ? "verweigert" : "GESCHRIEBEN"} (${a?.error ?? ""}) · gueltig: ${b?.ok === true ? "geschrieben" : "verweigert"}`;
     } catch (error) {
       detail23 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
     } finally {
-      // Fixture-Notiz zuruecksetzen — der Staging-Vault ist Wegwerfware, aber der naechste
-      // Punkt im selben Lauf soll die Kulisse vorfinden, die die README verspricht.
-      if (original23 !== null) {
-        await cdp.evaluate(`
-          const f = app.vault.getFileByPath("Notes/Project plan.md");
-          if (f) await app.vault.modify(f, ${JSON.stringify(original23)});
-          return true;
-        `).catch(() => undefined);
-      }
+      // Rueckschreibung ueber den EDITOR (nicht `vault.modify()`, s. Kommentar oben): der
+      // root-split Leaf, der die Notiz noch offen haelt, bekommt den Fixture-Text direkt in
+      // den Puffer. Nur wenn keiner die Notiz mehr offen haelt, greift der Vault-Fallback.
+      await cdp.evaluate(`
+        const path = ${JSON.stringify("Notes/Project plan.md")};
+        const leaf = app.workspace.getMostRecentLeaf(app.workspace.rootSplit);
+        if (leaf && leaf.view?.file?.path === path) {
+          leaf.view.editor.setValue(${JSON.stringify(FIXTURE_NOTE)});
+        } else {
+          const f = app.vault.getFileByPath(path);
+          if (f) await app.vault.modify(f, ${JSON.stringify(FIXTURE_NOTE)});
+        }
+        return true;
+      `).catch(() => undefined);
       await cdp.evaluate(`
         app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].setContextMode(${JSON.stringify(vorherMode)});
         document.querySelector(".modal-container .modal-close-button")?.click();
