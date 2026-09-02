@@ -102,3 +102,15 @@ describe("SessionStore Fehlerpfade (swallow vs. propagate)", () => {
     await expect(store.startNew()).rejects.toThrow("write failed");
   });
 });
+
+describe("Kontextfeld im JSONL", () => {
+  const ctx = { mode: "workspace" as const, items: [{ source: "active" as const, path: "A.md", kind: "pointer" as const, chars: 20 }], text: "[Arbeitskontext · Arbeitsplatz]\nAktive Notiz: A.md" };
+  it("ueberlebt den Roundtrip an einer Nutzer-Nachricht", () => {
+    const m: ChatMessage = { role: "user", content: "Frage", context: ctx };
+    expect(parseLines(serializeLine(m))).toEqual([m]);
+  });
+  it("ein kaputtes Feld kostet das Feld, nicht die Nachricht", () => {
+    const line = JSON.stringify({ role: "user", content: "Frage", context: { mode: "off", items: "x" } }) + "\n";
+    expect(parseLines(line)).toEqual([{ role: "user", content: "Frage" }]);
+  });
+});

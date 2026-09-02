@@ -1,4 +1,5 @@
 import type { LogEntry } from "../agent/types";
+import { isContextAttachment } from "../context/types";
 
 export interface SessionSink {
   read(path: string): Promise<string | null>;
@@ -25,7 +26,11 @@ export function parseLines(text: string): LogEntry[] {
         }
         continue;
       }
-      if (typeof parsed.role === "string" && typeof parsed.content === "string") out.push(parsed as unknown as LogEntry);
+      if (typeof parsed.role === "string" && typeof parsed.content === "string") {
+        // Ein kaputtes Kontextfeld kostet das Feld, nicht die Nachricht (Idiom wie bei der Marke).
+        if ("context" in parsed && !isContextAttachment(parsed.context)) delete parsed.context;
+        out.push(parsed as unknown as LogEntry);
+      }
     } catch {
       // Eine kaputte Zeile kostet eine Nachricht, nicht die Session.
     }

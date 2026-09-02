@@ -1,3 +1,5 @@
+import type { ContextAttachment } from "../context/types";
+
 export interface ToolCall { id: string; name: string; arguments: string }
 
 export interface ChatMessage {
@@ -9,6 +11,12 @@ export interface ChatMessage {
   stubbed?: true;
   /** Nur in der Projektion: zusammengesetzte fruehere Nutzer-Nachrichten (Stufe 2). Nie persistiert. */
   merged?: true;
+  /** Arbeitskontext, der mit dieser Nutzer-Nachricht ging. PERSISTIERT — anders als die zwei
+   *  Felder darueber. `content` bleibt der reine Nutzertext; eingewoben wird erst in der
+   *  Projektion (Spec E2/E4). */
+  context?: ContextAttachment;
+  /** Nur in der Projektion: der Kontextblock dieser Nachricht ist ein Stub (Stufe 1). Nie persistiert. */
+  contextStubbed?: true;
 }
 
 /** Verdichtungs-Marke im Verlauf. Referenziert nichts — ihre POSITION ist die Referenz:
@@ -27,8 +35,9 @@ export interface CompactionRecord {
   summary?: string;
   /** Stufe 2: wie viele abgeschlossene Runden zusammengefasst wurden (Anzeige). */
   turns?: number;
-  /** Was Stufe 1 gekuerzt hat (Anzahl, Zeichen) — fuer die Marke im Chat. */
-  stats: { stubbed: number; bytes: number };
+  /** Was Stufe 1 gekuerzt hat (Anzahl Tool-Ergebnisse, Zeichen) — fuer die Marke im Chat.
+   *  `contexts`: zusaetzlich gekuerzte Kontextbloecke; fehlt bei alten Marken. */
+  stats: { stubbed: number; bytes: number; contexts?: number };
 }
 
 export type LogEntry = ChatMessage | CompactionRecord;
