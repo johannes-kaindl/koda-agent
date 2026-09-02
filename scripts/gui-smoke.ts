@@ -1428,6 +1428,12 @@ async function main(): Promise<void> {
         an.includes("get_workspace") && an.includes("edit_active_note") && !aus.includes("get_workspace") && !aus.includes("edit_active_note"),
         `an: ${an.join(", ")} · aus: ${aus.join(", ")}`,
       );
+    } catch (error) {
+      record(
+        "22. get_workspace und edit_active_note stehen in der gesendeten Liste und sind abschaltbar",
+        false,
+        `Abbruch: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
