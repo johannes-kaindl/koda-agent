@@ -1,4 +1,4 @@
-import { projectForModel, formatStub, STUB_MIN_CHARS } from "../src/core/agent/compaction/project";
+import { projectForModel, formatStub, formatContextStub, STUB_MIN_CHARS } from "../src/core/agent/compaction/project";
 import type { ChatMessage, CompactionRecord, LogEntry } from "../src/core/agent/types";
 
 const sys: ChatMessage = { role: "system", content: "SYS" };
@@ -132,5 +132,60 @@ describe("formatStub", () => {
     expect(formatStub("read_note", '{"path":"Projekte/X.md"}', 4300)).toBe('[read_note "Projekte/X.md" — 4,2 KB, verdichtet; bei Bedarf erneut aufrufen]');
     expect(formatStub("search_notes", '{"query":"Rezepte"}', 900)).toBe('[search_notes "Rezepte" — 0,9 KB, verdichtet; bei Bedarf erneut aufrufen]');
     expect(formatStub("list_notes", "kaputt", 300)).toBe("[list_notes — 0,3 KB, verdichtet; bei Bedarf erneut aufrufen]");
+  });
+});
+
+describe("projectForModel mit Kontextbloecken", () => {
+  const ctx = (tag: string, len: number) => ({
+    mode: "workspace" as const,
+    items: [{ source: "active" as const, path: `${tag}.md`, kind: "pointer" as const, chars: len }],
+    text: `[Arbeitskontext · Arbeitsplatz]\n${tag} ${"k".repeat(len)}`,
+  });
+  const uc = (c: string, tag: string, len: number): ChatMessage => ({ role: "user", content: c, context: ctx(tag, len) });
+
+  it("webt den Block VOR den Nutzertext; content der Nachricht selbst bleibt unangetastet", () => {
+    const m = uc("Frage", "A", 10);
+    const out = projectForModel([sys, m]);
+    expect(out[1].content).toBe(`${m.context!.text}\n\nFrage`);
+    expect(out[1].context).toBe(m.context);
+    expect(m.content).toBe("Frage");
+    // Nachrichten ohne Kontext bleiben Referenzen
+    expect(out[0]).toBe(sys);
+  });
+
+  it("Stufe 1 zaehlt Kontextbloecke und Tool-Ergebnisse in EINER Reihe: die K juengsten bleiben", () => {
+    const h: LogEntry[] = [
+      sys,
+      uc("F1", "A", STUB_MIN_CHARS + 40), a("A1"),
+      uc("F2", "B", STUB_MIN_CHARS + 40), call("c1", "read_note", '{"path":"X.md"}'), tool("c1", big("X")), a("A2"),
+      uc("F3", "C", 5),
+    ];
+    const out = projectForModel([...h, s1(2)]);
+    const users = out.filter((m) => m.role === "user");
+    // K=2: die zwei juengsten Kandidaten in EINER Reihe — Kontext C und Tool-Ergebnis c1 —
+    // bleiben woertlich (c1 zaehlt hier als Kandidat mit, obwohl es ein Tool-Ergebnis und kein
+    // Kontextblock ist); Block B und Block A liegen dahinter und werden gestubbt.
+    expect(out.find((m) => m.role === "tool")!.stubbed).toBeUndefined();
+    expect(users[0].contextStubbed).toBe(true);
+    expect(users[0].content.startsWith(formatContextStub(users[0].context!))).toBe(true);
+    expect(users[0].content.endsWith("\n\nF1")).toBe(true);
+    expect(users[1].contextStubbed).toBe(true);
+    // Der kurze Block C liegt unter STUB_MIN_CHARS und bleibt woertlich
+    expect(users[2].contextStubbed).toBeUndefined();
+    expect(users[2].content).toContain("[Arbeitskontext");
+  });
+
+  it("Stufe 2 fasst nur den Nutzertext zusammen — Kontextbloecke fallen dabei weg", () => {
+    const h: LogEntry[] = [sys, uc("Frage 1", "A", 20), a("Antwort 1"), uc("Frage 2", "B", 20)];
+    const out = projectForModel([...h, s2("ZUSAMMENFASSUNG", 1)]);
+    expect(out[1].content).toContain("1. Frage 1");
+    expect(out[1].content).not.toContain("Arbeitskontext");
+  });
+});
+
+describe("formatContextStub", () => {
+  it("nennt Modus, Anzahl, Groesse und den Rueckweg", () => {
+    const text = formatContextStub({ mode: "workspace", items: [{ source: "active", path: "A.md", kind: "pointer", chars: 1 }, { source: "tab", path: "B.md", kind: "pointer", chars: 1 }], text: "x".repeat(2048) });
+    expect(text).toBe("[Arbeitskontext · Arbeitsplatz — 2 Einträge, 2,0 KB, verdichtet; bei Bedarf über read_note erneut lesen]");
   });
 });

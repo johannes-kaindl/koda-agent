@@ -47,3 +47,22 @@ describe("planStage1", () => {
     expect(after - before).toBe(rec.stats.stubbed);
   });
 });
+
+describe("planStage1 mit Kontextbloecken", () => {
+  const uc = (c: string, len: number): ChatMessage => ({
+    role: "user", content: c,
+    context: { mode: "workspace", items: [], text: "k".repeat(len) },
+  });
+  it("zaehlt Kontextbloecke getrennt in stats.contexts und rechnet ihre Zeichen in bytes", () => {
+    const h: LogEntry[] = [uc("F1", STUB_MIN_CHARS + 40), call("c1", "read_note", '{"path":"A.md"}'), tool("c1", big("A")), uc("F2", 5)];
+    const rec = planStage1(projectForModel(h), 0, "T");
+    expect(rec).not.toBeNull();
+    expect(rec!.stats.stubbed).toBe(1);
+    expect(rec!.stats.contexts).toBe(1);
+    expect(rec!.stats.bytes).toBe(big("A").length + STUB_MIN_CHARS + 40);
+  });
+  it("ohne Kontextbloecke fehlt stats.contexts — alte Marken bleiben, wie sie sind", () => {
+    const h: LogEntry[] = [u("F"), call("c1", "read_note", '{"path":"A.md"}'), tool("c1", big("A"))];
+    expect(planStage1(projectForModel(h), 0, "T")!.stats.contexts).toBeUndefined();
+  });
+});

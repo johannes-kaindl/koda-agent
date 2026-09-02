@@ -10,14 +10,31 @@
  * zurueck — Aufrufer duerfen sie nie beschreiben. Spec:
  * docs/superpowers/specs/2026-08-18-koda-compaction-design.md */
 import { isCompactionRecord, type ChatMessage, type CompactionRecord, type LogEntry } from "../types";
+import { modeLabel } from "../../context/labels";
+import type { ContextAttachment } from "../../context/types";
 
 /** Unter dieser Laenge spart ein Stub nichts — Fehler-Ergebnisse (`ERROR: …`) bleiben. */
 export const STUB_MIN_CHARS = 160;
 
 export const MERGED_HEADER = "Frühere Anfragen (wörtlich):";
 
+/** Ein Kontextblock ist Material wie ein Tool-Ergebnis, kein Nutzertext (Spec E4). */
 export function shouldStub(m: ChatMessage): boolean {
-  return m.role === "tool" && m.stubbed !== true && m.content.length > STUB_MIN_CHARS;
+  if (m.role === "tool") return m.stubbed !== true && m.content.length > STUB_MIN_CHARS;
+  if (m.role === "user" && m.context !== undefined) return m.contextStubbed !== true && m.context.text.length > STUB_MIN_CHARS;
+  return false;
+}
+
+/** Zeichen, die ein Stub an dieser Nachricht spart. */
+export function stubbableChars(m: ChatMessage): number {
+  if (m.role === "tool") return m.content.length;
+  return m.context?.text.length ?? 0;
+}
+
+/** Stub-Text fuer einen Kontextblock: WAS weg ist und WIE es zurueckkommt. Deutsch wie
+ *  `formatStub` — der Prompt-Regelblock ist englisch, die Stubs sind es im Bestand nicht. */
+export function formatContextStub(ctx: ContextAttachment): string {
+  return `[Arbeitskontext · ${modeLabel(ctx.mode, "de")} — ${ctx.items.length} Einträge, ${formatKb(ctx.text.length)}, verdichtet; bei Bedarf über read_note erneut lesen]`;
 }
 
 function coreArgument(args: string): string | null {
@@ -52,6 +69,8 @@ interface Slot {
   msg: ChatMessage;
   /** Nur bei merged-Nachrichten: die woertlichen Nutzer-Anfragen. */
   parts?: string[];
+  /** Stufe 1 hat den Kontextblock dieser Nutzer-Nachricht gestubbt. */
+  contextStubbed?: true;
 }
 
 /** Fasst mehrere `user`-Nachrichten zu einer zusammen — vorsorglich gegen Chat-Templates
@@ -64,16 +83,18 @@ function renderMerged(parts: string[]): ChatMessage {
   return { role: "user", content: `${MERGED_HEADER}\n${body}`, merged: true };
 }
 
-/** Indizes der Tool-Nachrichten, die eine Stufe-1-Marke mit diesem K stubben wuerde —
- *  EINE Regel fuer Marke (planStage1) und Projektion (applyStage1), damit beide nie
- *  auseinanderlaufen. K zaehlt positionell die K juengsten Tool-Ergebnisse (auch kurze
- *  oder schon gestubbte); gestubbt wird davon jenseits, was `shouldStub` erlaubt. */
+/** Indizes der Nachrichten, die eine Stufe-1-Marke mit diesem K stubben wuerde — EINE Regel
+ *  fuer Marke (planStage1) und Projektion (applyStage1), damit beide nie auseinanderlaufen.
+ *  K zaehlt positionell die K juengsten Kandidaten — Tool-Ergebnisse UND Kontextbloecke in
+ *  einer Reihe (auch kurze oder schon gestubbte); gestubbt wird davon jenseits, was
+ *  `shouldStub` erlaubt. */
 export function stage1Targets(msgs: ChatMessage[], keep: number): number[] {
   const targets: number[] = [];
   let seen = 0;
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i];
-    if (m.role !== "tool") continue;
+    const candidate = m.role === "tool" || (m.role === "user" && m.context !== undefined);
+    if (!candidate) continue;
     seen++;
     if (seen <= keep) continue;
     if (!shouldStub(m)) continue;
@@ -83,8 +104,11 @@ export function stage1Targets(msgs: ChatMessage[], keep: number): number[] {
 }
 
 function applyStage1(slots: Slot[], rec: CompactionRecord, calls: Map<string, { name: string; args: string }>): void {
-  for (const i of stage1Targets(slots.map((s) => s.msg), rec.keepToolResults)) {
+  // Die Zaehlung sieht das Slot-Flag, damit ein schon gestubbter Block nicht erneut zaehlt.
+  const view = slots.map((s): ChatMessage => (s.contextStubbed === true ? { ...s.msg, contextStubbed: true } : s.msg));
+  for (const i of stage1Targets(view, rec.keepToolResults)) {
     const m = slots[i].msg;
+    if (m.role === "user") { slots[i] = { ...slots[i], contextStubbed: true }; continue; }
     const c = calls.get(m.toolCallId ?? "");
     slots[i] = {
       msg: {
@@ -133,5 +157,16 @@ export function projectForModel(entries: LogEntry[]): ChatMessage[] {
     }
     slots.push({ msg: e });
   }
-  return slots.map((s) => s.msg);
+  return slots.map(renderSlot);
+}
+
+/** Einweben erst hier: Stufe 2 (`applyStage2`) sieht darueber nur den reinen Nutzertext, und
+ *  Nachrichten ohne Kontext gehen als Referenz durch (Aufrufer duerfen sie nie beschreiben). */
+function renderSlot(s: Slot): ChatMessage {
+  const m = s.msg;
+  if (m.role !== "user" || m.context === undefined) return m;
+  const head = s.contextStubbed === true ? formatContextStub(m.context) : m.context.text;
+  const out: ChatMessage = { ...m, content: `${head}\n\n${m.content}` };
+  if (s.contextStubbed === true) out.contextStubbed = true;
+  return out;
 }
