@@ -177,10 +177,16 @@ const FIXTURE_NOTE = readFileSync(join(FIXTURE_DIR, "notes", "Notes", "Project p
  * `finally`). Die Zielzeile wird ueber ihren INHALT gesucht (`startsWith("Model control
  * makes")`), nie ueber eine angenommene Zeilennummer.
  *
- * Endet mit `leaf`, `ed`, `idx`, `path` in Scope — ausser die Funktion hat schon per `return`
- * verlassen: `-2` wenn die Datei fehlt, `-1` wenn die Zeile nicht gefunden wurde. Der Aufrufer
- * sieht das nur am GESAMT-Rueckgabewert seines eigenen `evaluate()`-Aufrufs, nicht an einer
- * eigenen Zwischenpruefung.
+ * Endet mit `leaf`, `ed`, `idx`, `path` UND der 13-Zeichen-Markierung „Model control" in
+ * Scope — ausser die Funktion hat schon per `return` verlassen: `-2` wenn die Datei fehlt,
+ * `-1` wenn die Zeile nicht gefunden wurde. Der Aufrufer sieht das nur am GESAMT-
+ * Rueckgabewert seines eigenen `evaluate()`-Aufrufs, nicht an einer eigenen Zwischenpruefung.
+ * Die Markierung setzt die Szene SELBST (dritte Fix-Runde 2026-09-02) — vorher stand das
+ * jedem Aufrufer offen, und Pruefpunkt 23 erbte in Fall B die Rest-Markierung aus Fall A statt
+ * einer frischen: `edit_active_note` ersetzte „Model" (5 Zeichen, uebrig vom Verkleinern in
+ * Fall A) statt „Model control" (13), das Werkzeug arbeitete dabei VOELLIG korrekt und schrieb
+ * „Model steering control makes" — der Test hatte schlicht seine eigene Ausgangslage nicht neu
+ * hergestellt. Gemessen per Nachstellung, nicht vermutet.
  */
 const SCENE_JS = `
       const path = ${JSON.stringify("Notes/Project plan.md")};
@@ -202,6 +208,7 @@ const SCENE_JS = `
       await new Promise((r) => setTimeout(r, 300));
       const idx = ed.getValue().split("\\n").findIndex((l) => l.startsWith("Model control makes"));
       if (idx < 0) return -1;
+      ed.setSelection({ line: idx, ch: 0 }, { line: idx, ch: 13 });
     `;
 
 // --- Prüfpunkte -------------------------------------------------------------
@@ -1341,7 +1348,6 @@ async function main(): Promise<void> {
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
         p.setContextMode("workspace");
         ${SCENE_JS}
-        ed.setSelection({ line: idx, ch: 0 }, { line: idx, ch: 13 });
         document.querySelector(".koda-input")?.focus();
         await new Promise((r) => setTimeout(r, 300));
         const ctx = p.currentContext();
@@ -1466,10 +1472,14 @@ async function main(): Promise<void> {
       const inhaltA = await cdp.evaluate<string>(`return app.workspace.getMostRecentLeaf(app.workspace.rootSplit).view.editor.getValue();`);
       // B: Gegenprobe ohne Aenderung → geschrieben.
       await starte("Model steering");
-      const b = (await bestaetige()) as { ok: boolean } | null;
+      const b = (await bestaetige()) as { ok: boolean; content?: string } | null;
       const inhaltB = await cdp.evaluate<string>(`return app.workspace.getMostRecentLeaf(app.workspace.rootSplit).view.editor.getValue();`);
       ok23 = a?.ok === false && /geändert|changed/.test(a?.error ?? "") && inhaltA.includes("Model control makes") && b?.ok === true && inhaltB.includes("Model steering makes");
-      detail23 = `veraltet: ${a?.ok === false ? "verweigert" : "GESCHRIEBEN"} (${a?.error ?? ""}) · gueltig: ${b?.ok === true ? "geschrieben" : "verweigert"}`;
+      // Die Zeile nennt, WAS gemessen wurde (Model-Zeile in A und B), nicht nur das ok/verweigert-
+      // Fazit — ein rotes Ergebnis ohne diese Zeile kostete die dritte Runde eine volle
+      // Nachstellung, weil "GESCHRIEBEN, ok true" wie ein bestandener Punkt aussah.
+      const zeile = (t: string): string => t.split("\n").find((l) => l.startsWith("Model ")) ?? "(keine Model-Zeile)";
+      detail23 = `veraltet: ${a?.ok === false ? "verweigert" : "GESCHRIEBEN"} (${a?.error ?? ""}) · gueltig: ${b?.ok === true ? "geschrieben" : "verweigert"} · A: „${zeile(inhaltA).slice(0, 40)}“ · B: „${zeile(inhaltB).slice(0, 40)}“${b?.content ? ` · ${b.content}` : ""}`;
     } catch (error) {
       detail23 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
     } finally {
