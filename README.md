@@ -21,8 +21,8 @@ See `CLAUDE.md` for the current scope and design decisions.*
 - **Chat sidebar** (ribbon icon + command) with streaming answers, a collapsible
   "thinking" block for reasoning models, and a Stop button that leaves the partial
   answer in place.
-- **Six tools:** `search_notes`, `read_note`, `write_note`, `save_memory`,
-  `write_skill`, `list_notes` — the model calls these itself while answering, with each
+- **Eight tools:** `search_notes`, `read_note`, `write_note`, `save_memory`,
+  `write_skill`, `list_notes`, `get_workspace`, `edit_active_note` — the model calls these itself while answering, with each
   step shown inline in the chat. `list_notes` returns every note under a vault folder,
   optionally recursive, together with whichever frontmatter fields were asked for, in
   one call; a folder note (a note named like its folder) is marked as one, so it is not
@@ -37,6 +37,16 @@ See `CLAUDE.md` for the current scope and design decisions.*
   **separate, labelled blocks**, never merged into one ranking: a literal hit proves a
   wording exists, a semantic one does not. Without that plugin Koda behaves exactly as
   before — nothing to configure, and no dead tool in the prompt.
+- **Working context** — every question can carry what you are looking at: the active note
+  with its properties, the selection, the cursor line and the open tabs, as pointers only. A
+  dropdown next to Send switches between *Off* and *Workspace* per question (commands and a
+  right-click entry on selected text exist too), and the block that went along is shown under
+  each of your messages, collapsible, also after a restart. `get_workspace` returns the full
+  selection, the lines around the cursor and every tab; `edit_active_note` replaces the
+  selection or inserts at the cursor — after the usual approval dialog, and only if the
+  selection is still the one it previewed. Cut-offs (selection length, tab count, properties)
+  are settings and announce themselves in the block.
+
 - **A durable, transparent memory** — `save_memory` appends dated lines to
   `<Koda folder>/Memory.md`, which is also fed back into the system prompt on every
   question. Nothing is stored anywhere you can't open and edit.
@@ -121,6 +131,7 @@ The full settings list:
 | Text tool-call fallback | off | For models without native tool calling |
 | UI language | auto | Follows Obsidian, or force German/English |
 | Open on startup | off | Opt-in; the sidebar stays closed unless you ask for it |
+| Working context | *startup mode / Workspace, selection / tabs / properties cutoffs* | Startup mode (Off / Workspace), selection character count, number of open tabs, and number of properties to include in the context block — all configurable per question and in settings.
 | Context window (tokens) | 8192 (2048–1000000) | Size of the model's context window; one number for all endpoints. "Test" on an endpoint row fills it in when the server reports it (LM Studio, Ollama) and the field is still on its default |
 | Compact at (% of window) | 75 (40–95) | Koda compacts the conversation before a model call once the estimate exceeds this share of the window |
 | Keep tool results verbatim | 3 (0–20) | How many of the most recent tool results stay in full; older ones become a one-line stub |

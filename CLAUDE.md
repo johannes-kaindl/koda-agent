@@ -173,7 +173,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 19 Punkte (9–13 seit
+  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 23 Punkte (20–23 seit 2026-09-02: Arbeitsplatz-Block aus der Sidebar, Modus-Zustand, Werkzeugliste, `edit_active_note`-Invariante) (9–13 seit
   2026-08-30: Statuszeile, Kontext-Belegung, Thinking-Schalter, Rückfrage vorm Verwerfen,
   gesperrter Thinking-Zustand; 16–18 seit 2026-08-31: Reset auf den Auslieferungsstand,
   ein abgeschaltetes Werkzeug fehlt in der gesendeten Liste, das Vorschau-Modal führt
@@ -214,6 +214,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   lassen — ein offener ```-Fence ist keine Grenze), `reasoning-toggle.ts` (**uebernommen**
   aus `image-to-markdown`, Herkunftsstempel; drei Toggle-Zustaende **und** `effectiveSuppress`
   fuer die Request-Seite — die REGISTRY warnt, dass wer nur die Anzeige nimmt, die Haelfte hat).
+- `src/core/context/` — Arbeitskontext (Spec 2026-09-02): Typen, Ports, Block-Rendern; Adapter `src/obsidian/workspace.ts`.
 - `src/core/agent/compaction/` — zweistufige Verdichtung des Gesprächsverlaufs
   (`project.ts`/`estimate.ts`/`stage1.ts`/`stage2.ts`): Projektion statt Umschreiben,
   positionsbasierte Marken, Tool-Stubs vor Modell-Zusammenfassung, Nutzer-Nachrichten

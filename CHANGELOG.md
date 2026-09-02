@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Working context, stage 1.** A user message can carry a short block naming the active
+  note (with its properties and cursor line), the selection and the open tabs — pointers,
+  no contents. Mode *Off* / *Workspace* per question via a dropdown next to Send, five
+  commands (`Context mode: …`, `Ask Koda about the selection`) and a right-click entry on
+  selected text. The block is stored with the message and shown under it, collapsible.
+- **Two tools:** `get_workspace` (full selection, cursor surroundings, every tab) and
+  `edit_active_note` (replace the selection or insert at the cursor, after approval; refuses
+  if the selection or the active note changed since the preview).
+- **Settings group "Working context":** startup mode and the three cut-offs (selection,
+  tabs, properties). Every value that shapes what Koda sees is a setting.
+
+### Changed
+
+- Compaction stage 1 shortens old context blocks the way it shortens old tool results, and
+  the status line's context-window figure now measures what is actually sent (the
+  projection), not the raw history.
+- The GUI smoke has four new checks (20–23); `gui:ask` reports the context block per message.
+
 ## [0.10.1] — 2026-09-01
 
 ### Fixed

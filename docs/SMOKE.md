@@ -26,6 +26,15 @@ Vorbereitung: `npm run build`, `npm run smoke:gui -- --setup` (baut den Staging-
     Offen bleibt allein die Request-Seite (dass gpt-oss `reasoning_effort:"none"` wirklich
     ablehnt); die ist per Unit-Test fixiert und braucht ein echtes Modell.
 
+23. **Arbeitskontext, Praxistest (`gui:ask --full`):** eine Notiz mit Kopfdaten im Hauptbereich
+    öffnen, Modus „Arbeitsplatz", Frage „Worum geht es in der Notiz, die ich gerade offen habe?"
+    → der Bericht zeigt den `⊕ Arbeitskontext`-Block mit dem Pfad, und Koda ruft `read_note`
+    **auf genau diesen Pfad**, nicht `search_notes`. Ein `read_note` auf einen anderen Pfad ist
+    rot, auch wenn die Antwort inhaltlich stimmt.
+24. **Markierung ersetzen:** einen Satz markieren, „Verbessere den markierten Satz" → ⚙
+    `edit_active_note` mit Modal (Markierung gegen Ersatz), nach „Schreiben" steht der Ersatz im
+    Editor. Modus „Aus" als Gegenprobe: Koda kennt die Markierung dann nicht und muss nachfragen.
+
 ### Semantisches Retrieval (nur mit aktivem „Vault Retrieval")
 
 14. Frage mit einem Begriff, der **nicht wörtlich** im Vault steht, aber inhaltlich passt
@@ -83,7 +92,7 @@ CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den Port wartet.
 
 Erst wenn nichts läuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
 
-Neunzehn dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+Dreiundzwanzig dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
 laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
 2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
 erweitert, 2026-08-30 um 9–12 für die umgebaute Sidebar und um 13, den gesperrten Zustand des
