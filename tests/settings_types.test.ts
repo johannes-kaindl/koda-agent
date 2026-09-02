@@ -16,6 +16,8 @@ import {
   KEEP_TOOLS_MAX,
   SUMMARY_PCT_MIN,
   SUMMARY_PCT_MAX,
+  CONTEXT_SELECTION_MIN,
+  CONTEXT_TABS_MAX,
 } from "../src/core/settings-types";
 
 describe("validateKodaSettings", () => {
@@ -137,5 +139,25 @@ describe("Modell-Steuerung: die drei neuen Felder", () => {
     const s = validateKodaSettings({});
     s.toolsDisabled.push("x");
     expect(DEFAULT_SETTINGS.toolsDisabled).toEqual([]);
+  });
+});
+
+describe("Arbeitskontext-Einstellungen", () => {
+  it("Defaults: Arbeitsplatz, 600 Zeichen Markierung, 12 Tabs, 300 Zeichen Kopfdaten", () => {
+    const s = validateKodaSettings(null);
+    expect(s.contextModeDefault).toBe("workspace");
+    expect(s.contextSelectionChars).toBe(600);
+    expect(s.contextTabsMax).toBe(12);
+    expect(s.contextFrontmatterChars).toBe(300);
+  });
+  it("klemmt die Kappungen in ihre Spannen und laesst 0 Kopfdaten zu", () => {
+    expect(validateKodaSettings({ contextSelectionChars: 1 }).contextSelectionChars).toBe(CONTEXT_SELECTION_MIN);
+    expect(validateKodaSettings({ contextTabsMax: 999 }).contextTabsMax).toBe(CONTEXT_TABS_MAX);
+    expect(validateKodaSettings({ contextFrontmatterChars: 0 }).contextFrontmatterChars).toBe(0);
+  });
+  it("ein unbekannter Modus faellt auf den Default zurueck, ein noch nicht gebauter (note) bleibt erlaubt", () => {
+    expect(validateKodaSettings({ contextModeDefault: "galaxy" }).contextModeDefault).toBe("workspace");
+    expect(validateKodaSettings({ contextModeDefault: "off" }).contextModeDefault).toBe("off");
+    expect(validateKodaSettings({ contextModeDefault: "note" }).contextModeDefault).toBe("note");
   });
 });

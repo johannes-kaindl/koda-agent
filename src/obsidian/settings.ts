@@ -28,7 +28,9 @@ import {
   type App,
   type SettingDefinitionItem,
 } from "obsidian";
-import { t } from "../vendor/kit/i18n";
+import { t, getLang } from "../vendor/kit/i18n";
+import { modeLabel } from "../core/context/labels";
+import { CONTEXT_MODES } from "../core/context/types";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
 import { buildEndpointList, type EndpointListStrings } from "../vendor/kit-obsidian/endpoint-list";
@@ -60,6 +62,14 @@ import {
   KEEP_TOOLS_MAX,
   SUMMARY_PCT_MIN,
   SUMMARY_PCT_MAX,
+  CONTEXT_SELECTION_MIN,
+  CONTEXT_SELECTION_MAX,
+  CONTEXT_SELECTION_STEP,
+  CONTEXT_TABS_MIN,
+  CONTEXT_TABS_MAX,
+  CONTEXT_FRONTMATTER_MIN,
+  CONTEXT_FRONTMATTER_MAX,
+  CONTEXT_FRONTMATTER_STEP,
   type KodaSettings,
 } from "../core/settings-types";
 import type KodaPlugin from "../main";
@@ -173,6 +183,37 @@ export class KodaSettingsTab extends PluginSettingTab {
             name: t("settings.summaryLen"),
             desc: t("settings.summaryLen.desc"),
             control: { type: "slider", key: "summaryPercent", min: SUMMARY_PCT_MIN, max: SUMMARY_PCT_MAX, step: 1 },
+          },
+        ],
+      },
+      {
+        type: "group",
+        heading: t("settings.context"),
+        items: [
+          {
+            name: t("settings.contextMode"),
+            desc: t("settings.contextMode.desc"),
+            control: {
+              type: "dropdown",
+              key: "contextModeDefault",
+              // Dieselben Labels wie das Dropdown im Chat — ein Wortlaut, zwei Bedienstellen.
+              options: Object.fromEntries(CONTEXT_MODES.map((m) => [m, modeLabel(m, getLang() === "de" ? "de" : "en")])),
+            },
+          },
+          {
+            name: t("settings.contextSelection"),
+            desc: t("settings.contextSelection.desc"),
+            control: { type: "slider", key: "contextSelectionChars", min: CONTEXT_SELECTION_MIN, max: CONTEXT_SELECTION_MAX, step: CONTEXT_SELECTION_STEP },
+          },
+          {
+            name: t("settings.contextTabs"),
+            desc: t("settings.contextTabs.desc"),
+            control: { type: "slider", key: "contextTabsMax", min: CONTEXT_TABS_MIN, max: CONTEXT_TABS_MAX, step: 1 },
+          },
+          {
+            name: t("settings.contextFrontmatter"),
+            desc: t("settings.contextFrontmatter.desc"),
+            control: { type: "slider", key: "contextFrontmatterChars", min: CONTEXT_FRONTMATTER_MIN, max: CONTEXT_FRONTMATTER_MAX, step: CONTEXT_FRONTMATTER_STEP },
           },
         ],
       },

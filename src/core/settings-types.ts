@@ -8,6 +8,7 @@ import {
   type SettingsSchema,
 } from "../vendor/kit/settings_schema";
 import { migrateEndpointList, type EndpointConfig } from "../vendor/kit/endpoint_config";
+import { CONTEXT_MODES, type ContextMode } from "./context/types";
 
 /** Obergrenze für `maxRounds` — einzige Quelle, gegen die sowohl `validateKodaSettings`
  *  klemmt als auch der Settings-Slider (`src/obsidian/settings.ts`) seine Limits setzt.
@@ -65,6 +66,18 @@ export const KEEP_TOOLS_MAX = 20;
 export const SUMMARY_PCT_MIN = 3;
 export const SUMMARY_PCT_MAX = 30;
 
+/** Spannen fuer den Arbeitskontext (Spec E8). Alle vier sind Einstellungen: jeder Wert, der
+ *  Kodas Arbeit beeinflusst, ist aenderbar (Johannes, 2026-09-02) — die Kappungen melden
+ *  sich trotzdem im Block, Einstellbarkeit und Meldung schliessen sich nicht aus. */
+export const CONTEXT_SELECTION_MIN = 100;
+export const CONTEXT_SELECTION_MAX = 5000;
+export const CONTEXT_SELECTION_STEP = 100;
+export const CONTEXT_TABS_MIN = 1;
+export const CONTEXT_TABS_MAX = 100;
+export const CONTEXT_FRONTMATTER_MIN = 0;
+export const CONTEXT_FRONTMATTER_MAX = 2000;
+export const CONTEXT_FRONTMATTER_STEP = 50;
+
 export interface KodaSettings {
   endpoints: EndpointConfig[];
   model: string;
@@ -82,6 +95,13 @@ export interface KodaSettings {
   keepToolResults: number;
   summarizeEnabled: boolean;
   summaryPercent: number;
+  /** Modus beim Laden des Plugins; der Chat ueberstimmt ihn je Nachricht (Spec E1). Erlaubt
+   *  sind alle fuenf Modi, auch die noch nicht gebauten — ein Default fuer eine spaetere
+   *  Etappe soll nicht beim Laden verworfen werden. Angeboten wird er erst, wenn er geht. */
+  contextModeDefault: ContextMode;
+  contextSelectionChars: number;
+  contextTabsMax: number;
+  contextFrontmatterChars: number;
   /** Ersetzt den ausgelieferten Regelblock. "" heisst Auslieferungsstand — der Default wird
    *  NIE in die data.json kopiert, sonst friere er beim ersten Oeffnen des Feldes ein und
    *  jede spaetere Verbesserung erreichte genau die Nutzer nicht mehr, die hineingesehen
@@ -110,6 +130,10 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   keepToolResults: 3,
   summarizeEnabled: true,
   summaryPercent: 10,
+  contextModeDefault: "workspace",
+  contextSelectionChars: 600,
+  contextTabsMax: 12,
+  contextFrontmatterChars: 300,
   systemPromptOverride: "",
   toolsDisabled: [],
   toolDescriptions: {},
@@ -151,6 +175,10 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
   compactAtPercent: clampIntField(COMPACT_AT_MIN, COMPACT_AT_MAX),
   keepToolResults: clampIntField(KEEP_TOOLS_MIN, KEEP_TOOLS_MAX),
   summaryPercent: clampIntField(SUMMARY_PCT_MIN, SUMMARY_PCT_MAX),
+  contextModeDefault: oneOf([...CONTEXT_MODES]),
+  contextSelectionChars: clampIntField(CONTEXT_SELECTION_MIN, CONTEXT_SELECTION_MAX),
+  contextTabsMax: clampIntField(CONTEXT_TABS_MIN, CONTEXT_TABS_MAX),
+  contextFrontmatterChars: clampIntField(CONTEXT_FRONTMATTER_MIN, CONTEXT_FRONTMATTER_MAX),
   toolsDisabled: stringArray,
   toolDescriptions: stringRecord,
 };
