@@ -606,6 +606,16 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Baseline vor Arbeitskontext Etappe 1: 2026-09-02, 12:15 (19/19)
+
+Treiber `7c5291a` (unverändert), Plugin-Build aus `main` = `655b250` (kein Code-Commit seit
+`7c5291a`, Version 0.10.1), Obsidian 1.13.7, Staging-Vault `koda-agent` frisch aus dem Fixture
+(`--setup`), Fenster über den Pfad-URI in die laufende Instanz geöffnet — zwei fremde Fenster
+(`10_Pallas`, `anysource-sideloader`) blieben unberührt, Lock `--exclusive focus`. Festgehalten,
+weil der Smoke in Etappe 1 selbst umgebaut wird (Prüfpunkte 20–23) und ein grüner Lauf danach
+sonst nicht von „anders grün" zu unterscheiden wäre. Auffällig nichts: Prüfpunkt 3 antwortete
+nach 1035 ms und 9 s später weiter, Punkt 19 maß gesperrt · gesperrt · liste:2.
+
 ## Belegter Lauf: 2026-09-02, zwei Messlücken geschlossen (19/19)
 
 **Prüfpunkt 3 mass zu früh.** Er endete, sobald `is-ok` erschien (1035 ms) — ein Freeze, der erst
