@@ -79,6 +79,7 @@
  *
  * `--expect` prueft gegen den ganzen Verlauf — Tool-Ergebnis UND Antworttext. Es belegt
  * daher NICHT, dass ein Treffer aus dem Werkzeug stammt; ein Modell kann Pfade erfinden.
+ * Der Arbeitskontext-Block ist ausgenommen: Eingaben werden nicht als Verhalten gemessen.
  * Wer das unterscheiden muss, liest mit `--full` das ungekuerzte Tool-Ergebnis.
  *
  * ⚠️ Nur Lesefragen ohne Aufsicht stellen. Will Koda ausserhalb des Koda-Ordners schreiben,
@@ -354,7 +355,9 @@ async function main(): Promise<void> {
       if (expects.length > 0) {
         // Gegen den GANZEN Verlauf geprueft, nicht nur gegen die Antwort: der Beleg fuer
         // einen Treffer steht im Tool-ERGEBNIS, auch wenn das Modell ihn spaeter unterschlaegt.
-        const haystack = steps.map((s) => `${s.label} ${s.body}`).join("\n");
+        // Der Arbeitskontext ist Eingabe, nicht Verhalten: ein --expect auf einen Pfad darf nicht
+        // gruen werden, nur weil der Pfad im mitgesendeten Block steht.
+        const haystack = steps.filter((s) => s.kind !== "context").map((s) => `${s.label} ${s.body}`).join("\n");
         console.log("");
         for (const e of expects) {
           const hit = haystack.includes(e);
