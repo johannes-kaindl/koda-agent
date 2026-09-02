@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-09-02
+
 ### Added
 
 - **Working context, stage 1.** A user message can carry a short block naming the active
