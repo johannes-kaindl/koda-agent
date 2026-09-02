@@ -99,6 +99,18 @@
  * ```bash
  * npm run smoke:gui -- --vault koda-agent
  * ```
+ *
+ * ## Pruefpunkte 20-23 (Arbeitskontext, seit 2026-09-02)
+ *
+ * Vier neue Punkte messen ueber `plugin.currentContext()`, `plugin.setContextMode()`,
+ * `plugin.currentToolNames()` und `plugin.buildTools()` — dieselben Methoden, die `ask()`
+ * selbst ruft, kein eigener Messpfad daneben. 20 belegt, dass Notiz und Markierung den
+ * Fokuswechsel in die Sidebar ueberleben; 21, dass Modus „Aus" keinen Kontext sendet und
+ * Befehl und Dropdown denselben Zustand schalten; 22, dass `get_workspace` und
+ * `edit_active_note` in der gesendeten Werkzeugliste stehen und einzeln abschaltbar sind;
+ * 23 die Invariante von `edit_active_note` — eine seit dem Aufruf veraltete Markierung
+ * schreibt nicht, eine gueltige schreibt, und erst die Gegenprobe ohne Aenderung belegt,
+ * dass der Punkt seinen Gegenstand ueberhaupt beruehrt.
  */
 
 import { execFileSync } from "node:child_process";
@@ -1246,6 +1258,142 @@ async function main(): Promise<void> {
       await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
     }
     record("19. `hide()` verwirft den Modell-Cache (toter Endpunkt bleibt nicht tot)", hideOk, hidePunkt);
+
+    // --- 20. Arbeitsplatz-Block: aktive Notiz und Markierung aus der Sidebar heraus --------
+    // Die offene Frage der Spec (E3): bleibt `editor.getSelection()` erhalten, wenn der Fokus ins
+    // Eingabefeld wechselt? Gemessen, nicht angenommen. Drei Bedingungen: der aktive Leaf ist
+    // Koda (sonst misst der Punkt nicht die Sidebar-Situation), der Block nennt die Notiz mit
+    // Kopfdaten, und die Markierung steht drin.
+    const vorherMode = await cdp.evaluate<string>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].contextMode;`);
+    const punkt20 = await cdp.evaluate<{ aktivIstKoda: boolean; text: string; items: { source: string; path: string; chars: number }[] } | null>(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      p.setContextMode("workspace");
+      const file = app.vault.getFileByPath("Notes/Project plan.md");
+      if (!file) return null;
+      const leaf = app.workspace.getLeaf(false);
+      await leaf.openFile(file);
+      await new Promise((r) => setTimeout(r, 500));
+      // Zeile 9 (0-basiert 8) beginnt mit "Model control" — 13 Zeichen.
+      leaf.view.editor.setSelection({ line: 8, ch: 0 }, { line: 8, ch: 13 });
+      document.querySelector(".koda-input")?.focus();
+      await new Promise((r) => setTimeout(r, 300));
+      const ctx = p.currentContext();
+      return {
+        aktivIstKoda: app.workspace.activeLeaf?.view?.getViewType() === ${JSON.stringify(VIEW_TYPE)},
+        text: ctx?.text ?? "",
+        items: ctx?.items ?? [],
+      };
+    `);
+    const sel20 = punkt20?.items.find((i) => i.source === "selection");
+    record(
+      "20. Arbeitsplatz-Block nennt aktive Notiz, Kopfdaten und Markierung — aus der Sidebar heraus",
+      punkt20 !== null && punkt20.aktivIstKoda && punkt20.text.includes("Notes/Project plan.md") && punkt20.text.includes("status: active") && punkt20.text.includes("Model control") && sel20?.chars === 13,
+      punkt20 === null
+        ? "Fixture-Notiz Notes/Project plan.md fehlt"
+        : `aktiv ist Koda: ${String(punkt20.aktivIstKoda)} · Markierung: ${sel20 ? `${sel20.chars} Zeichen` : "fehlt"} · ${punkt20.text.split("\n")[1] ?? ""}`,
+    );
+
+    // --- 21. Modus Aus sendet nichts; Befehl und Dropdown sind EIN Zustand ---------------
+    const punkt21 = await cdp.evaluate<{ ausNull: boolean; dropdownNachBefehl: string; modeNachDropdown: string; anObjekt: boolean }>(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:context-mode-off`)});
+      await new Promise((r) => setTimeout(r, 200));
+      const ausNull = p.currentContext() === null;
+      const sel = document.querySelector(".koda-mode");
+      const dropdownNachBefehl = sel ? sel.value : "(kein Dropdown)";
+      if (sel) { sel.value = "workspace"; sel.dispatchEvent(new Event("change")); }
+      await new Promise((r) => setTimeout(r, 200));
+      return { ausNull, dropdownNachBefehl, modeNachDropdown: p.contextMode, anObjekt: p.currentContext() !== null };
+    `);
+    record(
+      "21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand",
+      punkt21.ausNull && punkt21.dropdownNachBefehl === "off" && punkt21.modeNachDropdown === "workspace" && punkt21.anObjekt,
+      `aus → null: ${String(punkt21.ausNull)} · Dropdown nach Befehl: ${punkt21.dropdownNachBefehl} · Modus nach Dropdown: ${punkt21.modeNachDropdown}`,
+    );
+
+    // --- 22. get_workspace und edit_active_note werden gesendet und sind abschaltbar --------
+    const vorher22 = await cdp.evaluate<string[]>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.toolsDisabled;`);
+    try {
+      const an = await cdp.evaluate<string[]>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].currentToolNames();`);
+      const aus = await cdp.evaluate<string[]>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.toolsDisabled = ["get_workspace", "edit_active_note"];
+        await p.saveSettings();
+        return p.currentToolNames();
+      `);
+      record(
+        "22. get_workspace und edit_active_note stehen in der gesendeten Liste und sind abschaltbar",
+        an.includes("get_workspace") && an.includes("edit_active_note") && !aus.includes("get_workspace") && !aus.includes("edit_active_note"),
+        `an: ${an.join(", ")} · aus: ${aus.join(", ")}`,
+      );
+    } finally {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.toolsDisabled = ${JSON.stringify(vorher22 ?? [])};
+        return p.saveSettings();
+      `).catch(() => undefined);
+    }
+
+    // --- 23. edit_active_note: veraltete Markierung schreibt nicht; gueltige schreibt -------
+    // Der Aufruf laeuft im Renderer als Promise (das Modal blockiert ihn), das Ergebnis landet in
+    // window.__koda23. Erst die Gegenprobe (ohne Aenderung) belegt, dass der Punkt seinen
+    // Gegenstand beruehrt — sonst waere „nichts geschrieben" auch bei kaputtem Werkzeug gruen.
+    const original23 = await cdp.evaluate<string | null>(`
+      const f = app.vault.getFileByPath("Notes/Project plan.md");
+      return f ? await app.vault.read(f) : null;
+    `);
+    let detail23 = "nicht gelaufen";
+    let ok23 = false;
+    try {
+      const starte = async (ersatz: string): Promise<void> => {
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          const file = app.vault.getFileByPath("Notes/Project plan.md");
+          const leaf = app.workspace.getLeaf(false);
+          await leaf.openFile(file);
+          await new Promise((r) => setTimeout(r, 400));
+          leaf.view.editor.setSelection({ line: 8, ch: 0 }, { line: 8, ch: 13 });
+          window.__koda23 = null;
+          p.buildTools().run("edit_active_note", { path: "Notes/Project plan.md", mode: "replace_selection", text: ${JSON.stringify(ersatz)} }).then((r) => { window.__koda23 = r; });
+          return true;
+        `);
+        const modal = await pollUntil<boolean>(cdp, `return !!document.querySelector(".modal-container .koda-preview");`, 8000);
+        if (!modal) throw new Error("Bestaetigungs-Modal erschien nicht");
+      };
+      const bestaetige = async (): Promise<unknown> => {
+        await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:last-child") ?? null`);
+        return pollUntil<unknown>(cdp, `return window.__koda23;`, 8000);
+      };
+      // A: Markierung nach dem Aufruf verkleinern, dann bestaetigen → Fehler, Datei unveraendert.
+      await starte("Model steering");
+      await cdp.evaluate(`app.workspace.getMostRecentLeaf().view.editor.setSelection({ line: 8, ch: 0 }, { line: 8, ch: 5 }); return true;`);
+      const a = (await bestaetige()) as { ok: boolean; error?: string } | null;
+      const inhaltA = await cdp.evaluate<string>(`return app.workspace.getMostRecentLeaf().view.editor.getValue();`);
+      // B: Gegenprobe ohne Aenderung → geschrieben.
+      await starte("Model steering");
+      const b = (await bestaetige()) as { ok: boolean } | null;
+      const inhaltB = await cdp.evaluate<string>(`return app.workspace.getMostRecentLeaf().view.editor.getValue();`);
+      ok23 = a?.ok === false && /geändert|changed/.test(a?.error ?? "") && inhaltA.includes("Model control makes") && b?.ok === true && inhaltB.includes("Model steering makes");
+      detail23 = `veraltet: ${a?.ok === false ? "verweigert" : "GESCHRIEBEN"} (${a?.error ?? ""}) · gueltig: ${b?.ok === true ? "geschrieben" : "verweigert"}`;
+    } catch (error) {
+      detail23 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      // Fixture-Notiz zuruecksetzen — der Staging-Vault ist Wegwerfware, aber der naechste
+      // Punkt im selben Lauf soll die Kulisse vorfinden, die die README verspricht.
+      if (original23 !== null) {
+        await cdp.evaluate(`
+          const f = app.vault.getFileByPath("Notes/Project plan.md");
+          if (f) await app.vault.modify(f, ${JSON.stringify(original23)});
+          return true;
+        `).catch(() => undefined);
+      }
+      await cdp.evaluate(`
+        app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].setContextMode(${JSON.stringify(vorherMode)});
+        document.querySelector(".modal-container .modal-close-button")?.click();
+        return true;
+      `).catch(() => undefined);
+    }
+    record("23. edit_active_note: veraltete Markierung schreibt nicht, gueltige schreibt (Invariante Vorschau == Inhalt)", ok23, detail23);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte

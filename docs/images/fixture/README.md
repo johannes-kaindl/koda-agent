@@ -20,7 +20,7 @@ out to be unproven (see `../../../../AGENTS.md`, § Staging-Vaults).
 
 ## What the checks need from the scenery
 
-Change the notes freely, but keep these four properties or the smoke goes red for reasons
+Change the notes freely, but keep these five properties or the smoke goes red for reasons
 that have nothing to do with the plugin:
 
 - **At least two notes** — check 6 clicks a wikilink and needs a target that is not the
@@ -33,6 +33,10 @@ that have nothing to do with the plugin:
 - **No plugin other than koda-agent** in `obsidian/community-plugins.json` — check 6 was red
   once in a working vault because a foreign plugin replaced the wikilink with its own inline
   widget.
+- **`Notes/Project plan.md` with `status: active` in its frontmatter and the text
+  `Model control makes` at the start of line 9** — checks 20 and 23 open this note, select
+  the first 13 characters of that line and read the working context; check 23 replaces the
+  selection through `edit_active_note` and restores the file afterwards.
 
 Plugin settings are *not* part of the fixture: `buildVault` deletes `data.json`, so every run
 starts from the shipped defaults — including the default endpoint `http://127.0.0.1:1234`.
