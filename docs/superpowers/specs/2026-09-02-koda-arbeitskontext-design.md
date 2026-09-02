@@ -184,9 +184,13 @@ einmal, die aktive Notiz nie als eigener Nachbar. Unaufgelöste Links werden ign
 | `render.ts` | Auswahl → Block-Text und `ContextItem[]`; Sprache aus `lang` wie in `stage2.ts` |
 | `workspace-line.ts` | der Arbeitsplatz-Block: Pfad, Kopfdaten (gekappt), Markierung (gekappt mit Hinweis „vollständig über get_workspace"), Cursor „Zeile 42 von 120", Tabs (bis 12 Pfade, dann „… und 9 weitere, vollständig über get_workspace") |
 
-Kappungen sind **Konstanten mit Meldung**, keine Einstellungen: `SELECTION_MAX = 600`,
-`TABS_MAX = 12`, `FRONTMATTER_MAX = 300`. Eine Grenze, die sich selbst benennt, darf eine
-Konstante sein; nur eine stille Grenze gehört in die Einstellungen.
+Kappungen sind **Einstellungen mit Meldung** (§ E8): Markierung (`contextSelectionChars`,
+Default 600), Tab-Pfade (`contextTabsMax`, Default 12), Kopfdaten (`contextFrontmatterChars`,
+Default 300; 0 = keine Kopfdaten). Ein erster Entwurf führte sie als Konstanten, weil eine
+Grenze, die sich selbst benennt, nichts still weglässt. Johannes hat das am 2026-09-02
+umgedreht: **jeder Wert, der Kodas Arbeit beeinflusst, ist einstellbar, sofern nichts dagegen
+spricht** — Transparenz, und die Möglichkeit, Koda auf ein bestimmtes lokales Modell
+einzustellen. Die Meldung im Block bleibt unabhängig vom eingestellten Wert.
 
 **Gerenderter Block (Arbeitsplatz, Deutsch):**
 
@@ -293,8 +297,12 @@ Inhalt. Der **Kontext-Tab**:
   Ein leerer Abschnitt zeigt den §8-Empty-State („keine aktive Notiz").
 - **Quellen-Chips unter der Antwort:** dieselben Chips, aus `context.items` der zugehörigen
   Nutzer-Nachricht gerendert, klickbar (vault-rag-Muster).
-- Abgewählte Einträge gelten **für die nächste Nachricht**; nach dem Senden wird die Abwahl
-  zurückgesetzt (`reset()` wie in vault-rag) — Manuelles bleibt gepinnt, bis es entfernt wird.
+- Ob Abwahl und Hinzufügen **bleiben** oder nur für die nächste Nachricht gelten, ist eine
+  Einstellung (`contextKeepChoices`, § E8). Default **bleiben**: was abgewählt ist, bleibt
+  abgewählt, bis der Nutzer im Panel-Kopf „Auswahl zurücksetzen" drückt oder ein neues
+  Gespräch beginnt — der weniger überraschende Zustand, und im Modus Notiz/Tabs sind die
+  Kandidaten ohnehin stabil. vault-rag lebt das Gegenteil (`reset()` nach jedem Senden), weil
+  dort alle Kandidaten je Frage neu kommen; das ist der andere Wert der Einstellung.
 
 **Ohne Hub-Umbau kein Modell-Tab:** der Modell-Tab ist eine eigene Spec; Etappe 2 legt nur
 das Gerüst, in das er später als drittes Panel kommt.
@@ -328,9 +336,21 @@ headless abfragen).
 | `contextBudgetChars` | 2 000 – 200 000, Schritt 1 000 | 20 000 | Zeichen für Volltext-Einträge je Nachricht (Arbeitsplatz-Zeiger zählen nicht) |
 | `contextLinkDepth` | 1 – 3 | 1 | Ebenen für Links und Backlinks |
 | `contextAutoK` | 0 – 20 | 5 | Trefferzahl für Vault-Kandidaten und semantische Nachbarn |
-| `contextSections` | `Record<string, boolean>` | `{}` | Auf/Zu-Zustand der Abschnitte (Etappe 2) |
+| `contextSelectionChars` | 100 – 5 000, Schritt 100 | 600 | Kappung der Markierung in der Arbeitsplatz-Zeile |
+| `contextTabsMax` | 1 – 100 | 12 | Tab-Pfade in der Arbeitsplatz-Zeile |
+| `contextFrontmatterChars` | 0 – 2 000, Schritt 50 | 300 | Kopfdaten in der Zeile; 0 = keine |
+| `contextKeepChoices` | boolean | `true` | Abwahl und Manuelles bleiben bis „Auswahl zurücksetzen"/neues Gespräch (`true`) oder gelten nur für die nächste Nachricht (`false`) |
+| `contextSections` | `Record<string, boolean>` | `{}` | Auf/Zu-Zustand der Abschnitte (Etappe 2; kein Bedienelement, nur Persistenz) |
 
-Alle in `KodaSettings` mit `clampIntField`/`oneOf` im Schema (geschlossene Welt). Gruppe
+**Grundsatz (Johannes, 2026-09-02):** jeder Wert, der Kodas Arbeit beeinflusst, ist in den
+Einstellungen änderbar, sofern kein Grund dagegen spricht. Gründe, die dagegen sprechen, sind
+benannt, nicht gefühlt: Sicherheitsgrenzen (Pfad-Guard, Schreib-Policy), Werte, die aus dem
+Endpunkt gemessen werden (Kontextfenster-Vorbefüllung), und Formkonstanten ohne Wirkung auf
+das Modell (`STUB_MIN_CHARS`). Eine Kappung, die im Block gemeldet wird, ist trotzdem eine
+Einstellung — Meldung und Einstellbarkeit schließen sich nicht aus, sie ergänzen sich.
+
+Alle in `KodaSettings` mit `clampIntField`/`oneOf` im Schema (geschlossene Welt);
+`contextSections` braucht einen eigenen `FieldCheck` (Record von Booleans). Gruppe
 „Arbeitskontext" im Settings-Tab, deklarativ wie die übrigen. Der Chat überstimmt Modus und
 Auswahl je Nachricht, nie die Einstellungen.
 
