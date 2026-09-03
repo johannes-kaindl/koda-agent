@@ -296,14 +296,23 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   inhaltlich stimmig (Schwester-Cockpits, eigene `_Log`-Einträge, Nachbar-Plugins, `_docs`,
   eine passende UI-Task). Die **zusammenhanglosen** Treffer mit hohen Scores, die den Befund
   vom 24.08. ausmachten, sind nicht wieder aufgetreten.
-  **Was offen bleibt:** Median **0.92**, max 0.93, min 0.91 — Spannweite **0.02** über 20
-  Treffer. Nach vault-rags Skala (verschobener Index 0.85–0.92, gesunder ~0.4) wäre das ein
-  Warnsignal. ⚠️ **Diese Messung kann es nicht entscheiden, weil der Prüfling ungeeignet
-  war:** ein Coding-Cockpit gehört zu ~25 Notizen aus **demselben Template** (gleiche
-  Überschriften, Callouts, `.base`-Einbettungen) — dass die sich stark ähneln, ist inhaltlich
-  richtig. „Strukturelle Zwillinge" und „kaputter Index" sind an einem Template-Exemplar
-  nicht zu trennen. Wer den Punkt wiederholt, nimmt eine **inhaltliche** Notiz ohne
-  Template-Klasse; vault-rags 40-Notizen-Probe misst dieselbe Frage breiter.
+  **Die Score-Zahlen sind gemessen, aber UNBEWERTBAR — aus zwei unabhängigen Gründen.**
+  Gemessen: Median **0.92**, max 0.93, min 0.91, Spannweite **0.02** über 20 Treffer.
+  (1) *Der Prüfling war ungeeignet:* ein Coding-Cockpit gehört zu ~25 Notizen aus
+  **demselben Template** (gleiche Überschriften, Callouts, `.base`-Einbettungen) — dass die
+  sich stark ähneln, ist inhaltlich richtig, und eine Spannweite von 0.02 ist dort das
+  erwartbare Ergebnis. „Strukturelle Zwillinge" und „kaputter Index" sind daran nicht zu
+  trennen. (2) *Es gibt keine Vergleichsskala:* die naheliegende Deutung wäre „0.9+ ist
+  verdächtig, gesund ist ~0.4" gewesen — diese Zahlen stammen aus vault-rags Cockpit vom
+  2026-08-30, und die dortige Session hat auf Nachfrage selbst festgestellt, dass **nicht
+  festgehalten ist, mit welchem Aufruf sie entstanden sind** (`search()` über eine Query
+  oder `related()` über eine Notiz, mit welchem k, über welche Notizklasse). Query-gegen-Notiz
+  und Notiz-gegen-Notiz sind verschiedene Größen; ein Vergleich über die Grenze trägt nicht.
+  **Ein Score ohne dokumentierten Aufrufweg ist keine Skala** — wer ihn als eine benutzt,
+  baut eine Deutung auf eine Zahl ohne Bezugssystem. Wer den Punkt wiederholt, nimmt eine
+  **inhaltliche** Notiz ohne Template-Klasse; belastbarer als der Score ist ohnehin der
+  **Rang** (findet sich eine Notiz über ihren eigenen Wortlaut auf Rang 0?), weil sein
+  Erwartungswert ohne jede Skala feststeht — so misst vault-rags 40-Notizen-Probe.
   **Nebenbefund, der Kodas Werkzeuggrenze belegt:** das Modell rief zuerst
   `related_notes({"path": "…/koda-agent"})` **ohne** `.md` auf, bekam
   `ERROR: Nur Markdown-Notizen (.md) erlaubt` und korrigierte sich im nächsten Aufruf
