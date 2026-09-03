@@ -25,9 +25,14 @@ die aktive Notiz kommt über `getMostRecentLeaf()`; (2) restaurierte, nicht besu
 `DeferredView`s ohne `view.file` — der Pfad steht in `getViewState().state.file`, und
 Seitenleisten-Ansichten (Backlinks, Gliederung) tragen `view.file` der aktiven Notiz und sind
 KEINE Tabs (Handpunkt 25). Offen für Etappe 2 (Spec § Etappen): Hub mit Kontext-Tab, Modi
-Notiz/Alle Tabs, Chips, Budget; davor `move_note` (Arbeits-Vault-Task). Der Adapter
-`src/obsidian/workspace.ts` hat keinen Unit-Test, weil der vendorte Mock kein `FileView` kennt —
-erster Punkt für Etappe 2, nicht der Hub.
+Notiz/Alle Tabs, Chips, Budget; davor `move_note` (Arbeits-Vault-Task).
+**Die Testschuld des Adapters ist am 2026-09-03 getilgt** (`tests/workspace_adapter.test.ts`,
+17 Tests): der Weg war der Rückfluss ins Kit — `obsidian-kit@0.31.0` kennt `FileView`, den
+Leaf-Baum (`parent`/`getRoot()`, die drei Splits, `iterateAllLeaves`, `getMostRecentLeaf`),
+einen `getViewState()`, der den gesetzten State behält, und `makeFakeEditor()` als Editor auf
+echtem Text. **Weil die Tests nach dem Code entstanden, hängt ihr Wert an der Gegenprobe:**
+sechs Mutationen an der Quelle werden jeweils genau von den zuständigen Tests gefangen — grün
+allein hätte hier nichts belegt.
 
 ⚠️ **0.10.1 ist ein Pflicht-Fix, kein Nachtrag: „Neues Gespräch" war seit 0.9.0 für niemanden
 sichtbar.** Beide Kopf-Aktionen (Verwerfen, Thinking) hingen an `addAction()`, und Obsidian
@@ -194,7 +199,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (533/533).
+- `npm test` — `check-no-abs-paths` + vitest (558/558).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
@@ -264,7 +269,13 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   (0.27.0; maßgeblich ist immer `src/vendor/kit/VENDOR.json`, nicht diese Zeile),
   Re-Sync über `tools/sync-kit.sh` — nie von Hand editieren. **Das Skript liest aus einer
   festen Ref (`KIT_REF`, Default `0.27.0`), nicht aus dem Arbeitsstand des Nachbar-Repos:
-  obsidian-kit steht auf 0.28.0 und hat die pure-Module nach `code-kit` verschoben, ein
-  `cp`-Lauf zoege also andere Dateien und stempelte sie falsch. Gegenprobe nach jedem Umbau
-  am Skript: ein zweiter Lauf mit demselben `KIT_REF` darf keine vendorte Datei aendern.**
+  obsidian-kit steht auf 0.31.0 und hat die pure-Module seit 0.28.0 nach `code-kit` verschoben,
+  ein `cp`-Lauf zoege also andere Dateien und stempelte sie falsch. Gegenprobe nach jedem Umbau
+  am Skript: ein zweiter Lauf mit denselben Refs darf keine vendorte Datei aendern.**
+  ⚠️ **Zwei Refs seit 2026-09-03, und das ist Absicht:** `MOCK_REF` (Default `0.31.0`) zieht
+  allein `tests/vendor/kit/obsidian-mock.ts`. Die pure-Schicht zu heben wäre eine inhaltliche
+  Änderung an Produktivcode und bräche heute an den nach `code-kit` abgewanderten Modulen; das
+  Test-Double liegt dagegen unter `src/testing/`, ist dort geblieben und hat null Importe. Ablesbar
+  ist die Trennung am Stempel: der Mock trägt seinen Pin in Zeile 1, die beiden `VENDOR.json`
+  nennen den Stand der Produktivschicht. Muster übernommen aus `epub-exporter/tools/sync-kit.sh`.
 - `src/i18n/` — DE/EN-Strings.
