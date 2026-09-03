@@ -75,9 +75,17 @@ Vorbereitung: `npm run build`, `npm run smoke:gui -- --setup` (baut den Staging-
     `617eb4d` neu entstandenes Fenster meldet (ein Live-Update während des Checkpoint-Awaits
     kann verloren gehen). ⚠️ Beides ist **Code-Lektüre, kein beobachteter Fall** — vault-rag
     führt es als eigene Task. Für den Handpunkt hier ändert sich nichts: eine frisch
-    angelegte Notiz ist als Gegenprobe nur brauchbar, wenn gerade kein Reindex läuft
-    (`_vaultrag/index.bin` mtime prüfen — bei laufendem Lauf ändert sie sich alle 250
-    Notizen).
+    angelegte Notiz ist als Gegenprobe nur brauchbar, wenn gerade kein Reindex läuft.
+    ⚠️ **Die naheliegende Prüfung dafür taugt nur in eine Richtung.** Eine sich bewegende
+    mtime von `_vaultrag/index.bin` **belegt** einen laufenden Lauf; eine stillstehende
+    belegt **nicht** das Gegenteil (Korrektur von `vault-rag-b1`, 2026-09-03, am Code):
+    `reindexAll` entscheidet **einmal vor der Schleife**, ob es Zwischenstände schreibt —
+    passt das Embedding-Modell auf der Platte nicht zum aktuellen, schreibt der ganze Lauf
+    keinen einzigen, und die Datei liegt stundenlang still, während indiziert wird.
+    Ausgerechnet der Modellwechsel ist der häufigste Anlass für einen Voll-Reindex. Dazu
+    kommt der erste Checkpoint frühestens nach 250 Notizen, bei ≤250 Notizen gar keiner.
+    Für den negativen Fall ist die Statusleiste im laufenden Obsidian der ehrlichere Zeuge
+    (`↻ embedding…` mit Fortschritt) — die braucht aber ein Fenster.
 17. Embedding-Endpunkt stoppen (Ollama beenden), dann Punkt 14 wiederholen → Volltext-Treffer
     plus die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)". **Nicht** stilles
     Schweigen — das ist der Kern von Spec E6.
