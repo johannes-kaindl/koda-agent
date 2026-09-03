@@ -48,11 +48,17 @@ mkdir -p src/vendor/kit src/vendor/kit-obsidian tests/vendor/kit
 # Stempel und Inhalt entstehen in EINER Umleitung: schlaegt `git show` fehl (falsche Ref,
 # verschobenes Modul), bricht `set -e` ab, bevor die Zieldatei geschrieben ist — es bleibt
 # kein Torso zurueck, der den Stempel traegt und dadurch wie gueltiges Vendoring aussieht.
+# Die Ref-Variable heisst GROSS, und das ist kein Stil: `tools/vendor_leseart_check.py`
+# (Sonde zu CORE-META-22) erkennt das Lesen aus einer Ref am Muster `show "$..REF:`. Mit
+# einem kleingeschriebenen `$ref` liest das Skript unveraendert korrekt aus der Ref, der
+# Dach-Waechter sieht es aber nicht mehr und meldet dieses Repo als Rueckstand — ein
+# Fehlalarm, der die naechste Session ans falsche Ende schickt (gemessen 2026-09-03: der
+# Umbau auf zwei Refs kippte koda-agent von "ref (konform)" auf "?? pruefen").
 vendor() { # vendor <kit-relativer-pfad> <zielpfad> [ref] [version]
-  ref=${3:-$KIT_REF}
-  ver=${4:-$VER}
+  REF=${3:-$KIT_REF}
+  ver=${4:-$VER}   # klein: ein grosses VER wuerde die globale Kit-Version ueberschreiben
   { printf '%s\n' "// vendored from obsidian-kit@$ver, $1 — do not hand-edit; re-vendor via tools/sync-kit.sh"
-    git -C "$KIT" show "$ref:$1"; } > "$2"
+    git -C "$KIT" show "$REF:$1"; } > "$2"
 }
 
 # uebernommen aus vim-dojo/tools/sync-kit.sh, 2026-08-28
