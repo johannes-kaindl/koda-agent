@@ -287,6 +287,37 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
 
 ### Durchläufe
 
+- **2026-09-03 (15:10–15:20), Handpunkt 16 auf Plausibilität — der Weg trägt, die Zahlen
+  sind offen, und der Prüfling war schlecht gewählt.** Erster Lauf gegen den echten Index
+  seit dem 2026-08-24, möglich geworden durch vault-rags Etappen-Reindex. `gui:ask --full`
+  gegen `10_Pallas` (6.664 indexierte Notizen), Modell `qwen/qwen3.8-27b`, Frage „Was hängt
+  mit der Notiz `25_Coding/koda-agent/koda-agent` zusammen?".
+  **Was belegt ist:** `related_notes` läuft und liefert 20 Treffer mit Scores; die Liste ist
+  inhaltlich stimmig (Schwester-Cockpits, eigene `_Log`-Einträge, Nachbar-Plugins, `_docs`,
+  eine passende UI-Task). Die **zusammenhanglosen** Treffer mit hohen Scores, die den Befund
+  vom 24.08. ausmachten, sind nicht wieder aufgetreten.
+  **Was offen bleibt:** Median **0.92**, max 0.93, min 0.91 — Spannweite **0.02** über 20
+  Treffer. Nach vault-rags Skala (verschobener Index 0.85–0.92, gesunder ~0.4) wäre das ein
+  Warnsignal. ⚠️ **Diese Messung kann es nicht entscheiden, weil der Prüfling ungeeignet
+  war:** ein Coding-Cockpit gehört zu ~25 Notizen aus **demselben Template** (gleiche
+  Überschriften, Callouts, `.base`-Einbettungen) — dass die sich stark ähneln, ist inhaltlich
+  richtig. „Strukturelle Zwillinge" und „kaputter Index" sind an einem Template-Exemplar
+  nicht zu trennen. Wer den Punkt wiederholt, nimmt eine **inhaltliche** Notiz ohne
+  Template-Klasse; vault-rags 40-Notizen-Probe misst dieselbe Frage breiter.
+  **Nebenbefund, der Kodas Werkzeuggrenze belegt:** das Modell rief zuerst
+  `related_notes({"path": "…/koda-agent"})` **ohne** `.md` auf, bekam
+  `ERROR: Nur Markdown-Notizen (.md) erlaubt` und korrigierte sich im nächsten Aufruf
+  selbstständig — eine sprechende Fehlermeldung an der Grenze ist mehr wert als ein stiller
+  Fallback.
+  **Vorgeschichte des Laufs, weil sie die Kosten erklärt:** Obsidian lief ohne Debug-Port,
+  der Neustart brauchte Johannes' Freigabe. Wen ein Quit trifft, kann keine Session messen —
+  `/json/list` braucht genau den Port, den man erst herstellt. Gebündelt mit `vault-rag-b1`
+  gefahren: ein Neustart, eine Freigabe. Wiederhergestellt wurde ein Fenster (`10_Pallas`).
+  ⚠️ **Der erste Lauf war verloren**, weil die Ausgabe durch `tail` lief und der
+  `related_notes`-Block mit den Scores oberhalb des Fensters lag — bei `gui:ask` die Ausgabe
+  **in eine Datei** schreiben und danach filtern, nicht in der Pipe kürzen. Ein Lauf kostet
+  zwei bis drei Minuten und ist nicht wiederholbar identisch.
+
 - **2026-08-30 (19:02–19:15), Handpunkte 21 und 22 gefahren — beide belegt, plus ein
   Nebenbefund, der schwerer wiegt als beide.** Vault `10_Pallas`, Obsidian 1.13.7,
   LM Studio `qwen/qwen3.6-27b` (CORS geprüft, nicht angenommen). CDP-Lock gehalten und
