@@ -7,8 +7,9 @@ configure (a local server such as [LM Studio](https://lmstudio.ai), or a hosted
 provider if you add an API key) and keeps its own memory in a plain Markdown note you
 can read and edit yourself.
 
-*Status: 0.10.1 — listed in the Obsidian Community Plugin store, no signed builds.
-See `CLAUDE.md` for the current scope and design decisions.*
+*Status: 0.11.0 — distributed via Forgejo releases and the AnySource Sideloader
+catalogue, no signed builds. Not currently listed in the Community plugin store (see
+[Install](#install)). See `CLAUDE.md` for the current scope and design decisions.*
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/gitea/v/release/jkaindl/koda-agent?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/koda-agent/releases)
@@ -29,7 +30,7 @@ See `CLAUDE.md` for the current scope and design decisions.*
   counted as ordinary content. A ninth, `related_notes`, appears when semantic retrieval is available
   (see below).
 - **Semantic retrieval, if you already have it** *(optional)* — if the
-  [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) plugin is installed
+  [Vault Retrieval](https://git.jkaindl.de/jkaindl/vault-rag) plugin is installed
   and has indexed your vault, Koda uses its embedding index: `search_notes` adds
   meaning-based matches when the literal search comes up thin (fewer than three hits),
   and a `related_notes` tool answers "what else is about this?" straight from the
@@ -72,16 +73,57 @@ See `CLAUDE.md` for the current scope and design decisions.*
   settings passes either way — it takes a different route that sends no `Origin` — so
   a green test with a chat that reports the endpoint as unreachable is the CORS
   signature, and Koda names it as such.
-- *Optional:* the [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag)
+- *Optional:* the [Vault Retrieval](https://git.jkaindl.de/jkaindl/vault-rag)
   plugin with an indexed vault, which adds semantic search and the `related_notes`
   tool. Koda works fully without it.
 
 ## Install
 
-Koda is in the Obsidian community plugin store: **Settings → Community plugins →
-Browse → "Koda" → Install → Enable**. Alternatively, drop `main.js`, `manifest.json`
-and `styles.css` from a [release](https://github.com/johannes-kaindl/koda-agent/releases)
-into `<vault>/.obsidian/plugins/koda-agent/`.
+Repository: [git.jkaindl.de/jkaindl/koda-agent](https://git.jkaindl.de/jkaindl/koda-agent)
+(GitHub mirror: currently unavailable)
+
+> **Note (2026-09-03):** Koda is currently **not listed in the Community plugins
+> browser**. The GitHub account hosting the mirror is unavailable, which also removed the
+> store listing. The plugin itself is unaffected and fully maintained — releases are
+> published on Forgejo, and the two routes below both work today.
+
+### With AnySource Sideloader (recommended)
+
+[AnySource Sideloader](https://git.jkaindl.de/jkaindl/anysource-sideloader) installs and
+updates plugins from any git forge, independent of the Community Store.
+
+1. Install and enable AnySource Sideloader. (Its own first install is manual — being
+   independent of the store is the point — but it only has to be done once, and it then
+   keeps itself and everything else updated.)
+2. Subscribe to the catalogue, which lists Koda alongside the other plugins from the
+   same author:
+   `https://git.jkaindl.de/jkaindl/obsidian-catalog/raw/branch/main/catalog.json`
+   — or add just this one repository as a source:
+   `https://git.jkaindl.de/jkaindl/koda-agent`
+3. Install Koda, then point it at an LLM endpoint in the settings.
+
+Updates then arrive the same way any other plugin update does.
+
+### From Obsidian's Community plugins browser
+
+Available again once the store listing returns:
+
+1. Open **Settings → Community plugins → Browse**.
+2. Search for **"Koda"** and select **Install**.
+3. **Enable** Koda, then point it at an LLM endpoint in the settings.
+
+### Manual install
+
+Download `main.js`, `manifest.json` and `styles.css` from the
+[latest Forgejo release](https://git.jkaindl.de/jkaindl/koda-agent/releases/latest)
+and copy them into your vault. Each release also ships `checksums.sha256`, so you can
+verify what you downloaded with `shasum -a 256 -c checksums.sha256`.
+
+```bash
+cp manifest.json main.js styles.css "<your-vault>/.obsidian/plugins/koda-agent/"
+```
+
+Then enable Koda under **Settings → Community plugins**.
 
 ## Usage
 

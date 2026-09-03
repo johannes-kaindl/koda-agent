@@ -61,10 +61,19 @@ Vorbereitung: `npm run build`, `npm run smoke:gui -- --setup` (baut den Staging-
     auf **Plausibilität** ansehen, nicht nur darauf, dass sie kommt — ein defekter Index liefert
     zusammenhanglose Treffer mit *hohen* Scores (0.85–0.92), also überzeugender als ein gesunder
     (Median ~0.4). (b) **Keine Notiz nehmen, die während eines laufenden Reindex entstanden oder
-    geändert wurde:** `reindexAll` sammelt in einer lokalen Map und ersetzt am Ende die ganze
-    Vektor-Tabelle — parallele Updates gehen dabei verloren. Ausgerechnet „frisch angelegt", das
-    Mittel für die Gegenprobe, trifft diesen Fall. Sonst misst man vault-rags Race und schreibt
-    ihn Kodas Aufbereitung zu (`src/core/tools/retrieval.ts` ist an beidem unschuldig).
+    geändert wurde.** Ausgerechnet „frisch angelegt", das Mittel für die Gegenprobe, trifft
+    diesen Fall — sonst misst man vault-rags Race und schreibt es Kodas Aufbereitung zu
+    (`src/core/tools/retrieval.ts` ist an beidem unschuldig).
+    **Der Mechanismus dahinter ist am 2026-09-03 halb korrigiert worden** (Hinweis der
+    Session `vault-rag-b1`, Commit `617eb4d` selbst nachgesehen): die frühere Begründung
+    „`reindexAll` sammelt in einer lokalen Map und ersetzt am Ende die ganze Vektor-Tabelle"
+    beschreibt den Stand **vor** vault-rag 0.29.0. Seither schreibt der Lauf alle 250 Notizen
+    einen **vollständigen** Zwischenstand, und ein Abbruch kostet höchstens die letzten <250
+    Notizen statt des ganzen Laufs. **Die Warnung bleibt trotzdem stehen**, weil der Commit
+    den Abbruchverlust behebt, nicht das Race: `persistCheckpoint` mischt neu berechnete
+    Vektoren mit den „noch nicht erreichten aus dem bisherigen Bestand" — eine Notiz, die
+    nach dem Sammeln der Pfadliste entsteht, liegt in keiner der beiden Mengen. Ob sie den
+    Lauf trotzdem übersteht, ist ungemessen; bis dahin gilt die Vorsichtsregel.
 17. Embedding-Endpunkt stoppen (Ollama beenden), dann Punkt 14 wiederholen → Volltext-Treffer
     plus die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)". **Nicht** stilles
     Schweigen — das ist der Kern von Spec E6.
