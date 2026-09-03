@@ -13,8 +13,32 @@ set -e
 
 KIT=../obsidian-kit
 KIT_REF=${KIT_REF:-0.27.0}
+
+# ZWEITE REF, NUR FUER DAS TEST-DOUBLE — und das ist Absicht, kein Schlendrian.
+# Muster uebernommen aus `epub-exporter/tools/sync-kit.sh` (zwei Refs fuer zwei
+# Vendor-Ordner), 2026-09-03.
+#
+# Die pure-Schicht dieses Repos steht auf 0.27.0. Sie hochzuziehen ist eine INHALTLICHE
+# Aenderung an vendoriertem Produktivcode: seit obsidian-kit 0.28.0 sind die pure-Module
+# nach code-kit abgewandert, ein Lauf mit einer neueren Ref braecht hier an
+# `src/pure/think-splitter.ts` ab. Das Test-Double liegt dagegen unter `src/testing/`,
+# ist dort geblieben und hat null Importe — es laesst sich einzeln heben, ohne die
+# Produktivschicht anzufassen. Die Trennung ist ablesbar: `tests/vendor/kit/obsidian-mock.ts`
+# traegt seinen Pin in der eigenen Stempelzeile (dort liegt kein VENDOR.json), waehrend die
+# beiden VENDOR.json den Stand der Produktivschicht nennen.
+#
+# Wer die Produktivschicht hebt, setzt KIT_REF und faehrt danach `npm run gate` — dann
+# duerfen beide Refs wieder gleich sein.
+MOCK_REF=${MOCK_REF:-0.31.0}
+
+for ref in "$KIT_REF" "$MOCK_REF"; do
+  git -C "$KIT" rev-parse --verify --quiet "$ref^{commit}" >/dev/null \
+    || { echo "sync-kit: Ref '$ref' existiert nicht in $KIT (KIT_REF/MOCK_REF setzen)" >&2; exit 1; }
+done
+
 VER=$(git -C "$KIT" describe --tags --abbrev=0 "$KIT_REF")
 SHA=$(git -C "$KIT" rev-parse --short "$KIT_REF^{commit}")
+MOCK_VER=$(git -C "$KIT" describe --tags --abbrev=0 "$MOCK_REF")
 
 PURE="think-splitter reasoning capabilities endpoint endpoint_config endpoint_diagnostics settings i18n num timeout frontmatter model-context error_body diff settings_schema model-choice model-list-cache"
 OBS="clock confirm folder-suggest settings_walker endpoint-list model-picker"
@@ -24,9 +48,11 @@ mkdir -p src/vendor/kit src/vendor/kit-obsidian tests/vendor/kit
 # Stempel und Inhalt entstehen in EINER Umleitung: schlaegt `git show` fehl (falsche Ref,
 # verschobenes Modul), bricht `set -e` ab, bevor die Zieldatei geschrieben ist — es bleibt
 # kein Torso zurueck, der den Stempel traegt und dadurch wie gueltiges Vendoring aussieht.
-vendor() { # vendor <kit-relativer-pfad> <zielpfad>
-  { printf '%s\n' "// vendored from obsidian-kit@$VER, $1 — do not hand-edit; re-vendor via tools/sync-kit.sh"
-    git -C "$KIT" show "$KIT_REF:$1"; } > "$2"
+vendor() { # vendor <kit-relativer-pfad> <zielpfad> [ref] [version]
+  ref=${3:-$KIT_REF}
+  ver=${4:-$VER}
+  { printf '%s\n' "// vendored from obsidian-kit@$ver, $1 — do not hand-edit; re-vendor via tools/sync-kit.sh"
+    git -C "$KIT" show "$ref:$1"; } > "$2"
 }
 
 # uebernommen aus vim-dojo/tools/sync-kit.sh, 2026-08-28
@@ -88,7 +114,7 @@ for m in $OBS; do
   echo "vendored obsidian-kit@$VER/obsidian/$m.ts"
 done
 
-vendor "src/testing/obsidian-mock.ts" "tests/vendor/kit/obsidian-mock.ts"
+vendor "src/testing/obsidian-mock.ts" "tests/vendor/kit/obsidian-mock.ts" "$MOCK_REF" "$MOCK_VER"
 
 list() { printf '%s' "$1" | sed 's/ /.ts, /g;s/$/.ts/'; }
 
@@ -110,4 +136,4 @@ cat > src/vendor/kit-obsidian/VENDOR.json <<JSON
   "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh (liest KIT_REF, nicht den Arbeitsstand)."
 }
 JSON
-echo "VENDOR.json → $VER ($SHA)"
+echo "VENDOR.json → $VER ($SHA) · obsidian-mock → $MOCK_VER"
