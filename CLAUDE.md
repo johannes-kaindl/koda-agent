@@ -17,7 +17,7 @@ Tool-Ergebnisse, Kontextzeile unter der Blase), Werkzeuge `get_workspace` und `e
 (Invariante „Vorschau == geschriebener Inhalt", Pfad muss zur aktiven Notiz passen), vier
 Einstellungen „Arbeitskontext" (Modus-Default und drei Kappungen — **jeder Wert mit Einfluss ist
 einstellbar**, Johannes' Grundsatz vom 2026-09-02), `contextUsage` misst die Projektion.
-Gate 541/541; GUI-Smoke **23/23** (fünf Läufe: die vier roten davor waren ausnahmslos
+Gate 585/585; GUI-Smoke **26/26** (Stand 2026-09-04, fünf Läufe — Befunde in `docs/SMOKE.md`); zur Etappe 1 waren es 541 und 23/23 (fünf Läufe: die vier roten davor waren ausnahmslos
 Treiber-Defekte, dokumentiert in `docs/SMOKE.md`); Praxistest gegen `qwen/qwen3.8-27b`: Koda liest
 die offene Notiz per `read_note` auf den Kontext-Pfad statt zu suchen. ⚠️ **Zwei gemessene
 Obsidian-Fallen aus dieser Arbeit:** (1) `activeEditor` ist aus der Seitenleiste heraus leer —

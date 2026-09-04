@@ -299,6 +299,36 @@ auf). Punkt 26 misst die Regel „Wirkung schlägt Ort" am laufenden Plugin: `de
 **auch im Koda-Ordner**, wo ein `write_note` frei wäre. Er legt sich dafür eine Wegwerf-Notiz an
 und räumt sie im `finally` weg.
 
+⚠️ **Was Punkt 24 beim ersten Lauf gefunden hat (2026-09-04), und warum er dafür gebaut war:**
+`fileManager.renameFile` legt **fehlende Zielordner nicht an**. Der Entwurf hatte das Gegenteil
+angenommen („Missing folders are created"), und ein Move nach `Archiv/Tools.md` scheiterte
+deshalb mit `ENOENT … rename`, solange `Archiv/` fehlte. Für ein Modell ist das die schlechteste
+Fehlerart: die Meldung nennt einen Systemfehler statt der Ursache, und ein Zielordner, den es
+gerade erfinden will, ist beim Aufräumen der **Normalfall**, nicht die Ausnahme. Behoben durch
+`ensureParents` vor dem Rename, wie `create` es schon tat. Die Unit-Tests konnten das
+strukturell nicht finden — der Fake-Port im Test ist ein `Record<string, string>`, in dem jeder
+Pfad ohne Ordner existiert. **Das ist die Arbeitsteilung, für die es den GUI-Smoke gibt:** die
+pure Schicht misst die Regel, der Smoke die Naht zum Host.
+
+⚠️ **Der zweite Befund desselben Laufs, und er betraf den PRÜFPUNKT, nicht das Produkt:**
+Obsidian schreibt einen Wikilink nur um, wenn er sonst nicht mehr auflöst — und wählt dabei die
+**kürzeste eindeutige Form**. Gemessen an einer Probe-Notiz mit beiden Formen nebeneinander,
+beim Verschieben `Notes/Tools.md` → `Archiv/Tools.md`:
+
+| Linkform | vorher | nachher |
+|---|---|---|
+| kurz | `[[Tools]]` | **unverändert** — löst auf `Archiv/Tools.md` auf |
+| mit Pfad | `[[Notes/Tools]]` | `[[Tools]]` — **nicht** `[[Archiv/Tools]]` |
+
+Die erste Fassung des Punktes prüfte „steht der neue Pfad im Text der verweisenden Notiz?" und
+war deshalb **rot, obwohl alles richtig war**: das Fixture verlinkt kurz, und ein kurzer Link
+muss beim Verschieben nicht angefasst werden. Der Punkt prüft jetzt beide Hälften an einer eigens
+angelegten Probe-Notiz — die Verlinkung bleibt intakt (der kurze Link löst auf den **neuen** Pfad
+auf) und der Text wird angepasst, wo er es muss. **Die Lehre ist allgemeiner als der Fall:** wer
+das *Ergebnis* einer fremden Automatik prüft, muss deren Regel kennen, sonst misst er seine eigene
+Erwartung. „Der Pfad steht im Text" war meine Erwartung; Obsidians Regel ist „so kurz wie
+eindeutig".
+
 **Was der Treiber bewusst nicht prüft:** alles, was eine echte Modell-Antwort braucht (die
 Punkte 2, 3, 5, 6, 7, 10, 14–19 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
 großen Vault **>90 s stumm**, bevor das erste Token kommt — Prüfpunkte darauf wären langsam
@@ -716,6 +746,36 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   synthetischer Mausklick probiert). **Prüfpunkt 3 ist damit unbewiesen** — er war noch nie
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
+
+## Belegter Lauf: 2026-09-04, 22:45 — move_note/delete_note (26/26)
+
+Fünf Läufe gegen den Staging-Vault `koda-agent`, Lock `--exclusive focus`, Obsidian 1.14.0 mit
+drei fremden Vault-Fenstern daneben (kein Quit — das Fenster kam per `obsidian://open?path=`
+dazu). **26/26 im fünften.** Die vier davor waren je ein eigener Befund, und drei davon lagen
+nicht am Produkt:
+
+1. **Lauf 1 — echter Produktdefekt.** `renameFile` legt fehlende Zielordner **nicht** an; der
+   Entwurf hatte das Gegenteil angenommen. Ein Move nach `Archiv/Tools.md` scheiterte mit
+   `ENOENT … rename`. Behoben mit `ensureParents` vor dem Rename. **Die Unit-Tests konnten das
+   strukturell nicht finden** — der Fake-Port ist ein `Record<string, string>`, in dem jeder
+   Pfad ohne Ordner existiert.
+2. **Lauf 2 — der Fix war deployt und wirkte nicht.** Identische Fehlermeldung: Obsidian hielt
+   `main.js` im Speicher. Der Treiber lud das Plugin nicht neu (koda-agent stand in
+   `_docs/LESSONS.md` 2026-09-03 namentlich als eines von fünf Repos ohne `disablePlugin`).
+   ⚠️ **Der gefährliche Teil ist, wie das aussieht:** ein wirkungsloser Fix und ein falscher Fix
+   sind an der Ausgabe nicht zu unterscheiden — man sucht am falschen Ende weiter. Behoben, der
+   Reload läuft jetzt vor dem ersten Prüfpunkt.
+3. **Lauf 3 — der Prüfpunkt maß die falsche Sache** (kurze vs. Pfad-Wikilinks, siehe oben).
+4. **Lauf 4 — Escaping-Fehler im Treiber.** Ein `\n` in einem Renderer-Template-String wurde zum
+   echten Zeilenumbruch und zerbrach den JS-String; die Meldung lautete nur „Renderer: Uncaught".
+
+**Bilanz: von vier roten Läufen war einer ein Produktdefekt.** Das entspricht dem Muster der
+früheren Runden (2026-09-02: vier rote, alle Treiber-Defekte) — mit dem Unterschied, dass diesmal
+einer davon ein echter Fund war, den kein Unit-Test hätte finden können.
+
+**Punkt 24 protokolliert `alwaysUpdateLinks: true`** — die Frage, ob `renameFile` auch bei
+abgeschalteter Einstellung nachzieht, ist damit **weiterhin offen**; gemessen ist nur der
+eingeschaltete Fall. Der Punkt behauptet das nicht, er schreibt den gemessenen Wert hin.
 
 ## Belegter Lauf: 2026-09-02, 17:00 — nach der Fix-Welle des Gesamt-Reviews (23/23) + Handpunkt 25
 

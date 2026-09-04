@@ -301,10 +301,17 @@ export default class KodaPlugin extends Plugin {
        *  der verweisenden Notizen nach. `vault.rename` verschiebt die Datei und laesst
        *  ueberall tote Links zurueck; der Unterschied ist an der Signatur nicht zu sehen
        *  und der Grund, warum der Port-Vertrag die API benennt.
-       *  Fehlende Zielordner legt Obsidian dabei selbst an. */
+       *
+       *  ⚠️ Fehlende Zielordner legt `renameFile` NICHT an — entgegen der Annahme beim
+       *  Entwurf. Gemessen am 2026-09-04 (GUI-Smoke 24): ein Move nach `Archiv/Tools.md`
+       *  scheitert mit `ENOENT ... rename`, wenn `Archiv/` nicht existiert. Fuer das Modell
+       *  ist das die schlechteste Fehlerart — die Meldung nennt einen Systemfehler, nicht
+       *  die Ursache, und ein Ordner, den es gerade erfinden wollte, ist der Normalfall.
+       *  Deshalb `ensureParents` davor, wie bei `create`. */
       move: async (from, to) => {
         const f = this.app.vault.getFileByPath(from);
         if (f === null) throw new Error(`nicht gefunden: ${from}`);
+        await this.ensureParents(to);
         await this.app.fileManager.renameFile(f, to);
       },
       /** `fileManager.trashFile` folgt der Papierkorb-Einstellung des Vaults (System-

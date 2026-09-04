@@ -350,6 +350,20 @@ async function main(): Promise<void> {
         ". Laeuft Obsidian mit --remote-debugging-port? (siehe Kopfkommentar)",
     );
   }
+  // Plugin neu laden, BEVOR irgendetwas gemessen wird. Obsidian haelt `main.js` im
+  // Speicher: ein frisch deploytes Bundle wirkt erst nach einem Neuladen, und ein
+  // Datei-Vergleich Repo↔Vault ist dabei GRUEN — die Dateien stimmen ja ueberein, nur
+  // laeuft der Code von vorhin. Gemessen am 2026-09-04: der ensureParents-Fix zu Punkt 24
+  // war deployt und der Punkt blieb mit identischer Fehlermeldung rot; ohne diese Zeile
+  // sieht ein wirkungsloser Fix aus wie ein falscher Fix, und man sucht am falschen Ende.
+  // (LESSONS 2026-09-03/calendar-notes; koda-agent stand dort namentlich als eines von
+  // fuenf Repos ohne Reload.)
+  await cdp.evaluate(`
+    await app.plugins.disablePlugin(${JSON.stringify(PLUGIN_ID)});
+    await app.plugins.enablePlugin(${JSON.stringify(PLUGIN_ID)});
+    return true;
+  `);
+
   // Ausserhalb des try, damit das `finally` sie auch nach einem Abbruch mitten im Lauf
   // zurueckschreiben kann — sonst bliebe der Vault mit toten Endpunkten stehen.
   let previous: Settings | null = null;
@@ -1515,25 +1529,41 @@ async function main(): Promise<void> {
     // DIE Frage, die dieser Punkt existiert um zu beantworten: `fileManager.renameFile` zieht
     // laut Doku die Links verweisender Notizen nach — ob das auch gilt, wenn Obsidians
     // Einstellung „Automatically update internal links" AUS steht, ist aus der Doku nicht zu
-    // beantworten. Deshalb wird die Einstellung hier GEMESSEN und mitprotokolliert, statt
-    // sie zu setzen: ein Punkt, der sich seine Vorbedingung selbst herstellt, misst nicht
-    // mehr, was der Nutzer erlebt.
-    // Kulisse: Notes/Tools.md wird von Compaction.md und Project plan.md verlinkt (n=2).
+    // beantworten. Deshalb wird die Einstellung GEMESSEN und mitprotokolliert, statt sie zu
+    // setzen: ein Punkt, der sich seine Vorbedingung selbst herstellt, misst nicht mehr, was
+    // der Nutzer erlebt.
+    //
+    // ⚠️ Gemessen am 2026-09-04, und die erste Fassung dieses Punktes war daran falsch:
+    // Obsidian schreibt einen Link nur um, wenn er sonst NICHT MEHR AUFLOEST — und waehlt
+    // dabei die kuerzeste eindeutige Form. Ein kurzer `[[Tools]]` bleibt beim Verschieben
+    // deshalb voellig unveraendert (er zeigt weiter aufs richtige File, der Dateiname hat
+    // sich ja nicht geaendert), waehrend `[[Notes/Tools]]` zu `[[Tools]]` wird — NICHT zu
+    // `[[Archiv/Tools]]`. Wer „steht der neue Pfad im Text?" prueft, misst also bei kurzen
+    // Links einen Fehlschlag, wo alles richtig ist. Der Punkt prueft deshalb BEIDE Haelften
+    // an einer eigens angelegten Probe-Notiz: die Verlinkung bleibt intakt (der kurze Link
+    // loest auf den NEUEN Pfad auf) und Obsidian fasst den Text an, wo er es muss.
     let detail24 = "nicht gelaufen";
     let ok24 = false;
     const QUELLE24 = "Notes/Tools.md";
     const ZIEL24 = "Archiv/Tools.md";
+    const PROBE24 = "Probe-smoke24.md";
     try {
       const linkOption = await cdp.evaluate<unknown>(
         `return app.vault.getConfig ? app.vault.getConfig("alwaysUpdateLinks") : "unbekannt";`,
       );
-      const vorher = await cdp.evaluate<number>(`
-        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-        return p.buildTools ? 0 : -1;
+      await cdp.evaluate(`
+        const alt = app.vault.getFileByPath(${JSON.stringify(PROBE24)});
+        if (alt) await app.fileManager.trashFile(alt);
+        await app.vault.create(${JSON.stringify(PROBE24)}, "kurz: [[Tools]]\\nmit Pfad: [[Notes/Tools]]\\n");
+        return true;
       `);
-      if (vorher < 0) throw new Error("buildTools fehlt");
-      // Innerhalb von Koda waere der Move frei; hier laeuft er ueber die Bestaetigung, weil
-      // Quelle und Ziel ausserhalb liegen — genau der Weg, den ein Nutzer sieht.
+      // Der Cache muss die frische Notiz kennen, sonst zieht der Rename ihre Links nicht nach.
+      const bekannt = await pollUntil<boolean>(cdp, `
+        const d = app.metadataCache.getFirstLinkpathDest("Tools", ${JSON.stringify(PROBE24)});
+        return d ? d.path === ${JSON.stringify(QUELLE24)} : false;
+      `, 8000);
+      if (!bekannt) throw new Error("Probe-Notiz kam nicht in den metadataCache");
+
       await cdp.evaluate(`
         window.__koda24 = null;
         app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools()
@@ -1545,28 +1575,33 @@ async function main(): Promise<void> {
       if (!modal24) throw new Error("Move-Modal erschien nicht");
       await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:last-child") ?? null`);
       const r24 = (await pollUntil<{ ok: boolean; content?: string; error?: string }>(cdp, `return window.__koda24;`, 8000)) ?? null;
-      // Der eigentliche Beleg: der Link IM VERWEISENDEN TEXT zeigt jetzt auf den neuen Ort.
-      // Gemessen wird der Dateiinhalt, nicht `resolvedLinks` — der Cache koennte den Link
-      // aufloesen, waehrend im Text ein toter Wikilink steht.
-      const verweis = await cdp.evaluate<string>(`
-        const f = app.vault.getFileByPath("Notes/Compaction.md");
+
+      // (a) Verlinkung intakt: der kurze Link zeigt jetzt auf den NEUEN Pfad.
+      const loestAuf = await pollUntil<string>(cdp, `
+        const d = app.metadataCache.getFirstLinkpathDest("Tools", ${JSON.stringify(PROBE24)});
+        return d ? d.path : null;
+      `, 8000);
+      // (b) Text angefasst, wo noetig: der Pfad-Link nennt "Notes/Tools" nicht mehr.
+      const text = await cdp.evaluate<string>(`
+        const f = app.vault.getFileByPath(${JSON.stringify(PROBE24)});
         return f ? await app.vault.read(f) : "(fehlt)";
       `);
-      const nachgezogen = verweis.includes("Archiv/Tools");
-      ok24 = r24?.ok === true && nachgezogen;
-      detail24 = `Werkzeug: ${r24?.ok === true ? "verschoben" : `FEHLER (${r24?.error ?? "?"})`} · Link in Compaction.md: ${nachgezogen ? "nachgezogen" : "NICHT nachgezogen"} · alwaysUpdateLinks: ${String(linkOption)}`;
+      const pfadWeg = !text.includes("[[Notes/Tools]]");
+      ok24 = r24?.ok === true && loestAuf === ZIEL24 && pfadWeg;
+      detail24 = `Werkzeug: ${r24?.ok === true ? "verschoben" : `FEHLER (${r24?.error ?? "?"})`} · kurzer Link loest auf: ${loestAuf ?? "GAR NICHT"} · Pfad-Link im Text: ${pfadWeg ? "angepasst" : "UNVERAENDERT"} („${text.split("\n").filter((l) => l.includes("[[")).join(" | ")}") · alwaysUpdateLinks: ${String(linkOption)}`;
     } catch (error) {
       detail24 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
     } finally {
-      // Zurueck an den Ausgangsort — ueber DIESELBE API, damit auch die Links zurueckwandern.
       await cdp.evaluate(`
         const f = app.vault.getFileByPath(${JSON.stringify(ZIEL24)});
         if (f) await app.fileManager.renameFile(f, ${JSON.stringify(QUELLE24)});
+        const probe = app.vault.getFileByPath(${JSON.stringify(PROBE24)});
+        if (probe) await app.fileManager.trashFile(probe);
         document.querySelector(".modal-container .modal-close-button")?.click();
         return true;
       `).catch(() => undefined);
     }
-    record("24. move_note verschiebt und Obsidian zieht die Wikilinks der verweisenden Notizen nach", ok24, detail24);
+    record("24. move_note verschiebt, die Verlinkung bleibt intakt und Obsidian passt den Text an, wo noetig", ok24, detail24);
 
     // --- 25. Das Move-Modal nennt die Reichweite -----------------------------------------
     // Der Punkt misst den TEXT im Modal, nicht dass ein Modal kommt: die Backlink-Zahl ist
