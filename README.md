@@ -22,13 +22,15 @@ catalogue, no signed builds. Not currently listed in the Community plugin store 
 - **Chat sidebar** (ribbon icon + command) with streaming answers, a collapsible
   "thinking" block for reasoning models, and a Stop button that leaves the partial
   answer in place.
-- **Eight tools:** `search_notes`, `read_note`, `write_note`, `save_memory`,
-  `write_skill`, `list_notes`, `get_workspace`, `edit_active_note` — the model calls these itself while answering, with each
+- **Ten tools:** `search_notes`, `read_note`, `write_note`, `move_note`, `delete_note`,
+  `save_memory`, `write_skill`, `list_notes`, `get_workspace`, `edit_active_note` — the model calls these itself while answering, with each
   step shown inline in the chat. `list_notes` returns every note under a vault folder,
   optionally recursive, together with whichever frontmatter fields were asked for, in
   one call; a folder note (a note named like its folder) is marked as one, so it is not
-  counted as ordinary content. A ninth, `related_notes`, appears when semantic retrieval is available
-  (see below).
+  counted as ordinary content. `move_note` renames or relocates a note and lets Obsidian
+  update the wikilinks pointing at it; `delete_note` moves a note to the vault's trash and
+  always asks first, even inside the Koda folder. An eleventh, `related_notes`, appears when
+  semantic retrieval is available (see below).
 - **Semantic retrieval, if you already have it** *(optional)* — if the
   [Vault Retrieval](https://git.jkaindl.de/jkaindl/vault-rag) plugin is installed
   and has indexed your vault, Koda uses its embedding index: `search_notes` adds

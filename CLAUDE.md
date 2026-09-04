@@ -53,7 +53,7 @@ wieder öffentlich ist und die Action für den Tag gelaufen ist.
 Koda ist ein agentisches Obsidian-Plugin („Freund/Begleiter im Vault", Lakota) —
 Chat-Sidebar + Vault-Tools + Markdown-Memory. **Im Community-Store gelistet**
 (Gate-Scan „passed" beim ersten Anlauf) und über ihn installierbar. Stufe 1 steht:
-Agent-Loop, sechs Tools (`search_notes`/`read_note`/`write_note`/`save_memory`/
+Agent-Loop, acht Tools (`search_notes`/`read_note`/`write_note`/`move_note`/`delete_note`/`save_memory`/
 `write_skill`/`list_notes`) plus ein optionales siebtes (`related_notes`, nur mit
 vault-rag), Schreibregel mit Bestätigungs-Modal, Memory-Notiz, Sessions als JSONL,
 Settings-Tab, i18n DE/EN, dazu die QoL-Schicht (Verbindungstest, Modell-Auswahl,
@@ -81,7 +81,7 @@ hatte, und korrigierte den ersten Entwurf in vier von fuenf Punkten.
 **Die Modell-Steuerung ist seit 2026-09-01 auf `main` und in 0.10.0 released**
 (Spec `2026-08-31-koda-modell-steuerung-design.md`) — der Regelblock des System-Prompts ist
 in den Einstellungen vollständig ersetzbar (mit Zurücksetzen und einer Warnung, die
-nichts verbietet), jedes der sieben Werkzeuge einzeln abschaltbar und umbeschreibbar, und
+nichts verbietet), jedes Werkzeug einzeln abschaltbar und umbeschreibbar, und
 die aktive Anweisung einsehbar: im Einstellungs-Modal für das nächste Gespräch, im
 `gui:ask`-Bericht für das letzte. Gespeichert wird dabei immer nur die **Abweichung** —
 ein leeres Feld heißt „die ausgelieferte Fassung gilt", nie „leer", damit eine spätere

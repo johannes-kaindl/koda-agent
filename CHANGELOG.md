@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`move_note` and `delete_note`.** Koda can now finish the vault's lifecycle steps
+  instead of stopping one hand movement short of them — moving a log into `2-erledigt/`,
+  clearing a processed inbox file. Moving uses Obsidian's own rename, so every wikilink
+  pointing at the note is updated; deleting goes to the vault's configured trash rather
+  than erasing, and always asks first — even inside the Koda folder, where writing is
+  free. The confirmation dialog names both paths and how many notes link to the one being
+  moved, because a move looks like it touches one file while it touches several.
+
 ## [0.11.0] — 2026-09-02
 
 ### Added
