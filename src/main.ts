@@ -297,6 +297,36 @@ export default class KodaPlugin extends Plugin {
         const f = this.app.vault.getFileByPath(p);
         return f === null ? null : this.app.metadataCache.getFileCache(f)?.frontmatter ?? null;
       },
+      /** `fileManager.renameFile`, NICHT `vault.rename` — nur ersteres zieht die Wikilinks
+       *  der verweisenden Notizen nach. `vault.rename` verschiebt die Datei und laesst
+       *  ueberall tote Links zurueck; der Unterschied ist an der Signatur nicht zu sehen
+       *  und der Grund, warum der Port-Vertrag die API benennt.
+       *  Fehlende Zielordner legt Obsidian dabei selbst an. */
+      move: async (from, to) => {
+        const f = this.app.vault.getFileByPath(from);
+        if (f === null) throw new Error(`nicht gefunden: ${from}`);
+        await this.app.fileManager.renameFile(f, to);
+      },
+      /** `fileManager.trashFile` folgt der Papierkorb-Einstellung des Vaults (System-
+       *  Papierkorb, `.trash/` im Vault oder endgueltig) — `vault.delete` entscheidet
+       *  das selbst und uebergeht damit, was der Nutzer eingestellt hat. */
+      trash: async (p) => {
+        const f = this.app.vault.getFileByPath(p);
+        if (f === null) throw new Error(`nicht gefunden: ${p}`);
+        await this.app.fileManager.trashFile(f);
+      },
+      /** Zaehlt die Notizen, die auf diese verweisen — nicht die Zahl der Links: zwei
+       *  Verweise aus derselben Notiz sind eine betroffene Notiz, und das Modal sagt
+       *  "N Notizen verlinken hierher". `resolvedLinks` ist Quelle → Ziel → Anzahl,
+       *  gefragt ist also die Gegenrichtung, die Obsidian nicht fertig vorhaelt. */
+      backlinkCount: (p) => {
+        const all = this.app.metadataCache.resolvedLinks;
+        let n = 0;
+        for (const quelle of Object.keys(all)) {
+          if (quelle !== p && (all[quelle]?.[p] ?? 0) > 0) n++;
+        }
+        return n;
+      },
     };
     return new VaultTools(vaultPort, (req) => confirmWrite(this.app, req), {
       kodaFolder: () => this.settings.kodaFolder,

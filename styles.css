@@ -93,6 +93,19 @@
 .koda-diff-del { background: rgba(var(--color-red-rgb), 0.15); text-decoration: line-through; }
 .koda-diff-ctx { color: var(--text-muted); }
 
+/* Freigabe-Modal fuer move_note/delete_note. Kein Diff und keine Textvorschau — beim
+   Verschieben aendert sich der Inhalt nicht, sondern der Ort. Die Pfade stehen deshalb
+   monospaced und umbruchfaehig: ein Pfad, den man pruefen soll, darf nicht abgeschnitten
+   werden, und `word-break` an beliebiger Stelle waere schlechter lesbar als am Trenner. */
+.koda-move-paths { border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: var(--size-4-2); margin-bottom: var(--size-4-2); }
+.koda-move-row { display: flex; gap: var(--size-4-1); align-items: baseline; }
+.koda-move-row + .koda-move-row { margin-top: var(--size-4-1); }
+.koda-move-path { font-family: var(--font-monospace); font-size: var(--font-ui-small); overflow-wrap: anywhere; }
+.koda-move-note { color: var(--text-muted); font-size: var(--font-ui-small); margin-bottom: var(--size-4-2); }
+/* Die Warnung traegt ihre Aussage im Text (⚠️ + Klartext); die Farbe verstaerkt nur —
+   Rot allein traegt sie fuer Farbenblinde nicht (dieselbe Regel wie beim Endpunkt-Status). */
+.koda-delete-warn { color: var(--text-error); font-size: var(--font-ui-small); margin-bottom: var(--size-4-2); }
+
 /* Ergebnis der Endpunkt-Probe. Farbe nur als Zugabe zum Text — die Aussage steht im
    Klartext, nicht im Farbton (Rot/Grün allein trägt sie für Farbenblinde nicht). */
 /* Statuspunkt der Endpunkt-Zeile: Icon + Tooltip in der Steuerspalte (Form aus vault-rag).

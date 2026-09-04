@@ -150,7 +150,7 @@ describe("renderToolList", () => {
   it("fuehrt jedes Werkzeug mit einer eigenen Zeile", () => {
     const s = new Setting(makeFakeEl());
     renderToolList(s, ctx());
-    expect(zeilen(s)).toHaveLength(9); // acht feste plus related_notes
+    expect(zeilen(s)).toHaveLength(11); // zehn feste plus related_notes
   });
   it("zeigt related_notes ausgegraut statt es zu verschweigen, wenn vault-rag fehlt", () => {
     const s = new Setting(makeFakeEl());

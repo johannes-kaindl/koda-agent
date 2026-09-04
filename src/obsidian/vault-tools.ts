@@ -1,6 +1,7 @@
 import type { ToolOutcome, ToolRunner } from "../core/agent/types";
 import { resolveFolderPath, resolveNotePath } from "../core/tools/path-guard";
 import { writePolicy } from "../core/tools/write-policy";
+import { movePolicy, planMove } from "../core/tools/move";
 import { appendMemoryLine } from "../core/memory/memory";
 import { serializeFrontmatter } from "../vendor/kit/frontmatter";
 import { sanitizeSkillName, skillPath } from "../core/skills/path";
@@ -26,9 +27,31 @@ export interface VaultPort {
    *  sonst je Aufruf N Dateien an, und ein Werkzeug gegen teure Pruefschritte darf
    *  nicht selbst der teuerste Aufruf sein. */
   frontmatterOf(path: string): Record<string, unknown> | null;
+  /** Verschieben ODER Umbenennen — fuer Obsidian dieselbe Operation. Die Implementierung
+   *  muss `fileManager.renameFile` nutzen, nicht `vault.rename`: nur erstere zieht die
+   *  Wikilinks der verweisenden Notizen nach. Ein Move ohne Nachzug hinterlaesst tote
+   *  Links und verletzt die Zero-Broken-Links-Regel des Vaults. */
+  move(from: string, to: string): Promise<void>;
+  /** In den Papierkorb, nicht `unlink`. Die Implementierung muss `fileManager.trashFile`
+   *  nutzen, weil das der Papierkorb-Einstellung des Vaults folgt — damit ist der Vorgang
+   *  in der Regel umkehrbar, und genau darauf beruht die Entscheidung, Koda ueberhaupt
+   *  loeschen zu lassen. */
+  trash(path: string): Promise<void>;
+  /** Wie viele Notizen auf diese verweisen. Synchron und ohne Dateizugriff (aus
+   *  `metadataCache.resolvedLinks`), weil die Zahl im Bestaetigungs-Modal steht und ein
+   *  Modal nicht auf Dateizugriffe warten darf. */
+  backlinkCount(path: string): number;
 }
 
-export interface WriteRequest {
+/** Eine Schreibfreigabe. Drei Arten, EIN Modal (UI-STANDARD §2: ein Confirm-Modal je
+ *  Plugin) — unterschieden ueber `kind`, damit der Modal-Code nicht raten muss, ob
+ *  `newText` eine Vorschau oder ein leerer Platzhalter ist. `kind` fehlt beim Schreiben
+ *  bewusst nicht: es ist verpflichtend, sonst waere ein vergessenes Feld ein stiller
+ *  Fall-through in den Text-Zweig. */
+export type WriteRequest = WriteFileRequest | MoveRequest | DeleteRequest;
+
+export interface WriteFileRequest {
+  kind: "write";
   path: string;
   mode: "create" | "append" | "replace";
   oldText: string;
@@ -36,6 +59,25 @@ export interface WriteRequest {
   /** Klartext, was sich kuenftig aendert — nur bei Skills gesetzt. Additiv: das Modal
    *  zeigt ihn ZUSAETZLICH zur vollstaendigen Vorschau, nie an ihrer Stelle. */
   effect?: string;
+}
+
+export interface MoveRequest {
+  kind: "move";
+  path: string;
+  destination: string;
+  /** Umbenennen (gleicher Ordner) oder Verschieben — das Modal benennt den Vorgang so,
+   *  wie er dem Nutzer erscheint. */
+  rename: boolean;
+  /** Zahl der verweisenden Notizen. Sie steht im Modal, weil sie die Reichweite des
+   *  Vorgangs sichtbar macht: ohne sie sieht ein Move nach einer Datei aus, waehrend er
+   *  N weitere anfasst. */
+  backlinks: number;
+}
+
+export interface DeleteRequest {
+  kind: "delete";
+  path: string;
+  backlinks: number;
 }
 
 export type ConfirmWritePort = (req: WriteRequest) => Promise<boolean>;
@@ -88,6 +130,8 @@ export class VaultTools implements ToolRunner {
         case "read_note": return await this.read(str(a.path));
         case "related_notes": return await this.relatedNotes(str(a.path));
         case "write_note": return await this.write(str(a.path), str(a.content), str(a.mode));
+        case "move_note": return await this.moveNote(str(a.source_path), str(a.destination_path));
+        case "delete_note": return await this.deleteNote(str(a.path));
         case "write_skill":
           return await this.writeSkill(str(a.name), str(a.description), str(a.body), str(a.mode));
         case "save_memory": return await this.saveMemory(str(a.text));
@@ -211,7 +255,7 @@ export class VaultTools implements ToolRunner {
 
     if (writePolicy(norm, this.opts.kodaFolder()) === "confirm") {
       const oldText = exists ? await this.vault.read(norm) : "";
-      const approved = await this.confirm({ path: norm, mode, oldText, newText: effective });
+      const approved = await this.confirm({ kind: "write", path: norm, mode, oldText, newText: effective });
       if (!approved) return { ok: false, error: "vom Nutzer abgelehnt" };
     }
 
@@ -219,6 +263,58 @@ export class VaultTools implements ToolRunner {
     else if (mode === "append") await this.vault.append(norm, effective);
     else await this.vault.overwrite(norm, effective);
     return { ok: true, content: `geschrieben: ${norm} (${mode})` };
+  }
+
+  /** Verschieben und Umbenennen — fuer Obsidian dieselbe Operation, fuer den Nutzer nicht.
+   *
+   *  Reihenfolge ist hier Sicherheit, nicht Stil: erst planen (beide Pfade durch den Guard,
+   *  Gleichheit raus), dann Existenz pruefen, dann fragen, dann schreiben. Wer die Freigabe
+   *  vor die Existenzpruefung zieht, laesst den Nutzer einen Vorgang bestaetigen, der
+   *  danach an einer Kleinigkeit scheitert — und gewoehnt ihn daran, Modale wegzuklicken. */
+  private async moveNote(source: string, destination: string): Promise<ToolOutcome> {
+    const plan = planMove(source, destination);
+    if (!(await this.vault.exists(plan.source))) {
+      return { ok: false, error: `nicht gefunden: "${plan.source}"` };
+    }
+    // Ein belegtes Ziel wird gemeldet, nie ueberschrieben: ein Move, der still eine fremde
+    // Notiz ersetzt, ist Datenverlust mit Erfolgsmeldung.
+    if (await this.vault.exists(plan.destination)) {
+      return { ok: false, error: `existiert schon: "${plan.destination}" — Ziel ist belegt` };
+    }
+
+    if (movePolicy(plan.source, plan.destination, this.opts.kodaFolder()) === "confirm") {
+      const approved = await this.confirm({
+        kind: "move",
+        path: plan.source,
+        destination: plan.destination,
+        rename: plan.kind === "rename",
+        backlinks: this.vault.backlinkCount(plan.source),
+      });
+      if (!approved) return { ok: false, error: "vom Nutzer abgelehnt" };
+    }
+
+    await this.vault.move(plan.source, plan.destination);
+    const verb = plan.kind === "rename" ? "umbenannt" : "verschoben";
+    return { ok: true, content: `${verb}: ${plan.source} → ${plan.destination}` };
+  }
+
+  /** Loeschen fragt IMMER — auch im Koda-Ordner, wo Schreiben frei ist.
+   *
+   *  Der raeumliche Freibrief begruendet sich damit, dass Kodas eigener Kram den Vault des
+   *  Nutzers nicht beruehrt. Beim Loeschen traegt das nicht: die Wirkung ist dieselbe, egal
+   *  wo die Datei liegt, und sie ist die einzige, die nichts hinterlaesst, woran man sie
+   *  bemerken koennte. Dieselbe Ueberlegung wie bei `write_skill` — Wirkung schlaegt Ort. */
+  private async deleteNote(path: string): Promise<ToolOutcome> {
+    const norm = resolveNotePath(path);
+    if (!(await this.vault.exists(norm))) return { ok: false, error: `nicht gefunden: "${norm}"` };
+
+    const approved = await this.confirm({
+      kind: "delete", path: norm, backlinks: this.vault.backlinkCount(norm),
+    });
+    if (!approved) return { ok: false, error: "vom Nutzer abgelehnt" };
+
+    await this.vault.trash(norm);
+    return { ok: true, content: `in den Papierkorb gelegt: ${norm}` };
   }
 
   /** Skills schreibt das Plugin, nicht das Modell: Pfad und Frontmatter entstehen hier,
@@ -244,7 +340,7 @@ export class VaultTools implements ToolRunner {
     // an EINE Stelle, und diese Zeile bricht auffaellig, wenn sie dort je wegfaellt.
     if (writePolicy(path, this.opts.kodaFolder()) === "confirm") {
       const oldText = exists ? await this.vault.read(path) : "";
-      const approved = await this.confirm({ path, mode, oldText, newText: content, effect: desc });
+      const approved = await this.confirm({ kind: "write", path, mode, oldText, newText: content, effect: desc });
       if (!approved) return { ok: false, error: "vom Nutzer abgelehnt" };
     }
 
@@ -309,7 +405,7 @@ export class VaultTools implements ToolRunner {
       return { ok: false, error: "Keine Markierung im Editor — für replace_selection muss Text markiert sein." };
     }
     if (writePolicy(target, this.opts.kodaFolder()) === "confirm") {
-      const req: WriteRequest = { path: target, mode: mode === "replace_selection" ? "replace" : "append", oldText: old, newText: text };
+      const req: WriteFileRequest = { kind: "write", path: target, mode: mode === "replace_selection" ? "replace" : "append", oldText: old, newText: text };
       // Additiv, nur bei insert_at_cursor: WriteRequest.mode bleibt "append" (Wortlaut fuer
       // append-artiges Verhalten), aber das Modal zeigte dafuer "append" an — irrefuehrend fuer
       // eine Einfuegung an der Cursor-Position. Die effect-Zeile steht ZUSAETZLICH ueber der

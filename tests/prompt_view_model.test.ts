@@ -42,7 +42,7 @@ describe("toolRows", () => {
 
   it("fuehrt jedes Werkzeug, auch related_notes ohne Index", () => {
     const rows = toolRows(leer, false);
-    expect(rows).toHaveLength(9);
+    expect(rows).toHaveLength(11);
     expect(rows.map((r) => r.name)).toContain("related_notes");
   });
   it("markiert related_notes ohne Index als nicht verfuegbar — und sonst nichts", () => {

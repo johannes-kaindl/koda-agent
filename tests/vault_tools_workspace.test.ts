@@ -73,7 +73,7 @@ describe("edit_active_note", () => {
     const tools = new VaultTools(fakeVault({}), async (req) => { calls.push(req); return true; }, { ...base, editor: fakeEditor(state) });
     const r = await tools.run("edit_active_note", { path: "Notes/Plan.md", mode: "replace_selection", text: "Model steering" });
     expect(r.ok).toBe(true);
-    expect(calls).toEqual([{ path: "Notes/Plan.md", mode: "replace", oldText: "Model control", newText: "Model steering" }]);
+    expect(calls).toEqual([{ kind: "write", path: "Notes/Plan.md", mode: "replace", oldText: "Model control", newText: "Model steering" }]);
     expect(state.doc).toBe("Model steering makes");
   });
   it("insert_at_cursor ausserhalb des Koda-Ordners: die Bestaetigung nennt den Cursor-Effekt zusaetzlich zur Vorschau", async () => {

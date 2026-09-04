@@ -91,6 +91,40 @@ export const TOOL_DEFS: ToolDef[] = [
     },
   },
   {
+    name: "move_note",
+    description:
+      "Move or rename a Markdown note. Obsidian updates the wikilinks in every note that "
+      + "links to it, so links stay intact. Moving within the Koda folder is free; anything "
+      + "else requires the user's approval. Fails if the source is missing or the target "
+      + "path is already taken — it never overwrites.",
+    parameters: {
+      type: "object",
+      properties: {
+        source_path: { type: "string", description: "Vault-relative path of the note to move, ending in .md" },
+        destination_path: {
+          type: "string",
+          description:
+            "Vault-relative target path ending in .md. Same folder with a different file name renames the note; "
+            + "a different folder moves it. Missing folders are created.",
+        },
+      },
+      required: ["source_path", "destination_path"],
+    },
+  },
+  {
+    name: "delete_note",
+    description:
+      "Move a Markdown note to the trash. Always requires the user's approval, even inside "
+      + "the Koda folder. The note goes to the vault's configured trash rather than being "
+      + "erased, but notes linking to it will have broken links — prefer move_note into an "
+      + "archive folder when the content might still be wanted.",
+    parameters: {
+      type: "object",
+      properties: { path: { type: "string", description: "Vault-relative path ending in .md" } },
+      required: ["path"],
+    },
+  },
+  {
     name: "save_memory",
     description:
       "Append one learned fact, preference, or correction to Koda's persistent memory note. Use sparingly for durable knowledge, not conversation details.",
