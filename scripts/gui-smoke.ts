@@ -1510,6 +1510,140 @@ async function main(): Promise<void> {
       `).catch(() => undefined);
     }
     record("23. edit_active_note: veraltete Markierung schreibt nicht, gueltige schreibt (Invariante Vorschau == Inhalt)", ok23, detail23);
+
+    // --- 24. move_note zieht die Wikilinks nach ------------------------------------------
+    // DIE Frage, die dieser Punkt existiert um zu beantworten: `fileManager.renameFile` zieht
+    // laut Doku die Links verweisender Notizen nach — ob das auch gilt, wenn Obsidians
+    // Einstellung „Automatically update internal links" AUS steht, ist aus der Doku nicht zu
+    // beantworten. Deshalb wird die Einstellung hier GEMESSEN und mitprotokolliert, statt
+    // sie zu setzen: ein Punkt, der sich seine Vorbedingung selbst herstellt, misst nicht
+    // mehr, was der Nutzer erlebt.
+    // Kulisse: Notes/Tools.md wird von Compaction.md und Project plan.md verlinkt (n=2).
+    let detail24 = "nicht gelaufen";
+    let ok24 = false;
+    const QUELLE24 = "Notes/Tools.md";
+    const ZIEL24 = "Archiv/Tools.md";
+    try {
+      const linkOption = await cdp.evaluate<unknown>(
+        `return app.vault.getConfig ? app.vault.getConfig("alwaysUpdateLinks") : "unbekannt";`,
+      );
+      const vorher = await cdp.evaluate<number>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        return p.buildTools ? 0 : -1;
+      `);
+      if (vorher < 0) throw new Error("buildTools fehlt");
+      // Innerhalb von Koda waere der Move frei; hier laeuft er ueber die Bestaetigung, weil
+      // Quelle und Ziel ausserhalb liegen — genau der Weg, den ein Nutzer sieht.
+      await cdp.evaluate(`
+        window.__koda24 = null;
+        app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools()
+          .run("move_note", { source_path: ${JSON.stringify(QUELLE24)}, destination_path: ${JSON.stringify(ZIEL24)} })
+          .then((r) => { window.__koda24 = r; });
+        return true;
+      `);
+      const modal24 = await pollUntil<boolean>(cdp, `return !!document.querySelector(".modal-container .koda-move-paths");`, 8000);
+      if (!modal24) throw new Error("Move-Modal erschien nicht");
+      await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:last-child") ?? null`);
+      const r24 = (await pollUntil<{ ok: boolean; content?: string; error?: string }>(cdp, `return window.__koda24;`, 8000)) ?? null;
+      // Der eigentliche Beleg: der Link IM VERWEISENDEN TEXT zeigt jetzt auf den neuen Ort.
+      // Gemessen wird der Dateiinhalt, nicht `resolvedLinks` — der Cache koennte den Link
+      // aufloesen, waehrend im Text ein toter Wikilink steht.
+      const verweis = await cdp.evaluate<string>(`
+        const f = app.vault.getFileByPath("Notes/Compaction.md");
+        return f ? await app.vault.read(f) : "(fehlt)";
+      `);
+      const nachgezogen = verweis.includes("Archiv/Tools");
+      ok24 = r24?.ok === true && nachgezogen;
+      detail24 = `Werkzeug: ${r24?.ok === true ? "verschoben" : `FEHLER (${r24?.error ?? "?"})`} · Link in Compaction.md: ${nachgezogen ? "nachgezogen" : "NICHT nachgezogen"} · alwaysUpdateLinks: ${String(linkOption)}`;
+    } catch (error) {
+      detail24 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      // Zurueck an den Ausgangsort — ueber DIESELBE API, damit auch die Links zurueckwandern.
+      await cdp.evaluate(`
+        const f = app.vault.getFileByPath(${JSON.stringify(ZIEL24)});
+        if (f) await app.fileManager.renameFile(f, ${JSON.stringify(QUELLE24)});
+        document.querySelector(".modal-container .modal-close-button")?.click();
+        return true;
+      `).catch(() => undefined);
+    }
+    record("24. move_note verschiebt und Obsidian zieht die Wikilinks der verweisenden Notizen nach", ok24, detail24);
+
+    // --- 25. Das Move-Modal nennt die Reichweite -----------------------------------------
+    // Der Punkt misst den TEXT im Modal, nicht dass ein Modal kommt: die Backlink-Zahl ist
+    // die Information, auf der die Freigabe beruht, und sie wandert durch drei Schichten
+    // (metadataCache → Port → Modal). Eine davon still auf 0 zu setzen faellt sonst nicht auf.
+    let detail25 = "nicht gelaufen";
+    let ok25 = false;
+    try {
+      await cdp.evaluate(`
+        window.__koda25 = null;
+        app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools()
+          .run("move_note", { source_path: ${JSON.stringify(QUELLE24)}, destination_path: "Archiv/Tools-x.md" })
+          .then((r) => { window.__koda25 = r; });
+        return true;
+      `);
+      const da = await pollUntil<boolean>(cdp, `return !!document.querySelector(".modal-container .koda-move-paths");`, 8000);
+      if (!da) throw new Error("Move-Modal erschien nicht");
+      const gelesen = await cdp.evaluate<{ pfade: string; hinweis: string; knopf: string }>(`
+        const m = document.querySelector(".modal-container");
+        return {
+          pfade: m.querySelector(".koda-move-paths")?.innerText ?? "",
+          hinweis: m.querySelector(".koda-move-note")?.innerText ?? "",
+          knopf: m.querySelector(".modal-button-container button:last-child")?.innerText ?? "",
+        };
+      `);
+      // Abbrechen: dieser Punkt misst die Anzeige, er soll nichts verschieben.
+      await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:first-child") ?? null`);
+      const nenntBeide = gelesen.pfade.includes(QUELLE24) && gelesen.pfade.includes("Archiv/Tools-x.md");
+      const nenntZahl = /\b2\b/.test(gelesen.hinweis);
+      const nochDa = await cdp.evaluate<boolean>(`return app.vault.getFileByPath(${JSON.stringify(QUELLE24)}) !== null;`);
+      ok25 = nenntBeide && nenntZahl && nochDa;
+      detail25 = `Pfade: ${nenntBeide ? "beide genannt" : `UNVOLLSTAENDIG („${gelesen.pfade.replace(/\n/g, " / ")}")`} · Reichweite: „${gelesen.hinweis}" ${nenntZahl ? "(2 erwartet, genannt)" : "(2 ERWARTET, FEHLT)"} · Knopf: „${gelesen.knopf}" · nach Abbruch am alten Ort: ${nochDa ? "ja" : "NEIN"}`;
+    } catch (error) {
+      detail25 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await cdp.evaluate(`document.querySelector(".modal-container .modal-close-button")?.click(); return true;`).catch(() => undefined);
+    }
+    record("25. Das Move-Modal nennt beide Pfade und die Zahl der verweisenden Notizen", ok25, detail25);
+
+    // --- 26. delete_note fragt AUCH im Koda-Ordner ---------------------------------------
+    // Die Regel „Wirkung schlaegt Ort" ist im Adapter getestet; hier wird sie am laufenden
+    // Plugin gemessen, weil sie die einzige ist, die eine Datei verschwinden laesst. Der
+    // Pruefling ist eine eigens angelegte Wegwerf-Notiz IM Koda-Ordner — dort waere ein
+    // write_note frei, ein delete_note darf es nicht sein.
+    let detail26 = "nicht gelaufen";
+    let ok26 = false;
+    const OPFER = "Koda/wegwerf-smoke26.md";
+    try {
+      await cdp.evaluate(`
+        const alt = app.vault.getFileByPath(${JSON.stringify(OPFER)});
+        if (alt) await app.fileManager.trashFile(alt);
+        await app.vault.create(${JSON.stringify(OPFER)}, "wegwerf");
+        window.__koda26 = null;
+        app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools()
+          .run("delete_note", { path: ${JSON.stringify(OPFER)} })
+          .then((r) => { window.__koda26 = r; });
+        return true;
+      `);
+      const gefragt = await pollUntil<boolean>(cdp, `return !!document.querySelector(".modal-container .koda-delete-warn, .modal-container .koda-move-note");`, 8000);
+      if (!gefragt) throw new Error("Loesch-Modal erschien nicht — im Koda-Ordner NICHT gefragt");
+      const knopf = await cdp.evaluate<string>(`return document.querySelector(".modal-container .modal-button-container button:last-child")?.innerText ?? "";`);
+      await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:last-child") ?? null`);
+      const r26 = (await pollUntil<{ ok: boolean }>(cdp, `return window.__koda26;`, 8000)) ?? null;
+      const weg = await cdp.evaluate<boolean>(`return app.vault.getFileByPath(${JSON.stringify(OPFER)}) === null;`);
+      ok26 = gefragt && r26?.ok === true && weg;
+      detail26 = `im Koda-Ordner gefragt: ja · Knopf: „${knopf}" · Werkzeug: ${r26?.ok === true ? "ok" : "FEHLER"} · Datei danach: ${weg ? "weg" : "NOCH DA"}`;
+    } catch (error) {
+      detail26 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await cdp.evaluate(`
+        const rest = app.vault.getFileByPath(${JSON.stringify(OPFER)});
+        if (rest) await app.fileManager.trashFile(rest);
+        document.querySelector(".modal-container .modal-close-button")?.click();
+        return true;
+      `).catch(() => undefined);
+    }
+    record("26. delete_note fragt auch im Koda-Ordner nach und legt die Notiz in den Papierkorb", ok26, detail26);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte

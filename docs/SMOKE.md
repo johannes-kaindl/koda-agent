@@ -285,6 +285,20 @@ schon gelesene Notiz sah nach Verschwendung aus statt nach Folge der Verdichtung
 **Beide Stufen sind gegen echte Records belegt** — Stufe 1 am 2026-08-22, Stufe 2 am
 2026-08-24; Einzelheiten unter „Durchläufe".
 
+**Punkte 24–26 (seit 2026-09-04): `move_note` und `delete_note`.** Der Kern ist Punkt 24,
+und er beantwortet eine Frage, die aus der Doku nicht zu beantworten war: `fileManager.renameFile`
+soll die Wikilinks verweisender Notizen nachziehen — gilt das auch, wenn Obsidians Einstellung
+*„Automatically update internal links"* **aus** steht? Der Punkt **setzt die Einstellung nicht**,
+er liest sie und schreibt sie ins Protokoll: ein Prüfpunkt, der sich seine Vorbedingung selbst
+herstellt, misst nicht mehr, was der Nutzer erlebt. Gemessen wird der Link im **Dateiinhalt** der
+verweisenden Notiz, nicht `resolvedLinks` — der Cache kann einen Link auflösen, während im Text
+ein toter Wikilink steht. Kulisse ist `Notes/Tools.md`, das im Fixture von zwei Notizen verlinkt
+wird; Punkt 25 prüft, dass genau diese **2** im Modal steht (die Zahl wandert durch drei
+Schichten: `metadataCache` → Port → Modal, und eine davon still auf 0 zu setzen fiele sonst nicht
+auf). Punkt 26 misst die Regel „Wirkung schlägt Ort" am laufenden Plugin: `delete_note` fragt
+**auch im Koda-Ordner**, wo ein `write_note` frei wäre. Er legt sich dafür eine Wegwerf-Notiz an
+und räumt sie im `finally` weg.
+
 **Was der Treiber bewusst nicht prüft:** alles, was eine echte Modell-Antwort braucht (die
 Punkte 2, 3, 5, 6, 7, 10, 14–19 oben). Gemessen am 2026-08-07 ist `qwen/qwen3.6-27b` über einem
 großen Vault **>90 s stumm**, bevor das erste Token kommt — Prüfpunkte darauf wären langsam

@@ -203,7 +203,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 23 Punkte (20–23 seit 2026-09-02: Arbeitsplatz-Block aus der Sidebar, Modus-Zustand, Werkzeugliste, `edit_active_note`-Invariante) (9–13 seit
+  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 26 Punkte (24–26 seit 2026-09-04: `move_note` zieht die Wikilinks nach — der Punkt misst den Link im **Dateiinhalt** der verweisenden Notiz, nicht `resolvedLinks`, und protokolliert Obsidians Einstellung `alwaysUpdateLinks` mit, statt sie zu setzen; das Move-Modal nennt beide Pfade und die Backlink-Zahl; `delete_note` fragt auch im Koda-Ordner) (20–23 seit 2026-09-02: Arbeitsplatz-Block aus der Sidebar, Modus-Zustand, Werkzeugliste, `edit_active_note`-Invariante) (9–13 seit
   2026-08-30: Statuszeile, Kontext-Belegung, Thinking-Schalter, Rückfrage vorm Verwerfen,
   gesperrter Thinking-Zustand; 16–18 seit 2026-08-31: Reset auf den Auslieferungsstand,
   ein abgeschaltetes Werkzeug fehlt in der gesendeten Liste, das Vorschau-Modal führt
