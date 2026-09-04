@@ -59,8 +59,14 @@ Vorbereitung: `npm run build`, `npm run smoke:gui -- --setup` (baut den Staging-
     nicht im Index", kein Fehler.
     ⚠️ **Zwei Fallen, beide 2026-08-30 von der vault-rag-Session gemeldet.** (a) Die Trefferliste
     auf **Plausibilität** ansehen, nicht nur darauf, dass sie kommt — ein defekter Index liefert
-    zusammenhanglose Treffer mit *hohen* Scores (0.85–0.92), also überzeugender als ein gesunder
-    (Median ~0.4). (b) **Keine Notiz nehmen, die während eines laufenden Reindex entstanden oder
+    zusammenhanglose Treffer mit *hohen* Scores (0.85–0.92 über `api.related()`, also
+    Notiz-gegen-Notiz) — er sieht überzeugender aus, gerade wenn er falsch ist.
+    ⚠️ **Einen Vergleichswert für „gesund“ gibt es nicht.** Hier stand bis 2026-09-04
+    „Median ~0.4“; vault-rag hat die Zahl an dem Tag **ersatzlos gestrichen** (`b6017dc`),
+    weil sie nie gemessen worden war — sie existierte an genau zwei Stellen im Workspace,
+    beide aus derselben Feder. Plausibilität heißt deshalb: **inhaltlich** hinsehen, oder
+    den **Rang** prüfen (findet sich eine Notiz über ihren eigenen Wortlaut auf Rang 0?) —
+    dessen Erwartungswert steht ohne jede Skala fest. (b) **Keine Notiz nehmen, die während eines laufenden Reindex entstanden oder
     geändert wurde.** Ausgerechnet „frisch angelegt", das Mittel für die Gegenprobe, trifft
     diesen Fall — sonst misst man vault-rags Race und schreibt es Kodas Aufbereitung zu
     (`src/core/tools/retrieval.ts` ist an beidem unschuldig).
@@ -313,6 +319,19 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   **inhaltliche** Notiz ohne Template-Klasse; belastbarer als der Score ist ohnehin der
   **Rang** (findet sich eine Notiz über ihren eigenen Wortlaut auf Rang 0?), weil sein
   Erwartungswert ohne jede Skala feststeht — so misst vault-rags 40-Notizen-Probe.
+
+  **Nachtrag 2026-09-04: Grund (2) war schwerwiegender als hier notiert — die 0.4 hatte
+  nicht bloß keinen dokumentierten Aufrufweg, sie hatte überhaupt keine Quelle.** Auf
+  unseren Hinweis hin hat vault-rag nachgemessen, woher die Zahl stammt: sie stand an genau
+  zwei Stellen im Workspace, in ihrer `AGENTS.md` und in einer Task, in die dieselbe Session
+  sie am selben Nachmittag selbst hineinkopiert hatte. Keine Messung, keine Stichprobe, kein
+  Lauf. Ersatzlos gestrichen in `b6017dc` — bewusst **nicht** mit einem Aufrufweg versehen,
+  denn das hätte ihr eine Herkunft angedichtet, die sie nie hatte. Die verbleibende Zahl
+  (0.85–0.92) hat ihren Aufrufweg bekommen: `api.related()`, Notiz-gegen-Notiz.
+  **Für diesen Punkt heißt das: der Score ist als Prüfgröße endgültig raus, der Rang ist
+  die Messung.** Und die allgemeine Lehre wird schärfer als „ein Score ohne Aufrufweg ist
+  keine Skala": eine übernommene Zahl trägt erst, wenn jemand ihre Herkunft *gemessen* hat —
+  ein zweites Vorkommen kann die Kopie des ersten sein.
   **Nebenbefund, der Kodas Werkzeuggrenze belegt:** das Modell rief zuerst
   `related_notes({"path": "…/koda-agent"})` **ohne** `.md` auf, bekam
   `ERROR: Nur Markdown-Notizen (.md) erlaubt` und korrigierte sich im nächsten Aufruf
