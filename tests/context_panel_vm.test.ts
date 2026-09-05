@@ -132,6 +132,24 @@ describe("Kontext-Tab im Modus Notiz", () => {
     expect(chip?.hint).toContain(String(item?.chars));
   });
 
+  it("zeigt bei Kuerzung die GESENDETE Groesse, nicht die volle (Befund 7) — sonst diskriminiert der Test nicht", async () => {
+    // Budget so knapp, dass beide Kandidaten (je 6 Zeichen Inhalt) gekuerzt werden: bei
+    // budget=20000 sind chars und fullChars gleich, und der Test oben kann dann nicht
+    // unterscheiden zwischen "aus dem gesendeten Block", "nachgerechnet" und "fullChars
+    // genommen". Erst ein Fall mit Kuerzung ist der eine, der das trennt.
+    const vm = await buildPanelViewModel("note", snapNote, new Set(), vollOpts({ budget: 4 }));
+    const ctx = await buildFullContext({
+      mode: "note", snap: snapNote, links, content, manual: [], off: new Set(),
+      linkDepth: 1, budget: 4, lang: "de",
+    });
+    const chip = vm.sections.find((s) => s.id === "note")?.chips.find((c) => c.path === "B.md");
+    const item = ctx.items.find((i) => i.path === "B.md");
+    expect(item?.fullChars).toBeDefined();
+    expect(item?.chars).not.toBe(item?.fullChars);
+    expect(chip?.hint).toContain(String(item?.chars));
+    expect(chip?.hint).not.toContain(String(item?.fullChars));
+  });
+
   it("zeigt einen abgewaehlten Chip weiter an — sonst waere er unerreichbar", async () => {
     const off = new Set([itemKey("link", "B.md")]);
     const vm = await buildPanelViewModel("note", snapNote, off, vollOpts());
@@ -160,6 +178,25 @@ describe("Kontext-Tab im Modus Notiz", () => {
     expect(treffer[0]?.section).toBe("manual");
     expect(treffer[0]?.chip.removable).toBe(true);
   });
+
+  it("die aktive Notiz, die zugleich manuell hinzugefuegt ist, steht GENAU EINMAL — im Abschnitt Manuell (Ruling 2026-09-05)", async () => {
+    // `collectCandidates` nimmt die aktive Notiz VOR dem manuellen Eintrag (candidates.ts)
+    // und dedupliziert nach Pfad — A.md traegt hier also `source: "active"`, obwohl sie
+    // zugleich in `manual` steht. Ein Filter auf `c.source !== "manual"` (der Fehlversuch
+    // aus `0ab7e52`) liesse sie durch: `manualSection` zeigte denselben Pfad dann ein
+    // zweites Mal, mit dem Schluessel "manual:A.md" — einem Schluessel, den `build.ts`
+    // beim Filtern nie liest (es filtert ueber `itemKey("active", "A.md")`). Der Chip
+    // zeigte dann dauerhaft "an", egal was tatsaechlich gesendet wird.
+    const vm = await buildPanelViewModel("note", snapNote, new Set(), vollOpts({ manual: ["A.md"] }));
+    const alle = vm.sections.flatMap((s) => s.chips.map((c) => ({ section: s.id, chip: c })));
+    const treffer = alle.filter((x) => x.chip.path === "A.md");
+    expect(treffer).toHaveLength(1);
+    expect(treffer[0]?.section).toBe("manual");
+    expect(treffer[0]?.chip.removable).toBe(true);
+    // Der Schluessel des Chips ist der Schluessel SEINES KANDIDATEN — hier "active", nicht
+    // "manual" — sonst schriebe `toggle` einen Schluessel, den `build.ts` nicht liest.
+    expect(treffer[0]?.chip.source).toBe("active");
+  });
 });
 
 describe("Abschnitt Manuell", () => {
@@ -177,5 +214,12 @@ describe("Abschnitt Manuell", () => {
     const manuell = vm.sections.find((s) => s.id === "manual");
     expect(vm.manualEnabled).toBe(false);
     expect(manuell?.chips[0]?.hint).toContain("Notiz");
+  });
+
+  it("hasOff wird auch von einer nicht-leeren manuellen Liste ausgeloest, ganz ohne Abwahl", async () => {
+    // `off` ist leer — allein die manuelle Liste soll den Reset-Knopf anbieten. Bisher
+    // ungetestete Verbreiterung dieser Zeile (Review 2026-09-05, Kleinigkeit).
+    const vm = await buildPanelViewModel("workspace", snapManual, new Set(), vollOpts({ manual: ["M.md"] }));
+    expect(vm.hasOff).toBe(true);
   });
 });

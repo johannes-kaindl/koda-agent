@@ -143,23 +143,25 @@ function workspaceSection(
 function sourceSection(
   mode: "note" | "tabs",
   kandidaten: readonly Candidate[],
+  manual: ReadonlySet<string>,
   off: ReadonlySet<SelectionKey>,
   groessen: ReadonlyMap<string, { chars: number }>,
   t: (typeof T)[keyof typeof T],
 ): PanelSection {
-  // `collectCandidates` liefert fuer die Modi Notiz/Alle-Tabs auch manuelle Eintraege mit
-  // (source: "manual") — sie werden vor der Link-/Tab-Suche eingesammelt und deduplizieren
-  // nach Pfad. Sie NICHT hier abbilden, sondern `manualSection` ueberlassen: das ist KEINE
-  // zweite Filterung im verbotenen Sinn (die waere eine zweite Anwendung der Abwahl-Regel
-  // `off`, und die gibt es genau einmal, in `buildFullContext`) — es ist eine Aufteilung
-  // der ANZEIGE nach Quelle, und genau dafuer sind Abschnitte da. Die Kandidatenliste, die
-  // in `buildFullContext` geht, bleibt unangetastet; es aendert sich nur, in welchem
-  // Abschnitt ein Chip erscheint. Ohne diese Ausblendung stuende derselbe Pfad zweimal im
-  // Panel: als nicht entfernbarer Chip hier UND als entfernbarer Chip im Abschnitt
-  // "manual" — zwei Bedienelemente fuer eine Sache mit verschiedener Wirkung (abwaehlen
-  // vs. entfernen).
+  // Ausgeblendet wird nach PFAD, nicht nach `c.source` (Ruling 2026-09-05, Korrektur zu
+  // `0ab7e52`): `collectCandidates` nimmt die aktive Notiz VOR dem manuellen Eintrag und
+  // dedupliziert nach Pfad (`candidates.ts`) — eine Notiz, die zugleich aktiv UND von Hand
+  // hinzugefuegt ist, traegt hier also `source: "active"`, obwohl ihr Zuhause im Panel der
+  // Abschnitt Manuell ist. Ein Filter auf `c.source !== "manual"` (der Fehlversuch aus
+  // `0ab7e52`) uebersieht genau diesen Fall, weil der interne Quellname nur ein
+  // Implementierungsdetail der Entdopplung ist, kein Merkmal fuer die Anzeige. Das bleibt
+  // trotzdem KEINE zweite Filterung im verbotenen Sinn (die waere eine zweite Anwendung
+  // der Abwahl-Regel `off`, und die gibt es genau einmal, in `buildFullContext`) — es ist
+  // eine Aufteilung der ANZEIGE nach Quelle, und genau dafuer sind Abschnitte da. Die
+  // Kandidatenliste, die in `buildFullContext` geht, bleibt unangetastet; es aendert sich
+  // nur, in welchem Abschnitt ein Chip erscheint.
   const chips: PanelChip[] = kandidaten
-    .filter((c) => c.source !== "manual")
+    .filter((c) => !manual.has(c.path))
     .map((c) => {
       const chipOff = off.has(itemKey(c.source, c.path));
       const groesse = groessen.get(`${c.source}:${c.path}`);
@@ -179,18 +181,40 @@ function sourceSection(
 
 function manualSection(
   manual: readonly string[],
+  kandidatenByPath: ReadonlyMap<string, Candidate>,
   off: ReadonlySet<SelectionKey>,
+  groessen: ReadonlyMap<string, { chars: number }>,
   enabled: boolean,
   t: (typeof T)[keyof typeof T],
 ): PanelSection {
-  const chips: PanelChip[] = manual.map((path) => ({
-    source: "manual" as const,
-    path,
-    label: chipLabel(path),
-    hint: enabled ? "" : t.manualOff,
-    off: off.has(itemKey("manual", path)),
-    removable: true,
-  }));
+  const chips: PanelChip[] = manual.map((path) => {
+    const kandidat = kandidatenByPath.get(path);
+    // Der Schluessel eines Chips ist der Schluessel SEINES KANDIDATEN, nicht "manual:pfad"
+    // (Ruling 2026-09-05): sonst laese `off` fuer diesen Pfad einen anderen Schluessel, als
+    // `build.ts` beim Filtern schreibt (`itemKey(c.source, c.path)`) — der Chip zeigte dann
+    // dauerhaft "an", egal was tatsaechlich gesendet wird. Ist der Pfad ein Kandidat
+    // geworden (jeder Fall ausser Arbeitsplatz, wo `collectCandidates` gar nicht laeuft),
+    // uebernimmt der Chip dessen Quelle UND Groesse; nur ohne Kandidat bleibt es beim
+    // Schluessel "manual:pfad" und dem Hinweis, dass er hier nicht wirkt — den liest dann
+    // ohnehin niemand.
+    if (kandidat !== undefined) {
+      const chipOff = off.has(itemKey(kandidat.source, path));
+      const groesse = groessen.get(`${kandidat.source}:${path}`);
+      const teile: string[] = [];
+      if (groesse !== undefined) teile.push(t.chars(groesse.chars));
+      if (kandidat.depth !== undefined) teile.push(t.level(kandidat.depth));
+      return {
+        source: kandidat.source, path, label: chipLabel(path),
+        hint: teile.join(", "), off: chipOff, removable: true,
+      };
+    }
+    return {
+      source: "manual" as const, path, label: chipLabel(path),
+      hint: enabled ? "" : t.manualOff,
+      off: off.has(itemKey("manual", path)),
+      removable: true,
+    };
+  });
   return { id: "manual", title: t.manual, chips, empty: chips.length === 0 ? t.emptyManual : "" };
 }
 
@@ -203,6 +227,9 @@ export async function buildPanelViewModel(
   const t = T[opts.lang];
   const sections: PanelSection[] = [];
   const manualEnabled = mode !== "workspace";
+  const manualSet = new Set(opts.manual);
+  let kandidatenByPath: ReadonlyMap<string, Candidate> = new Map();
+  let groessen: ReadonlyMap<string, { chars: number }> = new Map();
 
   let text: string;
   if (mode === "workspace") {
@@ -218,14 +245,15 @@ export async function buildPanelViewModel(
       mode, snap, links: opts.links, content: opts.content,
       manual: opts.manual, off, linkDepth: opts.linkDepth, budget: opts.budget, lang: opts.lang,
     });
-    const groessen = new Map(ctx.items.map((i) => [`${i.source}:${i.path}`, i]));
+    groessen = new Map(ctx.items.map((i) => [`${i.source}:${i.path}`, i]));
     const kandidaten = collectCandidates({
       mode, snap, links: opts.links, linkDepth: opts.linkDepth, manual: opts.manual,
     });
-    sections.push(sourceSection(mode, kandidaten, off, groessen, t));
+    kandidatenByPath = new Map(kandidaten.map((c) => [c.path, c]));
+    sections.push(sourceSection(mode, kandidaten, manualSet, off, groessen, t));
     text = ctx.text;
   }
-  sections.push(manualSection(opts.manual, off, manualEnabled, t));
+  sections.push(manualSection(opts.manual, kandidatenByPath, off, groessen, manualEnabled, t));
 
   const kb = (text.length / 1024).toFixed(1);
   const pct = Math.min(100, Math.round((text.length / CHARS_PER_TOKEN / Math.max(1, opts.windowTokens)) * 100));
