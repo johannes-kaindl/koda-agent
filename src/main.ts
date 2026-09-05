@@ -212,6 +212,10 @@ export default class KodaPlugin extends Plugin {
       });
     }
     this.addCommand({ id: "ask-with-selection", name: t("cmd.askWithSelection"), callback: () => void this.askWithSelection() });
+    // Jede Aktion braucht einen Weg, der nicht an der Darstellung haengt (Lehre 0.10.1):
+    // ein Tab, den nur ein Knopf erreicht, ist bei ausgeblendetem Knopf unerreichbar.
+    this.addCommand({ id: "tab-chat", name: t("cmd.tabChat"), callback: () => { void this.runInView((v) => { v.setTab("chat"); return Promise.resolve(); }); } });
+    this.addCommand({ id: "tab-context", name: t("cmd.tabContext"), callback: () => { void this.runInView((v) => { v.setTab("context"); return Promise.resolve(); }); } });
     // Rechtsklick auf markierten Text: nur dann, sonst ist der Eintrag Rauschen.
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor) => {
