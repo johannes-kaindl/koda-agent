@@ -361,12 +361,14 @@ Die Tests entstehen hier zwar vor dem Code, aber eine Regel ist geschenkt-grün:
 
 ```bash
 cp src/core/context/selection.ts /tmp/sel.bak
-# "else if" → "if"  (Markierung würde dann auch bei abgewählter Notiz geprüft)
-sed -i '' 's/else if (off.has(itemKey("selection"/if (off.has(itemKey("selection"/' src/core/context/selection.ts
+# zweiter Zweig prueft "active" statt "selection" → eine abgewaehlte Markierung wirkt nicht mehr
+sed -i '' 's/else if (off.has(itemKey("selection", active.path)))/else if (off.has(itemKey("active", active.path)))/' src/core/context/selection.ts
 npx vitest run tests/context_selection.test.ts
 cp /tmp/sel.bak src/core/context/selection.ts
 ```
-Expected: der Test „abgewaehlte aktive Notiz nimmt die Markierung mit" wird rot (`active` ist dann nicht `null`, weil der zweite Zweig ein Objekt aus `null` bauen will bzw. wirft). Danach Quelle unverändert.
+Expected: „abgewaehlte Markierung leert NUR die Markierung" wird rot (`selection` bleibt stehen). Danach Quelle unverändert.
+
+⚠️ **Nicht** `else if` → `if` mutieren: nach `active = null` wäre `active.path` ein Typfehler, der Lauf scheiterte am Compiler statt an einer Assertion — eine Mutation, die gar nicht baut, prüft nichts.
 
 - [ ] **Step 6: Gate + Commit**
 
@@ -495,6 +497,9 @@ export interface PanelSection {
 }
 export interface PanelViewModel {
   sections: PanelSection[];
+  /** Gemessene Groesse des gefilterten Blocks in Zeichen. Die Zahl, die die Logik rechnet —
+   *  `summary` ist nur ihre Darstellung und rundet auf 0,1 KB, taugt also nicht als Messwert. */
+  chars: number;
   /** Summenzeile, z. B. „1,2 KB · Fenster 4 %". */
   summary: string;
   /** §8-Status-Vokabel für die Summenzeile. */
@@ -546,10 +551,13 @@ describe("buildPanelViewModel", () => {
     expect(chip?.off).toBe(true);
     expect(vm.hasOff).toBe(true);
   });
-  it("die Summenzeile misst den GEFILTERTEN Block, nicht den vollen", () => {
-    const voll = buildPanelViewModel(snap, new Set(), opts).summary;
-    const knapp = buildPanelViewModel(snap, new Set([itemKey("tab", "Notes/Tools.md")]), opts).summary;
-    expect(knapp).not.toBe(voll);
+  it("die Messung nimmt den GEFILTERTEN Block, nicht den vollen", () => {
+    // Geprueft wird `chars`, nicht `summary`: die Summenzeile rundet auf 0,1 KB, und bei
+    // einem Block dieser Groesse liefern ein und zwei Tabs dieselbe Zeichenkette. Der Test
+    // waere falsch-rot gewesen, ohne dass am Code etwas falsch ist.
+    const voll = buildPanelViewModel(snap, new Set(), opts).chars;
+    const knapp = buildPanelViewModel(snap, new Set([itemKey("tab", "Notes/Tools.md")]), opts).chars;
+    expect(knapp).toBeLessThan(voll);
   });
   it("meldet is-warning, wenn der Block das Fenster fuellt", () => {
     const eng = buildPanelViewModel(snap, new Set(), { ...opts, windowTokens: 32 });
@@ -603,6 +611,7 @@ export interface PanelSection {
 }
 export interface PanelViewModel {
   sections: PanelSection[];
+  chars: number;
   summary: string;
   state: "is-ok" | "is-warning";
   hasOff: boolean;
@@ -666,6 +675,7 @@ export function buildPanelViewModel(
 
   return {
     sections: [{ id: "workspace", title: t.workspace, chips, empty: chips.length === 0 ? t.empty : "" }],
+    chars: text.length,
     summary: t.summary(kb, pct),
     state: pct >= WARN_AT * 100 ? "is-warning" : "is-ok",
     hasOff: off.size > 0,
