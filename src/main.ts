@@ -33,6 +33,8 @@ import { AVAILABLE_MODES, type ContextAttachment, type ContextMode } from "./cor
 import { modeLabel } from "./core/context/labels";
 import { renderWorkspaceContext } from "./core/context/workspace-line";
 import { editorPort, linesAround, readWorkspace } from "./obsidian/workspace";
+import { applySelection, itemKey, type SelectionKey } from "./core/context/selection";
+import type { ContextSource } from "./core/context/types";
 
 /** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
  *  "read-error" (Datei liess sich nicht lesen) und "no-description" (Frontmatter ohne
@@ -68,12 +70,32 @@ export default class KodaPlugin extends Plugin {
     for (const v of this.views()) v.syncContextMode();
   }
 
+  /** Abgewählte Teile des Arbeitsplatzes. Lebt im Plugin, nicht in der View: `currentContext()`
+   *  braucht ihn, die View zeigt ihn nur an (UI-STANDARD §4 — DOM ist Funktion des Zustands).
+   *  Nicht persistiert: eine Abwahl gilt für diese Sitzung, `contextKeepChoices` steuert nur,
+   *  ob sie das Senden überlebt. */
+  contextOff: Set<SelectionKey> = new Set();
+
+  toggleContextItem(source: ContextSource, path: string): void {
+    const key = itemKey(source, path);
+    if (this.contextOff.has(key)) this.contextOff.delete(key);
+    else this.contextOff.add(key);
+    for (const v of this.views()) v.syncContextPanel();
+  }
+
+  resetContextSelection(): void {
+    if (this.contextOff.size === 0) return;
+    this.contextOff.clear();
+    for (const v of this.views()) v.syncContextPanel();
+  }
+
   /** Der Kontext, der mit der naechsten Nachricht geht — `ask()` ruft DIESE Methode, der
    *  GUI-Smoke misst sie: es gibt keinen zweiten Weg, auf dem der Block entsteht. */
   currentContext(): ContextAttachment | null {
     if (this.contextMode === "off") return null;
     const s = this.settings;
-    return renderWorkspaceContext(readWorkspace(this.app, VIEW_TYPE_KODA), {
+    const snap = applySelection(readWorkspace(this.app, VIEW_TYPE_KODA), this.contextOff);
+    return renderWorkspaceContext(snap, {
       lang: this.promptLang(),
       selectionMax: s.contextSelectionChars,
       tabsMax: s.contextTabsMax,
@@ -389,6 +411,7 @@ export default class KodaPlugin extends Plugin {
     this.chatLog = [];
     this.lastNotice = null;
     this.skillNotice = null;
+    this.resetContextSelection();
     for (const v of this.views()) v.renderLog();
   }
 
@@ -409,6 +432,11 @@ export default class KodaPlugin extends Plugin {
       this.chatLog.push(userMsg);
       await this.store.appendMessages([userMsg]);
       for (const v of this.views()) v.renderLog();
+
+      // `contextKeepChoices` aus: die Abwahl galt nur für diese eine Nachricht. Nach dem
+      // Senden zurück auf den vollen Kontext — sonst wirkt eine einmalige Abwahl unbemerkt
+      // weiter (Spec § E6, Default ist das Gegenteil: behalten).
+      if (!this.settings.contextKeepChoices) this.resetContextSelection();
 
       const s = this.settings;
       const memory = await this.readMemory();

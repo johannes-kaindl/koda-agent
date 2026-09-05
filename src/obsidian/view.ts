@@ -118,6 +118,10 @@ export class KodaView extends ItemView {
     if (this.modeEl !== null) this.modeEl.value = this.plugin.contextMode;
   }
 
+  /** Platzhalter bis Task 7: der Kontext-Tab existiert noch nicht. Absichtlich leer statt
+   *  weggelassen — so bleibt jeder Task fuer sich gate-gruen. */
+  syncContextPanel(): void { /* Task 7 fuellt das */ }
+
   focusInput(): void {
     this.inputEl.focus();
   }
