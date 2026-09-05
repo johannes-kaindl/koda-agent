@@ -35,6 +35,8 @@ import { renderWorkspaceContext } from "./core/context/workspace-line";
 import { editorPort, linesAround, readWorkspace } from "./obsidian/workspace";
 import { applySelection, itemKey, type SelectionKey } from "./core/context/selection";
 import type { ContextSource } from "./core/context/types";
+import { buildPanelViewModel, type PanelViewModel } from "./core/context/panel-vm";
+import type { CollapsibleStorage } from "./vendor/kit-obsidian/collapsible";
 
 /** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
  *  "read-error" (Datei liess sich nicht lesen) und "no-description" (Frontmatter ohne
@@ -87,6 +89,30 @@ export default class KodaPlugin extends Plugin {
     if (this.contextOff.size === 0) return;
     this.contextOff.clear();
     for (const v of this.views()) v.syncContextPanel();
+  }
+
+  /** Speist den Kontext-Tab. Liest denselben Snapshot und dieselben Einstellungen wie
+   *  `currentContext()` — es gibt keinen zweiten Weg zu dem, was angezeigt wird. */
+  contextViewModel(): PanelViewModel {
+    const s = this.settings;
+    return buildPanelViewModel(readWorkspace(this.app, VIEW_TYPE_KODA), this.contextOff, {
+      lang: this.promptLang(),
+      selectionMax: s.contextSelectionChars,
+      tabsMax: s.contextTabsMax,
+      frontmatterMax: s.contextFrontmatterChars,
+      windowTokens: s.contextWindowTokens,
+    });
+  }
+
+  /** Auf/Zu-Zustand der Abschnitte, persistiert in `data.json`. */
+  sectionStorage(): CollapsibleStorage {
+    return {
+      getCollapsed: (key) => this.settings.contextSections[key],
+      setCollapsed: (key, collapsed) => {
+        this.settings.contextSections = { ...this.settings.contextSections, [key]: collapsed };
+        void this.saveSettings();
+      },
+    };
   }
 
   /** Der Kontext, der mit der naechsten Nachricht geht — `ask()` ruft DIESE Methode, der

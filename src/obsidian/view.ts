@@ -1,15 +1,19 @@
 import { Component, ItemView, MarkdownRenderer, setIcon, type WorkspaceLeaf } from "obsidian";
 import { t, getLang } from "../vendor/kit/i18n";
 import { confirmAction } from "../vendor/kit-obsidian/confirm";
+import { buildHubInto, type HubController, type HubPanel } from "../vendor/kit-obsidian/hub";
 import { isCompactionRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
 import { splitStable } from "../core/chat/stream-blocks";
 import { thinkToggleView } from "../core/chat/reasoning-toggle";
 import { AVAILABLE_MODES, isContextMode } from "../core/context/types";
 import { contextSummary, modeLabel } from "../core/context/labels";
+import { ContextPanel } from "./context-panel";
 import type KodaPlugin from "../main";
 
 export const VIEW_TYPE_KODA = "koda-agent-view";
+
+type KodaTab = "chat" | "context";
 
 /** Chat-Sidebar. Rendert plugin.chatLog; Streaming/Tool-Schritte kommen als
  *  gezielte DOM-Appends (kein Voll-Redraw pro Token). */
@@ -42,6 +46,10 @@ export class KodaView extends ItemView {
   /** Modus-Dropdown in der Knopfzeile — null vor onOpen. */
   private modeEl: HTMLSelectElement | null = null;
 
+  // — Hub: Chat- und Kontext-Tab —
+  private hub: HubController<KodaTab> | null = null;
+  private ctxPanel: ContextPanel | null = null;
+
   constructor(leaf: WorkspaceLeaf, private readonly plugin: KodaPlugin) {
     super(leaf);
   }
@@ -73,7 +81,24 @@ export class KodaView extends ItemView {
     newChatEl.setAttribute("aria-label", t("view.newChat"));
     newChatEl.addEventListener("click", () => void this.askNewChat());
 
-    this.mountChat(root);
+    const chatPanel: HubPanel<KodaTab> = {
+      id: "chat",
+      get label() { return t("view.tab.chat"); },
+      icon: "message-square",
+      mount: (c) => { this.mountChat(c); },
+      destroy: () => undefined,
+    };
+    this.ctxPanel = new ContextPanel({
+      mode: () => this.plugin.contextMode,
+      setMode: (m) => { this.plugin.setContextMode(m); },
+      viewModel: () => this.plugin.contextViewModel(),
+      toggle: (s, p) => { this.plugin.toggleContextItem(s, p); },
+      reset: () => { this.plugin.resetContextSelection(); },
+      openNote: (p) => { void this.app.workspace.openLinkText(p, "", false); },
+      sectionStorage: () => this.plugin.sectionStorage(),
+      lang: () => this.lang(),
+    });
+    this.hub = buildHubInto<KodaTab>(root.createDiv({ cls: "koda-hub" }), [chatPanel, this.ctxPanel], "chat");
 
     this.syncThinkAction();
 
@@ -82,16 +107,24 @@ export class KodaView extends ItemView {
     return Promise.resolve();
   }
 
+  onClose(): Promise<void> {
+    this.hub?.destroy();
+    this.hub = null;
+    return Promise.resolve();
+  }
+
   // — Arbeitskontext: Dropdown-Sync, Fokus aus main.ts (Editor-Kontextmenue, Befehlspalette) —
   private lang(): "de" | "en" { return getLang() === "de" ? "de" : "en"; }
 
+  /** `setTab` bleibt gekapselt: Befehlspalette/Deep-Links kennen die View, nicht den Hub. */
+  setTab(id: KodaTab): void { this.hub?.setTab(id); }
+
   syncContextMode(): void {
     if (this.modeEl !== null) this.modeEl.value = this.plugin.contextMode;
+    this.ctxPanel?.render();
   }
 
-  /** Platzhalter bis Task 7: der Kontext-Tab existiert noch nicht. Absichtlich leer statt
-   *  weggelassen — so bleibt jeder Task fuer sich gate-gruen. */
-  syncContextPanel(): void { /* Task 7 fuellt das */ }
+  syncContextPanel(): void { this.ctxPanel?.render(); }
 
   /** Der Chat-Inhalt (Verlauf, Statuszeile, Eingabe) in einen beliebigen Container.
    *  Aufgeteilt fuer den Hub: bis Etappe 2 baute `onOpen` direkt in `contentEl`. Der Baum ist
