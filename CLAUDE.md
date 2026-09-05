@@ -17,7 +17,7 @@ Tool-Ergebnisse, Kontextzeile unter der Blase), Werkzeuge `get_workspace` und `e
 (Invariante „Vorschau == geschriebener Inhalt", Pfad muss zur aktiven Notiz passen), vier
 Einstellungen „Arbeitskontext" (Modus-Default und drei Kappungen — **jeder Wert mit Einfluss ist
 einstellbar**, Johannes' Grundsatz vom 2026-09-02), `contextUsage` misst die Projektion.
-Gate 585/585; GUI-Smoke **26/26** (Stand 2026-09-04, fünf Läufe — Befunde in `docs/SMOKE.md`); zur Etappe 1 waren es 541 und 23/23 (fünf Läufe: die vier roten davor waren ausnahmslos
+Gate 598/598; GUI-Smoke **28/28** (Stand 2026-09-05, vier Läufe — Befunde in `docs/SMOKE.md`); zur Etappe 1 waren es 541 und 23/23 (fünf Läufe: die vier roten davor waren ausnahmslos
 Treiber-Defekte, dokumentiert in `docs/SMOKE.md`); Praxistest gegen `qwen/qwen3.8-27b`: Koda liest
 die offene Notiz per `read_note` auf den Kontext-Pfad statt zu suchen. ⚠️ **Zwei gemessene
 Obsidian-Fallen aus dieser Arbeit:** (1) `activeEditor` ist aus der Seitenleiste heraus leer —
@@ -203,7 +203,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 26 Punkte (24–26 seit 2026-09-04: `move_note` zieht die Wikilinks nach — der Punkt misst den Link im **Dateiinhalt** der verweisenden Notiz, nicht `resolvedLinks`, und protokolliert Obsidians Einstellung `alwaysUpdateLinks` mit, statt sie zu setzen; das Move-Modal nennt beide Pfade und die Backlink-Zahl; `delete_note` fragt auch im Koda-Ordner) (20–23 seit 2026-09-02: Arbeitsplatz-Block aus der Sidebar, Modus-Zustand, Werkzeugliste, `edit_active_note`-Invariante) (9–13 seit
+  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 28 Punkte (27–28 seit 2026-09-05: restaurierte Tabs als DeferredViews — der Treiber baut den Zustand mit `changeLayout(getLayout())` nach und braucht **keinen** Neustart mehr; dazu doppelte Tab-Pfade. Beide gegengeprobt: mit dem alten Build ist 28 rot, mit entferntem State-Zweig 27) (24–26 seit 2026-09-04: `move_note` zieht die Wikilinks nach — der Punkt misst den Link im **Dateiinhalt** der verweisenden Notiz, nicht `resolvedLinks`, und protokolliert Obsidians Einstellung `alwaysUpdateLinks` mit, statt sie zu setzen; das Move-Modal nennt beide Pfade und die Backlink-Zahl; `delete_note` fragt auch im Koda-Ordner) (20–23 seit 2026-09-02: Arbeitsplatz-Block aus der Sidebar, Modus-Zustand, Werkzeugliste, `edit_active_note`-Invariante) (9–13 seit
   2026-08-30: Statuszeile, Kontext-Belegung, Thinking-Schalter, Rückfrage vorm Verwerfen,
   gesperrter Thinking-Zustand; 16–18 seit 2026-08-31: Reset auf den Auslieferungsstand,
   ein abgeschaltetes Werkzeug fehlt in der gesendeten Liste, das Vorschau-Modal führt

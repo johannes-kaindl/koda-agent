@@ -43,6 +43,13 @@ Vorbereitung: `npm run build`, `npm run smoke:gui -- --setup` (baut den Staging-
     Tabs, keine Seitenleisten-Ansichten (Backlinks, Gliederung). Gemessen 2026-09-02: vor dem
     Fix 1 von 4 Tabs plus drei Seitenleisten-Ansichten.
 
+    → **seit 2026-09-05 automatisiert (Prüfpunkt 27).** Der Treiber braucht dafür weder
+    Neustart noch Fenster-Schließen: `workspace.changeLayout(workspace.getLayout())` stellt
+    die nicht-aktiven Tabs so wieder her wie ein Neustart, nämlich als DeferredViews
+    (gemessen 2026-09-05: 3 von 4 Leaves). Der Handpunkt bleibt trotzdem stehen — er misst
+    den **echten** Neustart, der Prüfpunkt nur dessen Nachbau. Wer nach einem
+    Obsidian-Update misst, fährt ihn.
+
 ### Semantisches Retrieval (nur mit aktivem „Vault Retrieval")
 
 14. Frage mit einem Begriff, der **nicht wörtlich** im Vault steht, aber inhaltlich passt
@@ -127,14 +134,16 @@ CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den Port wartet.
 
 Erst wenn nichts läuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
 
-Dreiundzwanzig dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+Achtundzwanzig dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
 laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
 2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
 erweitert, 2026-08-30 um 9–12 für die umgebaute Sidebar und um 13, den gesperrten Zustand des
 Thinking-Schalters, 2026-08-31 um 16–18 für die Modell-Steuerung: Reset auf den
 Auslieferungsstand, die GESENDETE Werkzeugliste bei einem abgeschalteten Werkzeug, das
 Vorschau-Modal mit Memory und Skills; 2026-09-02 um 19, den Kit-Vertrag `hide()` → Cache
-verwerfen). Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
+verwerfen; 2026-09-04 um 24–26 für `move_note`/`delete_note`; 2026-09-05 um 27 und 28 —
+restaurierte Tabs (DeferredViews, vorher nur Handpunkt 25) und doppelte Tab-Pfade).
+Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
 
 ```bash
 osascript -e 'quit app "Obsidian"'
@@ -746,6 +755,40 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   synthetischer Mausklick probiert). **Prüfpunkt 3 ist damit unbewiesen** — er war noch nie
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
+
+## Belegter Lauf: 2026-09-05, 08:30 — Etappe-2-Restposten (28/28), mit Gegenproben
+
+Vault `koda-agent` (Staging), Obsidian 1.14.0, Plugin-Build von `8d3cd44` + Treiber mit den
+neuen Punkten 27/28. Vier Läufe, CDP-Lock `--exclusive focus`, kein Quit — das Fenster kam per
+`obsidian://open?path=` neben zwei fremden Vaults dazu.
+
+**Der Kern des Tages ist nicht die 28, sondern dass Handpunkt 25 automatisierbar wurde.** Er
+verlangte bisher einen Neustart oder ein geschlossenes Fenster, und das ist auf einer geteilten
+Instanz teuer. Gemessen: `app.workspace.changeLayout(app.workspace.getLayout())` stellt die
+nicht-aktiven Tabs so wieder her wie ein Neustart, nämlich als `DeferredView`s (3 von 4 Leaves in
+der Vorab-Diagnose, 6 im Lauf). Der Punkt liest den Block danach, **ohne einen Tab anzufassen** —
+ein Klick würde den DeferredView laden und den Gegenstand zerstören.
+
+| Lauf | Plugin-Stand | 27 | 28 | Aussage |
+|---|---|---|---|---|
+| 1 | `8d3cd44` (neu) | ✓ 6/6 im Block | ✓ 5 Leaves → 1 Eintrag | beide grün |
+| 2 | `c48c6bc` (alt) | ✓ 6/6 | ✗ 5 im Block, 7 statt 3 Einträge | 28 fängt die Entdoppelung |
+| 3 | `8d3cd44` + Mutation | ✗ 0/6, „FEHLT: 6 Pfade" | ✗ (Folgefehler) | 27 fängt den State-Zweig |
+| 4 | `8d3cd44` (neu) | ✓ 6/6 | ✓ 5 → 1 | Quelle danach unverändert |
+
+**Warum zwei getrennte Gegenproben und nicht eine:** Lauf 2 lässt den DeferredView-Zweig intakt
+und trifft deshalb nur die Entdoppelung. Lauf 3 (State-Zweig aus `src/obsidian/workspace.ts`
+entfernt) macht Punkt 28 als Folge mit rot — sein Beleg steht schon aus Lauf 2. Wer beide
+Regeln in einem Lauf bricht, bekommt zwei rote Punkte und weiß von keinem, warum.
+
+**Punkt 27 belegt seinen Gegenstand selbst:** entsteht binnen 15 s kein einziger DeferredView,
+bricht er ab, statt grün zu melden. Ohne das wäre er grün, ohne die Sache je berührt zu haben —
+dieselbe Vorsicht wie bei Punkt 19s mittlerer Messung.
+
+⚠️ Der Handpunkt 25 bleibt stehen. `changeLayout` ist ein **Nachbau** des Neustarts; ob Obsidian
+nach einem echten Kaltstart dasselbe tut, sagt nur der Kaltstart — nach einem Obsidian-Update ist
+er die Probe. Hintergrund in `_docs/docs/obsidian-api-gotchas.md` (dort stand bis heute, der
+Zustand sei nur per Fenster-Neuöffnen herstellbar).
 
 ## Belegter Lauf: 2026-09-04, 22:45 — move_note/delete_note (26/26)
 

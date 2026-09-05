@@ -1679,6 +1679,99 @@ async function main(): Promise<void> {
       `).catch(() => undefined);
     }
     record("26. delete_note fragt auch im Koda-Ordner nach und legt die Notiz in den Papierkorb", ok26, detail26);
+
+    // ---- 27 + 28: restaurierte Tabs und doppelte Pfade ------------------------
+    //
+    // Beide messen dieselbe Naht zum Host und teilen deshalb einen Aufbau: drei Tabs, davon
+    // ZWEI auf derselben Notiz. Danach `changeLayout(getLayout())` — das stellt die
+    // nicht-aktiven Tabs so wieder her, wie ein Neustart es taete, naemlich als
+    // DeferredViews (gemessen 2026-09-05: 3 von 4 Leaves). Das ist der Grund, warum es
+    // diesen Punkt jetzt gibt: Handpunkt 25 verlangte bisher Fenster-Schliessen und
+    // Neuoeffnen und war deshalb nur von Hand belegt — eine Regel, die nur die
+    // Unit-Tests decken, ist auf der Obsidian-Seite unbelegt.
+    //
+    // Der Punkt belegt seinen eigenen Gegenstand mit: ohne mindestens einen DeferredView
+    // waere er gruen, ohne die Sache je beruehrt zu haben (dieselbe Vorsicht wie bei
+    // Punkt 19s mittlerer Messung). Deshalb wartet er auf den Zustand, statt ihn
+    // anzunehmen, und faellt durch, wenn er ausbleibt.
+    const TAB_A = "Notes/Project plan.md";
+    const TAB_B = "Notes/Compaction.md";
+    let ok27 = false;
+    let detail27 = "";
+    let ok28 = false;
+    let detail28 = "";
+    try {
+      await cdp.evaluate(`
+        window.__kodaLayoutVorher = app.workspace.getLayout();
+        for (const pfad of [${JSON.stringify(TAB_A)}, ${JSON.stringify(TAB_A)}, ${JSON.stringify(TAB_B)}]) {
+          const datei = app.vault.getFileByPath(pfad);
+          if (!datei) continue;
+          await app.workspace.getLeaf("tab").openFile(datei);
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        await app.workspace.changeLayout(app.workspace.getLayout());
+        return true;
+      `);
+      // Die Messung liest den Block, OHNE einen Tab anzufassen — ein Klick wuerde den
+      // DeferredView laden und damit genau den Zustand zerstoeren, um den es geht.
+      const mess = await pollUntil<{
+        items: string[];
+        allePfade: string[];
+        deferredPfade: string[];
+      }>(
+        cdp,
+        `
+        const plugin = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const ctx = plugin ? plugin.currentContext() : null;
+        if (!ctx) return null;
+        const items = (ctx.items ?? []).filter((i) => i.source === "tab").map((i) => i.path);
+        const allePfade = []; const deferredPfade = [];
+        app.workspace.iterateAllLeaves((l) => {
+          const root = l.getRoot();
+          if (root === app.workspace.leftSplit || root === app.workspace.rightSplit) return;
+          const st = l.getViewState();
+          if (st && st.type === ${JSON.stringify(VIEW_TYPE)}) return;
+          const ausView = l.view && l.view.file ? l.view.file.path : null;
+          const ausState = st && st.state && typeof st.state.file === "string" && st.state.file !== "" ? st.state.file : null;
+          const pfad = ausView ?? ausState;
+          if (!pfad) return;
+          allePfade.push(pfad);
+          if (l.isDeferred) deferredPfade.push(pfad);
+        });
+        // Kein DeferredView heisst NICHT „bestanden", sondern „noch nicht so weit" —
+        // deshalb null statt eines Ergebnisses (pollUntil-Vertrag).
+        if (deferredPfade.length === 0) return null;
+        return { items, allePfade, deferredPfade };
+      `,
+        15_000,
+      );
+      if (mess === null) throw new Error("kein DeferredView entstanden — der Punkt haette seinen Gegenstand nicht beruehrt");
+      const fehlend = mess.deferredPfade.filter((pfad) => !mess.items.includes(pfad));
+      ok27 = mess.deferredPfade.length > 0 && fehlend.length === 0;
+      detail27 = `DeferredViews: ${mess.deferredPfade.length} · davon im Block: ${mess.deferredPfade.length - fehlend.length}${fehlend.length > 0 ? ` · FEHLT: ${fehlend.join(", ")}` : ""}`;
+
+      const leavesMitA = mess.allePfade.filter((pfad) => pfad === TAB_A).length;
+      const imBlockA = mess.items.filter((pfad) => pfad === TAB_A).length;
+      const eindeutig = new Set(mess.allePfade).size;
+      ok28 = leavesMitA >= 2 && imBlockA === 1 && mess.items.length === eindeutig;
+      detail28 = `Leaves auf „${TAB_A}": ${leavesMitA} · im Block: ${imBlockA} · Block-Eintraege ${mess.items.length} vs. eindeutige Pfade ${eindeutig}`;
+    } catch (error) {
+      const grund = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail27 = grund;
+      detail28 = grund;
+    } finally {
+      // Das Layout so zuruecksetzen, wie es vorgefunden wurde — der Vault ist Wegwerfware,
+      // aber ein Lauf, der Tabs stehen laesst, veraendert die Ausgangslage des naechsten.
+      await cdp
+        .evaluate(`
+          if (window.__kodaLayoutVorher) await app.workspace.changeLayout(window.__kodaLayoutVorher);
+          delete window.__kodaLayoutVorher;
+          return true;
+        `)
+        .catch(() => undefined);
+    }
+    record("27. Restaurierte, nicht besuchte Tabs (DeferredViews) stehen im Arbeitskontext", ok27, detail27);
+    record("28. Dieselbe Notiz in zwei Tabs steht einmal im Block, nicht zweimal", ok28, detail28);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
