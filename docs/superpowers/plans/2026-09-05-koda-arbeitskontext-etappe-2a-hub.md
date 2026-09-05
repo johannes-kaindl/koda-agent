@@ -351,7 +351,7 @@ export function applySelection(snap: WorkspaceSnapshot, off: ReadonlySet<Selecti
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/context_selection.test.ts`
-Expected: PASS (6 Tests).
+Expected: PASS (7 Tests — einer fuer `itemKey`, sechs fuer `applySelection`).
 
 - [ ] **Step 5: Gegenprobe per Mutation**
 
