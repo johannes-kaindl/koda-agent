@@ -161,3 +161,20 @@ describe("Arbeitskontext-Einstellungen", () => {
     expect(validateKodaSettings({ contextModeDefault: "note" }).contextModeDefault).toBe("note");
   });
 });
+
+describe("Arbeitskontext-Einstellungen der Etappe 2", () => {
+  it("contextKeepChoices ist standardmaessig an — Abwahl bleibt, bis der Nutzer sie aufhebt", () => {
+    expect(validateKodaSettings({}).contextKeepChoices).toBe(true);
+    expect(validateKodaSettings({ contextKeepChoices: false }).contextKeepChoices).toBe(false);
+  });
+  it("contextKeepChoices faellt bei Unsinn auf den Auslieferungswert zurueck", () => {
+    expect(validateKodaSettings({ contextKeepChoices: "ja" }).contextKeepChoices).toBe(true);
+  });
+  it("contextSections nimmt nur Booleans — fremde Werte kosten den Eintrag, nicht das Feld", () => {
+    const s = validateKodaSettings({ contextSections: { workspace: false, kaputt: 7 } });
+    expect(s.contextSections).toEqual({ workspace: false });
+  });
+  it("contextSections faellt bei komplett falschem Typ auf {} zurueck", () => {
+    expect(validateKodaSettings({ contextSections: "auf" }).contextSections).toEqual({});
+  });
+});

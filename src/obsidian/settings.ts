@@ -219,6 +219,11 @@ export class KodaSettingsTab extends PluginSettingTab {
             desc: t("settings.contextFrontmatter.desc"),
             control: { type: "slider", key: "contextFrontmatterChars", min: CONTEXT_FRONTMATTER_MIN, max: CONTEXT_FRONTMATTER_MAX, step: CONTEXT_FRONTMATTER_STEP },
           },
+          {
+            name: t("settings.contextKeep"),
+            desc: t("settings.contextKeep.desc"),
+            control: { type: "toggle", key: "contextKeepChoices" },
+          },
         ],
       },
       {

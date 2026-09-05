@@ -102,6 +102,14 @@ export interface KodaSettings {
   contextSelectionChars: number;
   contextTabsMax: number;
   contextFrontmatterChars: number;
+  /** Bleiben Abwahl und manuelle Zusaetze ueber die Nachricht hinaus stehen? Default `true`:
+   *  der weniger ueberraschende Zustand — was abgewuehlt ist, bleibt abgewuehlt, bis „Auswahl
+   *  zuruecksetzen" oder ein neues Gespraech. vault-rag lebt das Gegenteil, weil dort die
+   *  Kandidaten je Frage neu kommen; hier sind sie stabil (Spec § E6). */
+  contextKeepChoices: boolean;
+  /** Auf/Zu-Zustand der Abschnitte im Kontext-Tab. Kein Bedienelement in den Einstellungen,
+   *  nur Persistenz — der Nutzer klappt im Panel. */
+  contextSections: Record<string, boolean>;
   /** Ersetzt den ausgelieferten Regelblock. "" heisst Auslieferungsstand — der Default wird
    *  NIE in die data.json kopiert, sonst friere er beim ersten Oeffnen des Feldes ein und
    *  jede spaetere Verbesserung erreichte genau die Nutzer nicht mehr, die hineingesehen
@@ -134,6 +142,8 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   contextSelectionChars: 600,
   contextTabsMax: 12,
   contextFrontmatterChars: 300,
+  contextKeepChoices: true,
+  contextSections: {},
   systemPromptOverride: "",
   toolsDisabled: [],
   toolDescriptions: {},
@@ -151,6 +161,16 @@ const stringRecord: FieldCheck<Record<string, string>> = (raw, fallback) => {
   if (!isPlainObject(raw)) return fallback;
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) if (typeof v === "string") out[k] = v;
+  return out;
+};
+
+/** Record von Booleans — dieselbe bewusste Ausnahme wie `stringRecord`: unbekannte Werttypen
+ *  kosten den EINTRAG, nicht das ganze Feld. Ein einzelner kaputter Abschnitts-Zustand soll
+ *  nicht alle anderen zuruecksetzen. */
+const boolRecord: FieldCheck<Record<string, boolean>> = (raw, fallback) => {
+  if (!isPlainObject(raw)) return fallback;
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(raw)) if (typeof v === "boolean") out[k] = v;
   return out;
 };
 
@@ -179,6 +199,7 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
   contextSelectionChars: clampIntField(CONTEXT_SELECTION_MIN, CONTEXT_SELECTION_MAX),
   contextTabsMax: clampIntField(CONTEXT_TABS_MIN, CONTEXT_TABS_MAX),
   contextFrontmatterChars: clampIntField(CONTEXT_FRONTMATTER_MIN, CONTEXT_FRONTMATTER_MAX),
+  contextSections: boolRecord,
   toolsDisabled: stringArray,
   toolDescriptions: stringRecord,
 };
