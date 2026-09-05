@@ -269,9 +269,11 @@
    `is-off` statt `is-pinned`: bei vault-rag ist Angeheftetsein die Ausnahme, hier ist es
    das Weglassen. */
 .koda-ctx-head { display: flex; align-items: center; gap: var(--size-4-2); padding: var(--size-4-2); }
-.koda-ctx-summary { display: flex; align-items: center; gap: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); margin-left: auto; }
+.koda-ctx-summary { display: flex; align-items: center; gap: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); margin-left: auto; } /* -label und -icon erben Größe und Farbe von hier. */
+.koda-ctx-summary.is-ok { color: var(--text-muted); }
 .koda-ctx-summary.is-warning { color: var(--text-warning); }
 .koda-ctx-summary-icon { display: flex; }
+.koda-ctx-summary-label { font-size: var(--font-ui-smaller); }
 .koda-ctx-body { padding: 0 var(--size-4-2) var(--size-4-2); overflow-y: auto; }
 .koda-ctx-chips { display: flex; flex-wrap: wrap; gap: var(--size-2-2); }
 .koda-ctx-chip { display: flex; align-items: center; gap: var(--size-2-1); font-size: var(--font-ui-smaller); padding: 2px 6px; border-radius: 10px; background: var(--background-modifier-border); }
