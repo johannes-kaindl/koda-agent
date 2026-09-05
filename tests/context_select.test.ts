@@ -52,4 +52,43 @@ describe("allocateBudget", () => {
     expect(out[0]?.shown).toBe("");
     expect(out[0]?.cut).toBe(true);
   });
+
+  it("haelt auch bei Aushungerung Ganzzahl-Verlust aus (4x5 Zeichen, Budget 3)", () => {
+    // Wasserfuellung: Scheibe = floor(3/4) = 0. Niemand passt.
+    // Alle bekommen 0, alle sind gekuerzt (und melden volle Laenge), Restzeichen bleiben liegen.
+    // Das ist korrekt: die Verteilung ist ganzzahlig, der Verlust durch offen.length beschraenkt,
+    // und kann nie zu Ueberschreitung führen — nur zu ungenutztem Rest.
+    const out = allocateBudget([eintrag("a.md", 5), eintrag("b.md", 5), eintrag("c.md", 5), eintrag("d.md", 5)], 3);
+    expect(out.map((e) => e.shown.length)).toEqual([0, 0, 0, 0]);
+    expect(out.map((e) => e.cut)).toEqual([true, true, true, true]);
+    expect(out.map((e) => e.fullChars)).toEqual([5, 5, 5, 5]);
+  });
+
+  it("einhält die Invarianten ueber verschiedene Laengenverteilungen (Summe <= Budget)", () => {
+    // Invarianten: Summe(shown.length) <= budget UND shown.length <= fullChars
+    // UND cut === (shown.length < fullChars). Getestet über eine feste Tabelle,
+    // damit der Fehler sagt, welcher Fall gebrochen ist.
+    const checkInvariants = (entries: LoadedCandidate[], budget: number, desc: string) => {
+      const out = allocateBudget(entries, budget);
+      const sumShown = out.reduce((s, e) => s + e.shown.length, 0);
+
+      // Invariante 1: Summe <= Budget
+      expect(sumShown, `${desc}: Summe(shown.length) exceeded budget`).toBeLessThanOrEqual(budget);
+
+      // Invariante 2 & 3: pro Eintrag
+      for (let i = 0; i < out.length; i++) {
+        const e = out[i]!;
+        expect(e.shown.length, `${desc}[${i}]: shown.length > fullChars`).toBeLessThanOrEqual(e.fullChars);
+        expect(e.cut, `${desc}[${i}]: cut-Flag inkorrekt`).toBe(e.shown.length < e.fullChars);
+      }
+    };
+
+    checkInvariants([eintrag("a.md", 100)], 50, "eine Notiz, Budget zu klein");
+    checkInvariants([eintrag("a.md", 100)], 1000, "eine Notiz, Budget gross");
+    checkInvariants([eintrag("a.md", 50), eintrag("b.md", 50)], 75, "zwei gleich gross, Budget knapp");
+    checkInvariants([eintrag("a.md", 10), eintrag("b.md", 100)], 50, "stark ungleich, Budget gemischt");
+    checkInvariants([eintrag("a.md", 100), eintrag("b.md", 100), eintrag("c.md", 100)], 50, "drei Eintraege, Budget sehr klein");
+    checkInvariants([eintrag("a.md", 1), eintrag("b.md", 1)], 0, "zwei Eintraege, Budget 0");
+    checkInvariants([eintrag("a.md", 1000)], 999, "grosse Notiz, fast ganzes Budget");
+  });
 });
