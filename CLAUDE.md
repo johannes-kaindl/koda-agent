@@ -17,6 +17,18 @@ läuft nicht, also entsteht kein GitHub-Release. **Nicht rescannen, solange das 
 Scan ohne Release gilt als durchgefallen und nimmt das *Plugin* binnen 24 h aus der Suche.
 Verteilung läuft über Forgejo und den `anysource-sideloader`-Katalog.
 
+**Auf dem Branch `feat/kontext-hub` (noch nicht nach `main` gemerged) ist Etappe 2a fertig:
+ein Kontext-Tab neben dem Chat.** Kodas Sidebar hat jetzt eine Hub-Tab-Leiste mit zwei Tabs —
+Chat wie bisher, dazu Kontext: er zeigt als Chips, was die nächste Nachricht ans Modell
+mitnimmt (aktive Notiz, Markierung, offene Tabs), lässt einzelne davon abwählen und nennt die
+Belegung des Kontextfensters darunter. Eine abgewählte Auswahl bleibt abgewählt, bis „Auswahl
+zurücksetzen" gedrückt wird oder ein neues Gespräch beginnt; die Einstellung „Kontext-Auswahl
+behalten" (`contextKeepChoices`, Default an) dreht das um. Zwei neue Befehle: Chat-Tab zeigen,
+Kontext-Tab zeigen. Gate **618/618** (57 Testdateien), GUI-Smoke **31/31** (drei neue Punkte
+29–31, alle einzeln gegengeprobt — Details in `docs/SMOKE.md`). Spec/Plan unter
+`.superpowers/sdd/2026-09-05-koda-arbeitskontext-etappe-2a-hub/`. Ein Release ist noch nicht
+Teil dieser Etappe.
+
 ### Vorgeschichte: 0.11.0
 
 **Arbeitskontext, Etappe 1 ist gebaut, reviewt, belegt und als 0.11.0 released** (Merge per
@@ -218,7 +230,11 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 28 Punkte (27–28 seit 2026-09-05: restaurierte Tabs als DeferredViews — der Treiber baut den Zustand mit `changeLayout(getLayout())` nach und braucht **keinen** Neustart mehr; dazu doppelte Tab-Pfade. Beide gegengeprobt: mit dem alten Build ist 28 rot, mit entferntem State-Zweig 27) (24–26 seit 2026-09-04: `move_note` zieht die Wikilinks nach — der Punkt misst den Link im **Dateiinhalt** der verweisenden Notiz, nicht `resolvedLinks`, und protokolliert Obsidians Einstellung `alwaysUpdateLinks` mit, statt sie zu setzen; das Move-Modal nennt beide Pfade und die Backlink-Zahl; `delete_note` fragt auch im Koda-Ordner) (20–23 seit 2026-09-02: Arbeitsplatz-Block aus der Sidebar, Modus-Zustand, Werkzeugliste, `edit_active_note`-Invariante) (9–13 seit
+  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 31 Punkte (29–31 seit 2026-09-05:
+  der Hub-Tab „Kontext" — Tab-Leiste sichtbar mit Höhe > 0, ein per Chip abgewählter Teil des
+  Arbeitskontexts verschwindet aus dem gesendeten Block und kehrt nach „Auswahl zurücksetzen"
+  zurück, der Auf/Zu-Zustand eines Abschnitts übersteht den Reload. Alle drei einzeln
+  gegengeprobt) (27–28 seit 2026-09-05: restaurierte Tabs als DeferredViews — der Treiber baut den Zustand mit `changeLayout(getLayout())` nach und braucht **keinen** Neustart mehr; dazu doppelte Tab-Pfade. Beide gegengeprobt: mit dem alten Build ist 28 rot, mit entferntem State-Zweig 27) (24–26 seit 2026-09-04: `move_note` zieht die Wikilinks nach — der Punkt misst den Link im **Dateiinhalt** der verweisenden Notiz, nicht `resolvedLinks`, und protokolliert Obsidians Einstellung `alwaysUpdateLinks` mit, statt sie zu setzen; das Move-Modal nennt beide Pfade und die Backlink-Zahl; `delete_note` fragt auch im Koda-Ordner) (20–23 seit 2026-09-02: Arbeitsplatz-Block aus der Sidebar, Modus-Zustand, Werkzeugliste, `edit_active_note`-Invariante) (9–13 seit
   2026-08-30: Statuszeile, Kontext-Belegung, Thinking-Schalter, Rückfrage vorm Verwerfen,
   gesperrter Thinking-Zustand; 16–18 seit 2026-08-31: Reset auf den Auslieferungsstand,
   ein abgeschaltetes Werkzeug fehlt in der gesendeten Liste, das Vorschau-Modal führt
@@ -260,6 +276,16 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   aus `image-to-markdown`, Herkunftsstempel; drei Toggle-Zustaende **und** `effectiveSuppress`
   fuer die Request-Seite — die REGISTRY warnt, dass wer nur die Anzeige nimmt, die Haelfte hat).
 - `src/core/context/` — Arbeitskontext (Spec 2026-09-02): Typen, Ports, Block-Rendern; Adapter `src/obsidian/workspace.ts`.
+  Seit Etappe 2a (2026-09-05) dazu `selection.ts` (pure, Abwahl-Zustand): abgewählt wird der
+  **Snapshot vor dem Rendern**, nicht der gerenderte Block — sonst müssten Text und `items`
+  dieselbe Regel zweimal treffen, und „was im Block steht, steht in `items`" wäre eine
+  Behauptung statt einer Folge. Abgewählte Einträge werden markiert, nicht entfernt, sonst gäbe
+  es keinen Weg zurück. `panel-vm.ts` (pure) baut daraus das `PanelViewModel` des Kontext-Tabs —
+  ruft dieselbe `renderWorkspaceContext` wie `currentContext()` für die Summenzeile, damit die
+  angezeigte Belegung den tatsächlich gesendeten Block misst statt ihn nachzurechnen.
+  `src/obsidian/context-panel.ts` ist das Hub-Panel selbst (`ContextPanel`, UI-STANDARD §4:
+  schmaler Host-Vertrag, `viewModel()` liest nur, ändert nichts) — Chips, Auf/Zu-Abschnitte über
+  `collapsibleSection`, Modus-Dropdown, „Auswahl zurücksetzen".
 - `src/core/agent/compaction/` — zweistufige Verdichtung des Gesprächsverlaufs
   (`project.ts`/`estimate.ts`/`stage1.ts`/`stage2.ts`): Projektion statt Umschreiben,
   positionsbasierte Marken, Tool-Stubs vor Modell-Zusammenfassung, Nutzer-Nachrichten

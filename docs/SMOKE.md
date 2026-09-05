@@ -134,7 +134,7 @@ CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den Port wartet.
 
 Erst wenn nichts läuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
 
-Achtundzwanzig dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+Einunddreißig dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
 laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
 2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
 erweitert, 2026-08-30 um 9–12 für die umgebaute Sidebar und um 13, den gesperrten Zustand des
@@ -142,7 +142,10 @@ Thinking-Schalters, 2026-08-31 um 16–18 für die Modell-Steuerung: Reset auf d
 Auslieferungsstand, die GESENDETE Werkzeugliste bei einem abgeschalteten Werkzeug, das
 Vorschau-Modal mit Memory und Skills; 2026-09-02 um 19, den Kit-Vertrag `hide()` → Cache
 verwerfen; 2026-09-04 um 24–26 für `move_note`/`delete_note`; 2026-09-05 um 27 und 28 —
-restaurierte Tabs (DeferredViews, vorher nur Handpunkt 25) und doppelte Tab-Pfade).
+restaurierte Tabs (DeferredViews, vorher nur Handpunkt 25) und doppelte Tab-Pfade; 2026-09-05 um
+29–31 für den Kontext-Tab — Hub-Leiste sichtbar, ein abgewählter Chip verschwindet aus dem
+gesendeten Block und kehrt nach „Auswahl zurücksetzen" zurück, der Auf/Zu-Zustand eines
+Abschnitts übersteht den Reload).
 Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
 
 ```bash
@@ -178,7 +181,11 @@ in der Kopfzeile · **Rückfrage vor dem Verwerfen** eines Gesprächs · **Reset
 und Textarea auf den Auslieferungsstand zurück · ein **abgeschaltetes Werkzeug** bleibt aus der
 **gesendeten** Werkzeugliste (`currentToolNames()`) und kehrt nach dem Zurückschreiben zurück ·
 das **Vorschau-Modal** führt Memory- und Skills-Abschnitt · **`hide()` verwirft den
-Modell-Cache**, ein tot gemessener Endpunkt bleibt also nicht die ganze Sitzung tot.
+Modell-Cache**, ein tot gemessener Endpunkt bleibt also nicht die ganze Sitzung tot ·
+die **Hub-Tab-Leiste** (Chat/Kontext) ist sichtbar und hat eine Höhe > 0 · ein per Chip
+**abgewählter Teil des Arbeitskontexts** verschwindet aus dem tatsächlich gesendeten Block
+und kehrt nach „Auswahl zurücksetzen" zurück · der **Auf/Zu-Zustand** eines Kontext-Abschnitts
+übersteht einen Reload (`data.json`).
 
 ⚠️ **Punkt 2 misst seit dem 2026-09-01 die Größe der Kopfzeilen-Aktionen, nicht ihre
 Existenz — und das ist der teuerste Fund dieser Runde.** Von 0.9.0 bis 0.10.0 hingen
@@ -755,6 +762,40 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   synthetischer Mausklick probiert). **Prüfpunkt 3 ist damit unbewiesen** — er war noch nie
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
+
+## Belegter Lauf: 2026-09-05 — Kontext-Tab (31/31), mit Gegenproben
+
+Vault `koda-agent` (Staging), Gate 618/618 (57 Testdateien), GUI-Smoke 31/31. Drei neue Punkte
+für den Hub-Tab „Kontext": **29** (Hub-Tabs sichtbar, Höhe > 0), **30** (ein abgewählter Chip
+verschwindet aus dem gesendeten Block, „Auswahl zurücksetzen" holt ihn wieder), **31** (der
+Auf/Zu-Zustand eines Abschnitts landet in `data.json`). Alle drei einzeln gegengeprobt — nicht
+gemeinsam, sonst wird ein Punkt zum Folgefehler des anderen und man weiß von keinem, warum er rot
+ist:
+
+| Punkt | Mutation | Ergebnis |
+|---|---|---|
+| 29 | Kontext-Panel aus dem Hub-Array gestrichen | rot: „nicht vollständig gerendert" |
+| 30 | `applySelection` aus `currentContext()` entfernt | rot: „292 → 292 Z.", keine Wirkung |
+| 31 | `saveSettings` aus `setCollapsed` entfernt | rot: „in data.json: null" |
+
+Jede Mutation traf genau ihren Punkt, die Nachbarn blieben grün.
+
+**Zwei Befunde aus dem Bau, die nächste Session Zeit sparen:**
+
+- **Punkt 29 musste seinen Zustand selbst herstellen.** Er war zweimal rot, ohne dass am
+  Produkt etwas fehlte: Punkt 27 fährt kurz davor `changeLayout(getLayout())`, und die
+  Koda-View bleibt dabei in einem Zwischenstand — nur ein Tab im DOM. `activateView()` allein
+  repariert das nicht, weil es eine **bestehende** View nicht neu aufbaut; es findet über
+  `getLeavesOfType` dieselbe kaputte Leaf und ruft auf ihr nur `setViewState`/`revealLeaf`.
+  Erst `leaf.detach()` **und danach** der Öffnen-Befehl liefern die frisch gerenderte Leiste.
+  Merksatz: ein Prüfpunkt darf sich nicht auf einen Vorzustand verlassen, den ein Nachbarpunkt
+  verändert.
+- **Die ursprünglich geplante Gegenprobe für Punkt 31 konnte nicht anschlagen**, weil der
+  Prüfpunkt selbst `saveSettings()` rief und damit genau den Effekt herbeiführte, den er
+  prüfen sollte — er hätte auch dann grün gemeldet, wenn der interne Save-Aufruf in
+  `sectionStorage().setCollapsed` entfernt worden wäre. Er ruft es jetzt nicht mehr selbst auf,
+  sondern pollt (5 s) auf den Wert, den `setCollapsed` über sein eigenes
+  `void this.saveSettings()` schreibt. Erst dadurch ist die Gegenprobe wirksam.
 
 ## Belegter Lauf: 2026-09-05, 08:30 — Etappe-2-Restposten (28/28), mit Gegenproben
 
