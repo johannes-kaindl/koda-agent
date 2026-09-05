@@ -22,6 +22,12 @@ catalogue, no signed builds. Not currently listed in the Community plugin store 
 - **Chat sidebar** (ribbon icon + command) with streaming answers, a collapsible
   "thinking" block for reasoning models, and a Stop button that leaves the partial
   answer in place.
+- **A Context tab beside the chat.** The sidebar has two tabs. The Context tab shows what
+  your next message will carry — the active note, your selection, the open tabs — as chips
+  you can click away one by one, plus a line telling you how much of the model's context
+  window it fills. Deselect a note and it leaves the block Koda sends; press
+  **Reset selection** (or start a new chat) to bring everything back. The setting
+  *Keep context choices* decides whether a deselection outlives the message it was made for.
 - **Ten tools:** `search_notes`, `read_note`, `write_note`, `move_note`, `delete_note`,
   `save_memory`, `write_skill`, `list_notes`, `get_workspace`, `edit_active_note` — the model calls these itself while answering, with each
   step shown inline in the chat. `list_notes` returns every note under a vault folder,
@@ -132,13 +138,16 @@ Then enable Koda under **Settings → Community plugins**.
 1. Open the sidebar — ribbon dog icon or the **Open Koda** command.
 2. Ask a question. Koda streams its answer; for reasoning models the "thinking" block
    sits collapsed above it, and **Stop** ends the stream while keeping what arrived.
-3. **Watch the tools work.** Each `search_notes` / `read_note` / `write_note` /
+3. **Check what goes along.** The **Context** tab lists the active note, your selection and
+   the open tabs as chips. Click a chip's × to leave it out of the next message, or its name
+   to open the note. Commands *Show Chat tab* and *Show Context tab* switch without the mouse.
+4. **Watch the tools work.** Each `search_notes` / `read_note` / `write_note` /
    `list_notes` call appears inline in the chat as it happens, so you can see which
    notes an answer is built on rather than taking it on trust.
-4. **Approve writes outside the Koda folder.** A modal shows the new text (create and
+5. **Approve writes outside the Koda folder.** A modal shows the new text (create and
    append) or a line diff (replace) before anything is written — see
    [The write rule](#the-write-rule).
-5. **New chat** starts a fresh session log, after a confirmation — discarding is final.
+6. **New chat** starts a fresh session log, after a confirmation — discarding is final.
    The button sits in the header row at the top of the sidebar, next to the thinking
    toggle. Both are also commands (`Koda: New chat`, `Koda: Toggle thinking`), so you can
    reach them from the command palette or bind a hotkey. Old sessions are restored after an

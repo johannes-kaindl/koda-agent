@@ -25,12 +25,22 @@ keine signierten Builds. Derzeit **nicht** im Community-Store gelistet (siehe
 - **Chat-Seitenleiste** (Ribbon-Icon + Befehl) mit gestreamten Antworten, einem
   einklappbaren „Denken"-Block für Reasoning-Modelle und einer Stopp-Schaltfläche, die
   die Teilantwort stehen lässt.
-- **Sechs Werkzeuge:** `search_notes`, `read_note`, `write_note`, `save_memory`,
-  `write_skill`, `list_notes` — das Modell ruft sie beim Antworten selbst auf, jeder
-  Schritt erscheint im Chat. `list_notes` liefert alle Notizen unter einem Vault-Ordner,
-  wahlweise rekursiv, samt den angeforderten Frontmatter-Feldern, in einem Aufruf. Ein
-  siebtes, `related_notes`, kommt hinzu, wenn semantische Suche verfügbar ist (siehe
-  unten).
+- **Ein Kontext-Tab neben dem Chat.** Die Seitenleiste hat zwei Tabs. Der Kontext-Tab
+  zeigt, was deine nächste Nachricht mitnimmt — die aktive Notiz, deine Markierung, die
+  offenen Tabs — als Chips, die du einzeln wegklicken kannst, dazu eine Zeile, wie viel
+  vom Kontextfenster des Modells das belegt. Was du abwählst, verlässt den Block, den Koda
+  sendet; **Auswahl zurücksetzen** (oder ein neues Gespräch) holt alles zurück. Die
+  Einstellung *Kontext-Auswahl behalten* entscheidet, ob eine Abwahl die Nachricht
+  überdauert, für die sie gemacht wurde.
+- **Zehn Werkzeuge:** `search_notes`, `read_note`, `write_note`, `move_note`,
+  `delete_note`, `save_memory`, `write_skill`, `list_notes`, `get_workspace`,
+  `edit_active_note` — das Modell ruft sie beim Antworten selbst auf, jeder Schritt
+  erscheint im Chat. `list_notes` liefert alle Notizen unter einem Vault-Ordner,
+  wahlweise rekursiv, samt den angeforderten Frontmatter-Feldern, in einem Aufruf.
+  `move_note` verschiebt oder benennt um und lässt Obsidian die Wikilinks nachziehen;
+  `delete_note` legt eine Notiz in den Papierkorb des Vaults und fragt immer vorher,
+  auch im Koda-Ordner. Ein elftes, `related_notes`, kommt hinzu, wenn semantische Suche
+  verfügbar ist (siehe unten).
 - **Semantische Suche, falls du sie schon hast** *(optional)* — ist das Plugin
   [Vault Retrieval](https://git.jkaindl.de/jkaindl/vault-rag) installiert und dein
   Vault indiziert, nutzt Koda dessen Embedding-Index: `search_notes` ergänzt
@@ -122,13 +132,17 @@ Danach Koda unter **Einstellungen → Community-Plugins** aktivieren.
 2. Eine Frage stellen. Koda streamt die Antwort; bei Reasoning-Modellen sitzt der
    „Denken"-Block eingeklappt darüber, und **Stopp** beendet den Stream, ohne das
    Angekommene zu verwerfen.
-3. **Den Werkzeugen zusehen.** Jeder Aufruf von `search_notes` / `read_note` /
+3. **Nachsehen, was mitgeht.** Der **Kontext**-Tab listet die aktive Notiz, deine
+   Markierung und die offenen Tabs als Chips. Ein Klick auf das × lässt einen Eintrag
+   aus der nächsten Nachricht heraus, ein Klick auf den Namen öffnet die Notiz. Die
+   Befehle *Chat-Tab zeigen* und *Kontext-Tab zeigen* schalten ohne Maus um.
+4. **Den Werkzeugen zusehen.** Jeder Aufruf von `search_notes` / `read_note` /
    `write_note` / `list_notes` erscheint im Chat, während er passiert — du siehst also,
    auf welchen Notizen eine Antwort beruht, statt es glauben zu müssen.
-4. **Schreibvorgänge außerhalb des Koda-Ordners bestätigen.** Ein Dialog zeigt vorher
+5. **Schreibvorgänge außerhalb des Koda-Ordners bestätigen.** Ein Dialog zeigt vorher
    den neuen Text (Anlegen und Anhängen) oder ein Zeilen-Diff (Ersetzen) — siehe
    [Die Schreibregel](#die-schreibregel).
-5. **Neuer Chat** beginnt ein frisches Sitzungs-Log. Alte Sitzungen werden nach einem
+6. **Neuer Chat** beginnt ein frisches Sitzungs-Log. Alte Sitzungen werden nach einem
    Obsidian-Neustart wiederhergestellt; es sind einfache JSONL-Dateien im Plugin-Ordner.
 
 Bittest du Koda, sich etwas zu merken, hängt es eine datierte Zeile an
