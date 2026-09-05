@@ -1776,14 +1776,34 @@ async function main(): Promise<void> {
     let ok29 = false;
     let detail29 = "";
     try {
-      const mass = await cdp.evaluate<{ tabs: number; hoehe: number; labels: string[] }>(`
-        const btns = Array.from(document.querySelectorAll(".koda-root .okit-hub-tabs [role='tab'], .koda-root .okit-hub-tabs button"));
-        return {
-          tabs: btns.length,
-          hoehe: Math.min(...btns.map((b) => b.getBoundingClientRect().height)),
-          labels: btns.map((b) => b.innerText.trim()),
-        };
+      // Fix-Runde 1, Finding 1: Punkt 27 kurz zuvor ruft changeLayout(getLayout()), um
+      // DeferredViews zu erzeugen — das laesst die Koda-View im echten Lauf haeufig in
+      // einem DOM-Zwischenstand zurueck (Tab-Leiste fehlt), obwohl das Produkt in Ordnung
+      // ist (manuell nachgemessen: ein erneutes onOpen() liefert sofort zwei Tabs). Der
+      // Punkt stellt seinen Zustand deshalb selbst her, statt sich auf den Vorzustand zu
+      // verlassen — Mutation (Oeffnen-Befehl) und Wartephase (pollUntil) getrennt, wie bei
+      // Punkt 2. Die Reihenfolge zu Punkt 27 bleibt unveraendert.
+      await cdp.evaluate(`
+        await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:open`)});
+        return true;
       `);
+      const mass = await pollUntil<{ tabs: number; hoehe: number; labels: string[] }>(
+        cdp,
+        `
+          const btns = Array.from(document.querySelectorAll(".koda-root .okit-hub-tabs [role='tab'], .koda-root .okit-hub-tabs button"));
+          // Weniger als zwei Tabs heisst „noch nicht fertig gerendert" — null statt eines
+          // wahrheitsfaehigen Leerstands, sonst wuerde pollUntil den Zwischenstand als
+          // Ergebnis nehmen.
+          if (btns.length < 2) return null;
+          return {
+            tabs: btns.length,
+            hoehe: Math.min(...btns.map((b) => b.getBoundingClientRect().height)),
+            labels: btns.map((b) => b.innerText.trim()),
+          };
+        `,
+        15_000,
+      );
+      if (mass === null) throw new Error("Hub-Tabs nach dem Oeffnen-Befehl nicht vollstaendig gerendert");
       // Größe, nicht Existenz: in einer Seitenleiste kann ein Element im DOM stehen und null
       // Pixel hoch sein — genau der Defekt von 0.10.1.
       ok29 = mass.tabs === 2 && mass.hoehe > 0;
@@ -1796,11 +1816,11 @@ async function main(): Promise<void> {
     let ok30 = false;
     let detail30 = "";
     try {
-      const r = await cdp.evaluate<{ vorher: string; nachher: string; zurueck: string }>(`
+      const r = await cdp.evaluate<{ vorher: string; nachher: string; zurueck: string; pfad: string | null }>(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
         const vorher = p.currentContext()?.text ?? "";
         const tab = (p.currentContext()?.items ?? []).find((i) => i.source === "tab");
-        if (!tab) return { vorher, nachher: "KEIN TAB", zurueck: "" };
+        if (!tab) return { vorher, nachher: "KEIN TAB", zurueck: "", pfad: null };
         p.toggleContextItem("tab", tab.path);
         const nachher = p.currentContext()?.text ?? "";
         p.resetContextSelection();
@@ -1808,7 +1828,9 @@ async function main(): Promise<void> {
         return { vorher, nachher, zurueck, pfad: tab.path };
       `);
       ok30 = r.vorher !== r.nachher && r.vorher === r.zurueck;
-      detail30 = `Block vorher ${r.vorher.length} Z. → abgewaehlt ${r.nachher.length} Z. → zurueckgesetzt ${r.zurueck.length} Z.`;
+      // Minor-Fix: Zeichenlaengen allein unterscheiden „kein Tab gefunden" kaum von einem
+      // echten kurzen Block — der Pfad (oder das Fehlen eines Tabs) steht deshalb mit.
+      detail30 = `Tab: ${r.pfad ?? "KEIN TAB"} · Block vorher ${r.vorher.length} Z. → abgewaehlt ${r.nachher === "KEIN TAB" ? "KEIN TAB" : `${r.nachher.length} Z.`} → zurueckgesetzt ${r.zurueck.length} Z.`;
     } catch (error) {
       detail30 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
     }
@@ -1817,25 +1839,54 @@ async function main(): Promise<void> {
     let ok31 = false;
     let detail31 = "";
     try {
-      const r = await cdp.evaluate<{ gespeichert: unknown; nachReload: unknown }>(`
+      // Fix-Runde 1, Finding 3: `sectionStorage().setCollapsed` speichert selbst,
+      // fire-and-forget (`void this.saveSettings()`, src/main.ts) — das ist der echte Weg,
+      // ueber den ein Klick in der Hub-UI persistiert. Der Punkt ruft deshalb bewusst KEIN
+      // eigenes saveSettings() mehr: ein expliziter Aufruf haette den zu pruefenden Effekt
+      // selbst herbeigefuehrt, und die im Brief vorgesehene Gegenprobe (den internen Save-
+      // Aufruf entfernen) waere daran blind vorbeigelaufen — der Punkt waere gruen
+      // geblieben, egal ob setCollapsed selbst speichert oder nicht. Der Preis: der interne
+      // Save ist async und ungewartet, also wird auf das Ergebnis gepollt statt es sofort
+      // zu lesen.
+      await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
         p.sectionStorage().setCollapsed("workspace", true);
-        await p.saveSettings();
-        const gespeichert = p.settings.contextSections.workspace;
-        const daten = await p.loadData();
-        return { gespeichert, nachReload: daten?.contextSections?.workspace };
+        return true;
       `);
-      ok31 = r.gespeichert === true && r.nachReload === true;
-      detail31 = `im Speicher: ${String(r.gespeichert)} · in data.json: ${String(r.nachReload)}`;
+      const nachReload = await pollUntil<boolean>(
+        cdp,
+        `
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          const daten = await p.loadData();
+          // Noch nicht geschrieben heisst „noch nicht so weit" — null statt false, sonst
+          // wuerde pollUntil einen fruehen Zwischenstand als Endergebnis nehmen.
+          if ((daten?.contextSections?.workspace ?? false) !== true) return null;
+          return true;
+        `,
+        5_000,
+      );
+      const gespeichert = await cdp.evaluate<unknown>(`
+        return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.contextSections.workspace;
+      `);
+      ok31 = gespeichert === true && nachReload === true;
+      detail31 = `im Speicher: ${String(gespeichert)} · in data.json: ${String(nachReload)}`;
+    } catch (error) {
+      detail31 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      // Fix-Runde 1, Finding 2: im finally, nicht am Ende des try — sonst verfaelscht ein
+      // Abbruch NACH dem setCollapsed(true) (z. B. ein Timeout im pollUntil) die
+      // Einstellungen des naechsten Laufs, weil der Reset dann nie erreicht wird.
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
         p.sectionStorage().setCollapsed("workspace", false);
         await p.saveSettings();
         return true;
       `).catch(() => undefined);
-    } catch (error) {
-      detail31 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
     }
+    // Gegenprobe: in `sectionStorage().setCollapsed` (src/main.ts) das
+    // `void this.saveSettings();` entfernen, neu bauen/deployen. Erwartung: pollUntil
+    // laeuft in den 5s-Timeout, „nachReload" bleibt null, detail zeigt
+    // "in data.json: null" statt "true" — der Punkt wird rot.
     record("31. Auf/Zu-Zustand der Abschnitte landet in data.json", ok31, detail31);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
