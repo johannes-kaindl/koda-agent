@@ -2,7 +2,38 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.13.0 released (Kontext-Tab), Rescan weiter BLOCKIERT — main, Stand 2026-09-05 abends
+## Status: Etappe 2b (Volltext-Quellen) fertig auf `feat/kontext-quellen`, 0.13.0 im Store weiter nicht rescannt — Stand 2026-09-06
+
+**Auf dem Branch `feat/kontext-quellen` (noch nicht nach `main` gemerged) ist Etappe 2b
+fertig: Kodas Arbeitskontext bekommt Volltext-Quellen statt nur Zeiger.** Zwei neue Modi —
+**Notiz** (die aktive Notiz plus ihre verlinkten Nachbarn, ausgehende Links und Backlinks,
+Tiefe 1–3 über `contextLinkDepth`) und **Alle Tabs** (jede offene Notiz) — gehen im Volltext
+mit, dazu **Manuell**: Notizen und ganze Ordner per zwei Pickern hinzufügen (drei neue
+Befehle, drei Knöpfe im Kontext-Tab), einzeln wieder entfernbar. Ein Zeichen-Budget je
+Nachricht (`contextBudgetChars`, Default 20 000) begrenzt alle drei Volltext-Modi; eine
+Kürzung nennt sich sichtbar statt zu verschwinden. Unter der Antwort zeigen **Quellen-Chips**,
+welche Notizen im Volltext mitgingen, anklickbar. `read_note` liest zusätzlich `.base` und
+`.canvas` — geschrieben wird weiterhin nur `.md`. Gate **689/689** (von 620 zu Beginn der
+Etappe), GUI-Smoke **39/39** (von 32).
+
+**Zwei Entscheidungen, die man an der API nicht ablesen kann, weil beide eine Review-Runde
+gekostet haben, sie zu finden:**
+- **Das Budget wird per Wasserfüllung verteilt, nicht gleichverteilt** (`allocateBudget` in
+  `src/core/context/select.ts`): wer unter seinen Anteil passt, bekommt seinen vollen Text,
+  und der Rest wird auf die übrigen Einträge neu verteilt — solange, bis niemand mehr passt.
+  Bewusste Abweichung von `vault-rag/src/context_source.ts`, dessen Gleichverteilung Budget
+  verschenkt, sobald Einträge unterschiedlich groß sind.
+- **Der Schlüssel eines Chips ist der Schlüssel seines Kandidaten, nicht seiner Platzierung.**
+  Ein Pfad erscheint genau einmal; steht er in `contextManual`, sitzt er im Abschnitt
+  *Manuell* — aber Abwahl-Zustand und Größe werden mit dem Schlüssel des Kandidaten gelesen,
+  der tatsächlich entstanden ist (`active`/`link`/`backlink`/`tab`/`manual`). Schlüsselt man
+  stattdessen nach Platzierung, reißt die Verbindung zwischen Schalter und Wirkung — das war
+  ein echter, von der Review gefundener Defekt in der Form „man wählt ab, und nichts passiert".
+  Zugehörig, weil derselbe Code-Kommentar es festhält: das **× eines manuellen Eintrags
+  entfernt ihn, statt ihn abzuwählen** — ein abgewählter manueller Eintrag bliebe sonst für
+  immer als zwecklose Chip-Leiche stehen (`context-panel.ts`, Kommentar bei `removable`).
+
+### Vorgeschichte: 0.13.0 released (Kontext-Tab), Rescan weiter BLOCKIERT — main, Stand 2026-09-05 abends
 
 **0.13.0 ist am 2026-09-05 released** (Release-Commit `0aa6a3c`, Tag auf Forgejo und GitHub,
 Mirror vom Skript verifiziert, Forgejo-Release vorhanden). Inhalt ist **Arbeitskontext
@@ -252,7 +283,13 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 31 Punkte (29–31 seit 2026-09-05:
+  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 39 Punkte (33–39 seit 2026-09-06,
+  Etappe 2b: 33 Modus Notiz nimmt die aktive Notiz und ihre Nachbarn im Volltext mit, 34 die
+  Budget-Kappung meldet sich im Block, 35 eine manuell hinzugefügte Notiz geht mit und lässt
+  sich wieder entfernen, 36 `read_note` liest eine `.base`, 37 Quellen-Chips unter der
+  Antwort, 38 der Kontext-Tab zeigt einen sichtbaren Fehlerzustand, wenn das ViewModel
+  ablehnt, 39 Knopf und Befehl „+ Aktive Notiz" landen auf demselben Zustand — Gegenproben
+  und ihre Grenzen in `docs/SMOKE.md` „Belegter Lauf: 2026-09-06 — Etappe 2b") (29–31 seit 2026-09-05:
   der Hub-Tab „Kontext" — Tab-Leiste sichtbar mit Höhe > 0, ein per Chip abgewählter Teil des
   Arbeitskontexts verschwindet aus dem gesendeten Block und kehrt nach „Auswahl zurücksetzen"
   zurück, der Auf/Zu-Zustand eines Abschnitts übersteht den Reload. Alle drei einzeln
@@ -308,6 +345,20 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   `src/obsidian/context-panel.ts` ist das Hub-Panel selbst (`ContextPanel`, UI-STANDARD §4:
   schmaler Host-Vertrag, `viewModel()` liest nur, ändert nichts) — Chips, Auf/Zu-Abschnitte über
   `collapsibleSection`, Modus-Dropdown, „Auswahl zurücksetzen".
+  **Seit Etappe 2b (2026-09-06) dazu die Volltext-Quellen** (pure, alle ohne Obsidian-Import):
+  `candidates.ts` (welche Notizen ein Modus anbietet, ohne Inhalte — Reihenfolge Quelle → Ebene
+  → Pfad: aktive Notiz · Manuelles · Tabs · Links · Backlinks), `select.ts` (definiert
+  `Candidate`/`AllocatedEntry` und `allocateBudget`, die Wasserfüllung — wer unter seinen
+  Anteil passt, bekommt seinen vollen Text, der Rest wird neu verteilt), `render.ts` (baut aus
+  den zugeteilten Einträgen den Block samt Kürzungs-Meldung), `build.ts` (`buildFullContext`,
+  die einzige Stelle, die Kandidaten, Zuteilung und Rendern verbindet), `manual.ts`
+  (`addPaths`/`removePaths` für `contextManual`, referenzgleiche Rückgabe bei „nichts
+  geändert" wie `selection.ts`). Adapter-seitig `src/obsidian/links.ts` (`LinkPort` aus
+  `metadataCache.resolvedLinks` — ausgehend ein Lookup, Backlinks eine Iteration über alle
+  Quellen), `src/obsidian/note-picker.ts` (Fuzzy-Notiz-Picker, **übernommen** aus
+  `vault-rag/src/note_picker.ts`, Herkunftsstempel) und `src/obsidian/folder-picker.ts`
+  (Modal um den vendorten `FolderSuggest`, weil es für Ordner keinen nativen Fuzzy-Picker
+  gibt).
 - `src/core/agent/compaction/` — zweistufige Verdichtung des Gesprächsverlaufs
   (`project.ts`/`estimate.ts`/`stage1.ts`/`stage2.ts`): Projektion statt Umschreiben,
   positionsbasierte Marken, Tool-Stubs vor Modell-Zusammenfassung, Nutzer-Nachrichten
@@ -319,7 +370,9 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   mit Warnung in Zeile 1, leerer Ordner als Fehler mit Vorschlägen (pure). Frontmatter
   kommt aus Obsidians `metadataCache`, kein Datei-Lesen je Notiz.
 - `src/llm/` — `KodaChatClient` + `XhrSseTransport` (Streaming-Chat-Client).
-- `src/obsidian/` — View, Vault-Tools-Adapter, Bestätigungs-Modal, Settings-Tab.
+- `src/obsidian/` — View, Vault-Tools-Adapter, Bestätigungs-Modal, Settings-Tab. `links.ts`,
+  `note-picker.ts`, `folder-picker.ts` gehören zu den Volltext-Quellen (s. o. bei
+  `src/core/context/`), liegen aber hier, weil sie Obsidian-APIs anfassen.
   `model-control.ts` hängt die zwei Hatch-Zeilen der Modell-Steuerung in die deklarative
   Settings-Tabelle (Anweisungs-Textarea mit Reset und Warnzeile, Werkzeug-Liste mit Schalter
   und eigener Beschreibung je Zeile); `prompt-modal.ts` zeigt die aktive Anweisung — ruft

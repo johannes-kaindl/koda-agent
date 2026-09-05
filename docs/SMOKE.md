@@ -769,6 +769,44 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-06 — Etappe 2b, Volltext-Quellen (39/39), mit Gegenproben
+
+Branch `feat/kontext-quellen`, Vault `koda-agent` (Staging), Gate 689/689 (von 620 zu Beginn
+der Etappe), GUI-Smoke 39/39 (von 32). Sechs neue Punkte (33–38) für die Volltext-Modi,
+Manuell, `.base`-Lesen, Quellen-Chips und den Fehlerzustand des Kontext-Tabs, dazu Punkt 39
+für die Doppelimplementierung „Knopf und Befehl landen auf demselben Zustand".
+
+### Gegenproben
+
+Vier der neuen Punkte wurden gegen eine gezielte Mutation gefahren, „Punkt — Mutation —
+gemessene Meldung":
+
+- **33** — `for (let ebene = 1; ebene <= input.linkDepth; ebene++)` in
+  `src/core/context/candidates.ts` auf `ebene <= 0` geändert (Link-BFS abgeschaltet) →
+  33 rot: „Eintraege 1 · Nachbarn 0 · Volltext aktive Notiz true · Volltext Nachbar false".
+  *Anmerkung dazu: im selben Lauf ging auch 34 rot, und zwar zu Recht — „Abbruch: kein
+  gekuerzter Eintrag bei Budget 300 — Gegenstand nicht beruehrt". Ohne Nachbarn gibt es
+  nichts zu kürzen; 34 verweigert sich, statt ins Leere zu bestehen. Sind 33 und 34 beide
+  rot, zuerst 33 beheben.*
+- **34** — der `meldung`-Ternary in `src/core/context/render.ts` auf `""` erzwungen
+  (Kürzungs-Meldung stummgeschaltet) → nur 34 rot: „Budget 300 · gekuerzte Eintraege 3 ·
+  Meldung im Block false · Blocklaenge 451 Z." Gekürzt wurde weiterhin, nur die Meldung fehlte.
+- **35** — `for (const p of input.manual) nimm(...)` aus
+  `src/core/context/candidates.ts` entfernt → nur 35 rot: „manuell nach dem Hinzufuegen: []".
+- **38** — der `.catch`-Körper in `ContextPanel.render()` kurzgeschlossen → nur 38 rot:
+  „Abbruch: keine Fehlerdarstellung innerhalb 8s".
+
+### Was nicht gegengeprobt ist — und warum das die Redlichkeit ist, nicht die Lücke
+
+**36, 37 und 39 haben keine Smoke-Gegenprobe.** 36 und 37 prüfen dieselbe Regel, für die auf
+Unit-Ebene bereits eine Mutation gefahren wurde (Task 10: der Default von `READ_EXTENSIONS`;
+Task 9: der Filter `kind === "full"`) — eine zweite Messung derselben Regel kostet vier
+Minuten Lock-Haltezeit und belegt nichts Neues. Punkt 39 kann seinen eigentlichen Fehlerfall
+konstruktionsbedingt nicht erkennen (ein Knopf, der eine doppelt gebaute Implementierung
+aufruft, die sich zufällig gleich verhält) — diese Grenze steht bereits im Kommentar des
+Punkts selbst. Für alle drei ist damit belegt, dass sie grün sind — nicht, dass sie rot
+werden können. Auf Smoke-Ebene bleibt das offen.
+
 ## Belegter Lauf: 2026-09-05 — Kontext-Tab (31/31), mit Gegenproben
 
 Vault `koda-agent` (Staging), Gate 618/618 (57 Testdateien), GUI-Smoke 31/31. Drei neue Punkte

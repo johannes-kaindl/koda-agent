@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Context modes **Note** and **All tabs**: the active note with its linked neighbours, or
+  every open note, go along in full text, capped by a budget.
+- **Manual**: notes and folders can be added to the context through two pickers (three new
+  commands, three buttons in the Context tab).
+- **Source chips under the answer** — which notes went along in full text, clickable.
+- Settings **Content budget per message** (`contextBudgetChars`, default 20,000) and
+  **Link depth in Note mode** (`contextLinkDepth`, default 1).
+- `read_note` also reads `.base` and `.canvas`. Writing stays `.md`-only.
+
+### Changed
+
+- The Context tab now shows sections per source and a stepper for the link depth; it renders
+  asynchronously, because the full-text modes read notes.
+
 ## [0.13.0] — 2026-09-05
 
 ### Added

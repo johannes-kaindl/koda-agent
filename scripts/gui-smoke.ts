@@ -2016,6 +2016,9 @@ async function main(): Promise<void> {
     // Gegenprobe: in `src/core/context/render.ts` die `meldung`-Zeile auf `""` setzen, neu
     // bauen/deployen. Erwartung: `hatMeldung` ist false, der Punkt wird rot, obwohl der
     // Block weiterhin gekuerzt ist — genau der stille Verlust, gegen den er steht.
+    // ⚠️ Ist auch 33 rot, zuerst 33 beheben — ohne Nachbarn im Modus Notiz gibt es nichts zu
+    // kuerzen, und dieser Punkt bricht dann mit "Gegenstand nicht beruehrt" ab statt gruen
+    // durchzulaufen (33 ist die Ursache, 34s Rot hier ist nur die Folge).
     let ok34 = false;
     let detail34 = "";
     const BUDGET34 = 300;

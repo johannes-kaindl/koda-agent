@@ -30,7 +30,8 @@ catalogue, no signed builds. Not currently listed in the Community plugin store 
   *Keep context choices* decides whether a deselection outlives the message it was made for.
 - **Ten tools:** `search_notes`, `read_note`, `write_note`, `move_note`, `delete_note`,
   `save_memory`, `write_skill`, `list_notes`, `get_workspace`, `edit_active_note` — the model calls these itself while answering, with each
-  step shown inline in the chat. `list_notes` returns every note under a vault folder,
+  step shown inline in the chat. `read_note` reads all three note formats — `.md`,
+  `.base` and `.canvas`; writing stays `.md`-only. `list_notes` returns every note under a vault folder,
   optionally recursive, together with whichever frontmatter fields were asked for, in
   one call; a folder note (a note named like its folder) is marked as one, so it is not
   counted as ordinary content. `move_note` renames or relocates a note and lets Obsidian
@@ -46,15 +47,25 @@ catalogue, no signed builds. Not currently listed in the Community plugin store 
   **separate, labelled blocks**, never merged into one ranking: a literal hit proves a
   wording exists, a semantic one does not. Without that plugin Koda behaves exactly as
   before — nothing to configure, and no dead tool in the prompt.
-- **Working context** — every question can carry what you are looking at: the active note
-  with its properties, the selection, the cursor line and the open tabs, as pointers only. A
-  dropdown next to Send switches between *Off* and *Workspace* per question (commands and a
-  right-click entry on selected text exist too), and the block that went along is shown under
-  each of your messages, collapsible, also after a restart. `get_workspace` returns the full
-  selection, the lines around the cursor and every tab; `edit_active_note` replaces the
-  selection or inserts at the cursor — after the usual approval dialog, and only if the
-  selection is still the one it previewed. Cut-offs (selection length, tab count, properties)
-  are settings and announce themselves in the block.
+- **Working context** — every question can carry what you are looking at. The dropdown next
+  to Send switches the mode per question (commands and a right-click entry on selected text
+  exist too), and the block that went along is shown under each of your messages, collapsible,
+  also after a restart:
+  - **Workspace** — the active note with its properties, the selection, the cursor line and
+    the open tabs, as pointers only. `get_workspace` returns the full selection, the lines
+    around the cursor and every tab; `edit_active_note` replaces the selection or inserts at
+    the cursor — after the usual approval dialog, and only if the selection is still the one
+    it previewed.
+  - **Note** and **All tabs** — the active note plus its linked neighbours (outgoing links and
+    backlinks, depth 1–3), or every open note, go along in **full text**, not just as a
+    pointer, capped by a character budget.
+  - **Manual** — add a note or a whole folder by hand, from the Context tab or three
+    commands; remove it again the same way.
+
+  Cut-offs (selection length, tab count, properties, and the content budget for Note/All
+  tabs/Manual) are settings and announce themselves in the block: nothing is dropped
+  silently, a cut always names both numbers and the way to the rest. **Source chips** under
+  the answer name which notes went along in full text, and clicking one opens it.
 
 - **A durable, transparent memory** — `save_memory` appends dated lines to
   `<Koda folder>/Memory.md`, which is also fed back into the system prompt on every
@@ -138,9 +149,11 @@ Then enable Koda under **Settings → Community plugins**.
 1. Open the sidebar — ribbon dog icon or the **Open Koda** command.
 2. Ask a question. Koda streams its answer; for reasoning models the "thinking" block
    sits collapsed above it, and **Stop** ends the stream while keeping what arrived.
-3. **Check what goes along.** The **Context** tab lists the active note, your selection and
-   the open tabs as chips. Click a chip's × to leave it out of the next message, or its name
-   to open the note. Commands *Show Chat tab* and *Show Context tab* switch without the mouse.
+3. **Check what goes along.** The **Context** tab lists the active note, your selection, the
+   open tabs and — in Note/All tabs/Manual mode — the notes going along in full text, all as
+   chips. Click a chip's × to leave it out of the next message, or its name to open the note.
+   Three commands and buttons in the tab add a note or a folder to the context by hand.
+   Commands *Show Chat tab* and *Show Context tab* switch without the mouse.
 4. **Watch the tools work.** Each `search_notes` / `read_note` / `write_note` /
    `list_notes` call appears inline in the chat as it happens, so you can see which
    notes an answer is built on rather than taking it on trust.
@@ -184,10 +197,12 @@ The full settings list:
 | Text tool-call fallback | off | For models without native tool calling |
 | UI language | auto | Follows Obsidian, or force German/English |
 | Open on startup | off | Opt-in; the sidebar stays closed unless you ask for it |
-| Context mode on startup | Workspace | Off / Workspace (Note, All tabs, Vault reserved for later stages) |
+| Context mode on startup | Workspace | Off / Workspace / Note / All tabs (Vault reserved for a later stage) |
 | Selection in the context | 600 chars (100–5000) | How many characters of the selected text to include in the context block |
 | Open tabs in the context | 12 (1–100) | How many open tabs to list in the context block |
 | Properties in the context | 300 chars (0–2000) | How many characters of the frontmatter properties to include (0 = none) |
+| Content budget per message | 20,000 chars (2000–200000) | How much note content the modes Note, All tabs and Manual may put into one message; cut entries are named, never dropped silently. Does not affect Workspace, which only sends pointers |
+| Link depth in the Note mode | 1 (1–3) | How many levels of outgoing links and backlinks are collected around the active note; each level multiplies the note count and splits the budget further |
 | Context window (tokens) | 8192 (2048–1000000) | Size of the model's context window; one number for all endpoints. "Test" on an endpoint row fills it in when the server reports it (LM Studio, Ollama) and the field is still on its default |
 | Compact at (% of window) | 75 (40–95) | Koda compacts the conversation before a model call once the estimate exceeds this share of the window |
 | Keep tool results verbatim | 3 (0–20) | How many of the most recent tool results stay in full; older ones become a one-line stub |

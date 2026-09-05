@@ -43,6 +43,11 @@ that have nothing to do with the plugin:
 - **`Notes/Overview.base` must exist** — check 36 reads it through `read_note` and expects
   the string `views:` in the result. It is the only non-Markdown file in the scenery; its
   content is irrelevant beyond being valid YAML with that key.
+- **The three notes check 34 collects must together hold roughly 820 characters** — the
+  check sets the budget to **300** to force a cut. With a larger scenery nothing would be
+  truncated and the check would stop touching its subject; it does not pass silently in
+  that case (it aborts with "Gegenstand nicht beruehrt"), but it would stop measuring
+  anything. Grow those notes and grow the check's budget with them, in the same commit.
 
 Plugin settings are *not* part of the fixture: `buildVault` deletes `data.json`, so every run
 starts from the shipped defaults — including the default endpoint `http://127.0.0.1:1234`.

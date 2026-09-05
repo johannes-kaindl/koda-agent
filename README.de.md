@@ -35,7 +35,8 @@ keine signierten Builds. Derzeit **nicht** im Community-Store gelistet (siehe
 - **Zehn Werkzeuge:** `search_notes`, `read_note`, `write_note`, `move_note`,
   `delete_note`, `save_memory`, `write_skill`, `list_notes`, `get_workspace`,
   `edit_active_note` — das Modell ruft sie beim Antworten selbst auf, jeder Schritt
-  erscheint im Chat. `list_notes` liefert alle Notizen unter einem Vault-Ordner,
+  erscheint im Chat. `read_note` liest alle drei Notiz-Formate — `.md`, `.base` und
+  `.canvas`; geschrieben wird weiterhin nur `.md`. `list_notes` liefert alle Notizen unter einem Vault-Ordner,
   wahlweise rekursiv, samt den angeforderten Frontmatter-Feldern, in einem Aufruf.
   `move_note` verschiebt oder benennt um und lässt Obsidian die Wikilinks nachziehen;
   `delete_note` legt eine Notiz in den Papierkorb des Vaults und fragt immer vorher,
@@ -51,6 +52,27 @@ keine signierten Builds. Derzeit **nicht** im Community-Store gelistet (siehe
   wörtlicher Treffer beweist, dass eine Formulierung existiert, ein semantischer nicht.
   Ohne dieses Plugin verhält sich Koda exakt wie vorher — nichts zu konfigurieren, und
   kein totes Werkzeug im Prompt.
+- **Arbeitskontext** — jede Frage kann mitnehmen, was du gerade vor dir hast. Das Dropdown
+  neben Senden schaltet den Modus je Frage um (Befehle und ein Rechtsklick-Eintrag auf
+  Markiertem gehen auch), und der mitgesendete Block steht unter jeder deiner Nachrichten,
+  einklappbar, auch nach einem Neustart:
+  - **Arbeitsplatz** — die aktive Notiz mit ihren Kopfdaten, die Markierung, die Cursorzeile
+    und die offenen Tabs, nur als Zeiger. `get_workspace` liefert die volle Markierung, die
+    Zeilen rund um den Cursor und jeden Tab; `edit_active_note` ersetzt die Markierung oder
+    fügt am Cursor ein — nach dem üblichen Bestätigungsdialog, und nur wenn die Markierung
+    noch die ist, die es zuvor angezeigt hat.
+  - **Notiz** und **Alle Tabs** — die aktive Notiz mit ihren verlinkten Nachbarn (ausgehende
+    Links und Backlinks, Tiefe 1–3 über die Einstellung *Link-Tiefe im Modus Notiz*), oder
+    jede offene Notiz, gehen im **Volltext** mit, nicht nur als Zeiger, begrenzt durch die
+    Einstellung *Inhalts-Budget je Nachricht* (Standard 20 000 Zeichen).
+  - **Manuell** — eine Notiz oder einen ganzen Ordner von Hand hinzufügen, über den
+    Kontext-Tab oder drei Befehle; genauso wieder entfernen.
+
+  Kappungen (Markierungslänge, Tab-Zahl, Kopfdaten, dazu das Inhalts-Budget für
+  Notiz/Alle Tabs/Manuell) sind Einstellungen und melden sich im Block: nichts fällt
+  stillschweigend weg, eine Kürzung nennt immer beide Zahlen und den Weg zum Rest.
+  **Quellen-Chips** unter der Antwort nennen, welche Notizen im Volltext mitgingen — ein
+  Klick öffnet die Notiz.
 - **Ein dauerhaftes, einsehbares Gedächtnis** — `save_memory` hängt datierte Zeilen an
   `<Koda-Ordner>/Memory.md` an, das bei jeder Frage wieder in den System-Prompt
   einfließt. Nichts wird irgendwo abgelegt, wo du es nicht öffnen und ändern kannst.
@@ -133,9 +155,11 @@ Danach Koda unter **Einstellungen → Community-Plugins** aktivieren.
    „Denken"-Block eingeklappt darüber, und **Stopp** beendet den Stream, ohne das
    Angekommene zu verwerfen.
 3. **Nachsehen, was mitgeht.** Der **Kontext**-Tab listet die aktive Notiz, deine
-   Markierung und die offenen Tabs als Chips. Ein Klick auf das × lässt einen Eintrag
-   aus der nächsten Nachricht heraus, ein Klick auf den Namen öffnet die Notiz. Die
-   Befehle *Chat-Tab zeigen* und *Kontext-Tab zeigen* schalten ohne Maus um.
+   Markierung, die offenen Tabs und — im Modus Notiz/Alle Tabs/Manuell — die Notizen, die
+   im Volltext mitgehen, alle als Chips. Ein Klick auf das × lässt einen Eintrag aus der
+   nächsten Nachricht heraus, ein Klick auf den Namen öffnet die Notiz. Drei Befehle und
+   Knöpfe im Tab fügen eine Notiz oder einen Ordner von Hand hinzu. Die Befehle
+   *Chat-Tab zeigen* und *Kontext-Tab zeigen* schalten ohne Maus um.
 4. **Den Werkzeugen zusehen.** Jeder Aufruf von `search_notes` / `read_note` /
    `write_note` / `list_notes` erscheint im Chat, während er passiert — du siehst also,
    auf welchen Notizen eine Antwort beruht, statt es glauben zu müssen.
