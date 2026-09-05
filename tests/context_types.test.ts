@@ -31,9 +31,6 @@ describe("Modi", () => {
     expect(isContextMode("vault")).toBe(true);
     expect(isContextMode("vaults")).toBe(false);
   });
-  it("kennt vier Modi als aktuellen Stand (Etappe 2b: Notiz und Alle Tabs sind dazugekommen)", () => {
-    expect(AVAILABLE_MODES).toEqual(["off", "workspace", "note", "tabs"]);
-  });
 });
 
 describe("AVAILABLE_MODES", () => {
