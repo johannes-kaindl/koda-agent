@@ -176,28 +176,26 @@ In `DEFAULT_SETTINGS`:
   contextSections: {},
 ```
 
-Im Schema (neben `contextFrontmatterChars`):
+Im Schema **nur ein** Eintrag, neben `toolDescriptions`:
 
 ```typescript
-  contextKeepChoices: boolField(),
-  contextSections: boolRecordField(),
+  contextSections: boolRecord,
 ```
 
-Falls `boolField` noch nicht existiert, daneben definieren (Muster wie die vorhandenen Feld-Checks):
+⚠️ **`contextKeepChoices` bekommt KEINEN Schema-Eintrag.** Der Kommentar über `SCHEMA` sagt, warum: die sechs vorhandenen Boolean-Felder haben keinen, weil ihre Defaults die Typinformation tragen, die die generische Prüfung des Kits braucht. Ein Eintrag wäre nicht nur überflüssig, er verdrängte diese Prüfung.
+
+`boolRecord` neben `stringRecord` (Zeile 150) definieren, in derselben Form — dasselbe `isPlainObject`, dieselbe Begründung:
 
 ```typescript
-/** Ein Record von Booleans: unbekannte Werttypen kosten den EINTRAG, nicht das ganze Feld —
- *  ein einzelner kaputter Abschnitts-Zustand soll nicht alle anderen zurücksetzen. */
-function boolRecordField() {
-  return (raw: unknown): Record<string, boolean> => {
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
-    const out: Record<string, boolean> = {};
-    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-      if (typeof v === "boolean") out[k] = v;
-    }
-    return out;
-  };
-}
+/** Record von Booleans — dieselbe bewusste Ausnahme wie `stringRecord`: unbekannte Werttypen
+ *  kosten den EINTRAG, nicht das ganze Feld. Ein einzelner kaputter Abschnitts-Zustand soll
+ *  nicht alle anderen zurücksetzen. */
+const boolRecord: FieldCheck<Record<string, boolean>> = (raw, fallback) => {
+  if (!isPlainObject(raw)) return fallback;
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(raw)) if (typeof v === "boolean") out[k] = v;
+  return out;
+};
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
