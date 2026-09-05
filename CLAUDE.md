@@ -352,7 +352,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   Anteil passt, bekommt seinen vollen Text, der Rest wird neu verteilt), `render.ts` (baut aus
   den zugeteilten Einträgen den Block samt Kürzungs-Meldung), `build.ts` (`buildFullContext`,
   die einzige Stelle, die Kandidaten, Zuteilung und Rendern verbindet), `manual.ts`
-  (`addPaths`/`removePaths` für `contextManual`, referenzgleiche Rückgabe bei „nichts
+  (`addPaths`/`removePath` für `contextManual`, referenzgleiche Rückgabe bei „nichts
   geändert" wie `selection.ts`). Adapter-seitig `src/obsidian/links.ts` (`LinkPort` aus
   `metadataCache.resolvedLinks` — ausgehend ein Lookup, Backlinks eine Iteration über alle
   Quellen), `src/obsidian/note-picker.ts` (Fuzzy-Notiz-Picker, **übernommen** aus
