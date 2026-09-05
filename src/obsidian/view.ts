@@ -73,36 +73,7 @@ export class KodaView extends ItemView {
     newChatEl.setAttribute("aria-label", t("view.newChat"));
     newChatEl.addEventListener("click", () => void this.askNewChat());
 
-    this.logEl = root.createDiv({ cls: "koda-log" });
-    // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
-    // registriert, damit jeder spaetere Redraw automatisch mitgedeckt ist.
-    this.logEl.addEventListener("click", (e) => this.onLogClick(e));
-
-    // Statuszeile zwischen Verlauf und Eingabe: waehrend eines Laufs die Taetigkeit, im
-    // Ruhezustand die Belegung des Kontextfensters. Ein Ort fuer „was ist gerade los".
-    this.statusEl = root.createDiv({ cls: "koda-status" });
-    this.statusIconEl = this.statusEl.createSpan({ cls: "koda-status-icon" });
-    this.statusLabelEl = this.statusEl.createSpan({ cls: "koda-status-label" });
-
-    const bar = root.createDiv({ cls: "koda-input-bar" });
-    this.inputEl = bar.createEl("textarea", { cls: "koda-input", attr: { placeholder: t("view.placeholder"), rows: "2" } });
-    this.inputEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
-    });
-    // Nur noch Senden und Stopp. „Neues Gespraech" sass hier daneben und wurde regelmaessig
-    // versehentlich getroffen — es steht jetzt in der Kopfzeile, hinter einer Bestaetigung.
-    const buttons = bar.createDiv({ cls: "koda-buttons" });
-    // Modus-Dropdown links vom Senden: fuenf Zustaende sind kein Schalter. Ein Zustand, zwei
-    // Bedienstellen (Befehle setzen denselben Wert) — syncContextMode zieht nach.
-    this.modeEl = buttons.createEl("select", { cls: "dropdown koda-mode", attr: { "aria-label": t("context.dropdownAria") } });
-    for (const m of AVAILABLE_MODES) this.modeEl.createEl("option", { value: m, text: modeLabel(m, this.lang()) });
-    this.modeEl.addEventListener("change", () => {
-      const v = this.modeEl?.value;
-      if (isContextMode(v)) this.plugin.setContextMode(v);
-    });
-    this.syncContextMode();
-    buttons.createEl("button", { text: t("view.send"), cls: "mod-cta" }).addEventListener("click", () => this.send());
-    buttons.createEl("button", { text: t("view.stop") }).addEventListener("click", () => this.plugin.stopRun());
+    this.mountChat(root);
 
     this.syncThinkAction();
 
@@ -121,6 +92,42 @@ export class KodaView extends ItemView {
   /** Platzhalter bis Task 7: der Kontext-Tab existiert noch nicht. Absichtlich leer statt
    *  weggelassen — so bleibt jeder Task fuer sich gate-gruen. */
   syncContextPanel(): void { /* Task 7 fuellt das */ }
+
+  /** Der Chat-Inhalt (Verlauf, Statuszeile, Eingabe) in einen beliebigen Container.
+   *  Aufgeteilt fuer den Hub: bis Etappe 2 baute `onOpen` direkt in `contentEl`. Der Baum ist
+   *  derselbe geblieben — wer hier etwas aendert, aendert den Chat, nicht den Umbau. */
+  private mountChat(container: HTMLElement): void {
+    this.logEl = container.createDiv({ cls: "koda-log" });
+    // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
+    // registriert, damit jeder spaetere Redraw automatisch mitgedeckt ist.
+    this.logEl.addEventListener("click", (e) => this.onLogClick(e));
+
+    // Statuszeile zwischen Verlauf und Eingabe: waehrend eines Laufs die Taetigkeit, im
+    // Ruhezustand die Belegung des Kontextfensters. Ein Ort fuer „was ist gerade los".
+    this.statusEl = container.createDiv({ cls: "koda-status" });
+    this.statusIconEl = this.statusEl.createSpan({ cls: "koda-status-icon" });
+    this.statusLabelEl = this.statusEl.createSpan({ cls: "koda-status-label" });
+
+    const bar = container.createDiv({ cls: "koda-input-bar" });
+    this.inputEl = bar.createEl("textarea", { cls: "koda-input", attr: { placeholder: t("view.placeholder"), rows: "2" } });
+    this.inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
+    });
+    // Nur noch Senden und Stopp. „Neues Gespraech" sass hier daneben und wurde regelmaessig
+    // versehentlich getroffen — es steht jetzt in der Kopfzeile, hinter einer Bestaetigung.
+    const buttons = bar.createDiv({ cls: "koda-buttons" });
+    // Modus-Dropdown links vom Senden: fuenf Zustaende sind kein Schalter. Ein Zustand, zwei
+    // Bedienstellen (Befehle setzen denselben Wert) — syncContextMode zieht nach.
+    this.modeEl = buttons.createEl("select", { cls: "dropdown koda-mode", attr: { "aria-label": t("context.dropdownAria") } });
+    for (const m of AVAILABLE_MODES) this.modeEl.createEl("option", { value: m, text: modeLabel(m, this.lang()) });
+    this.modeEl.addEventListener("change", () => {
+      const v = this.modeEl?.value;
+      if (isContextMode(v)) this.plugin.setContextMode(v);
+    });
+    this.syncContextMode();
+    buttons.createEl("button", { text: t("view.send"), cls: "mod-cta" }).addEventListener("click", () => this.send());
+    buttons.createEl("button", { text: t("view.stop") }).addEventListener("click", () => this.plugin.stopRun());
+  }
 
   focusInput(): void {
     this.inputEl.focus();
