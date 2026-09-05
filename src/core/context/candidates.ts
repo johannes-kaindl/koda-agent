@@ -44,21 +44,34 @@ export function collectCandidates(input: CandidateInput): Candidate[] {
   // Breitensuche. `grenze` ist die Ebene, deren Nachbarn als naechstes drankommen; die
   // Quelle (link/backlink) stammt aus der ERSTEN Entdeckung und bleibt danach stehen —
   // auf Ebene 2 waere sie ohnehin nicht mehr eindeutig.
+  //
+  // `gesehen` entscheidet, ob ein Knoten eingesammelt wird (das macht `nimm`); `expandiert`
+  // entscheidet getrennt davon, ob ein Knoten schon als Startpunkt der naechsten Ebene diente.
+  // Ein manuell hinzugefuegter Zwischenknoten ist zwar schon in `gesehen` (er behaelt seine
+  // Quelle „manual" und bekommt keine `depth`), aber noch nicht `expandiert` — seine eigenen
+  // Nachbarn muessen trotzdem gefunden werden, sonst verkuerzt eine manuelle Ergaenzung die
+  // Link-Nachbarschaft. Die aktive Notiz startet vorbelegt in `expandiert`, damit sie nicht
+  // ueber einen Backlink-Umweg erneut expandiert wird und die Suche im Kreis liefe.
   let grenze: string[] = [aktiv.path];
+  const expandiert = new Set<string>([aktiv.path]);
   for (let ebene = 1; ebene <= input.linkDepth; ebene++) {
     const naechste: string[] = [];
     for (const p of grenze) {
       for (const ziel of input.links.outgoing(p)) {
-        if (gesehen.has(ziel)) continue;
         nimm({ source: "link", path: ziel, depth: ebene });
-        naechste.push(ziel);
+        if (!expandiert.has(ziel)) {
+          expandiert.add(ziel);
+          naechste.push(ziel);
+        }
       }
     }
     for (const p of grenze) {
       for (const quelle of input.links.backlinks(p)) {
-        if (gesehen.has(quelle)) continue;
         nimm({ source: "backlink", path: quelle, depth: ebene });
-        naechste.push(quelle);
+        if (!expandiert.has(quelle)) {
+          expandiert.add(quelle);
+          naechste.push(quelle);
+        }
       }
     }
     grenze = naechste;

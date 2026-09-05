@@ -90,4 +90,24 @@ describe("collectCandidates — Manuelles quer zu beiden Modi", () => {
     const out = collectCandidates({ mode: "tabs", snap: snap(null), links, linkDepth: 1, manual: ["z.md", "a.md"] });
     expect(out.map((c) => c.path)).toEqual(["z.md", "a.md"]);
   });
+
+  it("verkuerzt die Link-Nachbarschaft NICHT, wenn ein Zwischenknoten manuell hinzugefuegt wurde (Befund 1)", () => {
+    // Graph A -> B -> C. Ohne manuellen Eintrag liefert Tiefe 2 A, B@1, C@2. Wuerde die
+    // BFS den manuell schon eingesammelten Knoten B nicht mehr expandieren, verschwaende
+    // C.md aus der Nachbarschaft, obwohl der Nutzer nur einen zusaetzlichen Knoten
+    // hinzugefuegt und keinen entfernt hat.
+    const kette: Record<string, string[]> = { "A.md": ["B.md"], "B.md": ["C.md"], "C.md": [] };
+    const linksKette: LinkPort = {
+      outgoing: (p) => kette[p] ?? [],
+      backlinks: () => [],
+    };
+    const out = collectCandidates({
+      mode: "note", snap: snap("A.md"), links: linksKette, linkDepth: 2, manual: ["B.md"],
+    });
+    expect(out).toEqual([
+      { source: "active", path: "A.md" },
+      { source: "manual", path: "B.md" },
+      { source: "link", path: "C.md", depth: 2 },
+    ]);
+  });
 });
