@@ -2,7 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.12.0 released (Tag auf Forgejo+GitHub, Forgejo-Release da, GitHub-Release FEHLT), Rescan BLOCKIERT — main, Stand 2026-09-05
+## Status: 0.13.0 released (Kontext-Tab), Rescan weiter BLOCKIERT — main, Stand 2026-09-05 abends
+
+**0.13.0 ist am 2026-09-05 released** (Release-Commit `0aa6a3c`, Tag auf Forgejo und GitHub,
+Mirror vom Skript verifiziert, Forgejo-Release vorhanden). Inhalt ist **Arbeitskontext
+Etappe 2a**: Kodas Sidebar hat jetzt eine Hub-Tab-Leiste (Chat · Kontext), und der Kontext-Tab
+zeigt als Chips, was die naechste Nachricht mitnimmt — einzeln abwaehlbar, mit Summenzeile
+und persistiertem Auf/Zu-Zustand. Gate **620/620**, GUI-Smoke **32/32**.
+
+⚠️ **Kein Rescan** — direkt nach dem Release gemessen: `releases/tags/0.13.0` → **404**,
+`actions/runs` → **`total_count: 0`**. Dieselbe Signatur wie bei 0.10.1 und 0.12.0: kein
+Workflow-Lauf bei erreichbarer API, das Konto bleibt geflaggt.
+
+**Der teuerste Befund der Etappe steht in der Dach-REGISTRY § UI und ist die Lektuere wert,
+bevor hier jemand einen Teilbaum umhaengt:** `.koda-log { flex: 1 }` haelt die Eingabezeile
+nur unten fest, solange der ELTERNKNOTEN ein Flex-Container ist. Der Umzug des Chats unter
+das Hub-Panel (Block-Container) machte die Regel wirkungslos — die Eingabezeile stand 459,6 px
+zu hoch. Der Umbau-Commit selbst war eine reine Verschiebung; der Defekt entstand im
+Folge-Commit, der den Elternknoten tauschte. Kein Task-Review sah es, und der GUI-Smoke sah es
+nicht, weil er Existenz und Hoehe misst, nicht Position. Seitdem gibt es **Pruefpunkt 32**,
+der Geometrie misst (`display` plus den Abstand zweier `getBoundingClientRect().bottom`).
+
+### Vorgeschichte: 0.12.0 (Tag auf Forgejo+GitHub, Forgejo-Release da, GitHub-Release FEHLT), Rescan BLOCKIERT — main, Stand 2026-09-05
 
 **0.12.0 ist am 2026-09-05 released** (Release-Commit `6729a32`, Tag auf beiden Remotes, Mirror
 verifiziert). Inhalt: `move_note`/`delete_note` (Added) und die drei Etappe-2-Restposten
