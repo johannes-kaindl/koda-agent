@@ -2,7 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.11.0 released (Tag auf Forgejo+GitHub, Forgejo-Release da, GitHub-Release AUSSTEHEND), Rescan BLOCKIERT — main, Stand 2026-09-02 abends
+## Status: 0.12.0 released (Tag auf Forgejo+GitHub, Forgejo-Release da, GitHub-Release FEHLT), Rescan BLOCKIERT — main, Stand 2026-09-05
+
+**0.12.0 ist am 2026-09-05 released** (Release-Commit `6729a32`, Tag auf beiden Remotes, Mirror
+verifiziert). Inhalt: `move_note`/`delete_note` (Added) und die drei Etappe-2-Restposten
+(Changed) — gespaltene Leseart von `contextFrontmatterChars`, zusammengezogene Tab-Duplikate,
+die Warnung `reading-tool-off` für einzeln abgeschaltete Lesewerkzeuge. Gate **598/598**,
+GUI-Smoke **28/28**.
+
+⚠️ **Der Store-Rescan bleibt blockiert, und das ist jetzt gemessen statt vermutet.** Unmittelbar
+nach dem Release am 2026-09-05: `GET /repos/johannes-kaindl/koda-agent/releases/tags/0.12.0` →
+**404**, `GET …/actions/runs` → **`total_count: 0`**. Das Konto ist weiter geflaggt, die Action
+läuft nicht, also entsteht kein GitHub-Release. **Nicht rescannen, solange das so ist** — ein
+Scan ohne Release gilt als durchgefallen und nimmt das *Plugin* binnen 24 h aus der Suche.
+Verteilung läuft über Forgejo und den `anysource-sideloader`-Katalog.
+
+### Vorgeschichte: 0.11.0
 
 **Arbeitskontext, Etappe 1 ist gebaut, reviewt, belegt und als 0.11.0 released** (Merge per
 Fast-Forward nach `main`, Johannes' Entscheidung 18:06; Release-Commit `2dc5d2c`, Tag auf beiden
