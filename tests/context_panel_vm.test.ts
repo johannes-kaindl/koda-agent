@@ -144,6 +144,22 @@ describe("Kontext-Tab im Modus Notiz", () => {
     expect((await buildPanelViewModel("tabs", snapNote, new Set(), vollOpts())).depth).toBeNull();
     expect((await buildPanelViewModel("workspace", snapNote, new Set(), vollOpts())).depth).toBeNull();
   });
+
+  it("ein manueller Eintrag, der zugleich Link-Kandidat waere, steht GENAU EINMAL ueber alle Abschnitte — im Abschnitt Manuell, entfernbar", async () => {
+    // B.md ist hier sowohl Link-Nachbar von A.md (linkDepth 1) als auch von Hand
+    // hinzugefuegt. `collectCandidates` liefert ihn deshalb als EINEN Kandidaten mit
+    // `source: "manual"` (Manuelles kommt vor der Link-Suche und dedupliziert nach Pfad).
+    // Ohne die Quelle-Ausblendung in `sourceSection` erschiene derselbe Pfad zweimal: als
+    // nicht entfernbarer Chip im Abschnitt "note" (aus der Kandidatenliste) UND als
+    // entfernbarer Chip im Abschnitt "manual" — zwei Bedienelemente fuer eine Sache mit
+    // verschiedener Wirkung (abwaehlen vs. entfernen).
+    const vm = await buildPanelViewModel("note", snapNote, new Set(), vollOpts({ manual: ["B.md"] }));
+    const alle = vm.sections.flatMap((s) => s.chips.map((c) => ({ section: s.id, chip: c })));
+    const treffer = alle.filter((x) => x.chip.path === "B.md");
+    expect(treffer).toHaveLength(1);
+    expect(treffer[0]?.section).toBe("manual");
+    expect(treffer[0]?.chip.removable).toBe(true);
+  });
 });
 
 describe("Abschnitt Manuell", () => {

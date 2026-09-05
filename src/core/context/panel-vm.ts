@@ -147,17 +147,30 @@ function sourceSection(
   groessen: ReadonlyMap<string, { chars: number }>,
   t: (typeof T)[keyof typeof T],
 ): PanelSection {
-  const chips: PanelChip[] = kandidaten.map((c) => {
-    const chipOff = off.has(itemKey(c.source, c.path));
-    const groesse = groessen.get(`${c.source}:${c.path}`);
-    const teile: string[] = [];
-    if (groesse !== undefined) teile.push(t.chars(groesse.chars));
-    if (c.depth !== undefined) teile.push(t.level(c.depth));
-    return {
-      source: c.source, path: c.path, label: chipLabel(c.path),
-      hint: teile.join(", "), off: chipOff, removable: false,
-    };
-  });
+  // `collectCandidates` liefert fuer die Modi Notiz/Alle-Tabs auch manuelle Eintraege mit
+  // (source: "manual") — sie werden vor der Link-/Tab-Suche eingesammelt und deduplizieren
+  // nach Pfad. Sie NICHT hier abbilden, sondern `manualSection` ueberlassen: das ist KEINE
+  // zweite Filterung im verbotenen Sinn (die waere eine zweite Anwendung der Abwahl-Regel
+  // `off`, und die gibt es genau einmal, in `buildFullContext`) — es ist eine Aufteilung
+  // der ANZEIGE nach Quelle, und genau dafuer sind Abschnitte da. Die Kandidatenliste, die
+  // in `buildFullContext` geht, bleibt unangetastet; es aendert sich nur, in welchem
+  // Abschnitt ein Chip erscheint. Ohne diese Ausblendung stuende derselbe Pfad zweimal im
+  // Panel: als nicht entfernbarer Chip hier UND als entfernbarer Chip im Abschnitt
+  // "manual" — zwei Bedienelemente fuer eine Sache mit verschiedener Wirkung (abwaehlen
+  // vs. entfernen).
+  const chips: PanelChip[] = kandidaten
+    .filter((c) => c.source !== "manual")
+    .map((c) => {
+      const chipOff = off.has(itemKey(c.source, c.path));
+      const groesse = groessen.get(`${c.source}:${c.path}`);
+      const teile: string[] = [];
+      if (groesse !== undefined) teile.push(t.chars(groesse.chars));
+      if (c.depth !== undefined) teile.push(t.level(c.depth));
+      return {
+        source: c.source, path: c.path, label: chipLabel(c.path),
+        hint: teile.join(", "), off: chipOff, removable: false,
+      };
+    });
   const id = mode === "note" ? "note" : "tabs";
   const title = mode === "note" ? t.note : t.tabs;
   const empty = mode === "note" ? t.emptyNote : t.emptyTabs;
