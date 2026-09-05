@@ -41,7 +41,7 @@ SHA=$(git -C "$KIT" rev-parse --short "$KIT_REF^{commit}")
 MOCK_VER=$(git -C "$KIT" describe --tags --abbrev=0 "$MOCK_REF")
 
 PURE="think-splitter reasoning capabilities endpoint endpoint_config endpoint_diagnostics settings i18n num timeout frontmatter model-context error_body diff settings_schema model-choice model-list-cache"
-OBS="clock confirm folder-suggest settings_walker endpoint-list model-picker"
+OBS="clock confirm folder-suggest settings_walker endpoint-list model-picker hub collapsible"
 
 mkdir -p src/vendor/kit src/vendor/kit-obsidian tests/vendor/kit
 
