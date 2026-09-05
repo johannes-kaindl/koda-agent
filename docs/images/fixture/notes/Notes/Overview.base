@@ -1,0 +1,10 @@
+filters:
+  and:
+    - 'status != ""'
+views:
+  - type: table
+    name: All notes
+    order:
+      - file.name
+      - status
+      - area

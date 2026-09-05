@@ -37,6 +37,12 @@ that have nothing to do with the plugin:
   `Model control makes` at the start of line 9** — checks 20 and 23 open this note, select
   the first 13 characters of that line and read the working context; check 23 replaces the
   selection through `edit_active_note` and restores the file afterwards.
+- **`Notes/Project plan.md` must link to `Notes/Tools.md` and `Notes/Compaction.md`, and
+  `Notes/Tools.md` must link back to `Notes/Project plan.md`** — check 33 opens the plan note
+  in mode Note and expects both linked neighbours in the block, in full text.
+- **`Notes/Overview.base` must exist** — check 36 reads it through `read_note` and expects
+  the string `views:` in the result. It is the only non-Markdown file in the scenery; its
+  content is irrelevant beyond being valid YAML with that key.
 
 Plugin settings are *not* part of the fixture: `buildVault` deletes `data.json`, so every run
 starts from the shipped defaults — including the default endpoint `http://127.0.0.1:1234`.

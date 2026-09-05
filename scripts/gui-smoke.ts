@@ -1955,6 +1955,322 @@ async function main(): Promise<void> {
     // meldet `block` statt `flex`, der Punkt wird rot allein daran — unabhaengig davon, ob
     // bei kurzem Verlauf die Differenz zufaellig noch klein ausfaellt.
     record("32. Chat-Panel ist Spalten-Flex, Eingabezeile sitzt am unteren Rand (nicht im Verlauf)", ok32, detail32);
+
+    // ---- 33: Modus Notiz nimmt die aktive Notiz und ihre Nachbarn im Volltext mit
+    // Kulisse: dieselbe `SCENE_JS` wie 20/23 (es gibt keinen eigenen Helfer `oeffneNotiz` —
+    // eine erste Fassung dieser Task nahm das an; der Treiber hat nur SCENE_JS).
+    // Gegenprobe: in `src/core/context/candidates.ts` die Breitensuche (die beiden
+    // `for`-Schleifen ueber `input.links.outgoing`/`.backlinks`) auskommentieren, neu
+    // bauen/deployen. Erwartung: `nachbarn` ist 0 und der Punkt wird rot — der Volltext der
+    // aktiven Notiz allein reicht nicht.
+    let ok33 = false;
+    let detail33 = "";
+    const vorherMode33 = await cdp.evaluate<string>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].contextMode;`);
+    try {
+      const idx33 = await cdp.evaluate<number>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        ${SCENE_JS}
+        await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:context-mode-note`)});
+        return idx;
+      `);
+      if (idx33 < 0) throw new Error(idx33 === -2 ? "Fixture-Notiz Notes/Project plan.md fehlt" : "Kulisse nicht hergestellt");
+      const r = await pollUntil<{
+        items: { path: string; source: string; kind: string }[];
+        hatVolltext: boolean;
+        hatNachbarText: boolean;
+      }>(
+        cdp,
+        `
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          const ctx = await p.currentContext();
+          if (!ctx || ctx.mode !== "note") return null;
+          return {
+            items: ctx.items.map((i) => ({ path: i.path, source: i.source, kind: i.kind })),
+            hatVolltext: ctx.text.includes("Model control makes"),
+            hatNachbarText: ctx.text.includes("Koda knows seven tools"),
+          };
+        `,
+        10_000,
+      );
+      if (r === null) throw new Error("kein Notiz-Kontext innerhalb 10s");
+      const nachbarn = r.items.filter((i) => i.source === "link" || i.source === "backlink").length;
+      ok33 = r.hatVolltext && r.hatNachbarText && nachbarn > 0 && r.items.every((i) => i.kind === "full");
+      detail33 = `Eintraege ${r.items.length} · Nachbarn ${nachbarn} · Volltext aktive Notiz ${r.hatVolltext} · Volltext Nachbar ${r.hatNachbarText}`;
+    } catch (error) {
+      detail33 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    // Kein finally hier — Punkt 34 braucht den Modus Notiz absichtlich weiter aktiv (er
+    // misst dieselbe Situation mit engerem Budget). Zurueckgesetzt wird erst am Ende von 35.
+    record("33. Modus Notiz schickt die aktive Notiz UND einen verlinkten Nachbarn im Volltext", ok33, detail33);
+
+    // ---- 34: Die Budget-Kappung meldet sich im Block
+    // ⚠️ Korrektur zur Planvorlage: die dort vorgesehenen `contextBudgetChars = 2000` kuerzen
+    // hier NICHTS — die drei Fixture-Notizen aus Punkt 33 (aktive Notiz + zwei Nachbarn)
+    // sind zusammen rund 820 Zeichen gross (`wc -c` auf die drei Dateien, gemessen, nicht
+    // angenommen). Bei 2000 haette der Punkt seinen Gegenstand nie beruehrt und waere still
+    // an der ersten Ausnahme unten gescheitert. 300 kuerzt zuverlaessig alle drei Eintraege.
+    // Gegenprobe: in `src/core/context/render.ts` die `meldung`-Zeile auf `""` setzen, neu
+    // bauen/deployen. Erwartung: `hatMeldung` ist false, der Punkt wird rot, obwohl der
+    // Block weiterhin gekuerzt ist — genau der stille Verlust, gegen den er steht.
+    let ok34 = false;
+    let detail34 = "";
+    const BUDGET34 = 300;
+    const vorherBudget = await cdp.evaluate<number>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.contextBudgetChars;`);
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.contextBudgetChars = ${JSON.stringify(BUDGET34)};
+        await p.saveSettings();
+        return true;
+      `);
+      const r = await pollUntil<{ gekuerzt: number; hatMeldung: boolean; laenge: number }>(
+        cdp,
+        `
+          const ctx = await app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].currentContext();
+          if (!ctx) return null;
+          const gekuerzt = ctx.items.filter((i) => typeof i.fullChars === "number");
+          // Ohne gekuerzten Eintrag hat der Punkt seinen Gegenstand nicht beruehrt.
+          if (gekuerzt.length === 0) return null;
+          return { gekuerzt: gekuerzt.length, hatMeldung: /gek(ü|ue)rzt: \\d+ von \\d+ Zeichen|cut: \\d+ of \\d+ chars/.test(ctx.text), laenge: ctx.text.length };
+        `,
+        10_000,
+      );
+      if (r === null) throw new Error(`kein gekuerzter Eintrag bei Budget ${BUDGET34} — Gegenstand nicht beruehrt`);
+      ok34 = r.hatMeldung && r.laenge <= 4000;
+      detail34 = `Budget ${BUDGET34} · gekuerzte Eintraege ${r.gekuerzt} · Meldung im Block ${r.hatMeldung} · Blocklaenge ${r.laenge} Z.`;
+    } catch (error) {
+      detail34 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.contextBudgetChars = ${JSON.stringify(vorherBudget)};
+        await p.saveSettings();
+        return true;
+      `).catch(() => undefined);
+    }
+    record("34. Die Budget-Kappung meldet sich im Block, statt still zu kuerzen", ok34, detail34);
+
+    // ---- 35: Manuell hinzugefuegte Notiz geht mit und laesst sich wieder entfernen
+    // Gegenprobe: in `src/core/context/candidates.ts` die `manual`-Schleife
+    // (`for (const p of input.manual) nimm(...)`) entfernen, neu bauen/deployen. Erwartung:
+    // `mitManuell` enthaelt den Pfad nie, der Punkt wird rot.
+    let ok35 = false;
+    let detail35 = "";
+    try {
+      const r = await cdp.evaluate<{ ohne: string[]; mitManuell: string[]; danach: string[]; ziel: string }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const ZIEL = "Notes/Compaction.md";
+        const ohne = ((await p.currentContext())?.items ?? []).map((i) => i.path);
+        p.addContextPaths([ZIEL]);
+        const mitManuell = ((await p.currentContext())?.items ?? []).filter((i) => i.source === "manual").map((i) => i.path);
+        p.removeContextPath(ZIEL);
+        const danach = ((await p.currentContext())?.items ?? []).filter((i) => i.source === "manual").map((i) => i.path);
+        return { ohne, mitManuell, danach, ziel: ZIEL };
+      `);
+      ok35 = r.mitManuell.includes(r.ziel) && !r.danach.includes(r.ziel);
+      detail35 = `manuell nach dem Hinzufuegen: [${r.mitManuell.join(", ")}] · nach dem Entfernen: [${r.danach.join(", ")}]`;
+    } catch (error) {
+      detail35 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      // Modus und Auswahl zurueck auf den Stand vor Punkt 33 — 34/35 liefen absichtlich
+      // beide im Modus Notiz weiter.
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.resetContextSelection();
+        await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:context-mode-`)} + ${JSON.stringify(vorherMode33)});
+        return true;
+      `).catch(() => undefined);
+    }
+    record("35. Eine von Hand hinzugefuegte Notiz geht mit und laesst sich wieder entfernen", ok35, detail35);
+
+    // ---- 36: read_note liest eine .base
+    // Gegenprobe: in `src/obsidian/vault-tools.ts` das zweite Argument von
+    // `resolveNotePath(path, READ_EXTENSIONS)` in `read` entfernen, neu bauen/deployen.
+    // Erwartung: `ok` ist false, die Fehlermeldung nennt `.md`, der Punkt wird rot.
+    let ok36 = false;
+    let detail36 = "";
+    try {
+      const r = await cdp.evaluate<{ ok: boolean; inhalt: string; mdOk: boolean }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const tools = p.buildTools();
+        const aus = await tools.run("read_note", { path: "Notes/Overview.base" });
+        const md = await tools.run("read_note", { path: "Notes/Tools.md" });
+        return { ok: aus.ok === true, inhalt: (aus.content ?? aus.error ?? "").slice(0, 120), mdOk: md.ok === true };
+      `);
+      // Die .md-Probe daneben belegt, dass das Werkzeug ueberhaupt laeuft — sonst waere ein
+      // rotes 36 auch mit einem kaputten read_note erklaerbar.
+      ok36 = r.ok && r.inhalt.includes("views:") && r.mdOk;
+      detail36 = `.base gelesen: ${r.ok} · .md gelesen: ${r.mdOk} · Anfang: ${JSON.stringify(r.inhalt.slice(0, 60))}`;
+    } catch (error) {
+      detail36 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    record("36. read_note liest eine .base aus dem Fixture (und weiterhin .md)", ok36, detail36);
+
+    // ---- 37: Quellen-Chips unter der Antwort
+    // Der Punkt setzt einen kuenstlichen Verlauf, weil der Smoke bewusst ohne Modell laeuft.
+    // Gemessen wird der RENDERER, und der ist die einzige Stelle, an der aus dem
+    // persistierten `context.items` sichtbare Chips werden.
+    // Gegenprobe: in `src/core/context/labels.ts` in `sourceChips` den `kind`-Filter
+    // entfernen. Erwartung: der Zeiger-Eintrag erscheint als dritter Chip, `chips` ist 3
+    // statt 2, der Punkt wird rot.
+    let ok37 = false;
+    let detail37 = "";
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        window.__kodaLogVorher = p.chatLog;
+        p.chatLog = [
+          { role: "user", content: "Frage", context: { mode: "note", text: "Block", items: [
+            { source: "active", path: "Notes/Project plan.md", kind: "full", chars: 500 },
+            { source: "link", path: "Notes/Tools.md", kind: "full", chars: 200 },
+            { source: "tab", path: "Notes/Compaction.md", kind: "pointer", chars: 11 },
+          ] } },
+          { role: "assistant", content: "Antwort" },
+        ];
+        for (const l of app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})) l.view.renderLog();
+        return true;
+      `);
+      const r = await pollUntil<{ anzahl: number; titel: string[]; hoehe: number }>(
+        cdp,
+        `
+          const leiste = document.querySelector(".koda-sources");
+          if (!leiste) return null;
+          const chips = Array.from(leiste.querySelectorAll(".koda-source-chip"));
+          if (chips.length === 0) return null;
+          return {
+            anzahl: chips.length,
+            titel: chips.map((c) => c.getAttribute("title")),
+            hoehe: Math.min(...chips.map((c) => c.getBoundingClientRect().height)),
+          };
+        `,
+        8_000,
+      );
+      if (r === null) throw new Error("keine Quellen-Leiste innerhalb 8s gerendert");
+      ok37 = r.anzahl === 2 && r.hoehe > 0 && !r.titel.includes("Notes/Compaction.md");
+      detail37 = `Chips ${r.anzahl} · kleinste Hoehe ${r.hoehe}px · Titel: ${r.titel.join(" | ")}`;
+    } catch (error) {
+      detail37 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        if (window.__kodaLogVorher) { p.chatLog = window.__kodaLogVorher; delete window.__kodaLogVorher; }
+        for (const l of app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})) l.view.renderLog();
+        return true;
+      `).catch(() => undefined);
+    }
+    record("37. Quellen-Chips stehen unter der Antwort — nur Volltext-Quellen, Hoehe > 0", ok37, detail37);
+
+    // ---- 38: Kontext-Tab zeigt einen sichtbaren Fehlerzustand, wenn das ViewModel ablehnt
+    // Zusatzpunkt (nicht im Plan) — Befund aus Task 8, Review 2026-09-05: `ContextPanel.render()`
+    // faengt eine Ablehnung von `host.viewModel()` ab und malt einen Fehlerzustand
+    // (§8-Vokabular: `is-error`, `alert-triangle`, sichtbarer Fliesstext). Kein Unit-Test
+    // erreicht das, weil es an der Kante zum Host haengt (Promise-Rejection ueber den
+    // View-Kanal). Gemessen wird der Zustand, nicht der Code: `contextViewModel` wird
+    // durch eine ablehnende Fassung ersetzt, dann neu gerendert.
+    // Gegenprobe: in `src/obsidian/context-panel.ts` das `.catch(...)` an `render()`
+    // entfernen. Erwartung: die Ablehnung landet unbehandelt (Konsole), `.koda-ctx-summary`
+    // bekommt nie `is-error`, `pollUntil` laeuft in den Timeout, der Punkt wird rot.
+    let ok38 = false;
+    let detail38 = "";
+    try {
+      await cdp.evaluate(`
+        await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:tab-context`)});
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        window.__koda38Original = p.contextViewModel.bind(p);
+        p.contextViewModel = () => Promise.reject(new Error("smoke-38"));
+        for (const l of app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})) l.view.syncContextPanel();
+        return true;
+      `);
+      const r = await pollUntil<{ istFehler: boolean; bodyHoehe: number; bodyText: string }>(
+        cdp,
+        `
+          const summary = document.querySelector(".koda-ctx-summary");
+          if (!summary || !summary.classList.contains("is-error")) return null;
+          const body = document.querySelector(".koda-ctx-body");
+          const rect = body ? body.getBoundingClientRect() : null;
+          const text = body ? body.textContent.trim() : "";
+          if (!rect || text === "") return null;
+          return { istFehler: true, bodyHoehe: rect.height, bodyText: text };
+        `,
+        8_000,
+      );
+      if (r === null) throw new Error("keine Fehlerdarstellung innerhalb 8s");
+      ok38 = r.istFehler && r.bodyHoehe > 0 && r.bodyText.length > 0;
+      detail38 = `is-error: ${r.istFehler} · Body-Hoehe ${r.bodyHoehe}px · Text: "${r.bodyText}"`;
+    } catch (error) {
+      detail38 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        if (window.__koda38Original) { p.contextViewModel = window.__koda38Original; delete window.__koda38Original; }
+        for (const l of app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})) l.view.syncContextPanel();
+        return true;
+      `).catch(() => undefined);
+    }
+    record("38. Kontext-Tab zeigt einen sichtbaren Fehlerzustand, wenn das ViewModel ablehnt", ok38, detail38);
+
+    // ---- 39: Knopf und Befehl "+ Aktive Notiz" landen auf demselben Zustand
+    // Zusatzpunkt (nicht im Plan) — Befund aus Task 8, Review 2026-09-05 (Befund 6): der
+    // Knopf im Kontext-Tab rief vorher seine eigene Kopie der Orchestrierung, statt
+    // `addContextActive()` zu teilen. Gemessen wird auf dem ZUSTAND (`contextManual`), nicht
+    // am Code: Befehl ausloesen, Zustand lesen, zuruecksetzen, Knopf klicken, Zustand
+    // erneut lesen — beide muessen denselben Pfad eintragen.
+    // ⚠️ Ehrlicher Grenzfall: der Punkt bleibt nur so lange gruen, wie Knopf und Befehl
+    // ZUFAELLIG dasselbe Ergebnis liefern. Eine Gegenprobe, die den Knopf auf einen von
+    // Hand nachgebauten Duplikat-Pfad umstellt (statt `this.host.addActive()` zu rufen),
+    // waere semantisch derselbe Fehler wie der behobene Befund — trifft aber nur dann auf
+    // einen roten Punkt, wenn der Duplikat-Nachbau tatsaechlich abweicht. `-notiz`/`-ordner`
+    // oeffnen je ein Modal und sind fuer einen automatisierten Klick nicht geeignet; nur die
+    // aktive-Notiz-Variante ist ohne Modal pruefbar.
+    // Gegenprobe: in `src/obsidian/context-panel.ts` den "+ Aktive Notiz"-Knopf auf
+    // `this.host.addActive()` durch einen eigenen Aufbau ersetzen, der einen ANDEREN Pfad
+    // eintraegt (z. B. fest "Notes/Tools.md" statt der aktiven Notiz). Erwartung:
+    // `nachKlick` enthaelt "Notes/Tools.md" statt des Pfads der aktiven Notiz, `ok39` wird
+    // false, der Punkt rot.
+    let ok39 = false;
+    let detail39 = "";
+    try {
+      const start = await cdp.evaluate<{ idx: number; aktivPfad: string | null; nachBefehl: string[] }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        ${SCENE_JS}
+        p.resetContextSelection();
+        await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:context-add-active`)});
+        return { idx, aktivPfad: app.workspace.activeLeaf?.view?.file?.path ?? null, nachBefehl: [...p.contextManual] };
+      `);
+      if (start.idx < 0) throw new Error(start.idx === -2 ? "Fixture-Notiz Notes/Project plan.md fehlt" : "Kulisse nicht hergestellt");
+      if (start.aktivPfad === null) throw new Error("keine aktive Notiz nach der Kulisse");
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.resetContextSelection();
+        await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:tab-context`)});
+        return true;
+      `);
+      const sichtbar = await pollUntil<boolean>(cdp, `return !!document.querySelector(".koda-ctx-add button") || null;`, 8_000);
+      if (sichtbar !== true) throw new Error("Kontext-Tab-Knoepfe nicht innerhalb 8s sichtbar");
+      const geklickt = await clickReal(cdp, `document.querySelector(".koda-ctx-add button:first-of-type")`);
+      if (!geklickt) throw new Error("Knopf '+ Aktive Notiz' nicht klickbar");
+      const nachKlick = await pollUntil<string[]>(
+        cdp,
+        `
+          const m = [...app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].contextManual];
+          return m.length > 0 ? m : null;
+        `,
+        8_000,
+      );
+      if (nachKlick === null) throw new Error("kein manueller Eintrag nach dem Klick innerhalb 8s");
+      ok39 = start.nachBefehl.includes(start.aktivPfad) && nachKlick.includes(start.aktivPfad);
+      detail39 = `aktive Notiz: ${start.aktivPfad} · nach Befehl: [${start.nachBefehl.join(", ")}] · nach Klick: [${nachKlick.join(", ")}]`;
+    } catch (error) {
+      detail39 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.resetContextSelection();
+        await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:tab-chat`)});
+        return true;
+      `).catch(() => undefined);
+    }
+    record("39. Knopf '+ Aktive Notiz' und Befehl context-add-active landen auf demselben Zustand", ok39, detail39);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte

@@ -134,7 +134,7 @@ CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den Port wartet.
 
 Erst wenn nichts läuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
 
-Einunddreißig dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
+Neununddreißig dieser Punkte fahren automatisiert selbst (`scripts/gui-smoke.ts`, CDP gegen ein
 laufendes Obsidian — CORE-TEST-02 b; Basis seit 2026-08-07, seither um 1b, 1c und —
 2026-08-18 — 7 (Verdichtungs-Marken) und 8 (Settings-Gruppe „Kontext & Verdichtung")
 erweitert, 2026-08-30 um 9–12 für die umgebaute Sidebar und um 13, den gesperrten Zustand des
@@ -145,7 +145,13 @@ verwerfen; 2026-09-04 um 24–26 für `move_note`/`delete_note`; 2026-09-05 um 2
 restaurierte Tabs (DeferredViews, vorher nur Handpunkt 25) und doppelte Tab-Pfade; 2026-09-05 um
 29–31 für den Kontext-Tab — Hub-Leiste sichtbar, ein abgewählter Chip verschwindet aus dem
 gesendeten Block und kehrt nach „Auswahl zurücksetzen" zurück, der Auf/Zu-Zustand eines
-Abschnitts übersteht den Reload).
+Abschnitts übersteht den Reload; 2026-09-05 (Etappe 2b, Task 11) um 33–39 für die
+Volltext-Quellen — Modus Notiz nimmt aktive Notiz UND Nachbar im Volltext mit, die
+Budget-Kappung meldet sich im Block statt still zu kürzen, eine manuell hinzugefügte Notiz
+geht mit und lässt sich wieder entfernen, `read_note` liest eine `.base`, Quellen-Chips unter
+der Antwort zeigen nur Volltext-Eintraege, der Kontext-Tab zeigt einen sichtbaren
+Fehlerzustand bei einer abgelehnten ViewModel-Promise, und Knopf/Befehl „+ Aktive Notiz"
+landen auf demselben Zustand).
 Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
 
 ```bash
