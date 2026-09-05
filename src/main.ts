@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf, normalizePath, type Editor, type Menu } from "obsidian";
+import { Plugin, WorkspaceLeaf, normalizePath, Notice, type Editor, type Menu } from "obsidian";
 import "./i18n/strings";
 import { getLanguage } from "obsidian";
 import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
@@ -38,6 +38,10 @@ import { editorPort, linesAround, readWorkspace } from "./obsidian/workspace";
 import { applySelection, itemKey, type SelectionKey } from "./core/context/selection";
 import type { ContextSource } from "./core/context/types";
 import { buildPanelViewModel, type PanelViewModel } from "./core/context/panel-vm";
+import { addPaths, removePath } from "./core/context/manual";
+import { pickNote } from "./obsidian/note-picker";
+import { pickFolder } from "./obsidian/folder-picker";
+import { resolveFolderPath } from "./core/tools/path-guard";
 import type { CollapsibleStorage } from "./vendor/kit-obsidian/collapsible";
 
 /** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
@@ -81,9 +85,39 @@ export default class KodaPlugin extends Plugin {
   contextOff: Set<SelectionKey> = new Set();
 
   /** Vom Nutzer hinzugefuegte Notizen, in der Reihenfolge des Hinzufuegens. Wie
-   *  `contextOff` nicht persistiert: eine Zusammenstellung gilt fuer diese Sitzung.
-   *  Gefuellt wird sie in Task 7. */
+   *  `contextOff` nicht persistiert — eine Zusammenstellung gilt fuer diese Sitzung.
+   *  Wirkt in den Modi Notiz und Alle Tabs; im Modus Arbeitsplatz stehen die Chips
+   *  weiter da, tragen dort aber einen Hinweis statt einer Groesse (der Block schickt
+   *  Zeiger, keine Inhalte — Spec E1). */
   contextManual: string[] = [];
+
+  addContextPaths(paths: readonly string[]): void {
+    const naechster = addPaths(this.contextManual, paths);
+    if (naechster === this.contextManual) return;
+    this.contextManual = naechster;
+    for (const v of this.views()) v.syncContextPanel();
+  }
+
+  removeContextPath(path: string): void {
+    const naechster = removePath(this.contextManual, path);
+    if (naechster === this.contextManual) return;
+    this.contextManual = naechster;
+    for (const v of this.views()) v.syncContextPanel();
+  }
+
+  /** „+ Ordner": die Markdown-Pfade des Ordners werden SOFORT einzeln eingetragen, nicht
+   *  der Ordner gemerkt. Ein gemerkter Ordner aenderte seinen Inhalt zwischen zwei
+   *  Nachrichten, ohne dass der Nutzer etwas tut — die Chips zeigten dann etwas anderes
+   *  als der Block. Rekursiv, weil ein Ordner mit Unterordnern sonst fast leer wirkt. */
+  async addContextFolder(): Promise<void> {
+    const ordner = await pickFolder(this.app);
+    if (ordner === null) return;
+    const norm = resolveFolderPath(ordner);
+    const praefix = norm === "" ? "" : `${norm}/`;
+    const pfade = this.app.vault.getMarkdownFiles().map((f) => f.path).filter((p) => p.startsWith(praefix)).sort();
+    if (pfade.length === 0) { new Notice(t("picker.folder.empty", ordner)); return; }
+    this.addContextPaths(pfade);
+  }
 
   toggleContextItem(source: ContextSource, path: string): void {
     const key = itemKey(source, path);
@@ -93,8 +127,9 @@ export default class KodaPlugin extends Plugin {
   }
 
   resetContextSelection(): void {
-    if (this.contextOff.size === 0) return;
+    if (this.contextOff.size === 0 && this.contextManual.length === 0) return;
     this.contextOff.clear();
+    this.contextManual = [];
     for (const v of this.views()) v.syncContextPanel();
   }
 
@@ -249,6 +284,24 @@ export default class KodaPlugin extends Plugin {
     // ein Tab, den nur ein Knopf erreicht, ist bei ausgeblendetem Knopf unerreichbar.
     this.addCommand({ id: "tab-chat", name: t("cmd.tabChat"), callback: () => { void this.runInView((v) => { v.setTab("chat"); return Promise.resolve(); }); } });
     this.addCommand({ id: "tab-context", name: t("cmd.tabContext"), callback: () => { void this.runInView((v) => { v.setTab("context"); return Promise.resolve(); }); } });
+    this.addCommand({
+      id: "context-add-active",
+      name: t("cmd.contextAddActive"),
+      callback: () => {
+        const aktiv = readWorkspace(this.app, VIEW_TYPE_KODA).active;
+        if (aktiv !== null) this.addContextPaths([aktiv.path]);
+      },
+    });
+    this.addCommand({
+      id: "context-add-note",
+      name: t("cmd.contextAddNote"),
+      callback: () => void pickNote(this.app).then((p) => { if (p !== null) this.addContextPaths([p]); }),
+    });
+    this.addCommand({
+      id: "context-add-folder",
+      name: t("cmd.contextAddFolder"),
+      callback: () => void this.addContextFolder(),
+    });
     // Rechtsklick auf markierten Text: nur dann, sonst ist der Eintrag Rauschen.
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor) => {
