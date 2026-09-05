@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { activeReadingTools } from "../src/core/prompt/effective";
+import { activeReadingTools, availableReadingTools } from "../src/core/prompt/effective";
 
 describe("activeReadingTools", () => {
   it("zaehlt die vier festen lesenden Werkzeuge", () => {
@@ -16,5 +16,12 @@ describe("activeReadingTools", () => {
   });
   it("laesst sich von einem abgeschalteten Schreibwerkzeug nicht beirren", () => {
     expect(activeReadingTools(["write_note"], false)).toHaveLength(4);
+  });
+});
+
+describe("availableReadingTools", () => {
+  it("nennt, was im aktuellen Zustand ueberhaupt angeboten werden koennte — unabhaengig von Abschaltungen", () => {
+    expect(availableReadingTools(false)).toEqual(["search_notes", "read_note", "list_notes", "get_workspace"]);
+    expect(availableReadingTools(true)).toContain("related_notes");
   });
 });

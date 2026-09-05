@@ -66,6 +66,17 @@ export function renderFrontmatter(fm: Record<string, unknown> | null, max: numbe
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+/** Derselbe Pfad in zwei Tabs (Split, zweites Fenster) ist fuer das Modell null
+ *  Information — und er kostet einen Platz in `tabsMax`, verdraengt also einen echten Tab.
+ *  Deshalb VOR der Kappung entdoppelt, nicht danach; der erste Eintrag gewinnt. Die aktive
+ *  Notiz bleibt in der Liste: dass sie offen ist, gehoert zur Antwort „was ist offen",
+ *  und sie herauszunehmen zwaenge das Modell, zwei Listen zu vereinigen.
+ *  (Entscheidung Johannes, 2026-09-05, Review-Minor 17 der Etappe 1.) */
+export function dedupeTabs(tabs: WorkspaceSnapshot["tabs"]): WorkspaceSnapshot["tabs"] {
+  const seen = new Set<string>();
+  return tabs.filter((x) => (seen.has(x.path) ? false : (seen.add(x.path), true)));
+}
+
 export function renderWorkspaceContext(snap: WorkspaceSnapshot, opts: WorkspaceLineOptions): ContextAttachment {
   const t = T[opts.lang];
   const lines: string[] = [t.head];
@@ -89,23 +100,31 @@ export function renderWorkspaceContext(snap: WorkspaceSnapshot, opts: WorkspaceL
       items.push(item);
     }
   }
-  if (snap.tabs.length === 0) {
+  const tabs = dedupeTabs(snap.tabs);
+  if (tabs.length === 0) {
     lines.push(t.tabsNone);
   } else {
-    const shown = snap.tabs.slice(0, opts.tabsMax);
-    const rest = snap.tabs.length - shown.length;
-    lines.push(`${t.tabs(snap.tabs.length)}: ${shown.map((x) => x.path).join(" · ")}${rest > 0 ? ` ${t.more(rest)}` : ""}`);
+    const shown = tabs.slice(0, opts.tabsMax);
+    const rest = tabs.length - shown.length;
+    lines.push(`${t.tabs(tabs.length)}: ${shown.map((x) => x.path).join(" · ")}${rest > 0 ? ` ${t.more(rest)}` : ""}`);
     for (const x of shown) items.push({ source: "tab", path: x.path, kind: "pointer", chars: x.path.length });
   }
   lines.push(t.hint);
   return { mode: "workspace", items, text: lines.join("\n") };
 }
 
-/** Text fuer `get_workspace`: dieselbe Quelle wie der Block, aber vollstaendig. */
+/** Text fuer `get_workspace`: dieselbe Quelle wie der Block, aber vollstaendig.
+ *  `frontmatterMax` wird hier GESPALTEN gelesen (Entscheidung Johannes, 2026-09-05,
+ *  Review-Minor 14): ein Wert > 0 ist eine Kappung und gilt nur dem Block — der Bericht
+ *  liefert die Kopfdaten vollstaendig, wie er es bei Markierung und Tab-Liste auch tut.
+ *  Die 0 ist dagegen keine Kappung, sondern eine Abwahl (nur dieses Feld kann ueberhaupt
+ *  auf 0; `contextSelectionChars` beginnt bei 100, `contextTabsMax` bei 1) — wer sie
+ *  waehlt, meint „nicht", nicht „kuerzer", und das gilt auch hier. */
 export function renderWorkspaceReport(
   snap: WorkspaceSnapshot,
   around: { from: number; lines: string[] } | null,
   lang: Lang,
+  frontmatterMax: number,
 ): string {
   const t = T[lang];
   const out: string[] = [];
@@ -115,7 +134,7 @@ export function renderWorkspaceReport(
   } else {
     const where = a.cursorLine !== null && a.lineCount !== null ? ` · ${t.line(a.cursorLine, a.lineCount)}` : "";
     out.push(`${t.active}: ${a.path}${where}`);
-    const props = renderFrontmatter(a.frontmatter, Number.MAX_SAFE_INTEGER);
+    const props = renderFrontmatter(a.frontmatter, frontmatterMax <= 0 ? 0 : Number.MAX_SAFE_INTEGER);
     if (props !== "") out.push(`${t.props}: ${props}`);
     if (a.selection !== "") out.push(`${t.sel(a.selection.length)}:\n${a.selection}`);
     if (around !== null && around.lines.length > 0) {
@@ -124,7 +143,8 @@ export function renderWorkspaceReport(
       out.push(`${t.around(around.from, to)}\n${around.lines.map((l, i) => `${String(around.from + i).padStart(width + 3)} | ${l}`).join("\n")}`);
     }
   }
-  if (snap.tabs.length === 0) out.push(t.tabsNone);
-  else out.push(`${t.tabs(snap.tabs.length)}:\n${snap.tabs.map((x) => `- ${x.path} (${x.viewType})`).join("\n")}`);
+  const tabs = dedupeTabs(snap.tabs);
+  if (tabs.length === 0) out.push(t.tabsNone);
+  else out.push(`${t.tabs(tabs.length)}:\n${tabs.map((x) => `- ${x.path} (${x.viewType})`).join("\n")}`);
   return out.join("\n\n");
 }

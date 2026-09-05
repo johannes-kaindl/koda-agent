@@ -26,13 +26,29 @@ describe("promptRow", () => {
     expect(promptRow({ ...leer, systemPromptOverride: "Sei knapp. {{sprache}} {{ordner}}" }, false).warnings)
       .toEqual(["no-tools"]);
   });
+  it("warnt bei einem einzeln abgeschalteten Lesewerkzeug und nennt es beim Namen", () => {
+    const m = promptRow({ systemPromptOverride: "", toolsDisabled: ["read_note"] }, false);
+    expect(m.warnings).toEqual(["reading-tool-off"]);
+    expect(m.readingToolsOff).toEqual(["read_note"]);
+  });
+  it("nennt related_notes nur dann als abgeschaltet, wenn es ueberhaupt angeboten wuerde", () => {
+    expect(promptRow({ systemPromptOverride: "", toolsDisabled: ["related_notes"] }, false).readingToolsOff).toEqual([]);
+    expect(promptRow({ systemPromptOverride: "", toolsDisabled: ["related_notes"] }, true).readingToolsOff).toEqual(["related_notes"]);
+  });
+  it("laesst readingToolsOff leer, solange alles aktiv ist", () => {
+    expect(promptRow({ systemPromptOverride: "", toolsDisabled: [] }, false).readingToolsOff).toEqual([]);
+  });
   it("warnt, wenn kein lesendes Werkzeug uebrig ist", () => {
     const m = promptRow({ systemPromptOverride: "", toolsDisabled: ["search_notes", "read_note", "list_notes", "get_workspace"] }, false);
     expect(m.warnings).toEqual(["no-reading-tool"]);
   });
   it("zaehlt related_notes nur als lesendes Werkzeug, wenn ein Index da ist", () => {
     const aus = { systemPromptOverride: "", toolsDisabled: ["search_notes", "read_note", "list_notes", "get_workspace"] };
-    expect(promptRow(aus, true).warnings).toEqual([]);
+    // Kernaussage des Tests: mit Index ist related_notes ein Lesewerkzeug, also faellt der
+    // schwere Befund weg. Der leichte bleibt — vier von fuenf sind aus, und genau das ist
+    // seit 2026-09-05 meldepflichtig.
+    expect(promptRow(aus, true).warnings).not.toContain("no-reading-tool");
+    expect(promptRow(aus, true).warnings).toEqual(["reading-tool-off"]);
     expect(promptRow(aus, false).warnings).toEqual(["no-reading-tool"]);
   });
 });

@@ -81,31 +81,38 @@ describe("checkRules", () => {
   const alle = ["search_notes", "read_note", "list_notes"];
 
   it("meldet nichts fuer den Auslieferungsstand", () => {
-    expect(checkRules(DEFAULT_RULES, alle)).toEqual([]);
+    expect(checkRules(DEFAULT_RULES, alle, alle)).toEqual([]);
   });
   it("meldet nichts fuer einen umformulierten, aber gueltigen Prompt", () => {
     // Der Kern von Spec E5: keine Wort-fuer-Wort-Pruefung. Sonst waere jede
     // Umformulierung ein Fehlalarm — und Fehlalarme erziehen zum Wegsehen.
     const eigen = `Du bist Koda. Antworte auf ${PLACEHOLDER_LANG}. Nutze deine Werkzeuge, bevor du behauptest. Schreibe frei in ${PLACEHOLDER_FOLDER}.`;
-    expect(checkRules(eigen, alle)).toEqual([]);
+    expect(checkRules(eigen, alle, alle)).toEqual([]);
   });
   it("meldet no-tools, wenn von Werkzeugen ueberhaupt nicht die Rede ist", () => {
-    expect(checkRules(`Antworte auf ${PLACEHOLDER_LANG} in ${PLACEHOLDER_FOLDER}.`, alle)).toContain("no-tools");
+    expect(checkRules(`Antworte auf ${PLACEHOLDER_LANG} in ${PLACEHOLDER_FOLDER}.`, alle, alle)).toContain("no-tools");
   });
   it("erkennt sowohl das englische als auch das deutsche Wort, ohne Ruecksicht auf Gross-Klein", () => {
     const rumpf = `${PLACEHOLDER_LANG} ${PLACEHOLDER_FOLDER} `;
-    expect(checkRules(rumpf + "Benutze TOOLS.", alle)).not.toContain("no-tools");
-    expect(checkRules(rumpf + "Benutze Werkzeuge.", alle)).not.toContain("no-tools");
-    expect(checkRules(rumpf + "Benutze werkzeuge.", alle)).not.toContain("no-tools");
+    expect(checkRules(rumpf + "Benutze TOOLS.", alle, alle)).not.toContain("no-tools");
+    expect(checkRules(rumpf + "Benutze Werkzeuge.", alle, alle)).not.toContain("no-tools");
+    expect(checkRules(rumpf + "Benutze werkzeuge.", alle, alle)).not.toContain("no-tools");
   });
   it("meldet missing-placeholder, wenn einer der beiden fehlt", () => {
-    expect(checkRules(`tools ${PLACEHOLDER_FOLDER}`, alle)).toContain("missing-placeholder");
-    expect(checkRules(`tools ${PLACEHOLDER_LANG}`, alle)).toContain("missing-placeholder");
+    expect(checkRules(`tools ${PLACEHOLDER_FOLDER}`, alle, alle)).toContain("missing-placeholder");
+    expect(checkRules(`tools ${PLACEHOLDER_LANG}`, alle, alle)).toContain("missing-placeholder");
   });
   it("meldet no-reading-tool, wenn kein lesendes Werkzeug mehr aktiv ist", () => {
-    expect(checkRules(DEFAULT_RULES, [])).toEqual(["no-reading-tool"]);
+    expect(checkRules(DEFAULT_RULES, [], alle)).toEqual(["no-reading-tool"]);
+  });
+  it("meldet reading-tool-off, wenn ein einzelnes lesendes Werkzeug fehlt — der gemessene Suchschleifen-Fall", () => {
+    const ohneLesen = ["search_notes", "list_notes"];
+    expect(checkRules(DEFAULT_RULES, ohneLesen, alle)).toEqual(["reading-tool-off"]);
+  });
+  it("meldet reading-tool-off NICHT, wenn gar keines mehr aktiv ist — dann gilt der schwerere Befund", () => {
+    expect(checkRules(DEFAULT_RULES, [], alle)).not.toContain("reading-tool-off");
   });
   it("meldet mehrere Befunde zugleich und in stabiler Reihenfolge", () => {
-    expect(checkRules("nichts", [])).toEqual(["no-tools", "missing-placeholder", "no-reading-tool"]);
+    expect(checkRules("nichts", [], alle)).toEqual(["no-tools", "missing-placeholder", "no-reading-tool"]);
   });
 });

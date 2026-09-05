@@ -353,6 +353,7 @@ export default class KodaPlugin extends Plugin {
       },
       editor: editorPort(this.app),
       lang: () => this.promptLang(),
+      contextFrontmatterChars: () => this.settings.contextFrontmatterChars,
     });
   }
 

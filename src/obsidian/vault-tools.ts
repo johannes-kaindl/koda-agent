@@ -14,6 +14,7 @@ import {
 } from "../core/tools/list";
 import type { EditorPort, WorkspacePort } from "../core/context/ports";
 import { renderWorkspaceReport } from "../core/context/workspace-line";
+import { DEFAULT_SETTINGS } from "../core/settings-types";
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
@@ -110,6 +111,11 @@ export class VaultTools implements ToolRunner {
       editor?: EditorPort;
       /** Sprache der Werkzeug-Texte; fehlt → deutsch wie die Stubs. */
       lang?: () => "de" | "en";
+      /** Einstellung `contextFrontmatterChars`, frisch je Aufruf gelesen. Sie wird hier
+       *  GESPALTEN gelesen — > 0 kappt nur den Block, 0 waehlt die Kopfdaten ueberall ab;
+       *  die Begruendung steht an `renderWorkspaceReport`. Fehlt das Feld, gilt der
+       *  Auslieferungswert, also keine Abwahl (Tests, die nur den Vault-Kern messen). */
+      contextFrontmatterChars?: () => number;
     },
   ) {}
 
@@ -381,7 +387,8 @@ export class VaultTools implements ToolRunner {
     const ws = this.opts.workspace;
     if (ws === undefined) return { ok: false, error: "Arbeitsplatz nicht verfügbar: kein Zugriff auf den Workspace." };
     const snap = ws.snapshot();
-    return { ok: true, content: renderWorkspaceReport(snap, ws.linesAround(radius), this.opts.lang?.() ?? "de") };
+    const fmMax = this.opts.contextFrontmatterChars?.() ?? DEFAULT_SETTINGS.contextFrontmatterChars;
+    return { ok: true, content: renderWorkspaceReport(snap, ws.linesAround(radius), this.opts.lang?.() ?? "de", fmMax) };
   }
 
   /** Invariante „Vorschau == geschriebener Inhalt": Pfad und Markierung werden VOR dem Modal

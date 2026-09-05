@@ -16,6 +16,24 @@ All notable changes to this project are documented here. The format follows
   free. The confirmation dialog names both paths and how many notes link to the one being
   moved, because a move looks like it touches one file while it touches several.
 
+### Changed
+
+- **The working context no longer lists the same note twice.** A note open in two tabs (a
+  split, a second window) used to appear once per tab. That told the model nothing and cost
+  a slot in the tab limit, pushing a real tab out of the list; duplicates are now folded
+  before the limit applies. The active note stays in the list — that it is open is part of
+  the answer to "what is open".
+- **"Properties in the context" now says what it does to `get_workspace`.** A value above 0
+  caps the block only; the tool still returns the properties in full, the same way it does
+  for the selection and the tab list. The 0 is not a cap but an opt-out and now applies
+  everywhere, including `get_workspace` — only this setting can be set to 0 at all, and
+  whoever picks it means "not", not "shorter".
+- **The instruction warning names a single switched-off reading tool.** Until now it only
+  fired when *all* reading tools were off. Switching off just `read_note` left no trace in
+  the interface, while Koda kept trying `search_notes` with ever more desperate queries
+  until it ran out of rounds. The warning now names the tools that are off and says what it
+  costs. The model itself is still not told — switched off stays switched off.
+
 ## [0.11.0] — 2026-09-02
 
 ### Added

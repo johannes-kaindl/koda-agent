@@ -49,6 +49,22 @@ describe("renderWorkspaceContext", () => {
     expect(ctx.text).toContain("… und 3 weitere (vollständig über get_workspace)");
     expect(ctx.items.filter((i) => i.source === "tab")).toHaveLength(12);
   });
+  it("zieht denselben Pfad in zwei Tabs zu einem Eintrag zusammen", () => {
+    const doubled = { ...snap, tabs: [...snap.tabs, { path: "Notes/Tools.md", viewType: "markdown" }] };
+    const ctx = renderWorkspaceContext(doubled, opts);
+    expect(ctx.text).toContain("Offene Tabs (3): Notes/Project plan.md · Notes/Tools.md · Board.canvas");
+    expect(ctx.items.filter((i) => i.source === "tab" && i.path === "Notes/Tools.md")).toHaveLength(1);
+  });
+  it("entdoppelt VOR der Kappung — ein Duplikat verdraengt keinen echten Tab", () => {
+    const tabs = [
+      ...Array.from({ length: 10 }, (_, i) => ({ path: `N${i}.md`, viewType: "markdown" })),
+      ...Array.from({ length: 5 }, (_, i) => ({ path: `N${i}.md`, viewType: "markdown" })),
+    ];
+    const ctx = renderWorkspaceContext({ ...snap, tabs }, { ...opts, tabsMax: 12 });
+    expect(ctx.text).toContain("Offene Tabs (10):");
+    expect(ctx.text).not.toContain("weitere");
+    expect(ctx.items.filter((i) => i.source === "tab")).toHaveLength(10);
+  });
   it("ohne aktive Notiz und ohne Tabs sagt der Block das — und liefert trotzdem einen Block", () => {
     const ctx = renderWorkspaceContext({ active: null, tabs: [] }, opts);
     expect(ctx.text).toContain("Aktive Notiz: keine (kein Editor im Hauptbereich)");
@@ -80,15 +96,32 @@ describe("renderFrontmatter", () => {
 
 describe("renderWorkspaceReport", () => {
   it("liefert Markierung und Cursor-Umgebung vollstaendig und alle Tabs mit Typ", () => {
-    const text = renderWorkspaceReport(snap, { from: 7, lines: ["", "# Project plan", "", "Model control makes"] }, "de");
+    const text = renderWorkspaceReport(snap, { from: 7, lines: ["", "# Project plan", "", "Model control makes"] }, "de", 300);
     expect(text).toContain("Aktive Notiz: Notes/Project plan.md · Zeile 9 von 11");
     expect(text).toContain("Markierung (13 Zeichen):\nModel control");
     expect(text).toContain("Cursor-Umgebung (Zeilen 7–10):");
     expect(text).toContain("    8 | # Project plan");
     expect(text).toContain("- Board.canvas (canvas)");
   });
+  it("liefert die Kopfdaten vollstaendig — die Kappung gilt nur dem Block", () => {
+    const wide = { ...snap, active: { ...snap.active!, frontmatter: { a: "x".repeat(500) } } };
+    const text = renderWorkspaceReport(wide, null, "de", 50);
+    expect(text).toContain(`a: ${"x".repeat(500)}`);
+    expect(text).not.toContain("…");
+  });
+  it("frontmatterMax 0 ist eine Abwahl und gilt auch hier", () => {
+    const text = renderWorkspaceReport(snap, null, "de", 0);
+    expect(text).not.toContain("Kopfdaten");
+    expect(text).toContain("Aktive Notiz: Notes/Project plan.md");
+  });
+  it("zieht denselben Pfad in zwei Tabs auch hier zu einem Eintrag zusammen", () => {
+    const doubled = { ...snap, tabs: [...snap.tabs, { path: "Notes/Tools.md", viewType: "markdown" }] };
+    const text = renderWorkspaceReport(doubled, null, "de", 300);
+    expect(text).toContain("Offene Tabs (3):");
+    expect(text.match(/Notes\/Tools\.md/g) ?? []).toHaveLength(1);
+  });
   it("ohne Editor nennt er das statt zu schweigen", () => {
-    const text = renderWorkspaceReport({ active: null, tabs: [] }, null, "de");
+    const text = renderWorkspaceReport({ active: null, tabs: [] }, null, "de", 300);
     expect(text).toContain("Aktive Notiz: keine");
     expect(text).not.toContain("Cursor-Umgebung");
   });

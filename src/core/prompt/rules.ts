@@ -43,15 +43,19 @@ export function renderRules(template: string, opts: { lang: "de" | "en"; folder:
  *  nicht verstreut in Bedingungen — die Warnung haengt daran (Spec E3). */
 export const READING_TOOLS = ["search_notes", "read_note", "list_notes", "related_notes", "get_workspace"];
 
-export type RuleWarning = "no-tools" | "missing-placeholder" | "no-reading-tool";
+export type RuleWarning = "no-tools" | "missing-placeholder" | "no-reading-tool" | "reading-tool-off";
 
 /** Prueft den Regelblock GROB. Absichtlich keine Satzpruefung: sie verbietet nichts, also
  *  darf sie ungenau sein — eine Sperre duerfte es nicht (Spec E5). Falsch-negativ ist
  *  hier der billigere Fehler als falsch-positiv, weil Fehlalarme zum Wegsehen erziehen. */
-export function checkRules(text: string, activeReadingTools: string[]): RuleWarning[] {
+export function checkRules(text: string, activeReadingTools: string[], availableReadingTools: string[]): RuleWarning[] {
   const out: RuleWarning[] = [];
   if (!/tool|werkzeug/i.test(text)) out.push("no-tools");
   if (!text.includes(PLACEHOLDER_LANG) || !text.includes(PLACEHOLDER_FOLDER)) out.push("missing-placeholder");
+  // Zwei Stufen desselben Befunds, und nur EINE davon wird gemeldet: „keines mehr" ist der
+  // schwerere Fall und schliesst den leichteren ein. Beide zugleich zu zeigen waere ein
+  // Fehlalarm neben einem echten Befund — und Fehlalarme erziehen zum Wegsehen.
   if (activeReadingTools.length === 0) out.push("no-reading-tool");
+  else if (activeReadingTools.length < availableReadingTools.length) out.push("reading-tool-off");
   return out;
 }

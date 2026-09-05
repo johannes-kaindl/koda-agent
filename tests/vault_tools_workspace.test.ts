@@ -44,6 +44,25 @@ describe("get_workspace", () => {
       expect(r.content).toContain("Cursor-Umgebung (Zeilen 7–9):");
     }
   });
+  it("frontmatterMax 0 ist eine Abwahl — der Bericht nennt die Kopfdaten dann nicht", async () => {
+    const tools = new VaultTools(fakeVault({}), yes, { ...base, workspace, contextFrontmatterChars: () => 0 });
+    const r = await tools.run("get_workspace", {});
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.content).not.toContain("Kopfdaten");
+      expect(r.content).toContain("Aktive Notiz: Notes/Plan.md");
+    }
+  });
+  it("ein Wert ueber 0 kappt nur den Block — der Bericht liefert die Kopfdaten vollstaendig", async () => {
+    const wide: WorkspacePort = {
+      snapshot: () => ({ active: { path: "N.md", frontmatter: { a: "x".repeat(500) }, selection: "", cursorLine: null, lineCount: null }, tabs: [] }),
+      linesAround: () => null,
+    };
+    const tools = new VaultTools(fakeVault({}), yes, { ...base, workspace: wide, contextFrontmatterChars: () => 50 });
+    const r = await tools.run("get_workspace", {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.content).toContain(`a: ${"x".repeat(500)}`);
+  });
   it("ohne Port meldet es Klartext statt zu werfen", async () => {
     const tools = new VaultTools(fakeVault({}), yes, base);
     expect(await tools.run("get_workspace", {})).toEqual({ ok: false, error: "Arbeitsplatz nicht verfügbar: kein Zugriff auf den Workspace." });

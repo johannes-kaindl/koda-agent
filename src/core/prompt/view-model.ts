@@ -1,5 +1,5 @@
 import { DEFAULT_RULES, checkRules, effectiveRules, type RuleWarning } from "./rules";
-import { activeReadingTools } from "./effective";
+import { activeReadingTools, availableReadingTools } from "./effective";
 import { toolDefs } from "../tools/defs";
 
 /** Was die Anweisungs-Zeile zeigt. Der Auslieferungsstand ist der PLATZHALTER, nie der
@@ -9,6 +9,12 @@ export interface PromptRowModel {
   value: string;
   placeholder: string;
   warnings: RuleWarning[];
+  /** Die lesenden Werkzeuge, die der Nutzer abgeschaltet hat — leer, solange alles aktiv
+   *  ist. Die Warnung `reading-tool-off` nennt sie beim Namen: „ein Lesewerkzeug fehlt"
+   *  schickt sonst auf die Suche nach dem Schalter, um den es geht. Das MODELL erfaehrt
+   *  weiterhin nichts davon (Spec E3, Entscheidung Johannes 2026-09-05) — abgeschaltet
+   *  heisst abgeschaltet; gewarnt wird dort, wo die Entscheidung faellt. */
+  readingToolsOff: string[];
 }
 
 export function promptRow(
@@ -18,10 +24,13 @@ export function promptRow(
   // Dieselbe Funktion, die auch `buildSystemPrompt` waehlen laesst: die Warnzeile prueft
   // damit garantiert den Text, der gesendet wird (Spec E2, eine Wahrheit).
   const wirksam = effectiveRules(s.systemPromptOverride);
+  const aktiv = activeReadingTools(s.toolsDisabled, related);
+  const moeglich = availableReadingTools(related);
   return {
     value: s.systemPromptOverride,
     placeholder: DEFAULT_RULES,
-    warnings: checkRules(wirksam, activeReadingTools(s.toolsDisabled, related)),
+    warnings: checkRules(wirksam, aktiv, moeglich),
+    readingToolsOff: moeglich.filter((n) => !aktiv.includes(n)),
   };
 }
 

@@ -16,7 +16,15 @@ const WARN_TEXT: Record<RuleWarning, string> = {
   "no-tools": "settings.warn.noTools",
   "missing-placeholder": "settings.warn.missingPlaceholder",
   "no-reading-tool": "settings.warn.noReadingTool",
+  "reading-tool-off": "settings.warn.readingToolOff",
 };
+
+/** Der Warntext, fertig fuer die Zeile. `reading-tool-off` nennt die abgeschalteten
+ *  Werkzeuge im Klartext — ohne sie waere die Warnung eine Suchaufgabe. Der Platzhalter
+ *  steht im i18n-String, damit die Satzstellung uebersetzbar bleibt. */
+function warnText(w: RuleWarning, toolsOff: string[]): string {
+  return t(WARN_TEXT[w]).split("{{werkzeuge}}").join(toolsOff.join(", "));
+}
 
 /** Textarea + Zuruecksetzen + Warnzeile + Ansehen-Knopf. Der Auslieferungsstand steht als
  *  PLATZHALTER, nie als Wert: waere er der Wert, friere er beim ersten Oeffnen ein (Spec E2). */
@@ -35,12 +43,14 @@ export function renderPromptRow(setting: Setting, ctx: ModelControlCtx): void {
     // `forEach` statt `for…of`: `NodeListOf` ist ohne die `dom.iterable`-Lib nicht iterierbar,
     // und die Schleifenvariable waere `any` (dieselbe Form wie im Kit-Endpunkt-Editor).
     setting.settingEl.querySelectorAll<HTMLElement>(".koda-warn").forEach((alt) => { alt.remove(); });
-    for (const w of promptRow(ctx.settings, ctx.relatedAvailable).warnings) {
+    const jetzt = promptRow(ctx.settings, ctx.relatedAvailable);
+    for (const w of jetzt.warnings) {
       // §8 Status-Indikator: Form UND Farbe UND State-Klasse UND aria-label — Farbe nie allein.
+      const text = warnText(w, jetzt.readingToolsOff);
       const el = setting.settingEl.createDiv({ cls: "koda-warn is-warning" });
       setIcon(el.createSpan({ cls: "koda-warn-icon" }), "alert-triangle");
-      el.createSpan({ text: t(WARN_TEXT[w]) });
-      el.setAttribute("aria-label", t(WARN_TEXT[w]));
+      el.createSpan({ text });
+      el.setAttribute("aria-label", text);
     }
   };
 
