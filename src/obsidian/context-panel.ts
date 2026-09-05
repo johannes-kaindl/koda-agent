@@ -78,7 +78,31 @@ export class ContextPanel implements HubPanel<"context"> {
     void this.host.viewModel().then((vm) => {
       if (gen !== this.gen) return;
       this.paint(vm);
+    }).catch((err: unknown) => {
+      // Befund 5 (Review 2026-09-05): eine unbehandelte Ablehnung liesse das Panel still
+      // veraltet stehen — sichtbar wird das nur ueber die Konsole, die der Nutzer nicht
+      // sieht. Derselbe Status-Indikator wie ueberall im Repo (§8): `is-error` plus
+      // `alert-triangle`.
+      if (gen !== this.gen) return;
+      console.error("Koda: Kontext-Tab konnte nicht aktualisiert werden", err);
+      this.paintError();
     });
+  }
+
+  private paintError(): void {
+    if (this.summaryEl !== null && this.summaryIconEl !== null) {
+      this.summaryEl.removeClass("is-ok");
+      this.summaryEl.removeClass("is-warning");
+      this.summaryEl.addClass("is-error");
+      setIcon(this.summaryIconEl, "alert-triangle");
+      const label = this.summaryEl.querySelector<HTMLElement>(".koda-ctx-summary-label");
+      if (label !== null) label.setText(t("context.error"));
+      this.summaryEl.setAttribute("aria-label", t("context.error"));
+    }
+    const body = this.bodyEl;
+    if (body === null) return;
+    body.empty();
+    body.createDiv({ cls: "koda-empty", text: t("context.error") });
   }
 
   private paint(vm: PanelViewModel): void {
@@ -87,6 +111,9 @@ export class ContextPanel implements HubPanel<"context"> {
     if (this.summaryEl !== null && this.summaryIconEl !== null) {
       this.summaryEl.removeClass("is-ok");
       this.summaryEl.removeClass("is-warning");
+      // Ein vorheriger Render kann `is-error` gesetzt haben (paintError) — nach einem
+      // erfolgreichen Nachladen muss der Fehlerzustand wieder verschwinden.
+      this.summaryEl.removeClass("is-error");
       this.summaryEl.addClass(vm.state);
       setIcon(this.summaryIconEl, vm.state === "is-warning" ? "alert-triangle" : "gauge");
       const label = this.summaryEl.querySelector<HTMLElement>(".koda-ctx-summary-label");
@@ -106,6 +133,9 @@ export class ContextPanel implements HubPanel<"context"> {
       const dec = wrap.createEl("button", { text: "−" });
       dec.setAttribute("role", "button");
       dec.setAttribute("tabindex", "0");
+      // Kleinigkeit (Review 2026-09-05): ohne aria-label hoert ein Screenreader nur das
+      // Minuszeichen — jedes andere Bedienelement in diesem Panel hat eines.
+      dec.setAttribute("aria-label", t("context.depthDec"));
       dec.addEventListener("click", () => step(depth - 1));
       dec.addEventListener("keydown", (evt: KeyboardEvent) => {
         if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); step(depth - 1); }
@@ -114,6 +144,7 @@ export class ContextPanel implements HubPanel<"context"> {
       const inc = wrap.createEl("button", { text: "+" });
       inc.setAttribute("role", "button");
       inc.setAttribute("tabindex", "0");
+      inc.setAttribute("aria-label", t("context.depthInc"));
       inc.addEventListener("click", () => step(depth + 1));
       inc.addEventListener("keydown", (evt: KeyboardEvent) => {
         if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); step(depth + 1); }
@@ -170,7 +201,9 @@ export class ContextPanel implements HubPanel<"context"> {
         }
       }
       if (sec.id === "manual") {
-        const add = body.createDiv({ cls: "koda-ctx-add" });
+        // Kleinigkeit (Review 2026-09-05): an `inner`, nicht an `body" — sonst schweben die
+        // Knoepfe bei zugeklapptem Abschnitt unter einer leeren Ueberschrift.
+        const add = inner.createDiv({ cls: "koda-ctx-add" });
         add.createEl("button", { text: t("context.addActive") }).addEventListener("click", () => { this.host.addActive(); });
         add.createEl("button", { text: t("context.addNote") }).addEventListener("click", () => { this.host.addNote(); });
         add.createEl("button", { text: t("context.addFolder") }).addEventListener("click", () => { this.host.addFolder(); });

@@ -105,6 +105,20 @@ export default class KodaPlugin extends Plugin {
     for (const v of this.views()) v.syncContextPanel();
   }
 
+  /** „+ Aktive Notiz": Befehl UND Knopf im Kontext-Tab rufen DIESE Methode (Befund 6, Review
+   *  2026-09-05: der Knopf baute die Orchestrierung des gleichnamigen Befehls bislang
+   *  woertlich nach — ein Zustand, zwei geschriebene Wege, die auseinanderlaufen koennen). */
+  addContextActive(): void {
+    const aktiv = readWorkspace(this.app, VIEW_TYPE_KODA).active;
+    if (aktiv !== null) this.addContextPaths([aktiv.path]);
+  }
+
+  /** „+ Notiz…": Fuzzy-Picker, dann in die manuelle Liste — wie `addContextActive` ein Weg
+   *  fuer Befehl und Knopf gemeinsam. */
+  addContextNote(): void {
+    void pickNote(this.app).then((p) => { if (p !== null) this.addContextPaths([p]); });
+  }
+
   /** „+ Ordner": die Markdown-Pfade des Ordners werden SOFORT einzeln eingetragen, nicht
    *  der Ordner gemerkt. Ein gemerkter Ordner aenderte seinen Inhalt zwischen zwei
    *  Nachrichten, ohne dass der Nutzer etwas tut — die Chips zeigten dann etwas anderes
@@ -301,15 +315,12 @@ export default class KodaPlugin extends Plugin {
     this.addCommand({
       id: "context-add-active",
       name: t("cmd.contextAddActive"),
-      callback: () => {
-        const aktiv = readWorkspace(this.app, VIEW_TYPE_KODA).active;
-        if (aktiv !== null) this.addContextPaths([aktiv.path]);
-      },
+      callback: () => this.addContextActive(),
     });
     this.addCommand({
       id: "context-add-note",
       name: t("cmd.contextAddNote"),
-      callback: () => void pickNote(this.app).then((p) => { if (p !== null) this.addContextPaths([p]); }),
+      callback: () => this.addContextNote(),
     });
     this.addCommand({
       id: "context-add-folder",

@@ -9,8 +9,6 @@ import { thinkToggleView } from "../core/chat/reasoning-toggle";
 import { AVAILABLE_MODES, isContextMode } from "../core/context/types";
 import { contextSummary, modeLabel } from "../core/context/labels";
 import { ContextPanel } from "./context-panel";
-import { readWorkspace } from "./workspace";
-import { pickNote } from "./note-picker";
 import type KodaPlugin from "../main";
 
 export const VIEW_TYPE_KODA = "koda-agent-view";
@@ -96,11 +94,10 @@ export class KodaView extends ItemView {
       viewModel: () => this.plugin.contextViewModel(),
       toggle: (s, p) => { this.plugin.toggleContextItem(s, p); },
       remove: (p) => { this.plugin.removeContextPath(p); },
-      addActive: () => {
-        const aktiv = readWorkspace(this.app, VIEW_TYPE_KODA).active;
-        if (aktiv !== null) this.plugin.addContextPaths([aktiv.path]);
-      },
-      addNote: () => void pickNote(this.app).then((p) => { if (p !== null) this.plugin.addContextPaths([p]); }),
+      // Befund 6 (Review 2026-09-05): Knopf und Befehl (main.ts) rufen dieselbe
+      // Plugin-Methode — kein zweiter geschriebener Weg zum selben Zustand.
+      addActive: () => { this.plugin.addContextActive(); },
+      addNote: () => { this.plugin.addContextNote(); },
       addFolder: () => void this.plugin.addContextFolder(),
       setDepth: (n) => { this.plugin.setContextLinkDepth(n); },
       reset: () => { this.plugin.resetContextSelection(); },
