@@ -54,4 +54,16 @@ describe("contentPort", () => {
     a.vault.cachedRead = () => Promise.reject(new Error("kaputt"));
     await expect(contentPort(a).read("A.md")).resolves.toBeNull();
   });
+
+  it("unterscheidet leere von nicht-existenter Notiz: liest eine existierende, aber leere Datei als leerer String", async () => {
+    /* `build.ts` verwirft null-Einträge still. Wenn zukünftig eine Änderung "" nach null
+     * kollabiert (z.B. via || null oder Truthiness-Prüfung), verschwänden leere Notizen
+     * aus dem Kontext, ohne dass Tests rot würden. Eine leere Notiz ist legitimer Inhalt,
+     * kein Fehler — dieser Test pinnt die Unterscheidung zwischen "" und null. */
+    const a: any = makeFakeApp();
+    const datei = new TFile("Empty.md");
+    a.vault.getFileByPath = (p: string) => (p === "Empty.md" ? datei : null);
+    a.vault.cachedRead = (f: unknown) => Promise.resolve(f === datei ? "" : "fallback");
+    await expect(contentPort(a).read("Empty.md")).resolves.toBe("");
+  });
 });
