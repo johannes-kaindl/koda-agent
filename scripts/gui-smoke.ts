@@ -1772,6 +1772,71 @@ async function main(): Promise<void> {
     }
     record("27. Restaurierte, nicht besuchte Tabs (DeferredViews) stehen im Arbeitskontext", ok27, detail27);
     record("28. Dieselbe Notiz in zwei Tabs steht einmal im Block, nicht zweimal", ok28, detail28);
+
+    let ok29 = false;
+    let detail29 = "";
+    try {
+      const mass = await cdp.evaluate<{ tabs: number; hoehe: number; labels: string[] }>(`
+        const btns = Array.from(document.querySelectorAll(".koda-root .okit-hub-tabs [role='tab'], .koda-root .okit-hub-tabs button"));
+        return {
+          tabs: btns.length,
+          hoehe: Math.min(...btns.map((b) => b.getBoundingClientRect().height)),
+          labels: btns.map((b) => b.innerText.trim()),
+        };
+      `);
+      // Größe, nicht Existenz: in einer Seitenleiste kann ein Element im DOM stehen und null
+      // Pixel hoch sein — genau der Defekt von 0.10.1.
+      ok29 = mass.tabs === 2 && mass.hoehe > 0;
+      detail29 = `Tabs: ${mass.tabs} · kleinste Hoehe: ${mass.hoehe}px · Labels: ${mass.labels.join(" | ")}`;
+    } catch (error) {
+      detail29 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    record("29. Hub-Tabs Chat und Kontext sind sichtbar (Hoehe > 0, nicht nur im DOM)", ok29, detail29);
+
+    let ok30 = false;
+    let detail30 = "";
+    try {
+      const r = await cdp.evaluate<{ vorher: string; nachher: string; zurueck: string }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const vorher = p.currentContext()?.text ?? "";
+        const tab = (p.currentContext()?.items ?? []).find((i) => i.source === "tab");
+        if (!tab) return { vorher, nachher: "KEIN TAB", zurueck: "" };
+        p.toggleContextItem("tab", tab.path);
+        const nachher = p.currentContext()?.text ?? "";
+        p.resetContextSelection();
+        const zurueck = p.currentContext()?.text ?? "";
+        return { vorher, nachher, zurueck, pfad: tab.path };
+      `);
+      ok30 = r.vorher !== r.nachher && r.vorher === r.zurueck;
+      detail30 = `Block vorher ${r.vorher.length} Z. → abgewaehlt ${r.nachher.length} Z. → zurueckgesetzt ${r.zurueck.length} Z.`;
+    } catch (error) {
+      detail30 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    record("30. Ein abgewaehlter Chip verschwindet aus dem gesendeten Block, Zuruecksetzen holt ihn wieder", ok30, detail30);
+
+    let ok31 = false;
+    let detail31 = "";
+    try {
+      const r = await cdp.evaluate<{ gespeichert: unknown; nachReload: unknown }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.sectionStorage().setCollapsed("workspace", true);
+        await p.saveSettings();
+        const gespeichert = p.settings.contextSections.workspace;
+        const daten = await p.loadData();
+        return { gespeichert, nachReload: daten?.contextSections?.workspace };
+      `);
+      ok31 = r.gespeichert === true && r.nachReload === true;
+      detail31 = `im Speicher: ${String(r.gespeichert)} · in data.json: ${String(r.nachReload)}`;
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.sectionStorage().setCollapsed("workspace", false);
+        await p.saveSettings();
+        return true;
+      `).catch(() => undefined);
+    } catch (error) {
+      detail31 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    record("31. Auf/Zu-Zustand der Abschnitte landet in data.json", ok31, detail31);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
