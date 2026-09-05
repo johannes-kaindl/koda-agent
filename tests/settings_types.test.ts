@@ -178,3 +178,22 @@ describe("Arbeitskontext-Einstellungen der Etappe 2", () => {
     expect(validateKodaSettings({ contextSections: "auf" }).contextSections).toEqual({});
   });
 });
+
+describe("Etappe 2b: Budget und Link-Tiefe", () => {
+  it("klemmt contextBudgetChars in seine Spanne und nimmt Ziffernstrings an", () => {
+    expect(validateKodaSettings({ contextBudgetChars: 500 }).contextBudgetChars).toBe(2000);
+    expect(validateKodaSettings({ contextBudgetChars: 999999 }).contextBudgetChars).toBe(200000);
+    expect(validateKodaSettings({ contextBudgetChars: "30000" }).contextBudgetChars).toBe(30000);
+  });
+
+  it("klemmt contextLinkDepth auf 1..3", () => {
+    expect(validateKodaSettings({ contextLinkDepth: 0 }).contextLinkDepth).toBe(1);
+    expect(validateKodaSettings({ contextLinkDepth: 9 }).contextLinkDepth).toBe(3);
+  });
+
+  it("liefert die Defaults, wenn nichts dasteht", () => {
+    const s = validateKodaSettings({});
+    expect(s.contextBudgetChars).toBe(20000);
+    expect(s.contextLinkDepth).toBe(1);
+  });
+});

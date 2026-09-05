@@ -70,6 +70,11 @@ import {
   CONTEXT_FRONTMATTER_MIN,
   CONTEXT_FRONTMATTER_MAX,
   CONTEXT_FRONTMATTER_STEP,
+  CONTEXT_BUDGET_MIN,
+  CONTEXT_BUDGET_MAX,
+  CONTEXT_BUDGET_STEP,
+  CONTEXT_LINK_DEPTH_MIN,
+  CONTEXT_LINK_DEPTH_MAX,
   type KodaSettings,
 } from "../core/settings-types";
 import type KodaPlugin from "../main";
@@ -218,6 +223,16 @@ export class KodaSettingsTab extends PluginSettingTab {
             name: t("settings.contextFrontmatter"),
             desc: t("settings.contextFrontmatter.desc"),
             control: { type: "slider", key: "contextFrontmatterChars", min: CONTEXT_FRONTMATTER_MIN, max: CONTEXT_FRONTMATTER_MAX, step: CONTEXT_FRONTMATTER_STEP },
+          },
+          {
+            name: t("settings.contextBudget"),
+            desc: t("settings.contextBudget.desc"),
+            control: { type: "slider", key: "contextBudgetChars", min: CONTEXT_BUDGET_MIN, max: CONTEXT_BUDGET_MAX, step: CONTEXT_BUDGET_STEP },
+          },
+          {
+            name: t("settings.contextLinkDepth"),
+            desc: t("settings.contextLinkDepth.desc"),
+            control: { type: "slider", key: "contextLinkDepth", min: CONTEXT_LINK_DEPTH_MIN, max: CONTEXT_LINK_DEPTH_MAX, step: 1 },
           },
           {
             name: t("settings.contextKeep"),

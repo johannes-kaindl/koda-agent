@@ -78,6 +78,22 @@ export const CONTEXT_FRONTMATTER_MIN = 0;
 export const CONTEXT_FRONTMATTER_MAX = 2000;
 export const CONTEXT_FRONTMATTER_STEP = 50;
 
+/** Spanne fuer `contextBudgetChars` — wie viele Zeichen Notiz-INHALT hoechstens in einen
+ *  Kontextblock wandern (Modi Notiz, Alle Tabs, Manuell). Zeiger-Blöcke des Modus
+ *  Arbeitsplatz zaehlen nicht mit: sie sind wenige Zeilen und kosten kein Fenster.
+ *  Wie `skillBudgetChars` bewusst eine Einstellung: die Grenze laesst Inhalt weg, und
+ *  solche Grenzen gehoeren sichtbar. 20000 Zeichen sind grob 5000 Token. */
+export const CONTEXT_BUDGET_MIN = 2000;
+export const CONTEXT_BUDGET_MAX = 200000;
+export const CONTEXT_BUDGET_STEP = 1000;
+
+/** Spanne fuer `contextLinkDepth` — wie viele Ebenen ausgehender Links und Backlinks der
+ *  Modus „Notiz" einsammelt. Obergrenze 3, weil die Nachbarschaft je Ebene multiplikativ
+ *  waechst: schon Ebene 2 kann in einem gepflegten Vault dreistellig werden, und das Budget
+ *  verteilt sich dann auf lauter Schnipsel. */
+export const CONTEXT_LINK_DEPTH_MIN = 1;
+export const CONTEXT_LINK_DEPTH_MAX = 3;
+
 export interface KodaSettings {
   endpoints: EndpointConfig[];
   model: string;
@@ -102,6 +118,8 @@ export interface KodaSettings {
   contextSelectionChars: number;
   contextTabsMax: number;
   contextFrontmatterChars: number;
+  contextBudgetChars: number;
+  contextLinkDepth: number;
   /** Bleiben Abwahl und manuelle Zusaetze ueber die Nachricht hinaus stehen? Default `true`:
    *  der weniger ueberraschende Zustand — was abgewuehlt ist, bleibt abgewuehlt, bis „Auswahl
    *  zuruecksetzen" oder ein neues Gespraech. vault-rag lebt das Gegenteil, weil dort die
@@ -142,6 +160,8 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   contextSelectionChars: 600,
   contextTabsMax: 12,
   contextFrontmatterChars: 300,
+  contextBudgetChars: 20000,
+  contextLinkDepth: 1,
   contextKeepChoices: true,
   contextSections: {},
   systemPromptOverride: "",
@@ -199,6 +219,8 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
   contextSelectionChars: clampIntField(CONTEXT_SELECTION_MIN, CONTEXT_SELECTION_MAX),
   contextTabsMax: clampIntField(CONTEXT_TABS_MIN, CONTEXT_TABS_MAX),
   contextFrontmatterChars: clampIntField(CONTEXT_FRONTMATTER_MIN, CONTEXT_FRONTMATTER_MAX),
+  contextBudgetChars: clampIntField(CONTEXT_BUDGET_MIN, CONTEXT_BUDGET_MAX),
+  contextLinkDepth: clampIntField(CONTEXT_LINK_DEPTH_MIN, CONTEXT_LINK_DEPTH_MAX),
   contextSections: boolRecord,
   toolsDisabled: stringArray,
   toolDescriptions: stringRecord,
