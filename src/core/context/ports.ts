@@ -31,3 +31,19 @@ export interface EditorPort {
   replaceSelection(text: string): void;
   insertAtCursor(text: string): void;
 }
+
+/** Die Link-Nachbarschaft einer Notiz. Beide Richtungen kommen aus Obsidians
+ *  `metadataCache.resolvedLinks` — UNAUFGELOESTE Links stehen dort nicht drin und
+ *  erreichen den Kern deshalb gar nicht erst (Spec E3: „werden ignoriert"). */
+export interface LinkPort {
+  outgoing(path: string): string[];
+  backlinks(path: string): string[];
+}
+
+/** Notiz-Inhalt fuer die Volltext-Modi. `null` heisst „nicht lesbar" (geloescht, kein
+ *  Textformat, Rechte) — der Eintrag faellt dann still aus dem Block, wie in vault-rags
+ *  `buildContext`. Still ist hier richtig: eine Notiz, die es nicht mehr gibt, ist keine
+ *  Kappung, die sich melden muesste, sondern ein Kandidat, der sich erledigt hat. */
+export interface ContentPort {
+  read(path: string): Promise<string | null>;
+}
