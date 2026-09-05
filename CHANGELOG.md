@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-09-05
+
 ### Added
 
 - **A Context tab next to the chat.** Koda's sidebar now has two tabs. The Context tab shows
