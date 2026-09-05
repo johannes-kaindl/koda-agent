@@ -4,10 +4,11 @@
 export const CONTEXT_MODES = ["off", "workspace", "note", "tabs", "vault"] as const;
 export type ContextMode = (typeof CONTEXT_MODES)[number];
 
-/** Etappe 1 baut zwei Modi; die uebrigen stehen in der Spec und kommen mit Etappe 2/3.
- *  Ein Modus, der noch nicht geht, wird NICHT angeboten (Spec E6: ein Eintrag, der nie
- *  geht, ist kein Versprechen). */
-export const AVAILABLE_MODES: readonly ContextMode[] = ["off", "workspace"];
+/** Angeboten wird nur, was gebaut ist (Spec E6: „ein Eintrag, der nie geht, ist kein
+ *  Versprechen"). Etappe 2b hat Notiz und Alle Tabs; „vault" braucht vault-rag und kommt
+ *  mit Etappe 3 — es ist der einzige Modus, dessen Verfuegbarkeit von einem fremden
+ *  Plugin abhaengt und deshalb zur Laufzeit geprueft werden muss, nicht hier. */
+export const AVAILABLE_MODES: readonly ContextMode[] = ["off", "workspace", "note", "tabs"];
 
 export type ContextSource =
   | "active" | "selection" | "tab" | "link" | "backlink" | "related" | "vault" | "manual" | "folder" | "base";

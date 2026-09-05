@@ -32,6 +32,8 @@ import { projectForModel } from "./core/agent/compaction/project";
 import { AVAILABLE_MODES, type ContextAttachment, type ContextMode } from "./core/context/types";
 import { modeLabel } from "./core/context/labels";
 import { renderWorkspaceContext } from "./core/context/workspace-line";
+import { buildFullContext } from "./core/context/build";
+import { contentPort, linkPort } from "./obsidian/links";
 import { editorPort, linesAround, readWorkspace } from "./obsidian/workspace";
 import { applySelection, itemKey, type SelectionKey } from "./core/context/selection";
 import type { ContextSource } from "./core/context/types";
@@ -78,6 +80,11 @@ export default class KodaPlugin extends Plugin {
    *  ob sie das Senden überlebt. */
   contextOff: Set<SelectionKey> = new Set();
 
+  /** Vom Nutzer hinzugefuegte Notizen, in der Reihenfolge des Hinzufuegens. Wie
+   *  `contextOff` nicht persistiert: eine Zusammenstellung gilt fuer diese Sitzung.
+   *  Gefuellt wird sie in Task 7. */
+  contextManual: string[] = [];
+
   toggleContextItem(source: ContextSource, path: string): void {
     const key = itemKey(source, path);
     if (this.contextOff.has(key)) this.contextOff.delete(key);
@@ -116,17 +123,43 @@ export default class KodaPlugin extends Plugin {
   }
 
   /** Der Kontext, der mit der naechsten Nachricht geht — `ask()` ruft DIESE Methode, der
-   *  GUI-Smoke misst sie: es gibt keinen zweiten Weg, auf dem der Block entsteht. */
-  currentContext(): ContextAttachment | null {
-    if (this.contextMode === "off") return null;
+   *  GUI-Smoke misst sie: es gibt keinen zweiten Weg, auf dem der Block entsteht.
+   *
+   *  Asynchron seit Etappe 2b: die Volltext-Modi lesen Notizen. Ein Inhalts-Cache im
+   *  Plugin waere synchron geblieben und haette eine zweite Wahrheit neben der Datei
+   *  eingefuehrt — `ask()` ist ohnehin async und wartet hier an Ort und Stelle. */
+  async currentContext(): Promise<ContextAttachment | null> {
     const s = this.settings;
-    const snap = applySelection(readWorkspace(this.app, VIEW_TYPE_KODA), this.contextOff);
-    return renderWorkspaceContext(snap, {
-      lang: this.promptLang(),
-      selectionMax: s.contextSelectionChars,
-      tabsMax: s.contextTabsMax,
-      frontmatterMax: s.contextFrontmatterChars,
-    });
+    const snap = readWorkspace(this.app, VIEW_TYPE_KODA);
+    switch (this.contextMode) {
+      case "off":
+        return null;
+      case "workspace":
+        return renderWorkspaceContext(applySelection(snap, this.contextOff), {
+          lang: this.promptLang(),
+          selectionMax: s.contextSelectionChars,
+          tabsMax: s.contextTabsMax,
+          frontmatterMax: s.contextFrontmatterChars,
+        });
+      case "note":
+      case "tabs":
+        return await buildFullContext({
+          mode: this.contextMode,
+          snap,
+          links: linkPort(this.app),
+          content: contentPort(this.app),
+          manual: this.contextManual,
+          off: this.contextOff,
+          linkDepth: s.contextLinkDepth,
+          budget: s.contextBudgetChars,
+          lang: this.promptLang(),
+        });
+      default:
+        // "vault" — Etappe 3. Kein Wurf: der Modus kann als gespeicherter Default aus
+        // einer spaeteren Version in einer aelteren stehen (der onload-Guard faengt das
+        // beim Laden ab, aber ein Nutzer kann `data.json` von Hand aendern).
+        return null;
+    }
   }
 
   /** Sidebar oeffnen, Modus mindestens Arbeitsplatz, Eingabefeld fokussieren — der Weg aus
@@ -457,7 +490,7 @@ export default class KodaPlugin extends Plugin {
       // Innerhalb des try: currentContext() kann werfen (z. B. ein Workspace-Adapter-Fehler),
       // und ausserhalb des try bliebe busy dann haengen — derselbe Fehler wie ein Wurf im Loop.
       const userMsg: ChatMessage = { role: "user", content: question };
-      const ctx = this.currentContext();
+      const ctx = await this.currentContext();
       if (ctx !== null) userMsg.context = ctx;
       this.chatLog.push(userMsg);
       await this.store.appendMessages([userMsg]);

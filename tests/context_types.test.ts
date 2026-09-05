@@ -31,7 +31,18 @@ describe("Modi", () => {
     expect(isContextMode("vault")).toBe(true);
     expect(isContextMode("vaults")).toBe(false);
   });
-  it("Etappe 1 bietet genau off und workspace an", () => {
-    expect(AVAILABLE_MODES).toEqual(["off", "workspace"]);
+  it("kennt vier Modi als aktuellen Stand (Etappe 2b: Notiz und Alle Tabs sind dazugekommen)", () => {
+    expect(AVAILABLE_MODES).toEqual(["off", "workspace", "note", "tabs"]);
+  });
+});
+
+describe("AVAILABLE_MODES", () => {
+  it("bietet nach Etappe 2b vier Modi an", () => {
+    expect([...AVAILABLE_MODES]).toEqual(["off", "workspace", "note", "tabs"]);
+  });
+
+  it("bietet den Vault-Modus noch nicht an — er braucht vault-rag und kommt in Etappe 3", () => {
+    expect(AVAILABLE_MODES).not.toContain("vault");
+    expect(CONTEXT_MODES).toContain("vault");
   });
 });
