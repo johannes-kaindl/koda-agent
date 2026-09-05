@@ -34,3 +34,14 @@ export function contextSummary(ctx: ContextAttachment, lang: Lang): string {
   else if (tabs > 1) parts.push(lang === "de" ? `${tabs} Tabs` : `${tabs} tabs`);
   return parts.join(" · ");
 }
+
+/** Die Quellen unter einer Antwort: nur Volltext-Eintraege. Zeiger (aktive Notiz,
+ *  Markierung, Tab-Pfade) stehen bereits vollstaendig in der aufklappbaren Kontextzeile
+ *  ueber der Antwort — sie hier zu wiederholen waere Rauschen. Gezeigt wird die GESENDETE
+ *  Zeichenzahl, nicht die volle: die Frage unter der Antwort lautet „was hat das Modell
+ *  gelesen", nicht „wie gross ist die Notiz". */
+export function sourceChips(ctx: ContextAttachment): { path: string; label: string; chars: number }[] {
+  return ctx.items
+    .filter((i) => i.kind === "full")
+    .map((i) => ({ path: i.path, label: basename(i.path), chars: i.chars }));
+}

@@ -6,8 +6,8 @@ import { isCompactionRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
 import { splitStable } from "../core/chat/stream-blocks";
 import { thinkToggleView } from "../core/chat/reasoning-toggle";
-import { AVAILABLE_MODES, isContextMode } from "../core/context/types";
-import { contextSummary, modeLabel } from "../core/context/labels";
+import { AVAILABLE_MODES, isContextMode, type ContextAttachment } from "../core/context/types";
+import { contextSummary, modeLabel, sourceChips } from "../core/context/labels";
 import { ContextPanel } from "./context-panel";
 import type KodaPlugin from "../main";
 
@@ -325,6 +325,11 @@ export class KodaView extends ItemView {
       pending.push(this.renderMarkdownInto(el, content));
     };
     let toolNames = new Map<string, string>();
+    // Die Quellen gehoeren unter die ANTWORT, nicht unter die Frage: dort beantworten sie
+    // „woraus stammt das". Gemerkt wird deshalb der Kontext der letzten Nutzer-Nachricht
+    // und unter der ersten abschliessenden Antwort danach ausgegeben (eine Antwort mit
+    // toolCalls ist ein Zwischenschritt, kein Abschluss).
+    let offeneQuellen: ContextAttachment | null = null;
     for (const m of this.plugin.chatLog) {
       if (isCompactionRecord(m)) { this.renderCompaction(this.logEl, m); continue; }
       if (m.role === "user") {
@@ -336,12 +341,32 @@ export class KodaView extends ItemView {
           d.createEl("summary", { text: t("context.line", contextSummary(m.context, this.lang())) });
           d.createEl("pre", { text: m.context.text });
         }
+        offeneQuellen = m.context ?? null;
       } else if (m.role === "assistant") {
         if (m.toolCalls && m.toolCalls.length > 0) {
           toolNames = new Map(m.toolCalls.map((c) => [c.id, c.name]));
           if (m.content !== "") assistantBubble(m.content);
         } else if (m.content !== "") {
           assistantBubble(m.content);
+          if (offeneQuellen !== null) {
+            const chips = sourceChips(offeneQuellen);
+            if (chips.length > 0) {
+              const leiste = this.logEl.createDiv({ cls: "koda-msg koda-notice koda-sources" });
+              leiste.createSpan({ cls: "koda-sources-label", text: t("context.sources") });
+              for (const c of chips) {
+                const el = leiste.createSpan({ cls: "koda-source-chip", text: `${c.label} · ${t("context.sourceChars", String(c.chars))}` });
+                el.setAttribute("title", c.path);
+                el.setAttribute("role", "button");
+                el.setAttribute("tabindex", "0");
+                const oeffnen = (): void => { void this.app.workspace.openLinkText(c.path, "", false); };
+                el.addEventListener("click", oeffnen);
+                el.addEventListener("keydown", (evt: KeyboardEvent) => {
+                  if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); oeffnen(); }
+                });
+              }
+            }
+            offeneQuellen = null;
+          }
         } else {
           this.logEl.createDiv({ cls: "koda-msg koda-assistant koda-placeholder", text: t("view.thoughtOnly") });
         }
