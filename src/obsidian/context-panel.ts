@@ -12,8 +12,13 @@ import { t } from "../vendor/kit/i18n";
 export interface ContextPanelHost {
   mode(): ContextMode;
   setMode(m: ContextMode): void;
-  viewModel(): PanelViewModel;
+  viewModel(): Promise<PanelViewModel>;
   toggle(source: ContextSource, path: string): void;
+  remove(path: string): void;
+  addActive(): void;
+  addNote(): void;
+  addFolder(): void;
+  setDepth(n: number): void;
   reset(): void;
   openNote(path: string): void;
   sectionStorage(): CollapsibleStorage;
@@ -29,6 +34,13 @@ export class ContextPanel implements HubPanel<"context"> {
   private modeEl: HTMLSelectElement | null = null;
   private summaryEl: HTMLElement | null = null;
   private summaryIconEl: HTMLElement | null = null;
+
+  /** uebernommen aus vault-rag/src/context_panel.ts:43-52, 2026-09-05 — Generationszaehler
+   *  gegen Out-of-Order-Ergebnisse. Seit Etappe 2b liest das ViewModel Dateien; zwei rasch
+   *  aufeinanderfolgende Klicks koennen sonst in umgekehrter Reihenfolge ankommen, und das
+   *  aeltere Bild ueberschreibt das neuere. Kein Unit-Test sieht das, und der GUI-Smoke
+   *  traefe es nur zufaellig — deshalb der Zaehler und nicht „wird schon passen". */
+  private gen = 0;
 
   constructor(private readonly host: ContextPanelHost) {}
 
@@ -58,9 +70,18 @@ export class ContextPanel implements HubPanel<"context"> {
 
   /** DOM = reine Funktion des Zustands: der Body wird komplett neu gebaut. Das Panel hält
    *  keinen langlebigen internen State (kein Stream, kein Eingabefeld) — das ist genau das
-   *  Auswahlkriterium für ViewModel-Re-Render statt Mount-once (UI-STANDARD §4). */
+   *  Auswahlkriterium für ViewModel-Re-Render statt Mount-once (UI-STANDARD §4).
+   *  Seit Etappe 2b liest das ViewModel Dateien (async) — `render()` ist nur noch der
+   *  Anstoss, `paint()` der eigentliche Rumpf hinter dem Generationszaehler. */
   render(): void {
-    const vm = this.host.viewModel();
+    const gen = ++this.gen;
+    void this.host.viewModel().then((vm) => {
+      if (gen !== this.gen) return;
+      this.paint(vm);
+    });
+  }
+
+  private paint(vm: PanelViewModel): void {
     if (this.modeEl !== null) this.modeEl.value = this.host.mode();
 
     if (this.summaryEl !== null && this.summaryIconEl !== null) {
@@ -77,6 +98,28 @@ export class ContextPanel implements HubPanel<"context"> {
     if (body === null) return;
     body.empty();
 
+    if (vm.depth !== null) {
+      const depth = vm.depth;
+      const wrap = body.createDiv({ cls: "koda-ctx-depth" });
+      wrap.createSpan({ text: t("context.depth") });
+      const step = (n: number): void => { this.host.setDepth(n); };
+      const dec = wrap.createEl("button", { text: "−" });
+      dec.setAttribute("role", "button");
+      dec.setAttribute("tabindex", "0");
+      dec.addEventListener("click", () => step(depth - 1));
+      dec.addEventListener("keydown", (evt: KeyboardEvent) => {
+        if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); step(depth - 1); }
+      });
+      wrap.createSpan({ text: String(depth) });
+      const inc = wrap.createEl("button", { text: "+" });
+      inc.setAttribute("role", "button");
+      inc.setAttribute("tabindex", "0");
+      inc.addEventListener("click", () => step(depth + 1));
+      inc.addEventListener("keydown", (evt: KeyboardEvent) => {
+        if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); step(depth + 1); }
+      });
+    }
+
     for (const sec of vm.sections) {
       const inner = collapsibleSection(body, {
         title: sec.title,
@@ -86,33 +129,51 @@ export class ContextPanel implements HubPanel<"context"> {
       });
       if (sec.chips.length === 0) {
         inner.createDiv({ cls: "koda-empty", text: sec.empty });
-        continue;
+      } else {
+        const list = inner.createDiv({ cls: "koda-ctx-chips" });
+        for (const chip of sec.chips) {
+          const el = list.createDiv({ cls: `koda-ctx-chip${chip.off ? " is-off" : ""}` });
+          el.setAttribute("title", chip.path);
+          // a11y (Befund 3, Review 2026-09-05): beide Klick-Ziele sind funktional Knoepfe —
+          // Rolle + Fokussierbarkeit + Enter/Leertaste, nach dem Muster aus collapsible.ts.
+          const name = el.createSpan({ cls: "koda-ctx-chip-label", text: chip.label });
+          name.setAttribute("role", "button");
+          name.setAttribute("tabindex", "0");
+          const openNote = (): void => { this.host.openNote(chip.path); };
+          name.addEventListener("click", openNote);
+          name.addEventListener("keydown", (evt: KeyboardEvent) => {
+            if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); openNote(); }
+          });
+          if (chip.hint !== "") el.createSpan({ cls: "koda-ctx-chip-hint", text: chip.hint });
+          const x = el.createSpan({ cls: "koda-ctx-chip-x" });
+          // `removable` (manuelle Eintraege): das Kreuz ENTFERNT statt abzuwaehlen — ein
+          // abgewaehlter manueller Eintrag bliebe sonst fuer immer als Chip ohne Zweck stehen.
+          if (chip.removable) {
+            setIcon(x, "x");
+            x.setAttribute("aria-label", t("context.chipRemove"));
+            const removeChip = (): void => { this.host.remove(chip.path); };
+            x.addEventListener("click", removeChip);
+            x.addEventListener("keydown", (evt: KeyboardEvent) => {
+              if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); removeChip(); }
+            });
+          } else {
+            setIcon(x, chip.off ? "plus" : "x");
+            x.setAttribute("aria-label", chip.off ? t("context.chipOn") : t("context.chipOff"));
+            const toggleChip = (): void => { this.host.toggle(chip.source, chip.path); };
+            x.addEventListener("click", toggleChip);
+            x.addEventListener("keydown", (evt: KeyboardEvent) => {
+              if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); toggleChip(); }
+            });
+          }
+          x.setAttribute("role", "button");
+          x.setAttribute("tabindex", "0");
+        }
       }
-      const list = inner.createDiv({ cls: "koda-ctx-chips" });
-      for (const chip of sec.chips) {
-        const el = list.createDiv({ cls: `koda-ctx-chip${chip.off ? " is-off" : ""}` });
-        el.setAttribute("title", chip.path);
-        // a11y (Befund 3, Review 2026-09-05): beide Klick-Ziele sind funktional Knoepfe —
-        // Rolle + Fokussierbarkeit + Enter/Leertaste, nach dem Muster aus collapsible.ts.
-        const name = el.createSpan({ cls: "koda-ctx-chip-label", text: chip.label });
-        name.setAttribute("role", "button");
-        name.setAttribute("tabindex", "0");
-        const openNote = (): void => { this.host.openNote(chip.path); };
-        name.addEventListener("click", openNote);
-        name.addEventListener("keydown", (evt: KeyboardEvent) => {
-          if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); openNote(); }
-        });
-        if (chip.hint !== "") el.createSpan({ cls: "koda-ctx-chip-hint", text: chip.hint });
-        const x = el.createSpan({ cls: "koda-ctx-chip-x" });
-        setIcon(x, chip.off ? "plus" : "x");
-        x.setAttribute("role", "button");
-        x.setAttribute("tabindex", "0");
-        x.setAttribute("aria-label", chip.off ? t("context.chipOn") : t("context.chipOff"));
-        const toggleChip = (): void => { this.host.toggle(chip.source, chip.path); };
-        x.addEventListener("click", toggleChip);
-        x.addEventListener("keydown", (evt: KeyboardEvent) => {
-          if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); toggleChip(); }
-        });
+      if (sec.id === "manual") {
+        const add = body.createDiv({ cls: "koda-ctx-add" });
+        add.createEl("button", { text: t("context.addActive") }).addEventListener("click", () => { this.host.addActive(); });
+        add.createEl("button", { text: t("context.addNote") }).addEventListener("click", () => { this.host.addNote(); });
+        add.createEl("button", { text: t("context.addFolder") }).addEventListener("click", () => { this.host.addFolder(); });
       }
     }
 

@@ -9,6 +9,8 @@ import { thinkToggleView } from "../core/chat/reasoning-toggle";
 import { AVAILABLE_MODES, isContextMode } from "../core/context/types";
 import { contextSummary, modeLabel } from "../core/context/labels";
 import { ContextPanel } from "./context-panel";
+import { readWorkspace } from "./workspace";
+import { pickNote } from "./note-picker";
 import type KodaPlugin from "../main";
 
 export const VIEW_TYPE_KODA = "koda-agent-view";
@@ -93,6 +95,14 @@ export class KodaView extends ItemView {
       setMode: (m) => { this.plugin.setContextMode(m); },
       viewModel: () => this.plugin.contextViewModel(),
       toggle: (s, p) => { this.plugin.toggleContextItem(s, p); },
+      remove: (p) => { this.plugin.removeContextPath(p); },
+      addActive: () => {
+        const aktiv = readWorkspace(this.app, VIEW_TYPE_KODA).active;
+        if (aktiv !== null) this.plugin.addContextPaths([aktiv.path]);
+      },
+      addNote: () => void pickNote(this.app).then((p) => { if (p !== null) this.plugin.addContextPaths([p]); }),
+      addFolder: () => void this.plugin.addContextFolder(),
+      setDepth: (n) => { this.plugin.setContextLinkDepth(n); },
       reset: () => { this.plugin.resetContextSelection(); },
       openNote: (p) => { void this.app.workspace.openLinkText(p, "", false); },
       sectionStorage: () => this.plugin.sectionStorage(),

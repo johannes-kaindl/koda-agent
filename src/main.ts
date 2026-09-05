@@ -20,7 +20,7 @@ import { buildSystemPrompt } from "./core/prompt/build";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
 import { selectSkills, type Selection } from "./core/skills/select";
-import { DEFAULT_SETTINGS, validateKodaSettings, type KodaSettings } from "./core/settings-types";
+import { CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN, DEFAULT_SETTINGS, validateKodaSettings, type KodaSettings } from "./core/settings-types";
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { readRetrievalApi } from "./obsidian/retrieval";
 import { confirmWrite } from "./obsidian/confirm-write";
@@ -135,15 +135,29 @@ export default class KodaPlugin extends Plugin {
 
   /** Speist den Kontext-Tab. Liest denselben Snapshot und dieselben Einstellungen wie
    *  `currentContext()` — es gibt keinen zweiten Weg zu dem, was angezeigt wird. */
-  contextViewModel(): PanelViewModel {
+  contextViewModel(): Promise<PanelViewModel> {
     const s = this.settings;
-    return buildPanelViewModel(readWorkspace(this.app, VIEW_TYPE_KODA), this.contextOff, {
+    const modus = this.contextMode === "off" || this.contextMode === "vault" ? "workspace" : this.contextMode;
+    return buildPanelViewModel(modus, readWorkspace(this.app, VIEW_TYPE_KODA), this.contextOff, {
       lang: this.promptLang(),
       selectionMax: s.contextSelectionChars,
       tabsMax: s.contextTabsMax,
       frontmatterMax: s.contextFrontmatterChars,
       windowTokens: s.contextWindowTokens,
+      budget: s.contextBudgetChars,
+      linkDepth: s.contextLinkDepth,
+      manual: this.contextManual,
+      links: linkPort(this.app),
+      content: contentPort(this.app),
     });
+  }
+
+  setContextLinkDepth(n: number): void {
+    const geklemmt = Math.min(CONTEXT_LINK_DEPTH_MAX, Math.max(CONTEXT_LINK_DEPTH_MIN, Math.round(n)));
+    if (geklemmt === this.settings.contextLinkDepth) return;
+    this.settings.contextLinkDepth = geklemmt;
+    void this.saveSettings();
+    for (const v of this.views()) v.syncContextPanel();
   }
 
   /** Auf/Zu-Zustand der Abschnitte, persistiert in `data.json`. */

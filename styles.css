@@ -300,3 +300,7 @@
 .koda-ctx-chip-x svg { width: 12px; height: 12px; }
 .koda-ctx-reset { margin-top: var(--size-4-2); }
 .koda-empty { color: var(--text-muted); font-size: var(--font-ui-small); padding: var(--size-4-2) 0; }
+.koda-ctx-depth { display: flex; align-items: center; gap: var(--size-2-2); font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.koda-ctx-depth button { padding: 0 var(--size-2-2); }
+.koda-ctx-add { display: flex; flex-wrap: wrap; gap: var(--size-2-2); margin-top: var(--size-2-2); }
+.koda-ctx-add button { font-size: var(--font-ui-smaller); }
