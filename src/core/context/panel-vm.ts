@@ -36,12 +36,14 @@ const T = {
     empty: "Keine aktive Notiz — öffne eine Notiz im Hauptbereich.",
     chars: (n: number) => `${n} Z.`,
     summary: (kb: string, pct: number) => `${kb} KB · Fenster ${pct} %`,
+    alsoTab: "auch als Tab",
   },
   en: {
     workspace: "Workspace",
     empty: "No active note — open one in the main area.",
     chars: (n: number) => `${n} chars`,
     summary: (kb: string, pct: number) => `${kb} KB · window ${pct} %`,
+    alsoTab: "also a tab",
   },
 } as const;
 
@@ -74,11 +76,18 @@ export function buildPanelViewModel(
       });
     }
   }
-  // Entdoppelt wie der Block selbst: zwei Chips für dieselbe Notiz wären zwei Schalter für
-  // einen Zustand — der zweite Klick sähe wirkungslos aus.
+  // Entdoppelt wie der Block selbst: zwei Chips fuer dieselbe Notiz UNTER DERSELBEN Quelle
+  // waeren zwei Schalter fuer einen Zustand — der zweite Klick saehe wirkungslos aus.
+  // Die aktive Notiz bleibt trotzdem in der Tab-Liste (wie `renderWorkspaceContext` sie
+  // behaelt): der Tab-Eintrag ist ueber `itemKey("tab", path)` unabhaengig vom
+  // `active`-Toggle abwaehlbar, und ohne eigenen Chip waere er im Kontext-Tab unsichtbar,
+  // aber weiterhin im gesendeten Block — genau der Anteil, den dieser Tab abschaffen soll.
   for (const x of dedupeTabs(snap.tabs)) {
-    if (a !== null && x.path === a.path) continue;
-    chips.push({ source: "tab", path: x.path, label: chipLabel(x.path), hint: "", off: off.has(itemKey("tab", x.path)) });
+    const isActive = a !== null && x.path === a.path;
+    chips.push({
+      source: "tab", path: x.path, label: chipLabel(x.path),
+      hint: isActive ? t.alsoTab : "", off: off.has(itemKey("tab", x.path)),
+    });
   }
 
   const gefiltert = applySelection(snap, off);
