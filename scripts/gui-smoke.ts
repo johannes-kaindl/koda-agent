@@ -1776,14 +1776,20 @@ async function main(): Promise<void> {
     let ok29 = false;
     let detail29 = "";
     try {
-      // Fix-Runde 1, Finding 1: Punkt 27 kurz zuvor ruft changeLayout(getLayout()), um
-      // DeferredViews zu erzeugen — das laesst die Koda-View im echten Lauf haeufig in
-      // einem DOM-Zwischenstand zurueck (Tab-Leiste fehlt), obwohl das Produkt in Ordnung
-      // ist (manuell nachgemessen: ein erneutes onOpen() liefert sofort zwei Tabs). Der
-      // Punkt stellt seinen Zustand deshalb selbst her, statt sich auf den Vorzustand zu
-      // verlassen — Mutation (Oeffnen-Befehl) und Wartephase (pollUntil) getrennt, wie bei
-      // Punkt 2. Die Reihenfolge zu Punkt 27 bleibt unveraendert.
+      // Fix-Runde 1, Finding 1 + Fix-Runde 2: Punkt 27 kurz zuvor ruft
+      // changeLayout(getLayout()), um DeferredViews zu erzeugen — das laesst die Koda-View
+      // im echten Lauf haeufig in einem DOM-Zwischenstand zurueck (Tab-Leiste fehlt),
+      // obwohl das Produkt in Ordnung ist. Der blosse Oeffnen-Befehl reicht dabei NICHT:
+      // `activateView()` findet die bestehende (kaputte) Leaf ueber
+      // `getLeavesOfType` und ruft nur `setViewState`/`revealLeaf` auf ihr — das baut die
+      // View nicht neu auf (verifiziert am laufenden Obsidian, Fix-Runde 2: 1 Tab bleibt 1
+      // Tab, bis die Leaf explizit detacht wird). Der Punkt detacht deshalb zuerst jede
+      // Leaf dieses View-Typs, bevor er den Oeffnen-Befehl feuert — erst das erzwingt einen
+      // frischen `onOpen()`-Aufbau. Mutation (Detach + Oeffnen-Befehl) und Wartephase
+      // (pollUntil) bleiben getrennt, wie bei Punkt 2. Die Reihenfolge zu Punkt 27 bleibt
+      // unveraendert.
       await cdp.evaluate(`
+        for (const l of app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})) l.detach();
         await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:open`)});
         return true;
       `);
@@ -1811,6 +1817,11 @@ async function main(): Promise<void> {
     } catch (error) {
       detail29 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
     }
+    // Gegenprobe: in `src/obsidian/view.ts` in `buildHubInto(..., [chatPanel, this.ctxPanel], ...)`
+    // das `this.ctxPanel` aus dem Panel-Array streichen, neu bauen/deployen. Erwartung: die
+    // Hub-Leiste hat nur noch einen Tab, `pollUntil` findet nie zwei Buttons und laeuft in
+    // den 15s-Timeout, der Punkt wird rot mit „Hub-Tabs nach dem Oeffnen-Befehl nicht
+    // vollstaendig gerendert".
     record("29. Hub-Tabs Chat und Kontext sind sichtbar (Hoehe > 0, nicht nur im DOM)", ok29, detail29);
 
     let ok30 = false;
