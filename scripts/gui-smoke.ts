@@ -1364,7 +1364,7 @@ async function main(): Promise<void> {
         ${SCENE_JS}
         document.querySelector(".koda-input")?.focus();
         await new Promise((r) => setTimeout(r, 300));
-        const ctx = p.currentContext();
+        const ctx = await p.currentContext();
         return {
           aktivIstKoda: app.workspace.activeLeaf?.view?.getViewType() === ${JSON.stringify(VIEW_TYPE)},
           text: ctx?.text ?? "",
@@ -1402,12 +1402,12 @@ async function main(): Promise<void> {
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
         app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:context-mode-off`)});
         await new Promise((r) => setTimeout(r, 200));
-        const ausNull = p.currentContext() === null;
+        const ausNull = (await p.currentContext()) === null;
         const sel = document.querySelector(".koda-mode");
         const dropdownNachBefehl = sel ? sel.value : "(kein Dropdown)";
         if (sel) { sel.value = "workspace"; sel.dispatchEvent(new Event("change")); }
         await new Promise((r) => setTimeout(r, 200));
-        return { ausNull, dropdownNachBefehl, modeNachDropdown: p.contextMode, anObjekt: p.currentContext() !== null };
+        return { ausNull, dropdownNachBefehl, modeNachDropdown: p.contextMode, anObjekt: (await p.currentContext()) !== null };
       `);
       record(
         "21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand",
@@ -1722,7 +1722,7 @@ async function main(): Promise<void> {
         cdp,
         `
         const plugin = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-        const ctx = plugin ? plugin.currentContext() : null;
+        const ctx = plugin ? await plugin.currentContext() : null;
         if (!ctx) return null;
         const items = (ctx.items ?? []).filter((i) => i.source === "tab").map((i) => i.path);
         const allePfade = []; const deferredPfade = [];
@@ -1831,14 +1831,20 @@ async function main(): Promise<void> {
     // GRUEN sein Ziel verfehlen (er misst dann nichts), oder — mit einem echten Tab in der
     // Kulisse — ROT mit „KEIN TAB" melden, obwohl ein Tab da ist. `typecheck:scripts` sieht
     // das nicht, weil der Aufruf in einer CDP-Zeichenkette liegt, kein TS-Ausdruck ist.
+    // Haertung (Baseline-Lauf 2026-09-05/06, Nachtrag): „KEIN TAB" durfte den Punkt vorher
+    // BESTEHEN lassen — `vorher="" !== nachher="KEIN TAB"` und `vorher="" === zurueck=""`
+    // erfuellten die Bedingung, ohne dass ueberhaupt ein Kontext gelesen wurde. Derselbe
+    // Vertrag wie bei `pollUntil` an anderer Stelle im Treiber: „kein Tab gefunden" ist ein
+    // Abbruch, kein bestandener Zustand. Der `KEIN TAB`-Zweig wirft deshalb jetzt, statt
+    // einen Wert zurueckzugeben, der die Bedingung zufaellig erfuellt.
     let ok30 = false;
     let detail30 = "";
     try {
-      const r = await cdp.evaluate<{ vorher: string; nachher: string; zurueck: string; pfad: string | null }>(`
+      const r = await cdp.evaluate<{ vorher: string; nachher: string; zurueck: string; pfad: string }>(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
         const vorher = (await p.currentContext())?.text ?? "";
         const tab = ((await p.currentContext())?.items ?? []).find((i) => i.source === "tab");
-        if (!tab) return { vorher, nachher: "KEIN TAB", zurueck: "", pfad: null };
+        if (!tab) throw new Error("kein Tab im Arbeitsplatz-Kontext gefunden — Gegenstand nicht beruehrt");
         p.toggleContextItem("tab", tab.path);
         const nachher = (await p.currentContext())?.text ?? "";
         p.resetContextSelection();
@@ -1846,9 +1852,7 @@ async function main(): Promise<void> {
         return { vorher, nachher, zurueck, pfad: tab.path };
       `);
       ok30 = r.vorher !== r.nachher && r.vorher === r.zurueck;
-      // Minor-Fix: Zeichenlaengen allein unterscheiden „kein Tab gefunden" kaum von einem
-      // echten kurzen Block — der Pfad (oder das Fehlen eines Tabs) steht deshalb mit.
-      detail30 = `Tab: ${r.pfad ?? "KEIN TAB"} · Block vorher ${r.vorher.length} Z. → abgewaehlt ${r.nachher === "KEIN TAB" ? "KEIN TAB" : `${r.nachher.length} Z.`} → zurueckgesetzt ${r.zurueck.length} Z.`;
+      detail30 = `Tab: ${r.pfad} · Block vorher ${r.vorher.length} Z. → abgewaehlt ${r.nachher.length} Z. → zurueckgesetzt ${r.zurueck.length} Z.`;
     } catch (error) {
       detail30 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
     }
