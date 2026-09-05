@@ -1824,18 +1824,25 @@ async function main(): Promise<void> {
     // vollstaendig gerendert".
     record("29. Hub-Tabs Chat und Kontext sind sichtbar (Hoehe > 0, nicht nur im DOM)", ok29, detail29);
 
+    // Nachgezogen (Etappe 2b, Task 11): `currentContext()` ist seit Task 6 async
+    // (Volltext-Modi lesen Notizen). Ohne `await` liefert jeder Aufruf ein Promise-Objekt
+    // statt eines ContextAttachment — `?.text` griffe daneben, `vorher`/`nachher`/`zurueck`
+    // waeren alle `""`, und `r.vorher !== r.nachher` scheiterte: der Punkt wuerde selbst
+    // GRUEN sein Ziel verfehlen (er misst dann nichts), oder — mit einem echten Tab in der
+    // Kulisse — ROT mit „KEIN TAB" melden, obwohl ein Tab da ist. `typecheck:scripts` sieht
+    // das nicht, weil der Aufruf in einer CDP-Zeichenkette liegt, kein TS-Ausdruck ist.
     let ok30 = false;
     let detail30 = "";
     try {
       const r = await cdp.evaluate<{ vorher: string; nachher: string; zurueck: string; pfad: string | null }>(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-        const vorher = p.currentContext()?.text ?? "";
-        const tab = (p.currentContext()?.items ?? []).find((i) => i.source === "tab");
+        const vorher = (await p.currentContext())?.text ?? "";
+        const tab = ((await p.currentContext())?.items ?? []).find((i) => i.source === "tab");
         if (!tab) return { vorher, nachher: "KEIN TAB", zurueck: "", pfad: null };
         p.toggleContextItem("tab", tab.path);
-        const nachher = p.currentContext()?.text ?? "";
+        const nachher = (await p.currentContext())?.text ?? "";
         p.resetContextSelection();
-        const zurueck = p.currentContext()?.text ?? "";
+        const zurueck = (await p.currentContext())?.text ?? "";
         return { vorher, nachher, zurueck, pfad: tab.path };
       `);
       ok30 = r.vorher !== r.nachher && r.vorher === r.zurueck;
