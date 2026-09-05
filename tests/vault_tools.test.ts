@@ -225,3 +225,33 @@ describe("write_skill", () => {
     expect(cap.calls[0].newText).toBe(vault.files["Koda/Skills/X.md"]);
   });
 });
+
+describe("Pfad-Guard: Schreiben bleibt .md", () => {
+  it("write_note lehnt .canvas ab — Meldung nennt nur .md als erlaubte Endung", async () => {
+    const tools = new VaultTools(fakeVault({}), yes, opts);
+    const r = await tools.run("write_note", { path: "Notes/Overview.canvas", content: "x", mode: "create" });
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
+  });
+
+  it("delete_note lehnt .canvas ab — Meldung nennt nur .md als erlaubte Endung", async () => {
+    const vault = fakeVault({ "Notes/Overview.canvas": "{}" });
+    const tools = new VaultTools(vault, yes, opts);
+    const r = await tools.run("delete_note", { path: "Notes/Overview.canvas" });
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
+  });
+
+  it("edit_active_note lehnt .canvas ab — Meldung nennt nur .md als erlaubte Endung", async () => {
+    const editor = {
+      path: () => "Notes/Overview.canvas",
+      selection: () => "sel",
+      insertAtCursor: () => {},
+      replaceSelection: () => {},
+    };
+    const tools = new VaultTools(fakeVault({ "Notes/Overview.canvas": "{}" }), yes, { ...opts, editor });
+    const r = await tools.run("edit_active_note", { path: "Notes/Overview.canvas", mode: "replace_selection", text: "new" });
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
+  });
+});

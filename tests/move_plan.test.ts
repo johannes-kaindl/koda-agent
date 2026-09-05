@@ -13,7 +13,11 @@ describe("planMove — Validierung beider Pfade", () => {
     expect(() => planMove("a.md", "../ausserhalb/a.md")).toThrow(/verlässt den Vault/i);
   });
   it("erbt den Pfad-Guard: nur .md", () => {
-    expect(() => planMove("a.md", "Archiv/a.txt")).toThrow(/\.md/);
+    // Exakte Meldung: prüft, dass Move die schmale Liste nutzt, nicht eine, die .md enthält
+    expect(() => planMove("a.md", "Archiv/a.txt")).toThrow('Nur .md erlaubt: "Archiv/a.txt"');
+    // Und ein Fall, der trägt unabhängig vom Wortlaut: .canvas ist nicht erlaubt.
+    // Unter dem falschen Guard (READ_EXTENSIONS) würde das nicht werfen — genau das soll dieser Test fangen.
+    expect(() => planMove("a.md", "Archiv/a.canvas")).toThrow();
   });
 });
 
