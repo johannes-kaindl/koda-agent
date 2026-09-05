@@ -42,6 +42,14 @@ export class ContextPanel implements HubPanel<"context"> {
    *  traefe es nur zufaellig — deshalb der Zaehler und nicht „wird schon passen". */
   private gen = 0;
 
+  /** Befund 3 (Abschluss-Review 2026-09-05): `notifyFileOpen` geht an ALLE Panels, sichtbar
+   *  oder nicht (Vendor-Hub, s.o.) — ohne diese Bremse baut jede Notiz-Navigation einen
+   *  Volltext-Block samt N sequenziellen `cachedRead`s und einen DOM-Neubau, auch wenn der
+   *  Chat-Tab vorn steht. `onFileOpen` haelt bei unsichtbarem Panel nur fest, dass neu
+   *  gezeichnet werden muss; `onShow` holt das nach. Ein sichtbares Panel aktualisiert
+   *  weiterhin sofort — sonst zeigt ein offener Kontext-Tab veraltete Chips. */
+  private sichtbar = false;
+
   constructor(private readonly host: ContextPanelHost) {}
 
   mount(container: HTMLElement): void {
@@ -64,9 +72,22 @@ export class ContextPanel implements HubPanel<"context"> {
     this.render();
   }
 
-  onShow(): void { this.render(); }
-  onFileOpen(): void { this.render(); }
-  destroy(): void { this.bodyEl = null; this.modeEl = null; this.summaryEl = null; }
+  onShow(): void {
+    this.sichtbar = true;
+    this.render();
+  }
+
+  onHide(): void { this.sichtbar = false; }
+
+  onFileOpen(): void {
+    // Unsichtbar: nichts tun — `onShow` zeichnet beim naechsten Tab-Wechsel ohnehin neu,
+    // egal welche Datei zwischenzeitlich geoeffnet wurde. Das ist die eigentliche Bremse
+    // aus Befund 3: kein `buildFullContext` und kein DOM-Neubau fuer ein Panel, das gerade
+    // niemand sieht.
+    if (this.sichtbar) this.render();
+  }
+
+  destroy(): void { this.bodyEl = null; this.modeEl = null; this.summaryEl = null; this.sichtbar = false; }
 
   /** DOM = reine Funktion des Zustands: der Body wird komplett neu gebaut. Das Panel hält
    *  keinen langlebigen internen State (kein Stream, kein Eingabefeld) — das ist genau das

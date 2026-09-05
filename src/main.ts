@@ -126,8 +126,20 @@ export default class KodaPlugin extends Plugin {
   async addContextFolder(): Promise<void> {
     const ordner = await pickFolder(this.app);
     if (ordner === null) return;
-    const norm = resolveFolderPath(ordner);
-    const praefix = norm === "" ? "" : `${norm}/`;
+    // `resolveFolderPath` wirft bei "..", und diese Methode ist async — ein Aufrufer, der
+    // sie mit `void` verwirft, wuerde einen solchen Wurf sonst stillschweigend schlucken
+    // (Befund 5). Deshalb hier fangen und melden, statt es dem Aufrufer zu ueberlassen.
+    let norm: string;
+    try {
+      norm = resolveFolderPath(ordner);
+    } catch (err) {
+      new Notice(t("picker.folder.invalid", err instanceof Error ? err.message : String(err)));
+      return;
+    }
+    // Ein leeres Feld normalisiert auf "" — das ist der ganze Vault, keine Auswahl, die
+    // ohne Rueckfrage durchgehen sollte (Befund 2). Ablehnen und sagen, was passiert waere.
+    if (norm === "") { new Notice(t("picker.folder.emptyRoot")); return; }
+    const praefix = `${norm}/`;
     const pfade = this.app.vault.getMarkdownFiles().map((f) => f.path).filter((p) => p.startsWith(praefix)).sort();
     if (pfade.length === 0) { new Notice(t("picker.folder.empty", ordner)); return; }
     this.addContextPaths(pfade);

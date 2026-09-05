@@ -69,6 +69,7 @@ const T = {
     emptyManual: "Nichts von Hand hinzugefügt.",
     level: (n: number) => `Ebene ${n}`,
     manualOff: "wirkt in den Modi Notiz und Alle Tabs",
+    unreadable: "nicht lesbar",
   },
   en: {
     workspace: "Workspace",
@@ -84,6 +85,7 @@ const T = {
     emptyManual: "Nothing added by hand.",
     level: (n: number) => `level ${n}`,
     manualOff: "takes effect in the Note and All tabs modes",
+    unreadable: "not readable",
   },
 } as const;
 
@@ -202,6 +204,11 @@ function manualSection(
       const groesse = groessen.get(`${kandidat.source}:${path}`);
       const teile: string[] = [];
       if (groesse !== undefined) teile.push(t.chars(groesse.chars));
+      // Befund 6 (Abschluss-Review): eine fehlende Groesse OHNE Abwahl heisst nicht
+      // "nichts zu zeigen", sondern `build.ts` hat `content.read()` mit `null` verworfen —
+      // die Datei ist weg oder unlesbar. Bei Abwahl fehlt die Groesse ebenfalls (gefiltert
+      // wird VOR dem Lesen), das ist aber der Normalfall und braucht keinen Hinweis.
+      else if (!chipOff) teile.push(t.unreadable);
       if (kandidat.depth !== undefined) teile.push(t.level(kandidat.depth));
       return {
         source: kandidat.source, path, label: chipLabel(path),

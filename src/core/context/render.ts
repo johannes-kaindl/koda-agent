@@ -4,9 +4,17 @@
  * die Invariante „was im Block steht, steht in items" ist damit eine Folge, keine
  * Behauptung (dieselbe Bauart wie `workspace-line.ts`). Pure. */
 import type { AllocatedEntry } from "./select";
-import type { ContextAttachment, ContextItem } from "./types";
+import type { ContextAttachment, ContextItem, ContextSource } from "./types";
 
 type Lang = "de" | "en";
+
+/** Was `headerLine`/`herkunft` braucht — genau die Felder, die schon vor dem Lesen des
+ *  Inhalts feststehen (Candidate wie AllocatedEntry erfuellen das). */
+export interface EntryHead {
+  source: ContextSource;
+  path: string;
+  depth?: number;
+}
 
 const T = {
   de: {
@@ -27,9 +35,21 @@ const T = {
   },
 } as const;
 
-function herkunft(e: AllocatedEntry, t: (typeof T)[Lang]): string {
+function herkunft(e: EntryHead, t: (typeof T)[Lang]): string {
   const name = (t.src as Record<string, string>)[e.source] ?? e.source;
   return e.depth === undefined ? name : `${name}${t.level(e.depth)}`;
+}
+
+/** Die Ueberschriftszeile — ohne Inhalt, deshalb schon VOR dem Budgetieren bekannt.
+ *  Genutzt sowohl beim Rendern als auch bei der Abschaetzung des Budget-Overheads
+ *  (Befund 2: die Ueberschrift ist Teil des Blocks, nicht daneben). */
+export function headerLine(e: EntryHead, lang: Lang): string {
+  return `## ${e.path} (${herkunft(e, T[lang])})`;
+}
+
+/** Die Kuerzungs-Meldung, isoliert exportiert aus demselben Grund wie `headerLine`. */
+export function cutMessage(shown: number, full: number, path: string, lang: Lang): string {
+  return T[lang].cut(shown, full, path);
 }
 
 export function renderFullContext(
@@ -47,8 +67,8 @@ export function renderFullContext(
   }
 
   for (const e of entries) {
-    const kopf = `## ${e.path} (${herkunft(e, t)})`;
-    const meldung = e.cut ? `\n${t.cut(e.shown.length, e.fullChars, e.path)}` : "";
+    const kopf = headerLine(e, lang);
+    const meldung = e.cut ? `\n${cutMessage(e.shown.length, e.fullChars, e.path, lang)}` : "";
     bloecke.push(`${kopf}\n${e.shown}${meldung}`);
     const item: ContextItem = { source: e.source, path: e.path, kind: "full", chars: e.shown.length };
     if (e.cut) item.fullChars = e.fullChars;

@@ -222,4 +222,27 @@ describe("Abschnitt Manuell", () => {
     const vm = await buildPanelViewModel("workspace", snapManual, new Set(), vollOpts({ manual: ["M.md"] }));
     expect(vm.hasOff).toBe(true);
   });
+
+  it("markiert einen manuellen Eintrag, dessen Datei nicht mehr lesbar ist, statt ihn stumm ohne Groesse zu zeigen (Befund 6)", async () => {
+    // `build.ts` verwirft eine Notiz still, wenn `content.read()` null liefert — der Chip
+    // blieb bisher als Kandidat stehen, nur ohne jede Groessenangabe. Das Fehlen war das
+    // einzige Signal. Jetzt bekommt genau dieser Fall einen eigenen Hinweis.
+    const readNull = { read: () => Promise.resolve(null as string | null) };
+    const vm = await buildPanelViewModel("note", snapManual, new Set(), vollOpts({ manual: ["M.md"], content: readNull }));
+    const chip = vm.sections.find((s) => s.id === "manual")?.chips.find((c) => c.path === "M.md");
+    expect(chip?.hint).toContain("nicht lesbar");
+    expect(chip?.off).toBe(false);
+    expect(chip?.removable).toBe(true);
+  });
+
+  it("zeigt bei Abwahl KEINEN Nicht-lesbar-Hinweis — die fehlende Groesse ist dort der Normalfall", async () => {
+    // Gefiltert wird VOR dem Lesen: ein abgewaehlter Eintrag hat ebenfalls keine Groesse in
+    // `ctx.items`, aber aus einem harmlosen Grund. Der neue Hinweis darf diesen Fall nicht
+    // mit einer wirklich unlesbaren Datei verwechseln.
+    const off = new Set([itemKey("manual", "M.md")]);
+    const vm = await buildPanelViewModel("note", snapManual, off, vollOpts({ manual: ["M.md"] }));
+    const chip = vm.sections.find((s) => s.id === "manual")?.chips.find((c) => c.path === "M.md");
+    expect(chip?.off).toBe(true);
+    expect(chip?.hint).not.toContain("nicht lesbar");
+  });
 });

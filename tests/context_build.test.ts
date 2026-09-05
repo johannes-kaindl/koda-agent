@@ -55,7 +55,33 @@ describe("buildFullContext", () => {
       linkDepth: 1, budget: 2000, lang: "de",
     });
     expect(ctx.items.every((i) => i.fullChars === 5000)).toBe(true);
-    expect(ctx.text).toContain("gekürzt: 1000 von 5000 Zeichen");
+    // Die genaue Zahl ist seit Befund 2 nicht mehr 1000: der Ueberschrift- und
+    // Kuerzungsmeldungs-Overhead wird jetzt aus demselben Budget bezahlt statt danebenzuliegen,
+    // die gezeigte Zeichenzahl faellt also etwas kleiner aus als 2000/2.
+    expect(ctx.text).toMatch(/gekürzt: \d+ von 5000 Zeichen/);
+  });
+
+  it("haelt den gerenderten Block nah am Budget, auch bei vielen Eintraegen (Befund 2)", async () => {
+    const N = 300;
+    const map: Record<string, string> = {};
+    const tabs = [];
+    for (let i = 0; i < N; i++) {
+      const pfad = `note-${String(i).padStart(3, "0")}.md`;
+      map[pfad] = "x".repeat(3000);
+      tabs.push({ path: pfad, viewType: "markdown" });
+    }
+    const vieleTabsSnap: WorkspaceSnapshot = { active: null, tabs };
+    const budget = 20000;
+    const ctx = await buildFullContext({
+      mode: "tabs", snap: vieleTabsSnap, links, content: inhalt(map), manual: [], off: new Set(),
+      linkDepth: 1, budget, lang: "de",
+    });
+    // Vorher (ohne Abzug des Overheads von der Budget-Verteilung): ~58604 Zeichen bei
+    // Budget 20000 — knapp das Dreifache (Faktor 2.9). Der verbleibende Rest hier ist die
+    // strukturelle Untergrenze aus 300 Ueberschriften + Kuerzungs-Meldungen bei praktisch
+    // auf null gedruecktem Inhaltsbudget — kein Vielfaches mehr, aber auch nicht 1x, weil
+    // der Overhead selbst schon fast das ganze Budget aufbraucht.
+    expect(ctx.text.length).toBeLessThan(budget * 1.7);
   });
 
   it("nimmt im Modus Alle Tabs die Tabs statt der Links", async () => {
