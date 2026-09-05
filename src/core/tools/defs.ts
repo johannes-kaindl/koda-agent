@@ -20,10 +20,10 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: "read_note",
-    description: "Read the full content of one Markdown note. Path must be vault-relative and end in .md.",
+    description: "Read the full content of one note. Path must be vault-relative and end in .md, .base (a Bases view definition, YAML) or .canvas (a canvas, JSON).",
     parameters: {
       type: "object",
-      properties: { path: { type: "string", description: "Vault-relative path, e.g. Projekte/Plan.md" } },
+      properties: { path: { type: "string", description: "Vault-relative path, e.g. Projekte/Plan.md or Projekte/Overview.base" } },
       required: ["path"],
     },
   },

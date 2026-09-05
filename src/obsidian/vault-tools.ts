@@ -1,5 +1,5 @@
 import type { ToolOutcome, ToolRunner } from "../core/agent/types";
-import { resolveFolderPath, resolveNotePath } from "../core/tools/path-guard";
+import { resolveFolderPath, resolveNotePath, READ_EXTENSIONS } from "../core/tools/path-guard";
 import { writePolicy } from "../core/tools/write-policy";
 import { movePolicy, planMove } from "../core/tools/move";
 import { appendMemoryLine } from "../core/memory/memory";
@@ -238,8 +238,10 @@ export class VaultTools implements ToolRunner {
     return { ok: true, content: formatRelatedResult(r, norm, hasText) };
   }
 
+  /** Die einzige Stelle mit erweiterter Erlaubnis. Schreiben, Verschieben und Loeschen
+   *  rufen `resolveNotePath` weiter ohne zweiten Parameter — der Default ist `.md`. */
   private async read(path: string): Promise<ToolOutcome> {
-    const norm = resolveNotePath(path);
+    const norm = resolveNotePath(path, READ_EXTENSIONS);
     const text = await this.vault.read(norm).catch(() => null);
     return text === null ? { ok: false, error: `Notiz nicht gefunden: "${path}"` } : { ok: true, content: text };
   }

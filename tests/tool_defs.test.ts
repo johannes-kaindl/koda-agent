@@ -94,3 +94,11 @@ describe("Arbeitskontext-Werkzeuge", () => {
     expect(names).not.toContain("edit_active_note");
   });
 });
+
+describe("read_note mit erweiterten Formaten", () => {
+  it("read_note nennt die drei lesbaren Formate in seiner Beschreibung", () => {
+    const def = TOOL_DEFS.find((d) => d.name === "read_note");
+    expect(def?.description).toContain(".base");
+    expect(def?.description).toContain(".canvas");
+  });
+});

@@ -13,7 +13,7 @@ describe("planMove — Validierung beider Pfade", () => {
     expect(() => planMove("a.md", "../ausserhalb/a.md")).toThrow(/verlässt den Vault/i);
   });
   it("erbt den Pfad-Guard: nur .md", () => {
-    expect(() => planMove("a.md", "Archiv/a.txt")).toThrow(/Markdown/i);
+    expect(() => planMove("a.md", "Archiv/a.txt")).toThrow(/\.md/);
   });
 });
 
