@@ -68,11 +68,19 @@ export function buildPanelViewModel(
   const chips: PanelChip[] = [];
   const a = snap.active;
   if (a !== null) {
-    chips.push({ source: "active", path: a.path, label: chipLabel(a.path), hint: "", off: off.has(itemKey("active", a.path)) });
+    const activeOff = off.has(itemKey("active", a.path));
+    chips.push({ source: "active", path: a.path, label: chipLabel(a.path), hint: "", off: activeOff });
     if (a.selection !== "") {
+      // Befund 4 (Review 2026-09-05): faellt die aktive Notiz aus dem Block, nimmt sie die
+      // Markierung mit (`selection.ts`: `active = null` loescht auch `selection`). Der Chip
+      // muss das ANZEIGEN, auch wenn sein eigener `contextOff`-Zustand das nicht sagt — sonst
+      // wirkt er "an", obwohl nichts mehr gesendet wird. Der gespeicherte Zustand bleibt
+      // unangetastet: wer die Notiz wieder anwaehlt, bekommt seine eigene Markierungs-Abwahl
+      // zurueck, nicht die der Notiz.
+      const selectionOff = off.has(itemKey("selection", a.path));
       chips.push({
         source: "selection", path: a.path, label: chipLabel(a.path),
-        hint: t.chars(a.selection.length), off: off.has(itemKey("selection", a.path)),
+        hint: t.chars(a.selection.length), off: activeOff || selectionOff,
       });
     }
   }

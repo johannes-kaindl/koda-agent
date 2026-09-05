@@ -92,13 +92,27 @@ export class ContextPanel implements HubPanel<"context"> {
       for (const chip of sec.chips) {
         const el = list.createDiv({ cls: `koda-ctx-chip${chip.off ? " is-off" : ""}` });
         el.setAttribute("title", chip.path);
+        // a11y (Befund 3, Review 2026-09-05): beide Klick-Ziele sind funktional Knoepfe —
+        // Rolle + Fokussierbarkeit + Enter/Leertaste, nach dem Muster aus collapsible.ts.
         const name = el.createSpan({ cls: "koda-ctx-chip-label", text: chip.label });
-        name.addEventListener("click", () => { this.host.openNote(chip.path); });
+        name.setAttribute("role", "button");
+        name.setAttribute("tabindex", "0");
+        const openNote = (): void => { this.host.openNote(chip.path); };
+        name.addEventListener("click", openNote);
+        name.addEventListener("keydown", (evt: KeyboardEvent) => {
+          if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); openNote(); }
+        });
         if (chip.hint !== "") el.createSpan({ cls: "koda-ctx-chip-hint", text: chip.hint });
         const x = el.createSpan({ cls: "koda-ctx-chip-x" });
         setIcon(x, chip.off ? "plus" : "x");
+        x.setAttribute("role", "button");
+        x.setAttribute("tabindex", "0");
         x.setAttribute("aria-label", chip.off ? t("context.chipOn") : t("context.chipOff"));
-        x.addEventListener("click", () => { this.host.toggle(chip.source, chip.path); });
+        const toggleChip = (): void => { this.host.toggle(chip.source, chip.path); };
+        x.addEventListener("click", toggleChip);
+        x.addEventListener("keydown", (evt: KeyboardEvent) => {
+          if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); toggleChip(); }
+        });
       }
     }
 

@@ -12,7 +12,8 @@ All notable changes to this project are documented here. The format follows
   what the next message will carry — the active note, your selection, the open tabs — as chips
   you can click away one by one, with a line telling you how much of the model's context window
   it fills. What you deselect stays deselected until you press "Reset selection" or start a new
-  chat; the setting "Keep context choices" turns that around.
+  chat — that is what the setting "Keep context choices" (on by default) does; turning it off
+  reverses it, so every new message starts from the full context again.
 
 ## [0.12.0] — 2026-09-05
 

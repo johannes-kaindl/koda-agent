@@ -1899,6 +1899,55 @@ async function main(): Promise<void> {
     // laeuft in den 5s-Timeout, „nachReload" bleibt null, detail zeigt
     // "in data.json: null" statt "true" — der Punkt wird rot.
     record("31. Auf/Zu-Zustand der Abschnitte landet in data.json", ok31, detail31);
+
+    let ok32 = false;
+    let detail32 = "";
+    try {
+      // Befund 1 (Review 2026-09-05): der Chat-Tab hatte seinen Spalten-Flex-Container
+      // verloren, weil er unter `.okit-hub-panel` (ein BLOCK-Container) haengt. `.koda-log`
+      // war dann Inhaltshoehe statt Restflaeche, und `.koda-input-bar` klebte am Ende des
+      // Verlaufs statt am unteren Rand des Panels. Punkt 2 (Kopfzeilen-Groesse) und Punkt 29
+      // (Tab-Hoehe > 0) haetten das nicht gesehen — beide messen Existenz/Groesse, keine
+      // Position. Dieser Punkt misst POSITION: `display: flex` am Panel UND die Unterkante
+      // der Eingabezeile nahe der Unterkante des Panels, nicht irgendwo in der Mitte.
+      await cdp.evaluate(`
+        await app.commands.executeCommandById(${JSON.stringify(`${PLUGIN_ID}:tab-chat`)});
+        return true;
+      `);
+      const geo = await pollUntil<{ display: string; panelBottom: number; barBottom: number; diff: number }>(
+        cdp,
+        `
+          const panel = document.querySelector(".koda-hub .okit-hub-panel[data-tab='chat']");
+          const bar = document.querySelector(".koda-hub .okit-hub-panel[data-tab='chat'] .koda-input-bar");
+          // Panel noch nicht sichtbar/gemountet oder Tab-Wechsel noch nicht angekommen:
+          // „noch nicht so weit" ist null, nie ein Objekt mit Nullwerten (pollUntil-Vertrag).
+          if (!panel || !bar || panel.classList.contains("is-hidden")) return null;
+          const pr = panel.getBoundingClientRect();
+          const br = bar.getBoundingClientRect();
+          if (pr.height === 0) return null;
+          return {
+            display: getComputedStyle(panel).display,
+            panelBottom: pr.bottom,
+            barBottom: br.bottom,
+            diff: Math.abs(pr.bottom - br.bottom),
+          };
+        `,
+        8_000,
+      );
+      if (geo === null) throw new Error("Chat-Panel/Eingabezeile nicht innerhalb 8s gerendert");
+      // Ein paar Pixel Toleranz fuer Border/Padding des Panels — die Eingabezeile muss am
+      // unteren Rand sitzen, nicht irgendwo im Verlauf.
+      ok32 = geo.display === "flex" && geo.diff <= 4;
+      detail32 = `display: ${geo.display} · Panel-Unterkante ${geo.panelBottom.toFixed(1)}px · Eingabe-Unterkante ${geo.barBottom.toFixed(1)}px · Differenz ${geo.diff.toFixed(1)}px`;
+    } catch (error) {
+      detail32 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    // Gegenprobe: in `styles.css` die Regel
+    // `.koda-hub .okit-hub-panel[data-tab="chat"] { display: flex; flex-direction: column; overflow: hidden; }`
+    // entfernen (oder auf einen Bau VOR Befund-1-Fix zurueckgehen). Erwartung: `display`
+    // meldet `block` statt `flex`, der Punkt wird rot allein daran — unabhaengig davon, ob
+    // bei kurzem Verlauf die Differenz zufaellig noch klein ausfaellt.
+    record("32. Chat-Panel ist Spalten-Flex, Eingabezeile sitzt am unteren Rand (nicht im Verlauf)", ok32, detail32);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte

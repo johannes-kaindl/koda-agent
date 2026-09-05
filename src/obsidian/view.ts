@@ -100,6 +100,12 @@ export class KodaView extends ItemView {
     });
     this.hub = buildHubInto<KodaTab>(root.createDiv({ cls: "koda-hub" }), [chatPanel, this.ctxPanel], "chat");
 
+    // Kontext-Tab lebt vom aktuellen Datei-Kontext — ohne diese Weiterleitung zeigt er
+    // beim Notiz-Wechsel weiter den alten Stand (Befund 2, Review 2026-09-05).
+    this.registerEvent(
+      this.app.workspace.on("file-open", (f) => { this.hub?.notifyFileOpen(f?.path ?? null); }),
+    );
+
     this.syncThinkAction();
 
     this.renderLog();

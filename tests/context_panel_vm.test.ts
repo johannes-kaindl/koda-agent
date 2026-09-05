@@ -70,6 +70,21 @@ describe("buildPanelViewModel", () => {
     expect(vm.sections[0]?.chips).toEqual([]);
     expect(vm.sections[0]?.empty).not.toBe("");
   });
+  it("der Markierungs-Chip zeigt abgewaehlt, wenn die aktive Notiz abgewaehlt ist (Befund 4)", () => {
+    // active=off nimmt die Markierung inhaltlich mit (selection.ts) — der Chip muss das
+    // ANZEIGEN, auch ohne eigenen contextOff-Eintrag fuer "selection".
+    const vm = buildPanelViewModel(snap, new Set([itemKey("active", "Notes/Project plan.md")]), opts);
+    const ws = vm.sections.find((s) => s.id === "workspace");
+    const selection = ws?.chips.find((c) => c.source === "selection");
+    expect(selection?.off).toBe(true);
+  });
+  it("die Markierungs-Abwahl bleibt eigenstaendig — Notiz wieder an, eigene Abwahl bleibt bestehen", () => {
+    const off = new Set([itemKey("selection", "Notes/Project plan.md")]);
+    const vm = buildPanelViewModel(snap, off, opts);
+    const ws = vm.sections.find((s) => s.id === "workspace");
+    expect(ws?.chips.find((c) => c.source === "active")?.off).toBe(false);
+    expect(ws?.chips.find((c) => c.source === "selection")?.off).toBe(true);
+  });
   it("englisch", () => {
     const vm = buildPanelViewModel(snap, new Set(), { ...opts, lang: "en" });
     expect(vm.sections[0]?.title).toBe("Workspace");

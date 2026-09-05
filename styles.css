@@ -204,6 +204,22 @@
   font-size: var(--font-ui-smaller);
 }
 
+/* .koda-hub (der Container aus view.ts, traegt zusaetzlich .okit-hub-root aus buildHubInto)
+   hatte bis zum Review 2026-09-05 keine eigene Regel (Befund 5). Ohne sie ist der Chat-Tab
+   ein BLOCK-Container (.okit-hub-panel: height:100%; overflow:auto aus der vendorten
+   HUB_CSS unten) — `.koda-log { flex: 1 }` ist dort wirkungslos, die Eingabezeile klebt am
+   Ende des Verlaufs statt am unteren Rand, und es scrollt das ganze Panel statt nur der
+   Verlauf (Befund 1). Fix ist Spalten-Flex NUR fuer den Chat-Tab, als Nachfahren-Selektor
+   unter der plugin-eigenen Klasse: die vendorte `.okit-hub-panel`-Regel bleibt unangetastet
+   (Namensraum wird von zwei Kit-Consumern im selben Vault geteilt) und der Kontext-Tab
+   behaelt sein normales Block-Scrollverhalten (dafuer reicht `.okit-hub-panel` allein).
+   `overflow: hidden` hier + `overflow-y: auto` an `.koda-log` zusammen: das Panel selbst
+   scrollt nicht mehr (kein zweiter Scrollbalken, keine doppelte Scroll-Flaeche), und weil
+   `.koda-status`/`.koda-input-bar` als Flex-Kinder mit `flex: 0 0 auto` ihre Inhaltshoehe
+   behalten, bleibt fuer `.koda-log` (flex: 1) genau der Rest — der Verlauf scrollt, die
+   Eingabe steht am unteren Rand. */
+.koda-hub .okit-hub-panel[data-tab="chat"] { display: flex; flex-direction: column; overflow: hidden; }
+
 /* uebernommen aus obsidian-kit/src/obsidian/hub.ts (HUB_CSS), 2026-09-05 — nie von Hand
    aendern, sondern den Block bei einem Kit-Update ersetzen. Das Kit injiziert kein CSS. */
 /* Hub-Tab-Leiste (obsidian-kit: buildHubInto). Die vier nummerierten Zutaten gehören

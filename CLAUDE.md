@@ -22,8 +22,9 @@ ein Kontext-Tab neben dem Chat.** Kodas Sidebar hat jetzt eine Hub-Tab-Leiste mi
 Chat wie bisher, dazu Kontext: er zeigt als Chips, was die nächste Nachricht ans Modell
 mitnimmt (aktive Notiz, Markierung, offene Tabs), lässt einzelne davon abwählen und nennt die
 Belegung des Kontextfensters darunter. Eine abgewählte Auswahl bleibt abgewählt, bis „Auswahl
-zurücksetzen" gedrückt wird oder ein neues Gespräch beginnt; die Einstellung „Kontext-Auswahl
-behalten" (`contextKeepChoices`, Default an) dreht das um. Zwei neue Befehle: Chat-Tab zeigen,
+zurücksetzen" gedrückt wird oder ein neues Gespräch beginnt — das ist die Einstellung
+„Kontext-Auswahl behalten" (`contextKeepChoices`, Default an). Ausschalten dreht es um: jede
+Nachricht startet dann wieder mit dem vollen Kontext. Zwei neue Befehle: Chat-Tab zeigen,
 Kontext-Tab zeigen. Gate **618/618** (57 Testdateien), GUI-Smoke **31/31** (drei neue Punkte
 29–31, alle einzeln gegengeprobt — Details in `docs/SMOKE.md`). Spec/Plan unter
 `.superpowers/sdd/2026-09-05-koda-arbeitskontext-etappe-2a-hub/`. Ein Release ist noch nicht
