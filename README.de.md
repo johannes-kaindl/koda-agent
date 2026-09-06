@@ -275,6 +275,40 @@ wirken, steht oben im Gespräch.
 sonst frei schreiben darf. Der Grund: ein Skill ist kein Entwurf — er ändert, was Koda
 künftig tut.
 
+## Modell-Steuerung
+
+**Einstellungen → Koda → Modell-Steuerung** lässt dich die Anweisungen ersetzen, denen
+Koda folgt, und einzelne Werkzeuge abschalten — nützlich für ein schwächeres oder
+kleineres Modell, das ausführlichere Anleitung und weniger Auswahl braucht.
+
+Die Anweisungs-Textarea startet **leer**, mit der ausgelieferten Fassung ausgegraut als
+Platzhalter dahinter. Ein leeres Feld heißt immer „die ausgelieferte Fassung gilt" —
+nie „keine Anweisungen". Das reicht über den Moment hinaus, in dem du das Feld öffnest:
+weil nichts übernommen wird, bevor du selbst etwas tippst, erreicht dich eine spätere
+Verbesserung der ausgelieferten Fassung auch dann noch, wenn du das Feld nie angerührt
+hast — und der Knopf „Ausgelieferte Fassung wiederherstellen" (↺) setzt dich jederzeit
+auf genau diesen Stand zurück. Zwei Platzhalter, `{{sprache}}` und `{{ordner}}`, stehen
+für deine Sprach- und Koda-Ordner-Einstellung und werden bei jedem Lauf eingesetzt —
+lässt du sie in einer eigenen Fassung stehen, folgt sie dir auch dann noch, wenn du eine
+der beiden Einstellungen später änderst.
+
+Unter der Textarea erscheint eine Warnzeile (ohne irgendetwas zu verbieten), wenn die
+Anweisungen Werkzeuge nie erwähnen, einen der beiden Platzhalter fallen lassen, kein
+lesendes Werkzeug mehr aktiv ist, oder wenn nur einzelne lesende Werkzeuge abgeschaltet
+sind — im letzten Fall nennt die Zeile sie beim Namen, denn Koda selbst erfährt von der
+Abschaltung nichts und würde sonst stillschweigend weiter bei den übrigen Werkzeugen
+anklopfen, bis die Runden aufgebraucht sind. „Aktive Anweisungen ansehen" öffnet eine
+Vorschau genau des Prompts, mit dem das nächste Gespräch beginnt — inklusive des
+aktuellen Gedächtnis- und Skill-Blocks.
+
+Jedes Werkzeug — auch die lesenden (`search_notes`, `read_note`, `list_notes`,
+`related_notes`) — hat einen eigenen Schalter und ein eigenes Beschreibungsfeld, das
+derselben Leer-heißt-ausgeliefert-Regel folgt wie die Anweisungs-Textarea. Ein
+abgeschaltetes Werkzeug fehlt in dem, was ans Modell geht, vollständig — es wird nicht
+nur ignoriert. `related_notes` bleibt auch ohne installiertes vault-rag sichtbar,
+ausgegraut mit einem Hinweis, warum, damit es nie wie eine still verschwundene
+Einstellung wirkt.
+
 ## Entwicklung
 
 ```bash
