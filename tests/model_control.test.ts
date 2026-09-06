@@ -1,11 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
-import { Setting, makeFakeEl, ExtraButtonComponent, TextAreaComponent } from "obsidian";
+// `Setting` bleibt vom REALEN "obsidian" importiert: `renderPromptRow`/`renderToolList` in
+// src/obsidian/model-control.ts sind gegen den echten Typ signiert (src/ typprueft immer
+// gegen die echte Obsidian-API, nie gegen den Mock). Zur Laufzeit ist es via vitest-Alias
+// trotzdem dieselbe Mock-Klasse — nur die anderen Komponenten braucht es typisiert ueber
+// den Mock direkt, weil der Mock zusaetzliche, testrelevante Felder traegt
+// (`onChangeCB`, `iconName`, `tooltip`, `clickCB`), die die echten Typen nicht kennen.
+import { Setting } from "obsidian";
+import {
+  makeFakeEl, ExtraButtonComponent, TextAreaComponent,
+  ToggleComponent as MockToggleComponent,
+} from "./vendor/kit/obsidian-mock";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "../src/obsidian/model-control";
 import { DEFAULT_SETTINGS, type KodaSettings } from "../src/core/settings-types";
 import { DEFAULT_RULES } from "../src/core/prompt/rules";
 import "../src/i18n/strings";
 
-function ctx(over: Partial<KodaSettings> = {}): ModelControlCtx & { save: ReturnType<typeof vi.fn> } {
+function ctx(over: Partial<KodaSettings> = {}): ModelControlCtx & { save: ReturnType<typeof vi.fn<[], Promise<void>>> } {
   return {
     // Tief geklont, nicht flach gespreadet: `toolDescriptions` waere sonst DASSELBE Objekt
     // wie `DEFAULT_SETTINGS.toolDescriptions`, und der blur-Test mutierte damit die
@@ -25,7 +35,7 @@ function ctx(over: Partial<KodaSettings> = {}): ModelControlCtx & { save: Return
 const textarea = (s: Setting): TextAreaComponent =>
   s.components.find((c) => c instanceof TextAreaComponent) as TextAreaComponent;
 const resetKnopf = (s: Setting): ExtraButtonComponent =>
-  s.components.find((c) => c instanceof ExtraButtonComponent && c.iconName === "rotate-ccw") as ExtraButtonComponent;
+  s.components.find((c) => c instanceof ExtraButtonComponent && c.iconName === "rotate-ccw") as unknown as ExtraButtonComponent;
 
 describe("renderPromptRow", () => {
   it("stellt das Feld leer dar, solange nichts ueberschrieben ist", () => {
@@ -142,7 +152,7 @@ describe("renderPromptRow", () => {
 /** Eine Werkzeug-Zeile im Fake-DOM. Der Zugriff laeuft ueber die Klasse und das
  *  data-Attribut, weil der Mock nur Tag- und Klassen-Selektoren kennt
  *  (obsidian-mock.ts:48). */
-const zeilen = (s: Setting): any[] => s.settingEl.querySelectorAll(".koda-tool-row");
+const zeilen = (s: Setting): any[] => Array.from(s.settingEl.querySelectorAll(".koda-tool-row"));
 const zeile = (s: Setting, name: string): any =>
   zeilen(s).find((r) => r.getAttribute("data-tool") === name);
 
@@ -172,7 +182,7 @@ describe("renderToolList", () => {
     // Ueber den Namen adressiert, nicht ueber einen Index — ein neues Werkzeug
     // verschoebe sonst still jeden nachfolgenden Index (Fix-Runde 1).
     const h = handles.find((x) => x.name === "write_note")!;
-    h.toggle.onChangeCB?.(false);
+    (h.toggle as unknown as MockToggleComponent).onChangeCB?.(false);
     expect(c.settings.toolsDisabled).toContain("write_note");
     expect(c.save).toHaveBeenCalled();
   });
@@ -181,7 +191,7 @@ describe("renderToolList", () => {
     const s = new Setting(makeFakeEl());
     const handles = renderToolList(s, c);
     const h = handles.find((x) => x.name === "write_note")!;
-    h.toggle.onChangeCB?.(true);
+    (h.toggle as unknown as MockToggleComponent).onChangeCB?.(true);
     expect(c.settings.toolsDisabled).toEqual([]);
   });
   it("nimmt eine eigene Beschreibung erst beim blur an, nicht bei jedem Tastendruck", () => {
@@ -191,7 +201,7 @@ describe("renderToolList", () => {
     const h = handles.find((x) => x.name === "read_note")!;
     h.textarea.setValue("Liest.");
     expect(c.settings.toolDescriptions.read_note).toBeUndefined();
-    h.textarea.inputEl.dispatchEvent({ type: "blur" });
+    h.textarea.inputEl.dispatchEvent(new Event("blur"));
     expect(c.settings.toolDescriptions.read_note).toBe("Liest.");
   });
   it("loescht den Eintrag wieder, wenn das Feld geleert wird — leer heisst ausgeliefert", () => {
@@ -200,7 +210,7 @@ describe("renderToolList", () => {
     const handles = renderToolList(s, c);
     const h = handles.find((x) => x.name === "read_note")!;
     h.textarea.setValue("   ");
-    h.textarea.inputEl.dispatchEvent({ type: "blur" });
+    h.textarea.inputEl.dispatchEvent(new Event("blur"));
     expect(c.settings.toolDescriptions.read_note).toBeUndefined();
   });
   // Steht bewusst am Ende der Datei: er misst, was die Tests DAVOR hinterlassen haben.

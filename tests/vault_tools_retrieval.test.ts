@@ -14,6 +14,10 @@ function vault(files: Record<string, string>): VaultPort {
     append: async () => {},
     overwrite: async () => {},
     frontmatterOf: () => null,
+    // Von diesen Tests nicht gerufen — ehrlich werfende Stubs statt stillem `undefined`.
+    move: async () => { throw new Error("nicht erwartet: move"); },
+    trash: async () => { throw new Error("nicht erwartet: trash"); },
+    backlinkCount: () => { throw new Error("nicht erwartet: backlinkCount"); },
   };
 }
 

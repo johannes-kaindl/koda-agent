@@ -1,4 +1,12 @@
-import { VaultTools, type VaultPort, type WriteRequest } from "../src/obsidian/vault-tools";
+import { VaultTools, type VaultPort, type WriteRequest, type WriteFileRequest } from "../src/obsidian/vault-tools";
+
+/** `WriteRequest` ist eine Union aus write/move/delete; diese Datei bestaetigt ausschliesslich
+ *  Schreibvorgaenge. Ein Waechter statt eines Casts, damit ein versehentlicher move/delete-Fall
+ *  sichtbar wirft statt `newText`/`effect` als `undefined` durchzureichen. */
+function erwarteWrite(req: WriteRequest): WriteFileRequest {
+  if (req.kind !== "write") throw new Error(`erwartete eine Schreibanfrage, bekam "${req.kind}"`);
+  return req;
+}
 
 function capturingConfirm(): { calls: WriteRequest[]; confirm: (req: WriteRequest) => Promise<boolean> } {
   const calls: WriteRequest[] = [];
@@ -24,6 +32,11 @@ function fakeVault(files: Record<string, string>): VaultPort & { files: Record<s
     append: async (p, c) => void (files[p] = (files[p] ?? "") + c),
     overwrite: async (p, c) => void (files[p] = c),
     frontmatterOf: () => null,
+    // Von diesen Tests nicht gerufen — ehrlich werfende Stubs statt stillem `undefined`,
+    // damit ein spaeterer echter Aufruf auffiele statt lautlos ins Leere zu laufen.
+    move: async () => { throw new Error("nicht erwartet: move"); },
+    trash: async () => { throw new Error("nicht erwartet: trash"); },
+    backlinkCount: () => { throw new Error("nicht erwartet: backlinkCount"); },
   };
 }
 
@@ -70,7 +83,7 @@ describe("VaultTools", () => {
     const r = await tools.run("write_note", { path: "Plan.md", content: "neu", mode: "replace" });
     expect(r.ok).toBe(true);
     expect(cap.calls).toHaveLength(1);
-    expect(vault.files["Plan.md"]).toBe(cap.calls[0].newText);
+    expect(vault.files["Plan.md"]).toBe(erwarteWrite(cap.calls[0]).newText);
     expect(vault.files["Plan.md"]).toBe("neu");
   });
   it("write_note ausserhalb mit Zustimmung (append) schreibt exakt die Vorschau (inkl. fuehrendem Zeilenumbruch)", async () => {
@@ -80,7 +93,7 @@ describe("VaultTools", () => {
     const r = await tools.run("write_note", { path: "Plan.md", content: "neu", mode: "append" });
     expect(r.ok).toBe(true);
     expect(cap.calls).toHaveLength(1);
-    const previewed = cap.calls[0].newText;
+    const previewed = erwarteWrite(cap.calls[0]).newText;
     // Die Vorschau MUSS der tatsaechlich angehaengte Effektiv-Inhalt sein — sonst
     // zeigt das Confirm-Modal etwas anderes, als am Ende geschrieben wird.
     expect(vault.files["Plan.md"]).toBe("alt" + previewed);
@@ -110,7 +123,7 @@ describe("VaultTools", () => {
     const tools = new VaultTools(vault, yes, { ...opts, allowed: () => new Set(["read_note"]) });
     const r = await tools.run("write_note", { path: "Koda/x.md", content: "Text", mode: "create" });
     expect(r.ok).toBe(false);
-    expect(r.error).toContain("abgeschaltet");
+    if (!r.ok) expect(r.error).toContain("abgeschaltet");
     // Die zweite Haelfte des Belegs: nichts wurde geschrieben.
     expect(vault.files["Koda/x.md"]).toBeUndefined();
   });
@@ -174,7 +187,7 @@ describe("write_skill", () => {
     const cap = capturingConfirm();
     const tools = new VaultTools(vault, cap.confirm, opts);
     await tools.run("write_skill", { name: "X", description: "Antworte kurz", body: "b", mode: "create" });
-    expect(cap.calls[0].effect).toBe("Antworte kurz");
+    expect(erwarteWrite(cap.calls[0]).effect).toBe("Antworte kurz");
   });
 
   it("Ablehnung schreibt nichts und meldet es zurueck", async () => {
@@ -222,7 +235,7 @@ describe("write_skill", () => {
     const cap = capturingConfirm();
     const tools = new VaultTools(vault, cap.confirm, opts);
     await tools.run("write_skill", { name: "X", description: "d", body: "b", mode: "create" });
-    expect(cap.calls[0].newText).toBe(vault.files["Koda/Skills/X.md"]);
+    expect(erwarteWrite(cap.calls[0]).newText).toBe(vault.files["Koda/Skills/X.md"]);
   });
 });
 
@@ -231,7 +244,7 @@ describe("Pfad-Guard: Schreiben bleibt .md", () => {
     const tools = new VaultTools(fakeVault({}), yes, opts);
     const r = await tools.run("write_note", { path: "Notes/Overview.canvas", content: "x", mode: "create" });
     expect(r.ok).toBe(false);
-    expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
+    if (!r.ok) expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
   });
 
   it("delete_note lehnt .canvas ab — Meldung nennt nur .md als erlaubte Endung", async () => {
@@ -239,7 +252,7 @@ describe("Pfad-Guard: Schreiben bleibt .md", () => {
     const tools = new VaultTools(vault, yes, opts);
     const r = await tools.run("delete_note", { path: "Notes/Overview.canvas" });
     expect(r.ok).toBe(false);
-    expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
+    if (!r.ok) expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
   });
 
   it("edit_active_note lehnt .canvas ab — Meldung nennt nur .md als erlaubte Endung", async () => {
@@ -252,6 +265,6 @@ describe("Pfad-Guard: Schreiben bleibt .md", () => {
     const tools = new VaultTools(fakeVault({ "Notes/Overview.canvas": "{}" }), yes, { ...opts, editor });
     const r = await tools.run("edit_active_note", { path: "Notes/Overview.canvas", mode: "replace_selection", text: "new" });
     expect(r.ok).toBe(false);
-    expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
+    if (!r.ok) expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
   });
 });

@@ -1,5 +1,12 @@
-import { VaultTools, type VaultPort, type WriteRequest } from "../src/obsidian/vault-tools";
+import { VaultTools, type VaultPort, type WriteRequest, type WriteFileRequest } from "../src/obsidian/vault-tools";
 import type { EditorPort, WorkspacePort } from "../src/core/context/ports";
+
+/** `WriteRequest` ist eine Union aus write/move/delete; diese Datei bestaetigt ausschliesslich
+ *  Schreibvorgaenge (`edit_active_note`). Ein Waechter statt eines Casts. */
+function erwarteWrite(req: WriteRequest): WriteFileRequest {
+  if (req.kind !== "write") throw new Error(`erwartete eine Schreibanfrage, bekam "${req.kind}"`);
+  return req;
+}
 
 function fakeVault(files: Record<string, string>): VaultPort {
   return {
@@ -10,6 +17,10 @@ function fakeVault(files: Record<string, string>): VaultPort {
     append: async (p, c) => void (files[p] = (files[p] ?? "") + c),
     overwrite: async (p, c) => void (files[p] = c),
     frontmatterOf: () => null,
+    // Von diesen Tests nicht gerufen — ehrlich werfende Stubs statt stillem `undefined`.
+    move: async () => { throw new Error("nicht erwartet: move"); },
+    trash: async () => { throw new Error("nicht erwartet: trash"); },
+    backlinkCount: () => { throw new Error("nicht erwartet: backlinkCount"); },
   };
 }
 
@@ -102,7 +113,7 @@ describe("edit_active_note", () => {
     const r = await tools.run("edit_active_note", { path: "Notes/Plan.md", mode: "insert_at_cursor", text: " Welt" });
     expect(r.ok).toBe(true);
     expect(calls).toHaveLength(1);
-    expect(calls[0].effect).toContain("Cursor");
+    expect(erwarteWrite(calls[0]).effect).toContain("Cursor");
   });
   it("Invariante: aendert sich die Markierung zwischen Aufruf und Bestaetigung, wird NICHT geschrieben", async () => {
     const state = { path: "Notes/Plan.md", selection: "Model control", doc: "Model control makes" };

@@ -5,7 +5,7 @@
  * zeichnet nur neu, wenn `onShow` das Panel zuletzt als sichtbar markiert hat (und `onHide`
  * es wieder als unsichtbar markiert); ein sichtbares Panel aktualisiert weiterhin sofort. */
 import { describe, it, expect, vi } from "vitest";
-import { makeFakeEl } from "obsidian";
+import { makeFakeEl } from "./vendor/kit/obsidian-mock";
 import { ContextPanel, type ContextPanelHost } from "../src/obsidian/context-panel";
 import type { PanelViewModel } from "../src/core/context/panel-vm";
 
@@ -14,13 +14,18 @@ import type { PanelViewModel } from "../src/core/context/panel-vm";
  *  genau das auf ihrem Summary-Element auf. Statt den vendorten Mock anzufassen (Kopfzeile:
  *  „do not hand-edit"), patcht dieser Helfer jedes ueber `createDiv`/`createEl`/`createSpan`
  *  neu entstehende Kind lokal fuer diese Testdatei. */
-function withQuerySelector<T extends Record<string, any>>(el: T): T {
+/* `el` ist bewusst `any` typisiert, nicht generisch: das Kit-Testdouble deklariert seine
+ * DOM-Knoten selbst durchgehend als `any` (obsidian-mock.ts, `makeFakeEl`), und ein Index
+ * ueber einen generischen Typparameter liesse sich zwar LESEN, aber nicht BESCHREIBEN
+ * (TS2862 — „generic and can only be indexed for reading"). Ein `any`-Parameter ist hier
+ * also keine Abkuerzung um einen Fehler, sondern der ehrliche Typ des Mocks. */
+function withQuerySelector(el: any): any {
   if (typeof el.querySelector !== "function") {
     el.querySelector = (sel: string) => el.querySelectorAll(sel)[0] ?? null;
   }
   for (const fn of ["createDiv", "createEl", "createSpan"] as const) {
     const orig = el[fn].bind(el);
-    (el as any)[fn] = (...args: unknown[]) => withQuerySelector(orig(...args));
+    el[fn] = (...args: unknown[]) => withQuerySelector(orig(...args));
   }
   return el;
 }

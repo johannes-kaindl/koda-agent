@@ -2,7 +2,7 @@
  * `resolvedLinks` ist Quelle → Ziel → Anzahl, Backlinks sind die Gegenrichtung, die
  * Obsidian nicht fertig vorhaelt (dieselbe Stelle wie `backlinkCount` in main.ts). */
 import { describe, it, expect } from "vitest";
-import { makeFakeApp, TFile } from "obsidian";
+import { makeFakeApp, TFile } from "./vendor/kit/obsidian-mock";
 import { linkPort, contentPort } from "../src/obsidian/links";
 
 function app(links: Record<string, Record<string, number>>): any {

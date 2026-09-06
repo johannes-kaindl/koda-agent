@@ -13,7 +13,10 @@ function makePlugin(files: Record<string, string | Error>): KodaPlugin {
     if (v instanceof Error) throw v;
     return v;
   };
-  const plugin = new KodaPlugin(app, { id: "koda", name: "Koda", version: "0.0.0" });
+  const plugin = new KodaPlugin(app, {
+    id: "koda", name: "Koda", version: "0.0.0",
+    author: "Jay", minAppVersion: "1.0.0", description: "Test-Manifest",
+  });
   plugin.settings = { ...plugin.settings, kodaFolder: "Koda" };
   return plugin;
 }

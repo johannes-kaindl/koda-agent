@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { contextUsage } from "../src/core/chat/context-usage";
+import { contextUsage, type ContextUsage } from "../src/core/chat/context-usage";
+
+/** `contextUsage` liefert `null`, wenn kein Fenster bekannt ist (siehe Kommentar dort). Die
+ *  Faelle hier erwarten immer ein Ergebnis — dieser Waechter verengt statt zu casten, und
+ *  wirft mit Klartext, falls die Annahme je nicht mehr stimmt, statt still `undefined` zu
+ *  lesen. */
+function erwarteErgebnis(u: ContextUsage | null): ContextUsage {
+  if (u === null) throw new Error("contextUsage lieferte null, erwartet wurde ein Ergebnis");
+  return u;
+}
 
 describe("contextUsage — Prozent des Kontextfensters", () => {
   it("rechnet die Belegung in Prozent", () => {
@@ -7,7 +16,7 @@ describe("contextUsage — Prozent des Kontextfensters", () => {
   });
 
   it("rundet auf ganze Prozent", () => {
-    expect(contextUsage(100, 3000, 75).percent).toBe(3);
+    expect(erwarteErgebnis(contextUsage(100, 3000, 75)).percent).toBe(3);
   });
 
   it("leerer Verlauf ist 0 Prozent und keine Warnung", () => {
@@ -17,16 +26,16 @@ describe("contextUsage — Prozent des Kontextfensters", () => {
 
 describe("contextUsage — Warnschwelle teilt sich die Zahl mit der Verdichtung", () => {
   it("genau auf der Schwelle wird gewarnt (dort loest die Verdichtung aus)", () => {
-    expect(contextUsage(6144, 8192, 75).warn).toBe(true);   // 75 %
+    expect(erwarteErgebnis(contextUsage(6144, 8192, 75)).warn).toBe(true);   // 75 %
   });
 
   it("knapp darunter noch nicht", () => {
-    expect(contextUsage(6000, 8192, 75).warn).toBe(false);  // 73 %
+    expect(erwarteErgebnis(contextUsage(6000, 8192, 75)).warn).toBe(false);  // 73 %
   });
 
   it("eine andere Einstellung verschiebt die Schwelle mit", () => {
-    expect(contextUsage(4096, 8192, 50).warn).toBe(true);   // 50 % bei Schwelle 50
-    expect(contextUsage(4096, 8192, 90).warn).toBe(false);
+    expect(erwarteErgebnis(contextUsage(4096, 8192, 50)).warn).toBe(true);   // 50 % bei Schwelle 50
+    expect(erwarteErgebnis(contextUsage(4096, 8192, 90)).warn).toBe(false);
   });
 });
 

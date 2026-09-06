@@ -4,7 +4,7 @@
  * gegen ein laufendes Obsidian erkauft wurden: Seitenleisten-Ansichten sind keine Tabs, und
  * restaurierte, nie besuchte Tabs tragen ihren Pfad nur im View-State. */
 import { describe, it, expect } from "vitest";
-import { FileView, MarkdownView, TFile, WorkspaceLeaf, makeFakeApp } from "obsidian";
+import { FileView, MarkdownView, TFile, WorkspaceLeaf, makeFakeApp } from "./vendor/kit/obsidian-mock";
 import type { App } from "obsidian";
 import { readWorkspace, linesAround, editorPort } from "../src/obsidian/workspace";
 
