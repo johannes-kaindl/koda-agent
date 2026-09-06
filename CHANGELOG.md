@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-09-06
+
 ### Added
 
 - Context modes **Note** and **All tabs**: the active note with its linked neighbours, or
