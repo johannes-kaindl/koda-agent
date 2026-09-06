@@ -307,9 +307,9 @@ if you change either setting later.
 
 Below the textarea, a warning appears (without blocking anything) if the instructions
 never mention tools, drop one of the two placeholders, or if every tool that looks into
-the vault has been turned off. **Show active instructions** opens a preview of the exact
-prompt the next conversation will start with, including the current memory and skills
-blocks.
+the vault has been turned off — or if only some reading tools are disabled, in which case
+the warning names them, so you know which ones Koda is not told about. **Show active instructions** opens a preview of the exact prompt the next conversation will start with, including the current memory and
+skills blocks.
 
 Each tool — including the reading ones (`search_notes`, `read_note`, `list_notes`,
 `related_notes`) — has its own switch and its own description field, which follows the
