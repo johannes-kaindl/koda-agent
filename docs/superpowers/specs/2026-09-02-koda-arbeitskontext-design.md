@@ -322,11 +322,30 @@ Werte, Formeln ausgewertet, Gruppen als Überschriften — die Form, die Bases b
 und billig) · **Notizen** (Volltext je Zeile, budgetiert) · **beides**. Filter, Sortierung,
 Limit und Formeln bleiben vollständig bei Obsidian.
 
-**Vorbehalt:** die API ist gelesen, nicht gemessen. Etappe 3 beginnt mit einem Spike
-(Registrierung, `data.data` lesen, `getValue(...).toString()`), bevor die Ansicht gebaut wird.
+**✅ Der Vorbehalt ist eingelöst — gemessen am 2026-09-06, Befunde in `docs/LAB.md`
+§ „Bases-View-API".** Die Grundannahme dieses Abschnitts trägt: eine Base ohne registrierte
+Ansicht liefert null Daten, die registrierte bekommt sie fertig gefiltert und sortiert, und
+die Übergabeform lässt sich als View-Option speichern. **Zwei Stellen sind vor dem Plan
+nachzuziehen** (Herleitung dort, hier nur die Folge für den Entwurf):
+
+1. **Der Default der Übergabeform gehört in den Lesecode**, nicht in die Options-Deklaration.
+   Das `options`-Callback wird nie von selbst gerufen, und `config.get(...)` liefert
+   `undefined`, solange der Nutzer nichts gewählt hat — der deklarierte `default` wird dabei
+   *nicht* eingesetzt. Also `config.get("uebergabeform") ?? "tabelle"`.
+2. **Der Übernahme-Weg wird für die echte Base-Ansicht spezifiziert, nicht für eingebettete
+   Bases.** Ein Embed instanziiert die Ansicht, versorgt sie aber nicht mit Daten — ein
+   Knopf hätte dort nichts zu übernehmen.
+
+Dazu zwei Fallen, die den Entwurf nicht ändern, aber jede Umsetzung betreffen: ein
+fehlender Wert ist ein `NullValue`, dessen `toString()` die Zeichenkette „null" ergibt (und
+`isTruthy()` unterscheidet ihn nicht von `false`), und `data` samt aller `BasesEntry` wird
+bei jedem Update ersetzt — übernommene Zeilen müssen deshalb **kopiert** werden, nicht
+referenziert, sonst zeigt ein Chip still veraltete Werte.
+
 Die alte Task „Strukturierte Property-Abfrage" im Arbeits-Vault ist damit für den Kontext-Fall
 beantwortet; als **Werkzeug** für das Modell bleibt sie offen (eine Base lässt sich nicht
-headless abfragen).
+headless abfragen) — der Spike bestätigt genau das: ohne registrierte, geöffnete Ansicht
+kommen keine Zeilen.
 
 ## E8 — Einstellungen
 
