@@ -4,7 +4,8 @@ import { confirmAction } from "../vendor/kit-obsidian/confirm";
 import { buildHubInto, type HubController, type HubPanel } from "../vendor/kit-obsidian/hub";
 import { isCompactionRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
-import { splitStable } from "../core/chat/stream-blocks";
+import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
+import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obsidian/stable-writer";
 import { thinkToggleView } from "../core/chat/reasoning-toggle";
 import { AVAILABLE_MODES, isContextMode, type ContextAttachment } from "../core/context/types";
 import { contextSummary, modeLabel, sourceChips } from "../core/context/labels";
@@ -20,8 +21,6 @@ type KodaTab = "chat" | "context";
 export class KodaView extends ItemView {
   private logEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
-  private streamEl: HTMLElement | null = null;
-  private reasonEl: HTMLElement | null = null;
   /** Lebensdauer-Anker fuer alles, was MarkdownRenderer im Log anlegt (Embeds, Hover-
    *  Handler). Wird bei jedem Voll-Redraw ausgetauscht, sonst wachsen die Kind-Komponenten
    *  mit jeder Antwort weiter an. */
@@ -33,13 +32,14 @@ export class KodaView extends ItemView {
   private statusLabelEl!: HTMLElement;
   private act: Activity = IDLE;
 
-  // — Streaming mit Markdown: was fertig ist, ist gerendert; der Rest bleibt Rohtext —
-  /** Roher Text der laufenden Antwort. Quelle fuer splitStable, nicht fuers Anzeigen. */
-  private streamRaw = "";
-  /** Wie viele Zeichen davon bereits als Markdown-Bloecke stehen. */
-  private streamStableLen = 0;
-  /** Der laufende Absatz. Immer das letzte Kind von streamEl. */
-  private streamTailEl: HTMLElement | null = null;
+  // — Streaming-Antwortbereich aus dem Kit (UI-STANDARD §8, `buildStreamArea` +
+  //   `createStableWriter`): eine Bubble je Antwort, `null` zwischen zwei Antworten und
+  //   nach jedem Voll-Redraw (`logEl.empty()` reisst ihre DOM-Referenzen aus). Verhaltens-
+  //   wechsel gegenueber dem Eigenbau (CHANGELOG Unreleased): der Gedankenblock steht
+  //   waehrend des Streams offen (Kit-Default), der Scroll folgt nur bei `atBottom` statt
+  //   hart ans Ende zu springen. —
+  private streamArea: StreamArea | null = null;
+  private streamWriter: StableMarkdownWriter | null = null;
 
   /** Kopf-Aktion des Thinking-Schalters — Zustand kommt aus thinkToggleView. */
   private thinkActionEl: HTMLElement | null = null;
@@ -313,7 +313,8 @@ export class KodaView extends ItemView {
   renderLog(): void {
     this.logEl.empty();
     this.endStream();
-    this.reasonEl = null;
+    this.streamArea = null;
+    this.streamWriter = null;
     if (this.mdComp !== null) this.removeChild(this.mdComp);
     this.mdComp = this.addChild(new Component());
     if (this.plugin.skillNotice !== null) {
@@ -388,47 +389,42 @@ export class KodaView extends ItemView {
 
   // — Streaming-Hooks, vom Plugin gerufen —
 
-  /** Der naechste Token-Block ist eine neue Blase. Setzt den Markdown-Schnitt mit zurueck,
-   *  sonst rechnete er gegen den Text der vorigen Blase weiter. */
+  /** Der naechste Token-Block ist eine neue Blase. */
   private endStream(): void {
-    this.streamEl = null;
-    this.streamTailEl = null;
-    this.streamRaw = "";
-    this.streamStableLen = 0;
+    this.streamArea = null;
+    this.streamWriter = null;
+  }
+
+  /** Legt Bereich + Schreiber einmalig je Antwort an — Gedanken koennen vor dem ersten
+   *  Token eintreffen, deshalb rufen beide Hooks dieselbe Stelle. Die Eingabezeile ist
+   *  NICHT Teil des Bausteins und bleibt unter `rootEl`, wo sie ist. */
+  private ensureStreamArea(): StreamArea {
+    if (this.streamArea !== null) return this.streamArea;
+    const area = buildStreamArea(this.logEl, {
+      strings: { reasoning: t("view.thinking") },
+      cls: "koda-msg koda-assistant koda-streaming",
+      // Der Body ist hier KEIN eigener Scroll-Container: die Blase ist nur EINE Nachricht
+      // im Chatverlauf, `logEl` rollt als Ganzes (Kit-Vertrag `scrollEl`).
+      scrollEl: this.logEl,
+    });
+    area.bodyEl.addClass("markdown-rendered");
+    this.streamArea = area;
+    this.streamWriter = createStableWriter({
+      area,
+      // Ein kaputter Block kostet die Formatierung, nicht die Antwort (Idiom aus session.ts)
+      // — `createStableWriter` faengt das selbst ab.
+      render: (el, md) => this.renderMarkdownInto(el, md),
+    });
+    return area;
   }
 
   streamToken(text: string): void {
-    if (this.streamEl === null) {
-      this.streamEl = this.logEl.createDiv({ cls: "koda-msg koda-assistant koda-streaming" });
-      this.streamTailEl = this.streamEl.createDiv({ cls: "koda-stream-tail" });
-      this.streamRaw = "";
-      this.streamStableLen = 0;
-    }
-    this.streamRaw += text;
-    const { stable, tail } = splitStable(this.streamRaw);
-    if (stable.length > this.streamStableLen) {
-      // Nur der NEU stabil gewordene Teil wird gerendert — bereits Gezeichnetes bleibt
-      // unangetastet. Das ist der Unterschied zum Voll-Rerender: kein Flackern, keine
-      // springende Scrollposition, kein quadratischer Aufwand.
-      const fresh = stable.slice(this.streamStableLen);
-      this.streamStableLen = stable.length;
-      const blockEl = this.streamEl.createDiv({ cls: "koda-stream-block" });
-      // Ein kaputter Block kostet die Formatierung, nicht die Antwort (Idiom aus session.ts).
-      void this.renderMarkdownInto(blockEl, fresh).catch(() => { blockEl.setText(fresh); });
-      // Der laufende Absatz gehoert immer ans Ende.
-      if (this.streamTailEl !== null) this.streamEl.appendChild(this.streamTailEl);
-    }
-    this.streamTailEl?.setText(tail);
-    this.logEl.scrollTo({ top: this.logEl.scrollHeight });
+    this.ensureStreamArea();
+    this.streamWriter?.push(text);
   }
 
   streamReasoning(text: string): void {
-    if (this.reasonEl === null) {
-      const d = this.logEl.createEl("details", { cls: "koda-reasoning" });
-      d.createEl("summary", { text: t("view.thinking") });
-      this.reasonEl = d.createEl("pre");
-    }
-    this.reasonEl.setText(this.reasonEl.getText() + text);
+    this.ensureStreamArea().appendReasoning(text);
   }
 
   toolStep(label: string, detail: string): void {

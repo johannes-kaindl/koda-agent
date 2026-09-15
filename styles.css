@@ -10,7 +10,7 @@
 /* pre-wrap gilt nur fuer die Plaintext-Blasen. Kodas fertige Antworten laufen durch
    MarkdownRenderer und bringen echte Block-Elemente mit — dort wuerde pre-wrap die
    Quelltext-Umbrueche ZUSAETZLICH zu den Absaetzen anzeigen (doppelte Leerzeilen). */
-.koda-user, .koda-stream-tail, .koda-placeholder, .koda-notice, .koda-error { white-space: pre-wrap; }
+.koda-user, .koda-placeholder, .koda-notice, .koda-error { white-space: pre-wrap; }
 /* Gerendertes Markdown in der Blase: aeussere Blockabstaende gehoeren der Blase. */
 .koda-assistant > :first-child { margin-top: 0; }
 .koda-assistant > :last-child { margin-bottom: 0; }
@@ -25,13 +25,35 @@
 .koda-compaction { font-size: var(--font-ui-smaller); color: var(--text-muted); border-top: 1px dashed var(--background-modifier-border); padding-top: var(--size-4-1); margin: var(--size-4-2) 0; }
 .koda-compaction-summary pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
 .koda-placeholder { color: var(--text-muted); font-style: italic; }
-.koda-tool, .koda-reasoning { margin-bottom: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); }
-.koda-tool pre, .koda-reasoning pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
-/* Waehrend des Streams gerenderte Bloecke: dieselben Blockabstaende wie in der fertigen
-   Blase, sonst springt die Antwort beim Abschluss sichtbar um. */
-.koda-stream-block > :first-child { margin-top: 0; }
-.koda-stream-block > :last-child { margin-bottom: 0; }
-.koda-stream-block ul, .koda-stream-block ol { margin: var(--size-4-1) 0; padding-inline-start: var(--size-4-4); }
+.koda-tool { margin-bottom: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.koda-tool pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
+/* Streaming-Antwortbereich aus obsidian-kit (UI-STANDARD §8, `buildStreamArea` +
+   `createStableWriter`, Stand 0.35.0) — Kit-Vertrag: das Kit injiziert kein CSS, die
+   Regeln gehoeren verbatim in die Consumer-`styles.css`. Nicht von Hand aendern, sondern
+   den Block bei einem Re-Vendor ersetzen (Herkunft: obsidian-kit/src/obsidian/stream-area.ts). */
+.okit-stream { display: flex; flex-direction: column; min-height: 0; gap: var(--size-4-2); }
+.okit-stream-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  font-size: var(--font-ui-small); line-height: var(--line-height-normal);
+}
+.okit-stream--host-scroll .okit-stream-body { flex: 0 0 auto; min-height: auto; overflow-y: visible; }
+.okit-stream-block > :first-child { margin-top: 0; }
+.okit-stream-block > :last-child { margin-bottom: 0; }
+.okit-stream-tail { white-space: pre-wrap; color: var(--text-muted); }
+.okit-stream-status {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--size-4-1);
+  font-size: var(--font-ui-smaller); color: var(--text-muted);
+}
+.okit-stream-reasoning {
+  flex: 0 0 auto;
+  font-size: var(--font-ui-smaller); color: var(--text-muted);
+}
+.okit-stream-reasoning > summary { cursor: var(--cursor); color: var(--text-faint); }
+.okit-stream-reasoning > pre {
+  max-height: 12em; overflow-y: auto; white-space: pre-wrap;
+  background: var(--background-secondary); padding: var(--size-4-2);
+}
 
 /* Statuszeile: was gerade laeuft, im Ruhezustand die Belegung des Kontextfensters.
    Baustein „Status-Indikator" aus UI-STANDARD.md §8 — Form (Icon) UND Farbe UND
@@ -117,7 +139,7 @@
    Die Bedeutung traegt das Icon, nicht die Farbe — Farbe ist Verstaerkung, nicht Traeger. */
 .koda-model-hint { font-size: var(--font-ui-smaller); color: var(--text-muted); margin-top: var(--size-4-1); }
 
-/* uebernommen aus obsidian-kit@0.27.0 src/obsidian/endpoint-list.ts (ENDPOINT_LIST_CSS), 2026-08-28
+/* uebernommen aus obsidian-kit@0.35.0 src/obsidian/endpoint-list.ts (ENDPOINT_LIST_CSS), 2026-09-15
    Der Kit-Vertrag sieht die Uebernahme in die styles.css des Consumers vor (Kit-README).
    Nie von Hand aendern: bei einem Kit-Update den Block ersetzen, sonst laeuft die sichtbare
    Haelfte des Bausteins von der Logik-Haelfte weg — der Dach-Check tools/ui_adoption_check.py
@@ -133,6 +155,8 @@
    gedämpfter als .okit-ep-warn, Bedeutung trägt das Dreieck + der Tooltip, nicht die Farbe. */
 .okit-ep-thirdparty { display: inline-flex; align-items: center; margin-right: 8px; vertical-align: middle; color: var(--text-muted); }
 .okit-ep-thirdparty svg { width: 14px; height: 14px; }
+.okit-ep-secret { color: var(--text-muted); font-size: var(--font-ui-small); margin-right: 8px; }
+.okit-ep-extra { flex: 0 0 100%; order: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
 /* Rolle der Zeile als Text unter den Feldern: „aktiv" / „erreichbar, aber Platz N" / … .
    Erreichbarkeit trägt das Icon (Form), die Rolle dieser Text — keins von beiden über Farbe
    allein (WCAG 1.4.1). Die frühere Auszeichnung saß auf dem Icon-Container und war wirkungslos:

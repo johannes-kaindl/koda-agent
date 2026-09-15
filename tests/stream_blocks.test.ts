@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitStable } from "../src/core/chat/stream-blocks";
+import { splitStable } from "../src/vendor/kit/stream-blocks";
 
 describe("splitStable — Schnitt an der letzten Absatzgrenze", () => {
   it("ohne Absatzgrenze bleibt alles im Schwanz", () => {
