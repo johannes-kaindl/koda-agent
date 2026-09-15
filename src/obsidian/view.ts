@@ -402,11 +402,14 @@ export class KodaView extends ItemView {
     if (this.streamArea !== null) return this.streamArea;
     const area = buildStreamArea(this.logEl, {
       strings: { reasoning: t("view.thinking") },
-      cls: "koda-msg koda-assistant koda-streaming",
-      // Der Body ist hier KEIN eigener Scroll-Container: die Blase ist nur EINE Nachricht
-      // im Chatverlauf, `logEl` rollt als Ganzes (Kit-Vertrag `scrollEl`).
+      // `opts.cls` geht 1:1 in `rootEl.addClass()` — Obsidians `addClass` ist EIN Token
+      // (DOMTokenList.add), kein klassenweiter String. Mehrere Klassen deshalb per
+      // `addClasses` nachtragen statt sie hier mit Leerzeichen zu bündeln (das wirft zur
+      // Laufzeit eine InvalidCharacterError, gefunden ueber eine direkte Stream-Probe,
+      // nicht ueber den GUI-Smoke — der ruft nie echtes Streaming gegen einen Endpunkt).
       scrollEl: this.logEl,
     });
+    area.rootEl.addClasses(["koda-msg", "koda-assistant", "koda-streaming"]);
     area.bodyEl.addClass("markdown-rendered");
     this.streamArea = area;
     this.streamWriter = createStableWriter({

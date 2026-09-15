@@ -1,3 +1,4 @@
+// uebernommen aus kuro-gamification/src/llm/XhrSseTransport.ts, 2026-08-05
 /* ==========================================================
    XHR-basierter SSE-Transport — die EINZIGE browser-nahe Datei
    unter src/llm/.
