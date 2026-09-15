@@ -38,7 +38,7 @@ import { createModelListCache, type ModelListCache, type ModelListClient } from 
 import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
-import { resolveModelChoice, type ModelOption } from "../core/llm/model-choice";
+import { resolveModelChoice, type ModelOption } from "../vendor/kit/model-choice";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "./model-control";
 import { PromptPreviewModal } from "./prompt-modal";
 import { readRetrievalApi } from "./retrieval";

@@ -1,4 +1,4 @@
-import { resolveModelChoice } from "../src/core/llm/model-choice";
+import { resolveModelChoice } from "../src/vendor/kit/model-choice";
 
 describe("resolveModelChoice", () => {
   it("bietet die gemeldeten Modelle als Auswahl an", () => {
