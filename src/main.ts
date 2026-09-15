@@ -3,7 +3,7 @@ import "./i18n/strings";
 import { getLanguage } from "obsidian";
 import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
 import { resolveLang, type Lang } from "./core/lang";
-import { effectiveModel, type EndpointConfig } from "./vendor/kit/endpoint_config";
+import type { EndpointConfig } from "./vendor/kit/endpoint_config";
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
 import { KodaChatClient, type LlmResult } from "./llm/KodaChatClient";
@@ -43,6 +43,16 @@ import { pickNote } from "./obsidian/note-picker";
 import { pickFolder } from "./obsidian/folder-picker";
 import { resolveFolderPath } from "./core/tools/path-guard";
 import type { CollapsibleStorage } from "./vendor/kit-obsidian/collapsible";
+
+/** Modell-Override der Zeile, sonst das globale Modell. Inline statt Kit-Import: das Kit
+ *  hat `effectiveModel` in `endpoint_config.ts` (code-kit 0.6.0) als `@deprecated`
+ *  markiert — koda hat weiterhin ein globales Modellfeld (`settings.model`), die Migration
+ *  weg davon ist eine eigene Design-Entscheidung, kein Nebenprodukt des Pin-Bumps auf
+ *  0.35.0. Verhalten unveraendert; nur der Aufrufer der deprecated-Warnung entfaellt. */
+function effectiveModel(cfg: EndpointConfig, globalModel: string): string {
+  const m = cfg.model?.trim();
+  return m ? m : globalModel;
+}
 
 /** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
  *  "read-error" (Datei liess sich nicht lesen) und "no-description" (Frontmatter ohne

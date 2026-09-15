@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Streaming answer area now uses `obsidian-kit`'s `buildStreamArea`/`createStableWriter`
+  (§8 building block) instead of the hand-rolled version. Two behaviour changes: the
+  reasoning block stays open for the duration of a stream (was collapsed by default), and
+  scrolling now follows the stream only while the reader is already at the bottom, instead
+  of forcing the view to the end on every token.
+- Kit pin bumped `0.27.0` → `0.35.0` (code-kit `0.6.0`); the local `resolveModelChoice`
+  duplicate is gone, `../vendor/kit/model-choice` is now the single source.
+
 ## [0.14.0] — 2026-09-06
 
 ### Added
