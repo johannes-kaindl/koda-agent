@@ -3,14 +3,14 @@ import { thinkToggleView, effectiveSuppress } from "../src/core/chat/reasoning-t
 
 describe("thinkToggleView — Label, Klasse, disabled", () => {
   it("immer-an-Modell → disabled, thinkingAlways, is-disabled (unabhängig vom Suppress-Flag)", () => {
-    expect(thinkToggleView("gpt-oss:20b", false)).toEqual({ labelKey: "view.thinkingAlways", hintKey: null, cls: "is-disabled", disabled: true });
-    expect(thinkToggleView("gpt-oss:20b", true)).toEqual({ labelKey: "view.thinkingAlways", hintKey: null, cls: "is-disabled", disabled: true });
+    expect(thinkToggleView("gpt-oss:20b", false)).toEqual({ labelKey: "view.thinkingAlways", hintKey: null, actionKey: null, icon: "brain", pressed: true, cls: "is-disabled", disabled: true });
+    expect(thinkToggleView("gpt-oss:20b", true)).toEqual({ labelKey: "view.thinkingAlways", hintKey: null, actionKey: null, icon: "brain", pressed: true, cls: "is-disabled", disabled: true });
   });
   it("normales Modell, nicht unterdrückt → thinkingOn, klickbar", () => {
-    expect(thinkToggleView("qwen3:8b", false)).toEqual({ labelKey: "view.thinkingOn", hintKey: null, cls: "", disabled: false });
+    expect(thinkToggleView("qwen3:8b", false)).toEqual({ labelKey: "view.thinkingOn", hintKey: null, actionKey: "view.thinkingClickOff", icon: "brain", pressed: true, cls: "", disabled: false });
   });
   it("normales Modell, unterdrückt → thinkingOff, is-off, klickbar", () => {
-    expect(thinkToggleView("qwen3:8b", true)).toEqual({ labelKey: "view.thinkingOff", hintKey: null, cls: "is-off", disabled: false });
+    expect(thinkToggleView("qwen3:8b", true)).toEqual({ labelKey: "view.thinkingOff", hintKey: null, actionKey: "view.thinkingClickOn", icon: "brain-cog", pressed: false, cls: "is-off", disabled: false });
   });
 });
 

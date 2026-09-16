@@ -16,6 +16,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Thinking-Schalter im Kopf zeigt seinen Zustand jetzt über mindestens zwei Kanäle statt nur
+  über Farbe (UI-STANDARD §8 „Zustands-Knopf", verbindlich seit 2026-09-16, Anlass: für
+  Johannes' Rot-Grün-Schwäche unlesbar): Icon-Wechsel `brain` (an/gesperrt) ↔ `brain-cog` (aus)
+  — Lucide kennt kein `brain-off`, das UI-STANDARD-Beispiel dafür ist erfunden (Meldung ans
+  Dach); `aria-pressed="true|false"`; Tooltip nennt zusätzlich zum Zustand die Aktion („Thinking:
+  an — Klick schaltet aus"); der gesperrte Zustand (Modell immer an) trägt jetzt das echte
+  HTML-`disabled`-Attribut, nicht nur `aria-disabled`.
 - Wortlaut der vier Koda-eigenen Settings-/Verlaufs-Begriffe angeglichen (UI-STANDARD §10, kein
   Fachbegriff ohne Auflösung): „Kontext & Verdichtung" → „Verlauf kürzen"/„Shorten history"
   (Settings-Gruppe + Verdichtungs-Marke), „Listen-Grenze" → „Höchstzahl aufgelisteter

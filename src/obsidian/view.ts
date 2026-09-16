@@ -222,12 +222,18 @@ export class KodaView extends ItemView {
     if (el === null) return;
     const s = this.plugin.settings;
     const v = thinkToggleView(s.model, s.suppressThinking);
-    const label = v.hintKey === null ? t(v.labelKey) : `${t(v.labelKey)} — ${t(v.hintKey)}`;
+    const parts = [t(v.labelKey)];
+    if (v.hintKey !== null) parts.push(t(v.hintKey));
+    if (v.actionKey !== null) parts.push(t(v.actionKey));
+    const label = parts.join(" — ");
     el.setAttribute("aria-label", label);
     el.setAttribute("aria-disabled", String(v.disabled));
+    el.setAttribute("aria-pressed", String(v.pressed));
+    el.toggleAttribute("disabled", v.disabled);
     el.removeClass("is-off");
     el.removeClass("is-disabled");
     if (v.cls !== "") el.addClass(v.cls);
+    setIcon(el, v.icon);
   }
 
   // — Statuszeile —

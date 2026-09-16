@@ -21,6 +21,17 @@ export interface ThinkToggleView {
   /** Zusatz für Tooltip + aria-label; null = kein Hinweis. Ändert NIE den sichtbaren Button-Text
    *  und NIE das Request-Verhalten. */
   hintKey: "view.thinkingHintAlways" | null;
+  /** Aktions-Nachsatz fuer den Tooltip ("… — click turns off"); null nur bei disabled — ein
+   *  Klick auf einen gesperrten Knopf hat keine Aktion, die man ankuendigen koennte. */
+  actionKey: "view.thinkingClickOn" | "view.thinkingClickOff" | null;
+  /** UI-STANDARD §8 Zustands-Knopf: Icon-Wechsel als eigener Kanal, nie dieselbe Glyphe in
+   *  zwei Farben. Lucide (Obsidian 1.14.2, 1944 Icons, gemessen) kennt kein „brain-off" —
+   *  UI-STANDARDs eigenes Beispiel dafuer ist erfunden. Nimmt stattdessen "brain-cog", das
+   *  einzige real existierende zweite Brain-Icon, das sich von "brain" klar unterscheidet
+   *  (Meldung an Dach 2026-09-16). */
+  icon: "brain" | "brain-cog";
+  /** aria-pressed — true, solange gedacht wird (an ODER gesperrt-immer-an), false bei aus. */
+  pressed: boolean;
   cls: "" | "is-off" | "is-disabled";
   disabled: boolean;
 }
@@ -41,11 +52,13 @@ function hintFor(model: string): ThinkToggleView["hintKey"] {
 /** gpt-oss/harmony lassen sich nicht abschalten → disabled + „immer an". Sonst: an/aus je Suppress-Flag. */
 export function thinkToggleView(model: string, suppress: boolean): ThinkToggleView {
   if (isAlwaysOnThinker(model)) {
-    return { labelKey: "view.thinkingAlways", hintKey: null, cls: "is-disabled", disabled: true };
+    return { labelKey: "view.thinkingAlways", hintKey: null, actionKey: null, icon: "brain", pressed: true, cls: "is-disabled", disabled: true };
   }
   const hintKey = hintFor(model);
-  if (suppress) return { labelKey: "view.thinkingOff", hintKey, cls: "is-off", disabled: false };
-  return { labelKey: "view.thinkingOn", hintKey, cls: "", disabled: false };
+  if (suppress) {
+    return { labelKey: "view.thinkingOff", hintKey, actionKey: "view.thinkingClickOn", icon: "brain-cog", pressed: false, cls: "is-off", disabled: false };
+  }
+  return { labelKey: "view.thinkingOn", hintKey, actionKey: "view.thinkingClickOff", icon: "brain", pressed: true, cls: "", disabled: false };
 }
 
 /** Effektiver Suppress-Wert für den Request: unterdrücke NUR, wenn der Nutzer es will UND das
