@@ -120,6 +120,23 @@ describe("KodaChatClient.complete", () => {
     const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
     expect(r).toMatchObject({ ok: false, kind: "timeout" });
   });
+  it("gibt eine abgeschnittene Antwort MIT Text als ok:true zurueck (Fall 2, Hinweis statt Fehler)", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { content: "Halber Sa" } }] }),
+      line({ choices: [{ delta: {}, finish_reason: "length" }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: true, content: "Halber Sa", finishReason: "length" });
+  });
+
+  it("meldet eine abgeschnittene Antwort OHNE Text als Fehler kind truncated (Fall 3, Reasoning-Normalfall)", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: {}, finish_reason: "length" }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: false, kind: "truncated", partial: "" });
+  });
+
   it("zieht den Idle-Timeout bei jedem Chunk neu auf — ein langer Stream laeuft nicht hinein", async () => {
     const set: number[] = [];
     const cleared: number[] = [];

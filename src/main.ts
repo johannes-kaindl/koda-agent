@@ -710,8 +710,11 @@ export default class KodaPlugin extends Plugin {
               ? { text: t("view.stopped"), kind: "neutral" }
               : e.errorKind === "overflow"
                 ? { text: t("view.overflow", e.message, s.contextWindowTokens), kind: "error" }
-                : { text: t("err.generic", e.message), kind: "error" };
+                : e.errorKind === "truncated"
+                  ? { text: t("error.truncatedEmpty"), kind: "error" }
+                  : { text: t("err.generic", e.message), kind: "error" };
           }
+          if (e.kind === "final" && e.truncated) this.lastNotice = { text: t("view.truncated"), kind: "neutral" };
           if (e.kind === "round-limit") this.lastNotice = { text: t("view.roundLimit", s.maxRounds), kind: "error" };
           if (e.kind === "compaction") for (const v of this.views()) v.compactionMark(e.record);
           if (e.kind === "summarizing") for (const v of this.views()) v.activity({ kind: "summarizing" });

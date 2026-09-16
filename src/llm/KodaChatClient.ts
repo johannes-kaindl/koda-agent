@@ -32,7 +32,7 @@ export interface ChatConfig {
 
 export type LlmResult =
   | { ok: true; content: string; toolCalls: ToolCall[]; finishReason?: string }
-  | { ok: false; kind: "aborted" | "http" | "network" | "timeout" | "overflow"; detail: string; partial: string };
+  | { ok: false; kind: "aborted" | "http" | "network" | "timeout" | "overflow" | "truncated"; detail: string; partial: string };
 
 const ERROR_BODY_CAP = 2048;
 export const DEFAULT_TIMEOUT_MS = 120_000;
@@ -134,6 +134,13 @@ export class KodaChatClient {
       // Ueberlauf ist ein HTTP-Fehler mit eigener Bedeutung: der Loop kann darauf mit
       // Verdichtung reagieren, auf einen 401 nicht. Der Server-Text bleibt im detail.
       return { ok: false, kind: isContextOverflow(rawBody) ? "overflow" : "http", detail, partial: content };
+    }
+    // Drei Faelle statt zwei (REGISTRY „Abgeschnittene LLM-Antwort als eigene Fehlerklasse",
+    // n=3): abgeschnitten MIT Text bleibt ok — die Meldung ist unten am Hinweis-Text der
+    // UI-Schicht, nicht hier. Abgeschnitten OHNE Text (bei Reasoning-Modellen der Normalfall:
+    // das Denken verbraucht das Budget vor der Antwort) ist ein Fehler, keine leere Erfolgsmeldung.
+    if (finishReason === "length" && content === "") {
+      return { ok: false, kind: "truncated", detail: "finish_reason: length, kein Text", partial: "" };
     }
     return { ok: true, content, toolCalls: assembler.finish(), ...(finishReason !== undefined ? { finishReason } : {}) };
   }

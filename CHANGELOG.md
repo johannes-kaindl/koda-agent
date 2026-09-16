@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Abgeschnittene Antwort (`finish_reason: "length"`) wird jetzt ausgewertet statt getragen und
+  verworfen: mit verwertbarem Text ein Hinweis unter der Antwort (kein Fehler), ohne Text ein
+  Fehler, der das Token-Limit nennt — der Reasoning-Normalfall, bei dem das Denken das Budget
+  vor der Antwort verbraucht. REGISTRY-Muster „Abgeschnittene LLM-Antwort als eigene
+  Fehlerklasse" (n=4 mit diesem Repo).
+
 ### Changed
 
 - Streaming answer area now uses `obsidian-kit`'s `buildStreamArea`/`createStableWriter`

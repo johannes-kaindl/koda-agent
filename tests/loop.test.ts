@@ -145,6 +145,34 @@ describe("runAgent", () => {
     expect(out).toEqual([{ role: "assistant", content: "Teil" }]);
   });
 
+  it("kind truncated (Fall 3, ohne Text) laeuft als error-Event mit errorKind truncated durch", async () => {
+    const events: { kind: string; errorKind?: string }[] = [];
+    const out = msgsOf(await runAgent(
+      { llm: scripted([{ ok: false, kind: "truncated", detail: "finish_reason: length", partial: "" }]), tools: okTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, (e) => events.push(e as never), sig(),
+    ));
+    expect(events[0]).toMatchObject({ kind: "error", errorKind: "truncated" });
+    expect(out).toEqual([]);
+  });
+
+  it("finishReason length MIT Text (Fall 2): final-Event traegt truncated:true", async () => {
+    const events: { kind: string; truncated?: boolean }[] = [];
+    await runAgent(
+      { llm: scripted([{ ok: true, content: "Halber Satz", toolCalls: [], finishReason: "length" }]), tools: okTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, (e) => events.push(e as never), sig(),
+    );
+    expect(events[0]).toMatchObject({ kind: "final", text: "Halber Satz", truncated: true });
+  });
+
+  it("vollstaendige Antwort: final-Event traegt truncated:false", async () => {
+    const events: { kind: string; truncated?: boolean }[] = [];
+    await runAgent(
+      { llm: scripted([{ ok: true, content: "Fertig", toolCalls: [] }]), tools: okTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, (e) => events.push(e as never), sig(),
+    );
+    expect(events[0]).toMatchObject({ kind: "final", text: "Fertig", truncated: false });
+  });
+
   it("Abort zwischen Tool-Calls: naechster Call laeuft nicht mehr, Loop stoppt sauber", async () => {
     const ctrl = new AbortController();
     let secondRan = false;

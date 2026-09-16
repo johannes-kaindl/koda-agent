@@ -25,8 +25,10 @@ export interface LoopLlm {
 export type AgentEvent =
   | { kind: "tool-start"; call: ToolCall }
   | { kind: "tool-end"; call: ToolCall; outcome: ToolOutcome }
-  | { kind: "final"; text: string }
-  | { kind: "error"; message: string; partial: string; errorKind: "aborted" | "http" | "network" | "timeout" | "overflow" }
+  /** truncated: finish_reason "length" bei verwertbarem Text (Fall 2, REGISTRY „Abgeschnittene
+   *  LLM-Antwort") — kein Fehler, nur ein Hinweis fuer die UI-Schicht. */
+  | { kind: "final"; text: string; truncated: boolean }
+  | { kind: "error"; message: string; partial: string; errorKind: "aborted" | "http" | "network" | "timeout" | "overflow" | "truncated" }
   | { kind: "round-limit" }
   | { kind: "compaction"; record: CompactionRecord }
   /** Vor dem Stufe-2-Modellaufruf — der kann lokal Minuten dauern, ohne dieses Ereignis
@@ -153,7 +155,7 @@ export async function runAgent(
 
     if (calls.length === 0) {
       appended.push({ role: "assistant", content: r.content });
-      onEvent({ kind: "final", text: r.content });
+      onEvent({ kind: "final", text: r.content, truncated: r.finishReason === "length" });
       return appended;
     }
 
