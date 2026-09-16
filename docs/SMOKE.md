@@ -178,7 +178,7 @@ Geprüft werden: Plugin aktiv · **Retrieval-Andockung** (vault-rags Vertrag lie
 Form vor, gegen die Koda gebaut ist) · **Frontmatter-Naht** (`metadataCache` liefert
 Frontmatter in der Form, gegen die `pickFields` gebaut ist) · Sidebar mit Eingabefeld und
 Knöpfen · Klick auf „Testen“ friert den Renderer nicht ein · toter Endpunkt wird als nicht
-erreichbar angezeigt · **Settings-Gruppe „Kontext & Verdichtung“** (Überschrift + Zahlenfeld
+erreichbar angezeigt · **Settings-Gruppe „Verlauf kürzen“** (Überschrift + Zahlenfeld
 „Kontextfenster (Token)“ vorhanden) · zwei tote Endpunkte ergeben Klartext statt Stacktrace ·
 Wikilink in der Antwort öffnet die Notiz · **Verdichtungs-Marken** (Stufe 1, Stufe 2
 aufklappbar mit Text, erzwungener Zusatz „Überlauf“/„overflow“) werden gerendert · **Statuszeile**

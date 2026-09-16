@@ -716,7 +716,7 @@ async function main(): Promise<void> {
             `Status ${tot ?? "(keiner)"} bei ${DEAD_A}`,
           );
 
-          // --- 8. Settings-Gruppe „Kontext & Verdichtung“ -----------------------
+          // --- 8. Settings-Gruppe „Verlauf kürzen“ -----------------------
           // Nur geprueft, waehrend das Einstellungsfenster ohnehin offen ist (Punkte 3/4) —
           // ein eigenes Oeffnen/Schliessen nur fuer diesen Punkt waere unnoetiger Aufwand.
           // Die Ueberschrift kommt aus dem deklarativen Settings-Walker (`setHeading()`,
@@ -724,12 +724,12 @@ async function main(): Promise<void> {
           // (`type: "number"` rendert `addText`, kein natives `<input type=number>`).
           const group = await settings.evaluate<{ heading: boolean; field: string | null }>(`
             const heads = [...document.querySelectorAll(".setting-item-heading .setting-item-name")].map((e) => e.textContent);
-            const heading = heads.some((h) => /Kontext & Verdichtung|Context & compaction/.test(h));
+            const heading = heads.some((h) => /Verlauf kürzen|Shorten history/.test(h));
             const item = [...document.querySelectorAll(".setting-item")].find((e) => /Kontextfenster|Context window/.test(e.querySelector(".setting-item-name")?.textContent ?? ""));
             return { heading, field: item?.querySelector("input")?.value ?? null };
           `);
           record(
-            "8. Settings-Gruppe „Kontext & Verdichtung“ mit Fenster-Feld",
+            "8. Settings-Gruppe „Verlauf kürzen“ mit Fenster-Feld",
             group.heading && group.field !== null,
             JSON.stringify(group),
           );

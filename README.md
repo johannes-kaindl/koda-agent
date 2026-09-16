@@ -190,7 +190,7 @@ The full settings list:
 | Endpoints | `http://127.0.0.1:1234` | URL, optional API key, optional per-endpoint model override. A priority list — see [Endpoints](#endpoints) |
 | Model | *(empty)* | Model id sent to the endpoint, unless that row overrides it |
 | Koda folder | `Koda` | Where memory, skills and free writes live |
-| Max tool rounds | 8 (1–50) | How many tool calls Koda may chain per question before it has to answer |
+| Max tool calls per answer | 8 (1–50) | How many tool calls Koda may chain per question before it has to answer |
 | Request timeout | 300 s (30–900) | Hard limit per model call |
 | Skill budget | 6000 chars (1000–100000) | How much skill text fits into the system prompt |
 | Suppress thinking | on | Hides the reasoning block by default |
@@ -206,7 +206,7 @@ The full settings list:
 | Context window (tokens) | 8192 (2048–1000000) | Size of the model's context window; one number for all endpoints. "Test" on an endpoint row fills it in when the server reports it (LM Studio, Ollama) and the field is still on its default |
 | Compact at (% of window) | 75 (40–95) | Koda compacts the conversation before a model call once the estimate exceeds this share of the window |
 | Keep tool results verbatim | 3 (0–20) | How many of the most recent tool results stay in full; older ones become a one-line stub |
-| Summarize with the model (stage 2) | on | If stubs are not enough, Koda asks the model to summarize completed turns; your own messages are never summarized |
+| Summarize older replies | on | If shortening alone is not enough, Koda asks the model to summarize older replies; your own messages are never summarized |
 | Summary length (% of window) | 10 (3–30) | Upper bound for the summary text |
 | Instructions for Koda | *(empty)* | Replaces the shipped rule block — see [Model control](#model-control) |
 | Tools | all enabled | Turns individual tools off and rewords their descriptions — see [Model control](#model-control) |
@@ -216,7 +216,7 @@ The full settings list:
 A question starts an **agent loop**: Koda sends your message plus a system prompt to
 the endpoint, and the model may answer directly or call one of its tools. A tool call
 is executed against the vault, its result goes back into the conversation, and the
-model gets another turn — up to **Max tool rounds**, after which it has to answer with
+model gets another turn — up to **Max tool calls per answer**, after which it has to answer with
 what it has. This is what keeps a stuck model from looping forever on your vault.
 
 The system prompt is assembled fresh for every question from three sources: Koda's own
@@ -237,7 +237,7 @@ A long conversation would eventually overflow the model's context window, so bef
 each model call Koda estimates the conversation's size against **Context window** and
 **Compact at**. Past that share, it compacts in two stages: first, older tool results
 collapse into one-line stubs (**Keep tool results verbatim** decides how many stay in
-full); if that alone is not enough and **Summarize with the model** is on, Koda asks
+full); if that alone is not enough and **Summarize older replies** is on, Koda asks
 the model itself to summarize the completed turns it just dropped. Compaction is a
 *projection* — it changes what goes to the model, never the stored conversation you
 see in the chat, and your own messages are never touched. Every compaction leaves a

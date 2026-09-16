@@ -16,6 +16,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Wortlaut der vier Koda-eigenen Settings-/Verlaufs-Begriffe angeglichen (UI-STANDARD §10, kein
+  Fachbegriff ohne Auflösung): „Kontext & Verdichtung" → „Verlauf kürzen"/„Shorten history"
+  (Settings-Gruppe + Verdichtungs-Marke), „Listen-Grenze" → „Höchstzahl aufgelisteter
+  Notizen"/„Maximum listed notes" (Vorbild vault-rag), „Max. Tool-Runden" →
+  „Maximale Tool-Aufrufe pro Antwort"/„Max tool calls per answer", und der unverständliche
+  Stufe-2-Hilfetext (`settings.summarize.desc`) komplett neu formuliert — ohne „Stufe 2",
+  „Stubs" oder „abgeschlossene Runden". README und `docs/SMOKE.md` (evergreen-Abschnitt)
+  nachgezogen.
 - Streaming answer area now uses `obsidian-kit`'s `buildStreamArea`/`createStableWriter`
   (§8 building block) instead of the hand-rolled version. Two behaviour changes: the
   reasoning block stays open for the duration of a stream (was collapsed by default), and
