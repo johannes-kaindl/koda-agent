@@ -16,6 +16,29 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Sieben Erklärtexte kommen jetzt aus `obsidian-kit`s `explain-texts.ts` (v0.38.0, einzeln
+  vendoriert — Koda ist der erste Konsument dieser Kit-Bauart) statt aus einer eigenen
+  Fassung; drei davon werden dadurch sichtbar ausführlicher (EN/DE):
+  - Modell-Hinweis „kein Modell-Liste": „Endpoint does not publish a model list — type the
+    name yourself." → „The endpoint returns no model list — type the name."
+  - API-Schlüssel-Warnung: „This endpoint has an API key — requests leave your machine." →
+    „Carries an API key — the request with your messages goes to this provider, not to a
+    local server."
+  - Endpunkt-nicht-erreichbar-Hinweis: „Endpoint not reachable — the stored name is kept.
+    Fetch again once it is running." → „Endpoint unreachable — the saved value is kept. Use
+    "Fetch models" once it is running."
+  - „Nur gedacht"-Platzhalter wechselt von einer parenthetischen Notiz zu einem vollen Satz
+    mit zwei Auswegen: „The model only thought and gave no answer. Turn thinking off in the
+    settings, or pick another model."
+  - „Denken unterdrücken"-Beschreibung nennt jetzt den Mechanismus (geteiltes Token-Budget)
+    statt nur das Ergebnis: „Sends suppress hints for the Chat call. On by default: thinking
+    and answer share the same token budget, and a long thinking phase can use it up before
+    the answer even starts. Turn it off only if your model produces better structured output
+    after thinking."
+  Zwei Texte (CORS-Blockade, Token-Limit-vor-Text) sind wörtlich unverändert — sie waren die
+  Kit-Vorlage selbst (Herkunft Koda, laut Kit-Kopfkommentar). Kein achter Text: Koda hat für
+  „Modell denkt trotz Suppress weiter" (`reasoningIgnoresSuppress`) keine Entsprechung — das
+  ist kein Verhaltenswechsel, sondern eine bestehende Lücke, außerhalb dieses Auftrags.
 - Thinking-Schalter im Kopf zeigt seinen Zustand jetzt über mindestens zwei Kanäle statt nur
   über Farbe (UI-STANDARD §8 „Zustands-Knopf", verbindlich seit 2026-09-16, Anlass: für
   Johannes' Rot-Grün-Schwäche unlesbar): Icon-Wechsel `brain` (an/gesperrt) ↔ `brain-cog` (aus)

@@ -111,7 +111,9 @@ export class KodaSettingsTab extends PluginSettingTab {
       },
       {
         name: t("settings.suppress"),
-        desc: t("settings.suppress.desc"),
+        // "Chat" ist Loanword-Stil (Kit-Vorlage: "{feature}-Call" statt "{feature}-Aufruf")
+        // und bleibt in beiden Sprachen gleich — kein getLang()-Branch noetig.
+        desc: t("settings.suppress.desc", "Chat"),
         control: { type: "toggle", key: "suppressThinking" },
       },
       {
@@ -424,7 +426,10 @@ export class KodaSettingsTab extends PluginSettingTab {
       refreshModels: t("settings.model.fetch"),
       moveToFront: t("settings.endpoints.moveToFront"),
       remove: t("settings.remove"),
-      thirdParty: t("settings.endpoints.thirdParty"),
+      // {content} ist NICHT sprachneutral (anders als {feature} oben): EN baeckt "your"
+      // in die Vorlage ein ("with your {0}"), DE nicht — der deutsche Fuellwert traegt
+      // Possessiv+Kasus deshalb selbst (Kit-Kopfkommentar explain-texts.ts).
+      thirdParty: t("settings.endpoints.thirdParty", getLang() === "de" ? "deinen Nachrichten" : "messages"),
       probing: t("settings.probe.testing"),
       // Ueber `kind` statt ueber das Kit-Feld `klartext`: das Kit formuliert nur auf
       // Deutsch, Koda spricht beide Sprachen. `endpointStatusView` macht genau das.
