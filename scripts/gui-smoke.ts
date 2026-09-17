@@ -126,12 +126,13 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { cwd } from "node:process";
 import { Cdp, attachTo, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { boxOf, capture } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
 const PLUGIN_ID = "koda-agent";
@@ -246,8 +247,35 @@ interface Settings {
  *
  * `requestUrl` umgeht CORS, deshalb genuegen hier nackte JSON-Antworten.
  */
-async function startFakeEndpoint(wunschPort = 0): Promise<{ url: string; port: number; close: () => Promise<void> }> {
+async function startFakeEndpoint(
+  wunschPort = 0,
+  // Nur fuer Pruefpunkt 40: eine kanonische OpenAI-SSE-Antwort auf POST /v1/chat/completions,
+  // mit finish_reason "length" — der Rest bleibt unveraendert (Verbindungsprobe, /v1/models).
+  chatStub?: { content: string; finishReason: string },
+): Promise<{ url: string; port: number; close: () => Promise<void> }> {
   const server: Server = createServer((req, res) => {
+    // CORS-Preflight nur relevant, seit Pruefpunkt 40 echte POSTs aus dem Renderer schickt
+    // (Verbindungsprobe/-`/v1/models` sind GETs, die kein Preflight ausloesen). Ohne Antwort
+    // hier bricht die Chat-Anfrage mit genau der CORS-Meldung ab, die Koda selbst kennt
+    // (`error.chatBlocked` — „Probe gruen, Chat rot"), lange bevor `chatStub` greift.
+    if (chatStub !== undefined && req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+      });
+      res.end();
+      return;
+    }
+    if (chatStub !== undefined && req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
+      res.writeHead(200, { "Content-Type": "text/event-stream", "Access-Control-Allow-Origin": "*" });
+      res.end(
+        `data: ${JSON.stringify({ choices: [{ delta: { content: chatStub.content }, finish_reason: null }] })}\n\n`
+        + `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: chatStub.finishReason }] })}\n\n`
+        + `data: [DONE]\n\n`,
+      );
+      return;
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       req.url?.includes("/v1/models") === true
@@ -2278,6 +2306,73 @@ async function main(): Promise<void> {
       `).catch(() => undefined);
     }
     record("39. Knopf '+ Aktive Notiz' und Befehl context-add-active landen auf demselben Zustand", ok39, detail39);
+
+    // --- 40. Abgeschnittene Antwort (finish_reason "length", MIT Text) wird als Hinweis
+    // gemeldet, nicht verschluckt ---------------------------------------------
+    // Die pure Auswertung ist laengst durch Unit-Tests belegt (chat_client.test.ts,
+    // loop.test.ts). Was die dort NICHT sehen koennen, ist die Obsidian-Kante: main.ts
+    // setzt lastNotice, view.ts rendert ihn. Ein echter finish_reason:"length"-Chunk aus
+    // einem eigenen SSE-Server (wie Pruefpunkt 3-5, kein Modell noetig) ist dafuer das
+    // richtige Mittel — direktes chatLog-Pushen (Muster Pruefpunkt 6/7) wuerde main.ts'
+    // Event-Handler gar nicht durchlaufen und den Punkt seines Gegenstands berauben.
+    await fake?.close();
+    const truncStub = { content: "Halber Satz", finishReason: "length" };
+    fake = await startFakeEndpoint(0, truncStub);
+    let detail40 = "";
+    let ok40 = false;
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.endpoints = [{ url: ${JSON.stringify(fake.url)} }];
+        await p.saveSettings();
+        await p.newChat();
+        void p.ask("Smoke-Test: bitte antworten.");
+        return true;
+      `);
+      const getroffen = await pollUntil<{ noticeText: string; noticeKlasse: string; assistantText: string; busy: boolean }>(
+        cdp,
+        `
+          const p2 = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          if (p2.busy) return null;
+          const el = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0]?.view?.containerEl;
+          // Nicht die erste Notiz nehmen: das Fixture hat einen aktiven Skill, und dessen
+          // ".koda-notice.koda-skills" steht laut renderLog() VOR dem Verlauf, waehrend
+          // lastNotice zuletzt gerendert wird — ein blosses ".koda-notice" hier waere ein
+          // Falsch-Gruen auf den Skill-Hinweis, nicht auf den Trunkierungs-Hinweis.
+          const notice = el?.querySelector(".koda-notice:not(.koda-skills):not(.koda-sources)");
+          const assistant = el?.querySelector(".koda-assistant:not(.koda-placeholder)");
+          if (!notice || !assistant) return null;
+          return {
+            noticeText: notice.textContent.trim(),
+            noticeKlasse: notice.className,
+            assistantText: assistant.textContent.trim(),
+            busy: p2.busy,
+          };
+        `,
+        15_000,
+      );
+      ok40 =
+        getroffen !== null
+        && getroffen.busy === false
+        && !getroffen.noticeKlasse.includes("koda-error")
+        && getroffen.assistantText.includes(truncStub.content)
+        && getroffen.noticeText.length > 0;
+      detail40 = getroffen
+        ? `Notiz „${getroffen.noticeText.slice(0, 90)}“ (${getroffen.noticeKlasse}) · Antworttext „${getroffen.assistantText}“`
+        : "kein Hinweis und keine Antwortblase innerhalb 15s";
+      if (ok40) {
+        mkdirSync("/tmp/w6-shots", { recursive: true });
+        const box = await boxOf(cdp, ".koda-log");
+        const png = await capture(cdp, box ?? undefined);
+        writeFileSync("/tmp/w6-shots/koda-truncated.png", png);
+      }
+    } catch (error) {
+      detail40 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await fake?.close();
+      fake = null;
+    }
+    record("40. Abgeschnittene Antwort (finish_reason length, mit Text) meldet einen Hinweis statt zu schweigen", ok40, detail40);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte

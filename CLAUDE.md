@@ -302,7 +302,11 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** Modell-Antwort. 39 Punkte (33–39 seit 2026-09-06,
+  Prüft die Naht zum Host, bewusst **ohne** echte Modell-Antwort. 40 Punkte (40 seit
+  2026-09-17: eine `finish_reason:"length"`-Antwort MIT Text aus einem eigenen SSE-Stub —
+  kein echtes Modell, aber ein echter `p.ask()`-Roundtrip — löst den Hinweis „Antwort am
+  Token-Limit abgeschnitten" statt Schweigen aus; Gegenprobe in `docs/SMOKE.md` „Belegter
+  Lauf: 2026-09-17 — Welle 6") (33–39 seit 2026-09-06,
   Etappe 2b: 33 Modus Notiz nimmt die aktive Notiz und ihre Nachbarn im Volltext mit, 34 die
   Budget-Kappung meldet sich im Block, 35 eine manuell hinzugefügte Notiz geht mit und lässt
   sich wieder entfernen, 36 `read_note` liest eine `.base`, 37 Quellen-Chips unter der

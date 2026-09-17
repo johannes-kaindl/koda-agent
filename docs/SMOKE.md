@@ -769,6 +769,46 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-17 — Welle 6, abgeschnittene Antwort (40/40), mit Gegenprobe
+
+Vault `koda-agent` (Staging, Zweitinstanz Port 9374), Gate 715/715 (unveraendert), GUI-Smoke
+40/40 (von 39). Ein neuer Punkt (40) fuer die Obsidian-Kante der bereits puren getesteten
+Auswertung von `finish_reason: "length"` (`59a95d1`, Task „Abgeschnittene Antwort wird
+getragen, aber nie gemeldet"): main.ts setzt `lastNotice`, `view.ts` rendert ihn.
+
+**Warum ein echter SSE-Stub statt `chatLog`-Pushen (Muster Punkt 6/7):** Ein direktes Pushen
+haette `main.ts`s Event-Handler — den eigentlichen Pruefgegenstand — gar nicht durchlaufen.
+Punkt 40 fuehrt deshalb einen echten `p.ask()`-Roundtrip gegen einen eigenen Node-Server, der
+auf `/v1/chat/completions` eine OpenAI-SSE-Antwort mit `finish_reason:"length"` und Text
+ausliefert (Muster Punkt 3/5: kein Modell noetig, deterministisch).
+
+**Fallstrick, gemessen beim Bauen — CORS-Preflight fehlte.** Die bestehende Fake-Endpoint-
+Funktion beantwortete nur GET (Verbindungsprobe, `/v1/models`); ein echter POST aus dem
+Renderer loest zusaetzlich ein `OPTIONS`-Preflight aus, und ohne Antwort darauf bricht die
+Anfrage mit genau der Meldung ab, die Koda selbst fuer fehlendes CORS kennt
+(`error.chatBlocked`, „Probe gruen, Chat rot"). Gefangen durch ein eigenes Debug-Skript, das
+serverseitig mitschnitt: OPTIONS kam an, die POST-Antwort fehlte aber ohne
+`Access-Control-Allow-Origin`-Header noch am eigentlichen Response — beide Header ergaenzt.
+
+**Zweiter Fallstrick — Selektor traf die falsche Notiz.** `document.querySelector(".koda-notice")`
+liefert den ERSTEN Treffer; das Fixture hat einen aktiven Skill, dessen
+`.koda-notice.koda-skills` laut `renderLog()` VOR dem Verlauf steht, waehrend `lastNotice`
+zuletzt gerendert wird. Der erste Lauf wurde daher gruen, ohne den Trunkierungs-Hinweis
+ueberhaupt gelesen zu haben — Selektor auf `.koda-notice:not(.koda-skills):not(.koda-sources)`
+verengt.
+
+### Gegenprobe
+
+`if (e.kind === "final" && e.truncated) this.lastNotice = …` in `src/main.ts` auskommentiert,
+gebaut, redeployt → **39/40, genau Punkt 40 rot** („kein Hinweis und keine Antwortblase
+innerhalb 15s"), alle anderen 39 Punkte unveraendert gruen. Mutation zurueckgenommen,
+redeployt, erneut 40/40. Ein einzelner Ausreisser dazwischen (Punkt 20, „aktiv ist Koda:
+false") verschwand beim direkten Wiederholen — Fokus-Flake aus dem Redeploy-Zyklus, keine
+Regression.
+
+Screenshot: `/tmp/w6-shots/koda-truncated.png` (Antwortblase „Halber Satz" + Hinweis „Antwort
+am Token-Limit abgeschnitten — der Text oben kann unvollständig sein.").
+
 ## Belegter Lauf: 2026-09-06 — Etappe 2b, Volltext-Quellen (39/39), mit Gegenproben
 
 Branch `feat/kontext-quellen`, Vault `koda-agent` (Staging), Gate 689/689 (von 620 zu Beginn
