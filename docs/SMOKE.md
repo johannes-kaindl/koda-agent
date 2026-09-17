@@ -769,6 +769,39 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-17 — Welle 6, llm-lab-Konsument (41/41), mit Gegenprobe
+
+Vault `koda-agent` (Staging, Zweitinstanz Port 9374), Gate 727/727 (von 715 — zwölf neue
+Tests: `tests/lab.test.ts` fuer `readLabApi`, `tests/lab_trace.test.ts` fuer die pure
+Zusammensetzung), GUI-Smoke 41/41 (von 40). Punkt 41 ist das Spiegelbild zu Punkt 40: kein
+Modell noetig, echter `p.ask()`-Roundtrip gegen denselben SSE-Stub-Server, diesmal mit
+`finish_reason:"stop"`. Zusaetzlich haengt der Punkt einen `llm-lab`-Stub ein (Muster
+`vault-rag/scripts/gui-smoke.ts` „7b. llm-lab-Meldestrecke") und prueft, MIT WELCHEN Feldern
+Koda `log()` ruft — nicht, ob ein echtes Lab die Zeile speichert (das ist dessen Smoke).
+
+**Warum ein Stub und kein installiertes llm-lab:** die Zusage lautet „wir rufen
+`readLabApi(app)?.log(...)` mit diesen Feldern" — ein echtes Lab wuerde diese Zusage nicht
+schaerfer pruefen, aber dessen Aufzeichnung mit Testzeilen verunreinigen. Das Fixture fuehrt
+llm-lab ohnehin nicht (`docs/images/fixture/obsidian/community-plugins.json` enthaelt nur
+`koda-agent`); der Punkt erkennt ein spaeter echt installiertes Lab trotzdem (Marker-Check vor
+dem Einhaengen) und ueberspringt sich dann selbst, statt es zu ueberschreiben.
+
+Geprueft werden `feature` (Skill-Name, hier „tidy-up" aus dem Fixture), `endpointUrl` (== der
+Stub-URL), `content`, `latencyMs`, `turnId` (nicht-leerer String), `promptTemplate`
+(nicht-leer — der Regelblock) und dass `messages` nur `system`/`user`/`assistant` traegt (kein
+`tool`, den llm-labs Rollen-Schema nicht kennt).
+
+### Gegenprobe
+
+`reportToLab()` in `src/main.ts` per fruehem `return;` no-op gemacht (Build ohne `tsc`, nur
+`node esbuild.config.mjs production` — die Mutation macht den Rest der Methode fuer TS
+unreachable und bricht dessen Discriminated-Union-Narrowing; fuer den GUI-Smoke reicht
+`main.js`) → **39/41, genau Punkt 41 rot** („kein log()-Aufruf innerhalb 15s"), Punkt 40
+unveraendert gruen. Mutation zurueckgenommen, sauber gebaut (`npm run build`), redeployt,
+erneut 41/41. Derselbe Fokus-Flake wie beim Punkt-40-Lauf (Punkt 20, „aktiv ist Koda: false")
+trat bei der Mutation erneut auf und verschwand beim naechsten Durchlauf — unabhaengig von
+dieser Aenderung.
+
 ## Belegter Lauf: 2026-09-17 — Welle 6, abgeschnittene Antwort (40/40), mit Gegenprobe
 
 Vault `koda-agent` (Staging, Zweitinstanz Port 9374), Gate 715/715 (unveraendert), GUI-Smoke

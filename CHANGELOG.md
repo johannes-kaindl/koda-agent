@@ -13,6 +13,13 @@ All notable changes to this project are documented here. The format follows
   Fehler, der das Token-Limit nennt — der Reasoning-Normalfall, bei dem das Denken das Budget
   vor der Antwort verbraucht. REGISTRY-Muster „Abgeschnittene LLM-Antwort als eigene
   Fehlerklasse" (n=4 mit diesem Repo).
+- Koda meldet jede LLM-Antwort jetzt an `llm-lab`, sofern installiert (Konsumenten-Seite,
+  `apiVersion` 4 — `turnId`, `promptTemplate`, `contextPaths`): Modell, Endpunkt, Nachrichten,
+  Latenz/TTFT, ein `turnId` je Nutzer-Handlung (klammert die mehreren LLM-Aufrufe eines
+  Agent-Loop-Durchlaufs), der stabile Regelblock als `promptTemplate` sowie die Pfade der per
+  `read_note` gelesenen Notizen als `contextPaths`. Fire-and-forget, wirft nie — ist llm-lab
+  nicht installiert, passiert nichts. `src/obsidian/lab.ts` uebernommen aus
+  `vault-rag/src/lab_client.ts`.
 
 ### Changed
 

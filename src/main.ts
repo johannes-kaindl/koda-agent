@@ -17,6 +17,9 @@ import { type ChatMessage, type LogEntry } from "./core/agent/types";
 import { toolDefs, toWireTools, type ToolDef } from "./core/tools/defs";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/prompt/build";
+import { effectiveRules, renderRules } from "./core/prompt/rules";
+import { toLabMessages, describeLlmFailure, readNotePathOf } from "./core/agent/lab-trace";
+import { readLabApi } from "./obsidian/lab";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
 import { selectSkills, type Selection } from "./core/skills/select";
@@ -578,6 +581,57 @@ export default class KodaPlugin extends Plugin {
     for (const v of this.views()) v.renderLog();
   }
 
+  /** Trennschaerfe fuer llm-lab (Task-Vorschlag: der Skill-Name). Mehrere geladene Skills
+   *  werden zusammengefasst statt nur den ersten zu nennen — sonst waeren zwei Aufrufe mit
+   *  unterschiedlichen Zweit-Skills im Lab ununterscheidbar. Ohne Skill bleibt "chat". */
+  private labFeature(selection: Selection): string {
+    const names = selection.loaded.map((sk) => sk.name);
+    return names.length > 0 ? names.join("+") : "chat";
+  }
+
+  /** Meldet einen LLM-Aufruf ans llm-lab, falls installiert. Fire-and-forget und darf einen
+   *  Chat nie mitreissen — Muster `vault-rag/src/chat_client.ts` (`reportToLab`), hier auf
+   *  Kodas turnId/promptTemplate/contextPaths erweitert (llm-lab apiVersion 4). */
+  private reportToLab(input: {
+    feature: string;
+    model: string;
+    endpointUrl: string;
+    apiKey?: string;
+    messages: ChatMessage[];
+    result: LlmResult;
+    reasoning: string;
+    latencyMs: number;
+    ttftMs?: number;
+    turnId: string;
+    promptTemplate: string;
+    contextPaths: string[];
+  }): void {
+    try {
+      const api = readLabApi(this.app);
+      if (api === null) return;
+      const id: unknown = api.log({
+        plugin: "koda-agent",
+        feature: input.feature,
+        model: input.model,
+        endpointUrl: input.endpointUrl,
+        messages: toLabMessages(input.messages),
+        content: input.result.ok ? input.result.content : input.result.partial,
+        ...(input.reasoning !== "" ? { reasoning: input.reasoning } : {}),
+        ...(input.result.ok && input.result.finishReason !== undefined ? { finishReason: input.result.finishReason } : {}),
+        latencyMs: input.latencyMs,
+        ...(input.ttftMs !== undefined ? { ttftMs: input.ttftMs } : {}),
+        ...(input.result.ok ? {} : { error: describeLlmFailure(input.result) }),
+        ...(input.apiKey ? { secrets: [input.apiKey] } : {}),
+        ...(input.contextPaths.length > 0 ? { contextPaths: [...new Set(input.contextPaths)] } : {}),
+        ...(input.promptTemplate !== "" ? { promptTemplate: input.promptTemplate } : {}),
+        turnId: input.turnId,
+      });
+      // Vertrag: log() gibt synchron eine id zurueck — ein fremdes Plugin bekommt trotzdem
+      // keinen blinden Vorschuss (Muster vault-rag).
+      void Promise.resolve(id).catch(() => undefined);
+    } catch { /* Telemetrie darf einen Chat nie mitreissen. */ }
+  }
+
   async ask(question: string): Promise<void> {
     if (this.busy) return;
     this.busy = true;
@@ -629,20 +683,54 @@ export default class KodaPlugin extends Plugin {
       // Client pro Lauf: der Idle-Timeout ist eine Einstellung und darf ohne
       // Plugin-Neustart wirken.
       const client = new KodaChatClient(this.transport, s.timeoutSec * 1000);
+
+      // llm-lab-Anbindung (Task „llm-lab als Konsument anschliessen", Design §9):
+      // EIN turnId je Nutzer-Handlung, durch alle Runden des Agent-Loops durchgereicht —
+      // nur koda kennt diese Zusammengehoerigkeit, aus Zeitnaehe liesse sie sich nur raten.
+      const turnId = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Derselbe stabile Regelblock, den auch `system` traegt — NICHT die ganze
+      // System-Nachricht (die haengt an Memory/Skills und variiert pro Lauf; genau daran
+      // ist der Vorgaenger `systemPromptHash` gescheitert, s. llm-lab CHANGELOG apiVersion 3).
+      const promptTemplate = renderRules(effectiveRules(s.systemPromptOverride), { lang, folder: s.kodaFolder });
+      // Pfade der per `read_note` gelesenen Notizen — Grundlage des Ordner-Filters im Lab;
+      // fail-open, bewusst: bleibt sie leer, greift der Filter einfach nicht (llm-lab
+      // plugin_api.ts, contextPaths-Kommentar).
+      const readPaths: string[] = [];
+
       const llm: LoopLlm = {
         complete: (messages, onToken, onReasoning, signal) =>
           withFailover(
             this.resolver,
-            (ep) =>
-              client.complete(
-                {
-                  endpoint: ep.url,
-                  apiKey: ep.apiKey ?? "",
-                  model: effectiveModel(ep, s.model),
-                  suppressThinking: s.suppressThinking,
-                },
-                messages, defs, onToken, onReasoning, signal,
-              ),
+            (ep) => {
+              const started = Date.now();
+              let firstToken: number | undefined;
+              let seenReasoning = "";
+              const timedOnToken = (tok: string): void => { firstToken ??= Date.now(); onToken(tok); };
+              const timedOnReasoning = (tok: string): void => { seenReasoning += tok; onReasoning(tok); };
+              const cfg = {
+                endpoint: ep.url,
+                apiKey: ep.apiKey ?? "",
+                model: effectiveModel(ep, s.model),
+                suppressThinking: s.suppressThinking,
+              };
+              return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal).then((r) => {
+                this.reportToLab({
+                  feature: this.labFeature(selection),
+                  model: cfg.model,
+                  endpointUrl: cfg.endpoint,
+                  apiKey: ep.apiKey,
+                  messages,
+                  result: r,
+                  reasoning: seenReasoning,
+                  latencyMs: Date.now() - started,
+                  ttftMs: firstToken !== undefined ? firstToken - started : undefined,
+                  turnId,
+                  promptTemplate,
+                  contextPaths: readPaths,
+                });
+                return r;
+              });
+            },
             // Erneut versuchen NUR, wenn der Endpunkt gar nicht geantwortet hat und noch
             // KEIN Token beim Nutzer war: nach einem angefangenen Stream stuende die halbe
             // Antwort sonst ein zweites Mal in der Blase. Ein HTTP-Fehler wird nicht
@@ -699,6 +787,10 @@ export default class KodaPlugin extends Plugin {
           if (e.kind === "tool-start") for (const v of this.views()) {
             v.activity({ kind: "tool-start", name: e.call.name, args: e.call.arguments });
             v.toolStep(`⚙ ${e.call.name}`, e.call.arguments);
+          }
+          if (e.kind === "tool-end" && e.outcome.ok) {
+            const path = readNotePathOf(e.call);
+            if (path !== null) readPaths.push(path);
           }
           if (e.kind === "tool-end") for (const v of this.views()) v.activity({ kind: "tool-end" });
           if (e.kind === "tool-end") for (const v of this.views()) v.toolStep(

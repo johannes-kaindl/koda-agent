@@ -302,11 +302,14 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** echte Modell-Antwort. 40 Punkte (40 seit
-  2026-09-17: eine `finish_reason:"length"`-Antwort MIT Text aus einem eigenen SSE-Stub —
-  kein echtes Modell, aber ein echter `p.ask()`-Roundtrip — löst den Hinweis „Antwort am
-  Token-Limit abgeschnitten" statt Schweigen aus; Gegenprobe in `docs/SMOKE.md` „Belegter
-  Lauf: 2026-09-17 — Welle 6") (33–39 seit 2026-09-06,
+  Prüft die Naht zum Host, bewusst **ohne** echte Modell-Antwort. 41 Punkte (41 seit
+  2026-09-17: llm-lab-Meldestrecke — ein `llm-lab`-Stub (Marker-Check gegen ein echtes
+  Plugin) sieht `feature`/`model`/`endpointUrl`/`content`/`latencyMs`/`turnId`/
+  `promptTemplate` und nur `system`/`user`/`assistant`-Nachrichten aus einem echten
+  `p.ask()`-Roundtrip; 40 seit 2026-09-17: eine `finish_reason:"length"`-Antwort MIT Text
+  aus einem eigenen SSE-Stub — kein echtes Modell, aber ein echter `p.ask()`-Roundtrip —
+  löst den Hinweis „Antwort am Token-Limit abgeschnitten" statt Schweigen aus; beide
+  Gegenproben in `docs/SMOKE.md` „Belegter Lauf: 2026-09-17 — Welle 6") (33–39 seit 2026-09-06,
   Etappe 2b: 33 Modus Notiz nimmt die aktive Notiz und ihre Nachbarn im Volltext mit, 34 die
   Budget-Kappung meldet sich im Block, 35 eine manuell hinzugefügte Notiz geht mit und lässt
   sich wieder entfernen, 36 `read_note` liest eine `.base`, 37 Quellen-Chips unter der
@@ -389,6 +392,13 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `src/core/tools/retrieval.ts` — Zusammenführung von Volltext- und Index-Treffern,
   Schwellenlogik, Ausfall-Meldungen (pure). Gegenstück: `src/obsidian/retrieval.ts`
   liest vault-rags API defensiv aus `app.plugins`.
+- `src/core/agent/lab-trace.ts` — pure Bausteine der llm-lab-Anbindung (seit 2026-09-17):
+  `toLabMessages` (nur system/user/assistant, das Lab kennt keine Tool-Rolle),
+  `describeLlmFailure` (Klartext für `error`), `readNotePathOf` (Pfad aus einem
+  `read_note`-Aufruf, Grundlage von `contextPaths`). Gegenstück: `src/obsidian/lab.ts`
+  (`readLabApi`, **übernommen** aus `vault-rag/src/lab_client.ts`, apiVersion 4 mit
+  `turnId`) liest llm-labs API defensiv aus `app.plugins`; verdrahtet in `main.ts`s
+  `ask()` (`reportToLab`, fire-and-forget, ein `turnId` je Nutzer-Handlung).
 - `src/core/tools/list.ts` — `list_notes`: Ordnerauswahl (flach/rekursiv), Kappung
   mit Warnung in Zeile 1, leerer Ordner als Fehler mit Vorschlägen (pure). Frontmatter
   kommt aus Obsidians `metadataCache`, kein Datei-Lesen je Notiz.

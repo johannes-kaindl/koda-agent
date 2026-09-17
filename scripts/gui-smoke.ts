@@ -2373,6 +2373,88 @@ async function main(): Promise<void> {
       fake = null;
     }
     record("40. Abgeschnittene Antwort (finish_reason length, mit Text) meldet einen Hinweis statt zu schweigen", ok40, detail40);
+
+    // --- 41. llm-lab-Meldestrecke (Konsumenten-Seite) -----------------------
+    // Spiegelbild zu Punkt 40: kein Modell noetig, echter p.ask()-Roundtrip gegen den
+    // gleichen SSE-Stub-Server (Muster oben), diesmal mit finish_reason "stop". Geprueft
+    // wird NICHT, ob ein echtes llm-lab die Zeile speichert (das ist dessen Smoke) — nur,
+    // dass Koda ueberhaupt meldet und mit welchen Feldern (Task „llm-lab als Konsument
+    // anschliessen", apiVersion 4: turnId, promptTemplate, contextPaths).
+    //
+    // Ein Stub statt eines echten Lab, aus demselben Grund wie in vault-rags Treiber: die
+    // Zusage ist "wir rufen readLabApi(app)?.log(...) mit diesen Feldern", nicht "das Lab
+    // verhaelt sich richtig" — und ein echtes Lab im Fixture wuerde dessen Aufzeichnung mit
+    // Testzeilen verunreinigen. Das Fixture fuehrt llm-lab nicht (community-plugins.json),
+    // der Zweig laeuft hier also immer; ein spaeter installiertes echtes Lab wird trotzdem
+    // erkannt und der Punkt uebersprungen statt es zu verunreinigen.
+    const labVorher = await cdp.evaluate<boolean>(`return !!app.plugins.plugins["llm-lab"];`);
+    let detail41 = "";
+    let ok41 = false;
+    if (labVorher) {
+      detail41 = "uebersprungen — ein llm-lab-Eintrag existiert bereits (echtes Plugin oder Rest eines abgebrochenen Laufs); Stub wuerde ihn ueberschreiben";
+      record("41. llm-lab-Meldestrecke (Konsumenten-Seite)", true, detail41);
+    } else {
+      fake = await startFakeEndpoint(0, { content: "Ok.", finishReason: "stop" });
+      try {
+        await cdp.evaluate(`
+          window.__kodaLabSeen = [];
+          app.plugins.plugins["llm-lab"] = {
+            __kodaSmokeStub: true,
+            api: {
+              apiVersion: 4,
+              status: () => ({ apiVersion: 4, recording: true }),
+              log: (input) => { window.__kodaLabSeen.push(input); return "smoke-" + window.__kodaLabSeen.length; },
+            },
+          };
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.settings.endpoints = [{ url: ${JSON.stringify(fake.url)} }];
+          await p.saveSettings();
+          await p.newChat();
+          void p.ask("Smoke-Test: bitte antworten.");
+          return true;
+        `);
+        const gemeldet = await pollUntil<{
+          feature: string; model: string; endpointUrl: string; content: string;
+          latencyMs: number; turnId: string; promptTemplate: string;
+          messages: { role: string; content: string }[];
+        }>(
+          cdp,
+          `
+            const p2 = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+            if (p2.busy) return null;
+            const seen = window.__kodaLabSeen || [];
+            return seen.length > 0 ? seen[0] : null;
+          `,
+          15_000,
+        );
+        ok41 =
+          gemeldet !== null
+          && gemeldet.feature !== ""
+          && gemeldet.endpointUrl === fake.url
+          && gemeldet.content === "Ok."
+          && gemeldet.latencyMs >= 0
+          && typeof gemeldet.turnId === "string" && gemeldet.turnId !== ""
+          && gemeldet.promptTemplate !== ""
+          && Array.isArray(gemeldet.messages)
+          && gemeldet.messages.some((m) => m.role === "user" && m.content.includes("Smoke-Test"))
+          && !gemeldet.messages.some((m) => (m as { role: string }).role === "tool");
+        detail41 = gemeldet
+          ? `feature „${gemeldet.feature}“ · model „${gemeldet.model}“ · turnId ${gemeldet.turnId.slice(0, 12)}… · `
+            + `promptTemplate ${gemeldet.promptTemplate.length} Z. · Nachrichten ${gemeldet.messages.length} (nur system/user/assistant) · content „${gemeldet.content}“`
+          : "kein log()-Aufruf innerhalb 15s";
+      } catch (error) {
+        detail41 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        await fake?.close();
+        fake = null;
+        await cdp.evaluate(`
+          delete app.plugins.plugins["llm-lab"];
+          delete window.__kodaLabSeen;
+          return true;
+        `).catch(() => undefined);
+      }
+      record("41. llm-lab-Meldestrecke (Konsumenten-Seite): turnId/promptTemplate/Nachrichten korrekt gemeldet", ok41, detail41);
+    }
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
