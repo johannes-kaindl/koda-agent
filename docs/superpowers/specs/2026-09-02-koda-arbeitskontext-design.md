@@ -397,6 +397,46 @@ Auswahl je Nachricht, nie die Einstellungen.
 
 Zwischen 1 und 2 wird `move_note` eingeschoben (Arbeits-Vault-Task, seit 2026-08-13 offen).
 
+### Etappe 3 — Zuschnitt (Design-Session mit Johannes, 2026-09-18)
+
+Etappen 1 und 2 sind released (0.11.0 bis 0.14.0). Für Etappe 3 ließ diese Spec fünf Punkte
+offen; entschieden wie empfohlen:
+
+1. **Zwei Teil-Etappen, ein Plan, nacheinander gebaut.** **3a** — die beiden Quellen aus
+   vault-rag: Vault-Modus und semantische Nachbarn, dazu `contextAutoK`. **3b** — die
+   Bases-Ansicht. Jede ist für sich releasefähig (verschiedene Fremd-Abhängigkeit:
+   Plugin-API von vault-rag gegen Bases-API von Obsidian). Nacheinander statt parallel, weil
+   beide `candidates.ts`, `main.ts` und `context-panel.ts` ändern.
+2. **Vault-Modus: gesucht wird beim Senden, mit dem echten Nachrichtentext.** Die Live-Suche
+   beim Tippen (Debounce in der View, Generationszähler gegen verspätete Antworten — Muster
+   aus `vault-rag/src/context_panel.ts`) speist **nur** die Vorschau im Kontext-Tab. Grund:
+   wer vor Ablauf der Verzögerung sendet, hätte sonst Treffer zu einem halben Satz im Block.
+   Abwahlen sind nach Pfad geschlüsselt und gelten deshalb auch dann, wenn beim Senden neu
+   gesucht wird. Schlägt die Suche fehl (`offline`, `no-index`), sagt der Block es in einer
+   Zeile, statt still leer zu bleiben — dieselbe Regel wie jede Kappung. Ohne vault-rag ist der
+   Modus im Dropdown gesperrt, mit dem Hinweis aus E1.
+3. **Die aktive Notiz ist auch im Vault-Modus Kandidat** — erster Chip, abwählbar. Reihenfolge
+   wie in `collectCandidates`: aktiv · manuell · Treffer. Grund: in Notiz und Alle Tabs ist es
+   genauso, und eine Frage entsteht fast immer aus einer Notiz heraus.
+4. **Semantische Nachbarn im Modus Notiz über `related()`, geschaltet über `contextAutoK`**
+   (Default 5, 0 = aus). Sie stehen nach den Backlinks (Quelle `related`) und erscheinen nur,
+   wenn vault-rag da und indexiert ist; sonst fehlt der Abschnitt ohne Fehlermeldung. Eine
+   Zahl für Vault-Treffer und Nachbarn, wie in E8.
+5. **Bases: Übernahme als Schnappschuss, kein Live-Abo.** „Als Kontext übernehmen" kopiert die
+   Zeilen (Tabellentext und Pfade, Falle 4 aus dem Spike) und stempelt den Zeitpunkt; ein zweiter
+   Klick in derselben Ansicht ersetzt den Schnappschuss. Grund: eine Base im Hintergrund liefert
+   nachweislich keine Updates (Falle 3), ein Live-Abo wäre also genau dann still veraltet, wenn
+   die Base nicht vorn liegt. Ein Schnappschuss mit Zeitpunkt sagt, welchen Stand er zeigt.
+   **Wirkung je Modus:** die Tabellenform geht in **jedem** Modus außer Aus mit (sie ist klein
+   und die Form, die Bases besonders macht). Die Übergabeformen *Notizen*/*beides* laden die
+   Volltexte nur in den Volltext-Modi, wie Manuelles; im Modus Arbeitsplatz tragen die
+   Notiz-Chips dort denselben Hinweis wie manuelle Chips.
+
+Die zwei Nachzüge aus dem Spike (E7: Default der Übergabeform im Lesecode; Übernahme nur in
+der echten Base-Ansicht, nicht im Embed) gelten unverändert. Die Nummern der GUI-Prüfpunkte
+schließen an den Stand an (41 seit 2026-09-17), nicht an die Zählung „28–30" der Tabelle
+oben, die aus der Zeit vor Etappe 2 stammt.
+
 ## Prüfen
 
 **Unit (pure, TDD):** `candidates` (Reihenfolge, Tiefe, Dubletten, aktive Notiz nie Nachbar) ·
@@ -446,7 +486,7 @@ Inhalts-Budget für die aktive Notiz im Arbeitsplatz-Modus (nachrüstbar, s. E1)
 
 ## Offene Punkte
 
-- **Bases-Spike** zu Beginn von Etappe 3 (§ E7). Ergebnis in `docs/LAB.md`.
+- ~~**Bases-Spike** zu Beginn von Etappe 3 (§ E7).~~ Erledigt 2026-09-06, Ergebnis in `docs/LAB.md`, Folge in E7.
 - **Prompt-Cache:** der Block ändert den letzten Nutzer-Turn je Nachricht; der Präfix davor
   bleibt stabil. Ob LM Studio den Präfix-Cache dabei hält, ist eine Messung, kein Designpunkt.
 - **Selektion nach Fokuswechsel** — Prüfpunkt 20 (§ Prüfen). Fällt er rot, wird die Markierung
