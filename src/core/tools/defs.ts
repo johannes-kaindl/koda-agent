@@ -65,7 +65,12 @@ export const TOOL_DEFS: ToolDef[] = [
       type: "object",
       properties: {
         path: { type: "string", description: "Vault-relative path of the active note, as shown in the working context" },
-        mode: { type: "string", enum: ["replace_selection", "insert_at_cursor"], description: "replace_selection needs a selection; insert_at_cursor inserts at the caret" },
+        // Kein `enum` hier — google/gemma-4-31b (Original-Template) scheitert an einem
+        // String-enum im Tool-Schema mit HTTP 400 "Unknown test: sequence" (llm-setup
+        // gemma-4-31b-tool-schema-bug.md). Die erlaubten Werte stehen deshalb nur in der
+        // description; VaultTools.editActiveNote validiert sie selbst und meldet einen
+        // falschen Wert als Tool-Ergebnis zurueck.
+        mode: { type: "string", description: "One of replace_selection, insert_at_cursor. replace_selection needs a selection; insert_at_cursor inserts at the caret" },
         text: { type: "string", description: "The replacement or the text to insert" },
       },
       required: ["path", "mode", "text"],
@@ -80,11 +85,12 @@ export const TOOL_DEFS: ToolDef[] = [
       properties: {
         path: { type: "string", description: "Vault-relative path ending in .md" },
         content: { type: "string", description: "Markdown content to write" },
+        // Kein `enum` (s. edit_active_note.mode oben) — die Werte stehen in der description,
+        // write() in vault-tools.ts validiert sie.
         mode: {
           type: "string",
-          enum: ["create", "append", "replace"],
           description:
-            "Required. 'create' for a new note (fails if it exists), 'append' to add to the end of an existing note, 'replace' to overwrite it entirely. Prefer 'append' when adding to an existing note — 'replace' discards everything else in the file.",
+            "Required, one of create/append/replace. 'create' for a new note (fails if it exists), 'append' to add to the end of an existing note, 'replace' to overwrite it entirely. Prefer 'append' when adding to an existing note — 'replace' discards everything else in the file.",
         },
       },
       required: ["path", "content", "mode"],
@@ -147,10 +153,11 @@ export const TOOL_DEFS: ToolDef[] = [
           description: "One sentence describing what will be different from now on. Shown to the user for approval.",
         },
         body: { type: "string", description: "The instruction itself, in Markdown" },
+        // Kein `enum` (s. edit_active_note.mode oben) — writeSkill() in vault-tools.ts
+        // validiert die Werte.
         mode: {
           type: "string",
-          enum: ["create", "replace"],
-          description: "Required. 'create' for a new skill (fails if it exists), 'replace' to overwrite an existing one entirely.",
+          description: "Required, one of create/replace. 'create' for a new skill (fails if it exists), 'replace' to overwrite an existing one entirely.",
         },
       },
       required: ["name", "description", "body", "mode"],

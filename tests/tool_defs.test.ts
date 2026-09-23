@@ -82,16 +82,41 @@ describe("Arbeitskontext-Werkzeuge", () => {
       expect(d?.description).toMatch(/^[\x20-\x7E]+$/);
     }
   });
-  it("edit_active_note verlangt Pfad, Modus und Text; der Modus ist ein Enum", () => {
+  it("edit_active_note verlangt Pfad, Modus und Text; der Modus ist KEIN Enum (Punkt 5: gemma-4-31b)", () => {
     const d = TOOL_DEFS.find((t) => t.name === "edit_active_note")!;
-    const p = d.parameters as { required: string[]; properties: { mode: { enum: string[] } } };
+    const p = d.parameters as { required: string[]; properties: { mode: { enum?: string[]; description: string } } };
     expect(p.required).toEqual(["path", "mode", "text"]);
-    expect(p.properties.mode.enum).toEqual(["replace_selection", "insert_at_cursor"]);
+    expect(p.properties.mode.enum).toBeUndefined();
+    expect(p.properties.mode.description).toContain("replace_selection");
+    expect(p.properties.mode.description).toContain("insert_at_cursor");
   });
   it("beide sind abschaltbar wie alle anderen", () => {
     const names = toolDefs({ related: false, disabled: ["get_workspace", "edit_active_note"] }).map((d) => d.name);
     expect(names).not.toContain("get_workspace");
     expect(names).not.toContain("edit_active_note");
+  });
+});
+
+describe("Werkzeug-Schemas ohne String-Enum (Punkt 5: google/gemma-4-31b scheitert an `enum` im Tool-Schema mit HTTP 400)", () => {
+  it("kein Tool-Def traegt ein `enum`-Feld — die erlaubten Werte stehen nur noch in der description", () => {
+    const hasEnum = (obj: unknown): boolean => {
+      if (obj === null || typeof obj !== "object") return false;
+      if ("enum" in obj) return true;
+      return Object.values(obj as Record<string, unknown>).some(hasEnum);
+    };
+    for (const d of TOOL_DEFS) expect(hasEnum(d.parameters)).toBe(false);
+  });
+  it("write_note.mode und write_skill.mode nennen ihre erlaubten Werte in der description", () => {
+    const write = TOOL_DEFS.find((t) => t.name === "write_note")!;
+    const wp = write.parameters as { properties: { mode: { description: string } } };
+    expect(wp.properties.mode.description).toContain("create");
+    expect(wp.properties.mode.description).toContain("append");
+    expect(wp.properties.mode.description).toContain("replace");
+
+    const skill = TOOL_DEFS.find((t) => t.name === "write_skill")!;
+    const sp = skill.parameters as { properties: { mode: { description: string } } };
+    expect(sp.properties.mode.description).toContain("create");
+    expect(sp.properties.mode.description).toContain("replace");
   });
 });
 

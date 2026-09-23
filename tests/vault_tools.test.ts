@@ -99,6 +99,11 @@ describe("VaultTools", () => {
     expect(vault.files["Plan.md"]).toBe("alt" + previewed);
     expect(previewed).toBe("\nneu");
   });
+  it("ein ungueltiger mode-Wert ist ein Fehler-Result ans Modell (Punkt 5: kein enum mehr im Schema, Validierung uebernimmt es)", async () => {
+    const tools = new VaultTools(fakeVault({}), yes, opts);
+    const r = await tools.run("write_note", { path: "Koda/x.md", content: "Hi", mode: "delete" });
+    expect(r).toEqual({ ok: false, error: 'mode muss create|append|replace sein, war: "delete"' });
+  });
   it("create auf existierende Datei ist ein Fehler-Result (kein Ueberschreiben)", async () => {
     const tools = new VaultTools(fakeVault({ "Koda/x.md": "da" }), yes, opts);
     const r = await tools.run("write_note", { path: "Koda/x.md", content: "neu", mode: "create" });

@@ -115,6 +115,13 @@ describe("edit_active_note", () => {
     expect(calls).toHaveLength(1);
     expect(erwarteWrite(calls[0]).effect).toContain("Cursor");
   });
+  it("ein ungueltiger mode-Wert ist ein Fehler-Result ans Modell (Punkt 5: kein enum mehr im Schema)", async () => {
+    const state = { path: "Notes/Plan.md", selection: "Model control", doc: "Model control makes" };
+    const tools = new VaultTools(fakeVault({}), yes, { ...base, editor: fakeEditor(state) });
+    const r = await tools.run("edit_active_note", { path: "Notes/Plan.md", mode: "delete_selection", text: "X" });
+    expect(r).toEqual({ ok: false, error: "unbekannter Modus: delete_selection — erlaubt sind replace_selection und insert_at_cursor" });
+    expect(state.doc).toBe("Model control makes");
+  });
   it("Invariante: aendert sich die Markierung zwischen Aufruf und Bestaetigung, wird NICHT geschrieben", async () => {
     const state = { path: "Notes/Plan.md", selection: "Model control", doc: "Model control makes" };
     const confirm = async (): Promise<boolean> => { state.selection = "Model"; return true; };
