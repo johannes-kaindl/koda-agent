@@ -8,6 +8,29 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Tool-Use gegen LM Studio/MLX gehaertet (Sonderauftrag „Koda-Fix Tool-Use", Befunde
+  llm-setup `6f75737` + `~/Projects/verdigado/llm-configs`):
+  - Ein Tool-Call gilt nur bei `finish_reason: "tool_calls"` als vollstaendig. Kommt der
+    Kopf-Chunk (Name da) mit einem anderen `finish_reason` (z. B. `"length"`, 9x gemessen bei
+    LM Studio), wird er NICHT ausgefuehrt, sondern als abgeschnitten gemeldet — der
+    Text-Fallback (`parseTextToolCall`) ist ausgenommen, er hat nie `finish_reason:
+    "tool_calls"`.
+  - Neue lange Idle-Frist (`TOOL_CALL_IDLE_TIMEOUT_MS`, 900 s) ab dem Tool-Call-Kopf-Chunk:
+    LM Studio puffert die Argumente bis zum Ende ihrer Generierung, ohne ein Byte dazwischen
+    zu senden — das normale 120-s-Timeout riss dabei gesunde Schreib-Calls ab. Die Statuszeile
+    zeigt in dieser Phase „Schreibt Werkzeug-Aufruf …" statt weiter „denkt nach".
+  - `reasoning`-Echo fuer mehrrundige Tool-Laeufe: das Denken einer Tool-Call-Runde geht in
+    der Folgerunde DESSELBEN Laufs als `reasoning`+`reasoning_content` mit zurueck (Vorbild
+    llm-benchmark-harness `fade3f6`). Ohne dieses Echo brechen mehrrundige Laeufe gegen
+    Open WebUI/gpt-oss nach genau zwei Runden stumm ab (gemessen 2026-09-21, `verdigado-pro`).
+    Nicht persistiert — nur innerhalb eines `runAgent`-Laufs relevant.
+  - `max_tokens` von 2048 auf 8192 angehoben (vorlaeufig, die Sampling-Spec legt Budgets
+    spaeter je Modus fest) — 2048 reichte nicht fuer ein `write_note` mit ~9 KB Text.
+  - Die `mode`-Felder von `edit_active_note`, `write_note` und `write_skill` tragen kein
+    `enum` mehr im Tool-Schema (google/gemma-4-31b mit Original-Template scheitert daran mit
+    HTTP 400 „Unknown test: sequence"); die erlaubten Werte stehen weiterhin in der
+    description, die bestehende Validierung in `vault-tools.ts` bleibt die Instanz, die
+    einen falschen Wert als Tool-Ergebnis ans Modell zurueckmeldet.
 - Abgeschnittene Antwort (`finish_reason: "length"`) wird jetzt ausgewertet statt getragen und
   verworfen: mit verwertbarem Text ein Hinweis unter der Antwort (kein Fehler), ohne Text ein
   Fehler, der das Token-Limit nennt — der Reasoning-Normalfall, bei dem das Denken das Budget
