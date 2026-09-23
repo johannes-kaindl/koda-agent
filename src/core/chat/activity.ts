@@ -13,6 +13,10 @@
 
 export type ActivityEvent =
   /** ask() startet. */                       | { kind: "ask" }
+  /** Tool-Call-Kopf da (Name bekannt), Argumente werden noch gepuffert generiert — die lange
+   *  Stille aus KodaChatClient.TOOL_CALL_IDLE_TIMEOUT_MS braucht ein eigenes Lebenszeichen,
+   *  sonst steht die Statuszeile noch auf "denkt nach" waehrend das Modell schon schreibt. */
+                                              | { kind: "tool-call-head"; name: string }
   /** ein Werkzeug beginnt (args = roher JSON-String des Modells). */
                                               | { kind: "tool-start"; name: string; args: string }
   /** das Werkzeug ist zurueck. */            | { kind: "tool-end" }
@@ -96,6 +100,8 @@ export function nextActivity(_prev: Activity, e: ActivityEvent): Activity {
       return { busy: true, labelKey: "activity.summarizing", labelArg: "" };
     case "tool-start":
       return toolActivity(e.name, e.args);
+    case "tool-call-head":
+      return { busy: true, labelKey: "activity.writingToolCall", labelArg: shorten(e.name) };
     case "done":
       return IDLE;
   }

@@ -58,6 +58,10 @@ defineStrings({
     "activity.tool.related_notes": "Looking for notes related to {0}…",
     "activity.tool.save_memory": "Saving something to memory…",
     "activity.tool.generic": "Running {0}…",
+    // Zwischen Kopf-Chunk und Argumenten puffert LM Studio bis zu 15 Minuten still
+    // (KodaChatClient.TOOL_CALL_IDLE_TIMEOUT_MS) — ohne dieses Label sieht das nach
+    // "denkt nach" aus, obwohl das Modell schon den Tool-Aufruf schreibt.
+    "activity.writingToolCall": "Writing tool call {0}…",
     "activity.context": "Context {0} % used",
     "confirm.title": "Koda wants to {0}: {1}",
     "confirm.cancel": "Cancel",
@@ -269,6 +273,7 @@ defineStrings({
     "activity.tool.related_notes": "Sucht Notizen, die {0} ähneln…",
     "activity.tool.save_memory": "Merkt sich etwas…",
     "activity.tool.generic": "Führt {0} aus…",
+    "activity.writingToolCall": "Schreibt Werkzeug-Aufruf {0}…",
     "activity.context": "Kontext {0} % belegt",
     "confirm.title": "Koda möchte {0}: {1}",
     "confirm.cancel": "Abbrechen",

@@ -239,6 +239,106 @@ describe("runAgent", () => {
     expect(toolMsg?.content).toMatch(/ohne Argumente/i);
     expect(toolMsg?.content).toContain("write_note");
   });
+
+  it("finish_reason ungleich tool_calls MIT nativen Calls: nicht ausfuehren, truncated-Error statt Tool-Lauf (Punkt 1)", async () => {
+    const events: { kind: string; errorKind?: string }[] = [];
+    const out = msgsOf(await runAgent(
+      {
+        llm: scripted([
+          { ok: true, content: "", toolCalls: [{ id: "c1", name: "write_note", arguments: '{"path":"A.md"' }], finishReason: "length" },
+        ]),
+        tools: okTools, maxRounds: 8, textFallback: false,
+      },
+      user, () => {}, () => {}, (e) => events.push(e as never), sig(),
+    ));
+    expect(events[0]).toMatchObject({ kind: "error", errorKind: "truncated" });
+    // Das Tool lief NICHT — es steht keine Tool-Nachricht im Verlauf.
+    expect(out.some((m) => m.role === "tool")).toBe(false);
+  });
+
+  it("finish_reason tool_calls: der vollstaendige Call laeuft ganz normal", async () => {
+    const out = msgsOf(await runAgent(
+      {
+        llm: scripted([
+          { ok: true, content: "", toolCalls: [{ id: "c1", name: "search_notes", arguments: '{"query":"x"}' }], finishReason: "tool_calls" },
+          { ok: true, content: "Fertig", toolCalls: [] },
+        ]),
+        tools: okTools, maxRounds: 8, textFallback: false,
+      },
+      user, () => {}, () => {}, () => {}, sig(),
+    ));
+    expect(out.map((m) => m.role)).toEqual(["assistant", "tool", "assistant"]);
+  });
+
+  it("Text-Fallback ist von der finish_reason-Pruefung ausgenommen (kein finish_reason tool_calls dort je)", async () => {
+    const out = msgsOf(await runAgent(
+      {
+        llm: scripted([
+          { ok: true, content: '{"tool":"search_notes","arguments":{"query":"x"}}', toolCalls: [], finishReason: "stop" },
+          { ok: true, content: "Fertig", toolCalls: [] },
+        ]),
+        tools: okTools, maxRounds: 8, textFallback: true,
+      },
+      user, () => {}, () => {}, () => {}, sig(),
+    ));
+    expect(out.map((m) => m.role)).toEqual(["assistant", "tool", "assistant"]);
+  });
+
+  it("Reasoning einer Tool-Call-Runde geht in der naechsten Runde mit, aber nie in die Rueckgabe (Punkt 3)", async () => {
+    const seen: ChatMessage[][] = [];
+    const llm: LoopLlm = {
+      complete: async (m) => {
+        seen.push(m);
+        if (seen.length === 1) {
+          return {
+            ok: true, content: "", reasoning: "Ich denke nach",
+            toolCalls: [{ id: "c1", name: "search_notes", arguments: '{"query":"x"}' }],
+          };
+        }
+        return { ok: true, content: "Fertig", toolCalls: [] };
+      },
+    };
+    const out = msgsOf(await runAgent(
+      { llm, tools: okTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, () => {}, sig(),
+    ));
+    const secondRoundAssistant = seen[1].find((m) => m.role === "assistant" && (m.toolCalls?.length ?? 0) > 0);
+    expect(secondRoundAssistant?.reasoning).toBe("Ich denke nach");
+    const persistedAssistant = out.find((m) => (m.toolCalls?.length ?? 0) > 0);
+    expect(persistedAssistant).not.toHaveProperty("reasoning");
+  });
+
+  it("ohne Reasoning: kein reasoning-Feld auf der Tool-Call-Nachricht", async () => {
+    const seen: ChatMessage[][] = [];
+    const llm: LoopLlm = {
+      complete: async (m) => {
+        seen.push(m);
+        if (seen.length === 1) return { ok: true, content: "", toolCalls: [{ id: "c1", name: "search_notes", arguments: "{}" }] };
+        return { ok: true, content: "Fertig", toolCalls: [] };
+      },
+    };
+    await runAgent(
+      { llm, tools: okTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, () => {}, sig(),
+    );
+    const secondRoundAssistant = seen[1].find((m) => m.role === "assistant" && (m.toolCalls?.length ?? 0) > 0);
+    expect(secondRoundAssistant).not.toHaveProperty("reasoning");
+  });
+
+  it("tool-call-head wird als Event durchgereicht (Punkt 2, Status-Anzeige)", async () => {
+    const events: string[] = [];
+    const llm: LoopLlm = {
+      complete: async (_m, _t, _r, _s, onToolCallHead) => {
+        onToolCallHead?.("write_note");
+        return { ok: true, content: "", toolCalls: [{ id: "c1", name: "write_note", arguments: '{"path":"A.md","content":"x","mode":"create"}' }], finishReason: "tool_calls" };
+      },
+    };
+    await runAgent(
+      { llm, tools: okTools, maxRounds: 1, textFallback: false },
+      user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
+    );
+    expect(events[0]).toBe("tool-call-head");
+  });
 });
 
 const big = (tag: string): string => `${tag} ${"x".repeat(STUB_MIN_CHARS + 40)}`;

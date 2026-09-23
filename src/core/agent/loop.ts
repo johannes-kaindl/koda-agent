@@ -1,4 +1,5 @@
 import {
+  isChatMessage,
   type ChatMessage,
   type CompactionRecord,
   type LogEntry,
@@ -19,12 +20,19 @@ export interface LoopLlm {
     onToken: (t: string) => void,
     onReasoning: (t: string) => void,
     signal: AbortSignal,
+    // Optional: feuert, sobald ein Tool-Call-Kopf (Name bekannt, Argumente noch leer) da ist —
+    // die UI kann daraus "schreibt Tool-Aufruf <name> …" zeigen, statt in der gepufferten
+    // Stille (KodaChatClient TOOL_CALL_IDLE_TIMEOUT_MS) ohne Lebenszeichen dazustehen.
+    onToolCallHead?: (name: string) => void,
   ): Promise<LlmResult>;
 }
 
 export type AgentEvent =
   | { kind: "tool-start"; call: ToolCall }
   | { kind: "tool-end"; call: ToolCall; outcome: ToolOutcome }
+  /** Kopf-Chunk eines Tool-Calls (Name da, Argumente werden noch gepuffert generiert) —
+   *  vor "tool-start", das erst nach der vollstaendigen Assemblierung kommt. */
+  | { kind: "tool-call-head"; name: string }
   /** truncated: finish_reason "length" bei verwertbarem Text (Fall 2, REGISTRY „Abgeschnittene
    *  LLM-Antwort") — kein Fehler, nur ein Hinweis fuer die UI-Schicht. */
   | { kind: "final"; text: string; truncated: boolean }
@@ -68,8 +76,28 @@ export interface AgentDeps {
  *  Pure: kennt nur die Ports. Rueckgabe sind die NEU erzeugten Eintraege — Nachrichten
  *  UND Verdichtungs-Marken im selben Kanal; der Aufrufer haengt sie an seine Session
  *  und persistiert. Vor jedem Modellaufruf wird der Verlauf projiziert und bei Bedarf
- *  verdichtet (Spec § Architektur). */
+ *  verdichtet (Spec § Architektur). Duennes Aeusseres um `runAgentImpl`: entfernt das
+ *  `reasoning`-Feld (s. types.ts), bevor die Nachrichten den Aufrufer erreichen — es ist
+ *  Loop-lokal und darf nicht in die persistierte Session gelangen. */
 export async function runAgent(
+  deps: AgentDeps,
+  history: LogEntry[],
+  onToken: (t: string) => void,
+  onReasoning: (t: string) => void,
+  onEvent: (e: AgentEvent) => void,
+  signal: AbortSignal,
+): Promise<LogEntry[]> {
+  const appended = await runAgentImpl(deps, history, onToken, onReasoning, onEvent, signal);
+  return appended.map((e) => {
+    if (isChatMessage(e) && e.reasoning !== undefined) {
+      const { reasoning: _reasoning, ...rest } = e;
+      return rest;
+    }
+    return e;
+  });
+}
+
+async function runAgentImpl(
   deps: AgentDeps,
   history: LogEntry[],
   onToken: (t: string) => void,
@@ -129,7 +157,10 @@ export async function runAgent(
   let overflowRetried = false;
   while (round < deps.maxRounds) {
     await compact(false);
-    const r = await deps.llm.complete(projectForModel(entries()), onToken, onReasoning, signal);
+    const r = await deps.llm.complete(
+      projectForModel(entries()), onToken, onReasoning, signal,
+      (name) => onEvent({ kind: "tool-call-head", name }),
+    );
 
     if (!r.ok) {
       // Reaktives Netz: beim ERSTEN Ueberlauf einmal erzwungen verdichten (K=0, dann
@@ -147,6 +178,17 @@ export async function runAgent(
       return appended;
     }
 
+    // Ein Call ist nur bei finish_reason "tool_calls" vollstaendig (llm-setup 6f75737,
+    // 9x gemessen: bei "length" kommt der Kopf-Chunk mit Name, der Argument-Chunk fehlt).
+    // Nur native Calls betrifft das — der Text-Fallback unten hat nie finish_reason
+    // "tool_calls" und ist hier absichtlich ausgenommen (er greift erst, wenn r.toolCalls
+    // leer ist, also unterhalb dieser Weiche).
+    if (r.toolCalls.length > 0 && r.finishReason !== undefined && r.finishReason !== "tool_calls") {
+      if (r.content !== "") appended.push({ role: "assistant", content: r.content });
+      onEvent({ kind: "error", message: "", partial: r.content, errorKind: "truncated" });
+      return appended;
+    }
+
     let calls: ToolCall[] = r.toolCalls;
     if (calls.length === 0 && deps.textFallback) {
       const textual = parseTextToolCall(r.content);
@@ -159,7 +201,12 @@ export async function runAgent(
       return appended;
     }
 
-    appended.push({ role: "assistant", content: r.content, toolCalls: calls });
+    appended.push({
+      role: "assistant",
+      content: r.content,
+      toolCalls: calls,
+      ...(r.reasoning !== undefined && r.reasoning !== "" ? { reasoning: r.reasoning } : {}),
+    });
     for (const call of calls) {
       if (signal.aborted) {
         onEvent({ kind: "error", message: "", partial: "", errorKind: "aborted" });

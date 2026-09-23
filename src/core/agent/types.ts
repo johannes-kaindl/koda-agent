@@ -17,6 +17,14 @@ export interface ChatMessage {
   context?: ContextAttachment;
   /** Nur in der Projektion: der Kontextblock dieser Nachricht ist ein Stub (Stufe 1). Nie persistiert. */
   contextStubbed?: true;
+  /** Nur waehrend eines laufenden `runAgent`-Aufrufs (Loop-lokal, NIE persistiert — der Loop
+   *  entfernt das Feld vor der Rueckgabe): das Denken, mit dem diese Assistant-Runde ihre
+   *  Tool-Calls gewaehlt hat. Manche Endpunkte (Open WebUI/gpt-oss, gemessen 2026-09-21,
+   *  llm-configs `docs/reference/openwebui-api.md` § „Mehrrundige Werkzeuglaeufe") brechen
+   *  einen mehrrundigen Tool-Lauf nach der zweiten Runde stumm ab, wenn dieses Denken der
+   *  Vorrunde nicht zurueckgeschickt wird — nur ueber die naechste(n) Folgerunde(n) desselben
+   *  Laufs hinweg relevant, nicht ueber Sitzungsgrenzen. */
+  reasoning?: string;
 }
 
 /** Verdichtungs-Marke im Verlauf. Referenziert nichts — ihre POSITION ist die Referenz:
@@ -79,6 +87,12 @@ export function toWireMessages(msgs: ChatMessage[]): unknown[] {
       return {
         role: "assistant",
         content: m.content,
+        // Beide Feldnamen wie llm-benchmark-harness seit `fade3f6` (2026-09-21) — der
+        // Konsument entscheidet, welchen er liest, ein Client kann es nicht wissen (gemessen:
+        // opencode liest `reasoning`, Open WebUI/gpt-oss ignoriert `reasoning_content`).
+        ...(m.reasoning !== undefined && m.reasoning !== ""
+          ? { reasoning: m.reasoning, reasoning_content: m.reasoning }
+          : {}),
         tool_calls: m.toolCalls.map((c) => ({
           id: c.id,
           type: "function",

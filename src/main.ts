@@ -698,7 +698,7 @@ export default class KodaPlugin extends Plugin {
       const readPaths: string[] = [];
 
       const llm: LoopLlm = {
-        complete: (messages, onToken, onReasoning, signal) =>
+        complete: (messages, onToken, onReasoning, signal, onToolCallHead) =>
           withFailover(
             this.resolver,
             (ep) => {
@@ -713,7 +713,7 @@ export default class KodaPlugin extends Plugin {
                 model: effectiveModel(ep, s.model),
                 suppressThinking: s.suppressThinking,
               };
-              return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal).then((r) => {
+              return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal, onToolCallHead).then((r) => {
                 this.reportToLab({
                   feature: this.labFeature(selection),
                   model: cfg.model,
@@ -784,6 +784,7 @@ export default class KodaPlugin extends Plugin {
         (tok) => { for (const v of this.views()) { v.activity({ kind: "token" }); v.streamToken(tok); } },
         (r) => { for (const v of this.views()) { v.activity({ kind: "reasoning" }); v.streamReasoning(r); } },
         (e) => {
+          if (e.kind === "tool-call-head") for (const v of this.views()) v.activity({ kind: "tool-call-head", name: e.name });
           if (e.kind === "tool-start") for (const v of this.views()) {
             v.activity({ kind: "tool-start", name: e.call.name, args: e.call.arguments });
             v.toolStep(`⚙ ${e.call.name}`, e.call.arguments);

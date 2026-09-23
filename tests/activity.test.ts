@@ -73,6 +73,14 @@ describe("nextActivity — Werkzeuge nennen, was sie tun", () => {
     });
   });
 
+  it("tool-call-head: Koda schreibt schon den Tool-Aufruf, bevor die Argumente da sind", () => {
+    expect(run([{ kind: "ask" }, { kind: "tool-call-head", name: "write_note" }])).toEqual({
+      busy: true,
+      labelKey: "activity.writingToolCall",
+      labelArg: "write_note",
+    });
+  });
+
   it("nach dem Werkzeug denkt Koda wieder nach", () => {
     const a = run([
       { kind: "ask" },
