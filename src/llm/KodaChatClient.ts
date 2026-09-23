@@ -31,11 +31,20 @@ export interface ChatConfig {
 }
 
 export type LlmResult =
-  | { ok: true; content: string; toolCalls: ToolCall[]; finishReason?: string }
+  | { ok: true; content: string; toolCalls: ToolCall[]; finishReason?: string; reasoning?: string }
   | { ok: false; kind: "aborted" | "http" | "network" | "timeout" | "overflow" | "truncated"; detail: string; partial: string };
 
 const ERROR_BODY_CAP = 2048;
 export const DEFAULT_TIMEOUT_MS = 120_000;
+/** LM Studio streamt Tool-Call-Argumente nicht, es puffert sie: der Kopf-Chunk (`id`, `name`,
+ *  leere Argumente) kommt, sobald der Name feststeht, danach kein Byte, bis die kompletten
+ *  Argumente auf einmal folgen — die Stille entspricht der vollen Generierungszeit der
+ *  Argumente (llm-setup `6f75737`, `docs/reference/setup.md` § „Tool-Calls im Stream").
+ *  Das normale Idle-Timeout wuerde einen gesunden Schreib-Call darin abbrechen; ab dem
+ *  Kopf-Chunk gilt deshalb diese laengere Frist — Groessenordnung von OpenCodes
+ *  `chunkTimeout`-Default (llm-setup `docs/explanation/qwen3.8-27b-toolcall-loop.md`
+ *  § „Gegenmittel"). */
+export const TOOL_CALL_IDLE_TIMEOUT_MS = 900_000;
 
 export class KodaChatClient {
   constructor(
@@ -51,6 +60,11 @@ export class KodaChatClient {
     onToken: (t: string) => void,
     onReasoning: (t: string) => void,
     signal: AbortSignal,
+    // Nur der Status-Zeile gedacht (UI-STANDARD §8 Status-Indikator): feuert einmal je
+    // Tool-Call-Index, sobald dessen Name feststeht — also genau am Kopf-Chunk, bevor die
+    // lange Stille der gepufferten Argumente beginnt. Optional, weil kein Aufrufer sie
+    // BRAUCHT (der Timeout-Wechsel unten haengt nicht daran).
+    onToolCallHead?: (name: string) => void,
   ): Promise<LlmResult> {
     if (signal.aborted) return { ok: false, kind: "aborted", detail: "stream aborted", partial: "" };
 
@@ -61,7 +75,11 @@ export class KodaChatClient {
       messages: toWireMessages(messages),
       stream: true,
       temperature: 0.2,
-      max_tokens: 2048,
+      // 2048 reichte nicht fuer ein write_note mit ~9 KB Text (~2000 Tokens allein fuer den
+      // Inhalt). Vorlaeufiger Wert — die Sampling-Spec (Design-Session obsidian-kit-d8) legt
+      // Budgets spaeter je Modus fest; llm-setup empfahl mindestens 8192, siehe Befundnotiz
+      // "Tool-Use-Budget und Gemma-Schemas" 2026-09-23.
+      max_tokens: 8192,
       ...suppressParams(effectiveSuppress(cfg.model, cfg.suppressThinking)),
     };
     if (tools.length > 0) body.tools = toWireTools(tools);
@@ -77,37 +95,49 @@ export class KodaChatClient {
        (Als Gesamt-Timeout brach er eine laufende Antwort mitten im Satz ab; GUI-Smoke
        2026-08-06.) Fuer den Abbruch einer gesunden, aber unerwuenschten Antwort ist der
        Stopp-Knopf zustaendig, nicht die Uhr. */
+    let idleTimeoutMs = this.timeoutMs;
     const fire = (): void => { timedOut = true; ctrl.abort(); };
-    let timer = this.clock.setTimeout(fire, this.timeoutMs);
+    let timer = this.clock.setTimeout(fire, idleTimeoutMs);
     const bumpIdleTimer = (): void => {
       this.clock.clearTimeout(timer);
-      timer = this.clock.setTimeout(fire, this.timeoutMs);
+      timer = this.clock.setTimeout(fire, idleTimeoutMs);
     };
 
     const splitter = new ThinkSplitter();
     const assembler = new ToolCallAssembler();
+    const notifiedToolCallHeads = new Set<number>();
     let content = "";
+    let reasoning = "";
     let finishReason: string | undefined;
     let rest = "";
     let rawBody = "";
 
     const emit = (c: string, r: string): void => {
       if (c !== "") { content += c; onToken(c); }
-      if (r !== "") { onReasoning(r); }
+      if (r !== "") { reasoning += r; onReasoning(r); }
     };
     const drainSplitter = (): void => {
       const tail = splitter.flush();
       emit(tail.content, tail.reasoning);
     };
     const consume = (raw: string): void => {
-      bumpIdleTimer();
       if (rawBody.length < ERROR_BODY_CAP) rawBody += raw;
       const p = parseAgentSSE(rest + raw);
       rest = p.rest;
       if (p.finishReason !== undefined && finishReason === undefined) finishReason = p.finishReason;
       for (const r of p.reasoning) emit("", r);
       for (const c of p.content) { const s = splitter.push(c); emit(s.content, s.reasoning); }
-      for (const d of p.toolCalls) assembler.push(d);
+      for (const d of p.toolCalls) {
+        assembler.push(d);
+        // Ab hier gilt die lange Frist (s. TOOL_CALL_IDLE_TIMEOUT_MS): dieser Chunk KANN der
+        // Kopf-Chunk sein, danach kommt kein Byte mehr, bis die Argumente fertig sind.
+        idleTimeoutMs = TOOL_CALL_IDLE_TIMEOUT_MS;
+        if (d.name !== undefined && !notifiedToolCallHeads.has(d.index)) {
+          notifiedToolCallHeads.add(d.index);
+          onToolCallHead?.(d.name);
+        }
+      }
+      bumpIdleTimer();
     };
 
     let status: number;
@@ -118,7 +148,7 @@ export class KodaChatClient {
       drainSplitter();
       if (err.name === "AbortError") {
         return timedOut
-          ? { ok: false, kind: "timeout", detail: `keine Antwort seit ${this.timeoutMs / 1000}s`, partial: content }
+          ? { ok: false, kind: "timeout", detail: `keine Antwort seit ${idleTimeoutMs / 1000}s`, partial: content }
           : { ok: false, kind: "aborted", detail: "stream aborted", partial: content };
       }
       return { ok: false, kind: "network", detail: chatErrorMessage(err), partial: content };
@@ -142,6 +172,12 @@ export class KodaChatClient {
     if (finishReason === "length" && content === "") {
       return { ok: false, kind: "truncated", detail: "finish_reason: length, kein Text", partial: "" };
     }
-    return { ok: true, content, toolCalls: assembler.finish(), ...(finishReason !== undefined ? { finishReason } : {}) };
+    return {
+      ok: true,
+      content,
+      toolCalls: assembler.finish(),
+      ...(finishReason !== undefined ? { finishReason } : {}),
+      ...(reasoning !== "" ? { reasoning } : {}),
+    };
   }
 }

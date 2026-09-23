@@ -1,4 +1,4 @@
-import { KodaChatClient, type SseTransport } from "../src/llm/KodaChatClient";
+import { KodaChatClient, TOOL_CALL_IDLE_TIMEOUT_MS, type SseTransport } from "../src/llm/KodaChatClient";
 import type { ChatMessage } from "../src/core/agent/types";
 
 const cfg = { endpoint: "http://127.0.0.1:1234", apiKey: "", model: "m", suppressThinking: true };
@@ -159,5 +159,70 @@ describe("KodaChatClient.complete", () => {
     // abgebrochen (GUI-Smoke-Befund 2026-08-06).
     expect(set).toHaveLength(4);
     expect(cleared).toEqual([1, 2, 3, 4]);
+  });
+
+  it("schickt max_tokens 8192 (Punkt 4: 2048 reichte nicht fuer ein write_note mit ~9 KB)", async () => {
+    let sentBody: Record<string, unknown> | undefined;
+    const t: SseTransport = {
+      async postStream(_u, b, _h, onChunk) {
+        sentBody = b as Record<string, unknown>;
+        onChunk("data: [DONE]\n");
+        return 200;
+      },
+    };
+    const client = new KodaChatClient(t, 1000, fakeClock);
+    await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(sentBody?.max_tokens).toBe(8192);
+  });
+
+  it("wechselt ab dem Tool-Call-Kopf auf die lange Idle-Frist (TOOL_CALL_IDLE_TIMEOUT_MS)", async () => {
+    const ms: number[] = [];
+    let n = 0;
+    const capturingClock = {
+      now: () => 0,
+      setTimeout: (_fn: () => void, m: number): number => { ms.push(m); n += 1; return n; },
+      clearTimeout: (): void => {},
+    };
+    const client = new KodaChatClient(transportOf([
+      // Kopf-Chunk: Name da, Argumente noch leer — hier soll die Frist wechseln.
+      line({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "write_note", arguments: "" } }] } }] }),
+      line({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] })
+        + line({ choices: [{ delta: {}, finish_reason: "tool_calls" }] }) + "data: [DONE]\n",
+    ]), 1000, capturingClock);
+    await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    // Initialer Timer vor dem ersten Byte laeuft noch mit der normalen Frist.
+    expect(ms[0]).toBe(1000);
+    // Ab dem Kopf-Chunk (und danach) gilt die lange Frist.
+    expect(ms[ms.length - 1]).toBe(TOOL_CALL_IDLE_TIMEOUT_MS);
+  });
+
+  it("meldet den Tool-Call-Kopf genau einmal je Index ueber onToolCallHead", async () => {
+    const heads: string[] = [];
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "write_note", arguments: "" } }] } }] }),
+      // Zweiter Chunk desselben Index traegt keinen neuen Namen — kein zweites Kopf-Event.
+      line({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] })
+        + line({ choices: [{ delta: {}, finish_reason: "tool_calls" }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal, (name) => heads.push(name));
+    expect(heads).toEqual(["write_note"]);
+  });
+
+  it("liefert das akkumulierte Reasoning im ok-Ergebnis, damit es der Loop zurueckschicken kann", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { reasoning_content: "Ich ueberlege." } }] })
+        + line({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "search_notes", arguments: "{}" } }] } }] })
+        + line({ choices: [{ delta: {}, finish_reason: "tool_calls" }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: true, reasoning: "Ich ueberlege." });
+  });
+
+  it("liefert kein reasoning-Feld, wenn nichts anfiel", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { content: "Antwort" } }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    if (r.ok) expect(r.reasoning).toBeUndefined();
   });
 });
