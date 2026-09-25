@@ -94,6 +94,13 @@ export const CONTEXT_BUDGET_STEP = 1000;
 export const CONTEXT_LINK_DEPTH_MIN = 1;
 export const CONTEXT_LINK_DEPTH_MAX = 3;
 
+/** Spanne fuer `contextAutoK` — wie viele Notizen vault-rag im Modus Vault (Treffer zur
+ *  Frage) und im Modus Notiz (semantische Nachbarn) beisteuert. 0 schaltet beides ab;
+ *  eine eigene Schalter-Einstellung daneben waere ein zweiter Weg zum selben Zustand
+ *  (Spec E8, Etappe-3-Zuschnitt Punkt 4). */
+export const CONTEXT_AUTO_K_MIN = 0;
+export const CONTEXT_AUTO_K_MAX = 20;
+
 export interface KodaSettings {
   endpoints: EndpointConfig[];
   model: string;
@@ -120,6 +127,7 @@ export interface KodaSettings {
   contextFrontmatterChars: number;
   contextBudgetChars: number;
   contextLinkDepth: number;
+  contextAutoK: number;
   /** Bleiben Abwahl und manuelle Zusaetze ueber die Nachricht hinaus stehen? Default `true`:
    *  der weniger ueberraschende Zustand — was abgewuehlt ist, bleibt abgewuehlt, bis „Auswahl
    *  zuruecksetzen" oder ein neues Gespraech. vault-rag lebt das Gegenteil, weil dort die
@@ -162,6 +170,7 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   contextFrontmatterChars: 300,
   contextBudgetChars: 20000,
   contextLinkDepth: 1,
+  contextAutoK: 5,
   contextKeepChoices: true,
   contextSections: {},
   systemPromptOverride: "",
@@ -221,6 +230,7 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
   contextFrontmatterChars: clampIntField(CONTEXT_FRONTMATTER_MIN, CONTEXT_FRONTMATTER_MAX),
   contextBudgetChars: clampIntField(CONTEXT_BUDGET_MIN, CONTEXT_BUDGET_MAX),
   contextLinkDepth: clampIntField(CONTEXT_LINK_DEPTH_MIN, CONTEXT_LINK_DEPTH_MAX),
+  contextAutoK: clampIntField(CONTEXT_AUTO_K_MIN, CONTEXT_AUTO_K_MAX),
   contextSections: boolRecord,
   toolsDisabled: stringArray,
   toolDescriptions: stringRecord,

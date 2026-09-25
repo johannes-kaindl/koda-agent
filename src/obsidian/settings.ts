@@ -75,6 +75,8 @@ import {
   CONTEXT_BUDGET_STEP,
   CONTEXT_LINK_DEPTH_MIN,
   CONTEXT_LINK_DEPTH_MAX,
+  CONTEXT_AUTO_K_MIN,
+  CONTEXT_AUTO_K_MAX,
   type KodaSettings,
 } from "../core/settings-types";
 import type KodaPlugin from "../main";
@@ -235,6 +237,11 @@ export class KodaSettingsTab extends PluginSettingTab {
             name: t("settings.contextLinkDepth"),
             desc: t("settings.contextLinkDepth.desc"),
             control: { type: "slider", key: "contextLinkDepth", min: CONTEXT_LINK_DEPTH_MIN, max: CONTEXT_LINK_DEPTH_MAX, step: 1 },
+          },
+          {
+            name: t("settings.contextAutoK"),
+            desc: t("settings.contextAutoK.desc"),
+            control: { type: "slider", key: "contextAutoK", min: CONTEXT_AUTO_K_MIN, max: CONTEXT_AUTO_K_MAX, step: 1 },
           },
           {
             name: t("settings.contextKeep"),

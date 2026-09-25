@@ -186,6 +186,13 @@ describe("Etappe 2b: Budget und Link-Tiefe", () => {
     expect(validateKodaSettings({ contextBudgetChars: "30000" }).contextBudgetChars).toBe(30000);
   });
 
+  it("klemmt contextAutoK auf 0..20, Default 5", () => {
+    expect(validateKodaSettings({}).contextAutoK).toBe(5);
+    expect(validateKodaSettings({ contextAutoK: -1 }).contextAutoK).toBe(0);
+    expect(validateKodaSettings({ contextAutoK: 99 }).contextAutoK).toBe(20);
+    expect(validateKodaSettings({ contextAutoK: "7" }).contextAutoK).toBe(7);
+  });
+
   it("klemmt contextLinkDepth auf 1..3", () => {
     expect(validateKodaSettings({ contextLinkDepth: 0 }).contextLinkDepth).toBe(1);
     expect(validateKodaSettings({ contextLinkDepth: 9 }).contextLinkDepth).toBe(3);
