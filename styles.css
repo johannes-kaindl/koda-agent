@@ -248,6 +248,10 @@
    behalten, bleibt fuer `.koda-log` (flex: 1) genau der Rest — der Verlauf scrollt, die
    Eingabe steht am unteren Rand. */
 .koda-hub .okit-hub-panel[data-tab="chat"] { display: flex; flex-direction: column; overflow: hidden; }
+/* Spezifitaet: die Regel oben (0,3,0) schlug `.okit-hub-panel.is-hidden` (0,2,0) — der Chat blieb im
+ * Kontext-Tab stehen und schob das Kontext-Panel 801 px nach unten, aus dem Bild (gemessen
+ * 2026-09-25, Screenshot Etappe 3a; seit 0.13.0 so). */
+.koda-hub .okit-hub-panel.is-hidden { display: none; }
 
 /* uebernommen aus obsidian-kit/src/obsidian/hub.ts (HUB_CSS), 2026-09-05 — nie von Hand
    aendern, sondern den Block bei einem Kit-Update ersetzen. Das Kit injiziert kein CSS. */
