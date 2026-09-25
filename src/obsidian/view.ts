@@ -7,8 +7,9 @@ import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/c
 import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obsidian/stable-writer";
 import { thinkToggleView } from "../core/chat/reasoning-toggle";
-import { AVAILABLE_MODES, isContextMode, type ContextAttachment } from "../core/context/types";
-import { contextSummary, modeLabel, sourceChips } from "../core/context/labels";
+import { isContextMode, type ContextAttachment } from "../core/context/types";
+import { contextSummary, sourceChips } from "../core/context/labels";
+import { fillModeSelect } from "./mode-select";
 import { ContextPanel } from "./context-panel";
 import type KodaPlugin from "../main";
 
@@ -91,6 +92,7 @@ export class KodaView extends ItemView {
     this.ctxPanel = new ContextPanel({
       mode: () => this.plugin.contextMode,
       setMode: (m) => { this.plugin.setContextMode(m); },
+      vaultAvailable: () => this.plugin.vaultAvailable(),
       viewModel: () => this.plugin.contextViewModel(),
       toggle: (s, p) => { this.plugin.toggleContextItem(s, p); },
       remove: (p) => { this.plugin.removeContextPath(p); },
@@ -133,7 +135,7 @@ export class KodaView extends ItemView {
   setTab(id: KodaTab): void { this.hub?.setTab(id); }
 
   syncContextMode(): void {
-    if (this.modeEl !== null) this.modeEl.value = this.plugin.contextMode;
+    if (this.modeEl !== null) fillModeSelect(this.modeEl, this.lang(), this.plugin.vaultAvailable(), this.plugin.contextMode);
     this.ctxPanel?.render();
   }
 
@@ -165,7 +167,6 @@ export class KodaView extends ItemView {
     // Modus-Dropdown links vom Senden: fuenf Zustaende sind kein Schalter. Ein Zustand, zwei
     // Bedienstellen (Befehle setzen denselben Wert) — syncContextMode zieht nach.
     this.modeEl = buttons.createEl("select", { cls: "dropdown koda-mode", attr: { "aria-label": t("context.dropdownAria") } });
-    for (const m of AVAILABLE_MODES) this.modeEl.createEl("option", { value: m, text: modeLabel(m, this.lang()) });
     this.modeEl.addEventListener("change", () => {
       const v = this.modeEl?.value;
       if (isContextMode(v)) this.plugin.setContextMode(v);

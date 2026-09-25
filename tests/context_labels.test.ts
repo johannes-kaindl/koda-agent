@@ -1,4 +1,4 @@
-import { contextSummary, modeLabel } from "../src/core/context/labels";
+import { contextSummary, modeLabel, modeOptions } from "../src/core/context/labels";
 import type { ContextAttachment } from "../src/core/context/types";
 
 describe("modeLabel", () => {
@@ -38,5 +38,17 @@ describe("contextSummary", () => {
     };
     expect(contextSummary(one, "de")).toBe("Arbeitsplatz · 1 Tab");
     expect(contextSummary(one, "en")).toBe("Workspace · 1 tab");
+  });
+});
+
+describe("modeOptions", () => {
+  it("sperrt Vault ohne vault-rag und sagt warum", () => {
+    const opts = modeOptions("de", false);
+    const vault = opts.find((o) => o.value === "vault");
+    expect(vault).toEqual({ value: "vault", label: "Vault (braucht vault-rag)", disabled: true });
+    expect(opts.filter((o) => o.disabled)).toHaveLength(1);
+  });
+  it("gibt Vault mit vault-rag frei", () => {
+    expect(modeOptions("en", true).find((o) => o.value === "vault")).toEqual({ value: "vault", label: "Vault", disabled: false });
   });
 });

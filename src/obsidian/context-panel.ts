@@ -3,8 +3,8 @@ import type { ContextMode, ContextSource } from "../core/context/types";
 import type { PanelViewModel } from "../core/context/panel-vm";
 import type { HubPanel } from "../vendor/kit-obsidian/hub";
 import { collapsibleSection, type CollapsibleStorage } from "../vendor/kit-obsidian/collapsible";
-import { AVAILABLE_MODES, isContextMode } from "../core/context/types";
-import { modeLabel } from "../core/context/labels";
+import { isContextMode } from "../core/context/types";
+import { fillModeSelect } from "./mode-select";
 import { t } from "../vendor/kit/i18n";
 
 /** Schmaler Host-Vertrag (UI-STANDARD §4): das Panel kennt weder Plugin noch Ports.
@@ -12,6 +12,8 @@ import { t } from "../vendor/kit/i18n";
 export interface ContextPanelHost {
   mode(): ContextMode;
   setMode(m: ContextMode): void;
+  /** Ist vault-rag da? Bestimmt, ob der Modus Vault im Dropdown waehlbar ist. */
+  vaultAvailable(): boolean;
   viewModel(): Promise<PanelViewModel>;
   toggle(source: ContextSource, path: string): void;
   remove(path: string): void;
@@ -57,7 +59,6 @@ export class ContextPanel implements HubPanel<"context"> {
 
     // Derselbe Modus wie im Chat — ein Zustand, zwei Bedienstellen (Spec § E6).
     this.modeEl = head.createEl("select", { cls: "dropdown koda-mode", attr: { "aria-label": t("context.dropdownAria") } });
-    for (const m of AVAILABLE_MODES) this.modeEl.createEl("option", { value: m, text: modeLabel(m, this.host.lang()) });
     this.modeEl.addEventListener("change", () => {
       const v = this.modeEl?.value;
       if (isContextMode(v)) this.host.setMode(v);
@@ -127,7 +128,7 @@ export class ContextPanel implements HubPanel<"context"> {
   }
 
   private paint(vm: PanelViewModel): void {
-    if (this.modeEl !== null) this.modeEl.value = this.host.mode();
+    if (this.modeEl !== null) fillModeSelect(this.modeEl, this.host.lang(), this.host.vaultAvailable(), this.host.mode());
 
     if (this.summaryEl !== null && this.summaryIconEl !== null) {
       this.summaryEl.removeClass("is-ok");

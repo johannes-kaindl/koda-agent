@@ -34,12 +34,8 @@ describe("Modi", () => {
 });
 
 describe("AVAILABLE_MODES", () => {
-  it("bietet nach Etappe 2b vier Modi an", () => {
-    expect([...AVAILABLE_MODES]).toEqual(["off", "workspace", "note", "tabs"]);
-  });
-
-  it("bietet den Vault-Modus noch nicht an — er braucht vault-rag und kommt in Etappe 3", () => {
-    expect(AVAILABLE_MODES).not.toContain("vault");
-    expect(CONTEXT_MODES).toContain("vault");
+  it("bietet seit Etappe 3 alle fuenf Modi an — die Verfuegbarkeit von Vault prueft die Oberflaeche zur Laufzeit", () => {
+    expect([...AVAILABLE_MODES]).toEqual(["off", "workspace", "note", "tabs", "vault"]);
+    expect([...AVAILABLE_MODES]).toEqual([...CONTEXT_MODES]);
   });
 });

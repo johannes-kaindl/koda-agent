@@ -206,10 +206,9 @@ export class KodaSettingsTab extends PluginSettingTab {
               type: "dropdown",
               key: "contextModeDefault",
               // Dieselben Labels wie das Dropdown im Chat — ein Wortlaut, zwei Bedienstellen.
-              // AVAILABLE_MODES statt CONTEXT_MODES: angeboten wird nur, was auch gebaut ist
-              // (Spec E6: „ein Eintrag, der nie geht, ist kein Versprechen"). Das Schema in
-              // settings-types.ts akzeptiert weiterhin alle fuenf Modi — ein gespeicherter
-              // Default aus einer spaeteren Etappe bleibt gueltig, siehe onload()-Guard.
+              // Alle fuenf Modi sind gebaut; Vault als *Default* ist auch ohne vault-rag erlaubt —
+              // der Chat faellt beim Start auf Arbeitsplatz zurueck, wenn vault-rag fehlt
+              // (`onLayoutReady` in main.ts).
               options: Object.fromEntries(AVAILABLE_MODES.map((m) => [m, modeLabel(m, getLang() === "de" ? "de" : "en")])),
             },
           },

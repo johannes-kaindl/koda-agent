@@ -1,15 +1,15 @@
 /* Treffer aus vault-rag als WERT: der Vault-Modus meldet einen Fehler, der Modus Notiz
  * schweigt (Spec, Etappe-3-Zuschnitt Punkte 2 und 4). */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, type Mock } from "vitest";
 import { fetchSemanticHits, semanticNotice, NO_HITS } from "../src/core/context/semantic";
 import type { ApiResult, RetrievalApi } from "../src/core/tools/retrieval";
 
-function api(search: ApiResult, related: ApiResult = search, indexed = true): RetrievalApi & { search: ReturnType<typeof vi.fn>; related: ReturnType<typeof vi.fn> } {
+function api(search: ApiResult, related: ApiResult = search, indexed = true): RetrievalApi & { search: Mock<unknown[], Promise<ApiResult>>; related: Mock<unknown[], Promise<ApiResult>> } {
   return {
     apiVersion: 1,
     status: () => ({ apiVersion: 1, indexed, noteCount: 3 }),
-    search: vi.fn(() => Promise.resolve(search)),
-    related: vi.fn(() => Promise.resolve(related)),
+    search: vi.fn((..._args: unknown[]) => Promise.resolve(search)),
+    related: vi.fn((..._args: unknown[]) => Promise.resolve(related)),
   };
 }
 const ok: ApiResult = { ok: true, hits: [{ path: "V1.md", score: 0.9 }, { path: "V2.md", score: 0.8 }] };

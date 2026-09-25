@@ -42,6 +42,7 @@ function makeHost(vm: () => Promise<PanelViewModel>): ContextPanelHost {
   return {
     mode: () => "note",
     setMode: () => {},
+    vaultAvailable: () => true,
     viewModel: vm,
     toggle: () => {},
     remove: () => {},

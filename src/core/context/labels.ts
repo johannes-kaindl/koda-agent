@@ -1,4 +1,4 @@
-import type { ContextAttachment, ContextMode } from "./types";
+import { AVAILABLE_MODES, type ContextAttachment, type ContextMode } from "./types";
 
 type Lang = "de" | "en";
 
@@ -9,6 +9,21 @@ const MODE: Record<Lang, Record<ContextMode, string>> = {
 
 export function modeLabel(mode: ContextMode, lang: Lang): string {
   return MODE[lang][mode];
+}
+
+export interface ModeOption { value: ContextMode; label: string; disabled: boolean }
+
+const NEEDS_RAG: Record<Lang, string> = { de: "braucht vault-rag", en: "needs vault-rag" };
+
+/** Die Eintraege beider Modus-Dropdowns (Chat und Kontext-Tab) — ein Wortlaut, zwei
+ *  Bedienstellen. Vault ohne vault-rag bleibt SICHTBAR, aber gesperrt und nennt den Grund
+ *  (Spec E1: „derselbe Wortlaut wie bei related_notes"). */
+export function modeOptions(lang: Lang, vaultAvailable: boolean): ModeOption[] {
+  return AVAILABLE_MODES.map((m) => {
+    const disabled = m === "vault" && !vaultAvailable;
+    const label = disabled ? `${modeLabel(m, lang)} (${NEEDS_RAG[lang]})` : modeLabel(m, lang);
+    return { value: m, label, disabled };
+  });
 }
 
 function basename(path: string): string {

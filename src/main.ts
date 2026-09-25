@@ -85,8 +85,20 @@ export default class KodaPlugin extends Plugin {
    *  „Neues Gespraech" aendert ihn nicht. */
   contextMode: ContextMode = "workspace";
 
+  /** Ist vault-rags API da (Version und Form geprueft)? Je Aufruf frisch — vault-rag kann zur
+   *  Laufzeit an- oder abgeschaltet werden (Muster `readRetrievalApi`). Ob ein Index geladen
+   *  ist, entscheidet diese Frage NICHT: das meldet die Suche selbst als Grund. */
+  vaultAvailable(): boolean {
+    return readRetrievalApi(this.app) !== null;
+  }
+
   setContextMode(mode: ContextMode): void {
     if (!AVAILABLE_MODES.includes(mode)) return;
+    if (mode === "vault" && !this.vaultAvailable()) {
+      // Befehl oder veraltetes Dropdown: nicht still ignorieren, sondern sagen, was fehlt.
+      new Notice(t("context.vaultNeedsRag"));
+      return;
+    }
     this.contextMode = mode;
     for (const v of this.views()) v.syncContextMode();
   }
@@ -296,6 +308,13 @@ export default class KodaPlugin extends Plugin {
     // nicht angeboten — dann faellt der Start auf Arbeitsplatz zurueck, statt den Chat in
     // einem Modus zu starten, den er gar nicht anbietet.
     if (!AVAILABLE_MODES.includes(this.contextMode)) this.contextMode = "workspace";
+    // Erst wenn alle Plugins geladen sind, ist die Frage „gibt es vault-rag?" beantwortbar.
+    // Ein gespeicherter Default „vault" ohne vault-rag faellt dann auf Arbeitsplatz zurueck,
+    // und die Dropdowns bekommen ihre Sperre (sie wurden womoeglich vor vault-rag gebaut).
+    this.app.workspace.onLayoutReady(() => {
+      if (this.contextMode === "vault" && !this.vaultAvailable()) this.contextMode = "workspace";
+      for (const v of this.views()) v.syncContextMode();
+    });
     this.applyLanguage();
 
     const dir = normalizePath(`${this.manifest.dir ?? ""}/sessions`);
