@@ -14,7 +14,9 @@ import { requestUrlProbe } from "./obsidian/http-probe";
 import { XhrSseTransport } from "./llm/XhrSseTransport";
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
 import { type ChatMessage, type LogEntry } from "./core/agent/types";
-import { toolDefs, toWireTools, type ToolDef } from "./core/tools/defs";
+import { toolSet, toWireTools, type ToolDef, type ToolSet } from "./core/tools/defs";
+import { readToolProviders } from "./obsidian/providers";
+import { confirmAction } from "./vendor/kit-obsidian/confirm";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/prompt/build";
 import { effectiveRules, renderRules } from "./core/prompt/rules";
@@ -493,10 +495,20 @@ export default class KodaPlugin extends Plugin {
    *  jeder Messpunkt darf sie ebenfalls rufen und misst damit die WIRKLICHE Liste — es gibt
    *  keinen zweiten Weg, auf dem die gesendete Liste entsteht. */
   currentToolDefs(): ToolDef[] {
-    return toolDefs({
+    return this.currentToolSet().defs;
+  }
+
+  /** Wirts- UND Anbieter-Werkzeuge als eine Menge (Spike Werkzeug-Anbieter, 2026-09-25):
+   *  Anbieter werden bei jedem Aufruf frisch aus dem Plugin-Register gelesen, ihre
+   *  Definitionen in der Prompt-Sprache geholt. Dieselbe Menge liefert dem Runner die Route
+   *  — ein zweiter Aufbau waere eine zweite Wahrheit. */
+  currentToolSet(): ToolSet {
+    const lang = this.promptLang();
+    return toolSet({
       related: readRetrievalApi(this.app)?.status().indexed === true,
       disabled: this.settings.toolsDisabled,
       descriptions: this.settings.toolDescriptions,
+      providers: readToolProviders(this.app).map((p) => ({ id: p.id, tools: p.api.tools({ lang }) })),
     });
   }
 
@@ -599,6 +611,20 @@ export default class KodaPlugin extends Plugin {
       editor: editorPort(this.app),
       lang: () => this.promptLang(),
       contextFrontmatterChars: () => this.settings.contextFrontmatterChars,
+      // Anbieter-Werkzeuge: Route aus derselben Menge wie die gesendete Liste, API frisch aus
+      // dem Register — ein zwischenzeitlich deaktiviertes Plugin ergibt null, der Runner
+      // meldet Klartext.
+      provider: (name) => {
+        const id = this.currentToolSet().routes.get(name);
+        if (id === undefined) return null;
+        return readToolProviders(this.app).find((p) => p.id === id)?.api ?? null;
+      },
+      confirmProvider: (preview) => confirmAction(this.app, {
+        title: t("provider.confirm.title"),
+        message: [preview.summary, ...(preview.paths.length > 0 ? [t("provider.confirm.paths", preview.paths.join(", "))] : [])],
+        confirmLabel: t("provider.confirm.ok"),
+        warning: false,
+      }),
     });
   }
 

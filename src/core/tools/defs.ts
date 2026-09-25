@@ -1,3 +1,5 @@
+import { mountProviderTools, type MountedTools, type ProviderOffer } from "./provider";
+
 export interface ToolDef {
   name: string;
   description: string;
@@ -191,18 +193,49 @@ const RELATED_DEF: ToolDef = {
  *  Ort, an dem sie entsteht — abgeschaltet heisst hier: nicht gesendet, das Modell erfaehrt
  *  nichts davon (Spec E3). Die Kopie ist Absicht: ein Aufrufer soll TOOL_DEFS nicht
  *  versehentlich veraendern koennen. */
-export function toolDefs(opts: {
+export function toolDefs(opts: ToolSetOptions): ToolDef[] {
+  return toolSet(opts).defs;
+}
+
+export interface ToolSetOptions {
   related: boolean;
   disabled?: string[];
   descriptions?: Record<string, string>;
-}): ToolDef[] {
-  const alle = opts.related ? [...TOOL_DEFS, RELATED_DEF] : [...TOOL_DEFS];
+  /** Werkzeug-Anbieter (Spike 2026-09-25): was fremde Plugins ueber den Vertrag anbieten,
+   *  in Lesereihenfolge. Fehlt das Feld, verhaelt sich Koda wie vor der Montage. */
+  providers?: ProviderOffer[];
+}
+
+export interface ToolSet extends MountedTools {
+  /** Die Namen aller Werkzeuge, die dieser Wirt selbst traegt — auch die gerade nicht
+   *  gesendeten. Der Runner unterscheidet damit „abgeschaltet" von „nie meins". */
+  hostNames: Set<string>;
+}
+
+/** Wirts-Werkzeuge plus montierte Anbieter-Werkzeuge als EINE Menge: Definitionen fuer den
+ *  Draht, Routen fuer den Runner, Schreibkennzeichen fuer die Bestaetigung. Abschaltung und
+ *  eigene Beschreibung des Nutzers gelten fuer beide Sorten gleich — der Schalter je
+ *  Werkzeug ist die Feinsteuerung, mit der ein Anbieter mit vielen Werkzeugen ertraeglich
+ *  bleibt. **Montiert statt handgeschrieben:** bietet ein Anbieter `related_notes` an,
+ *  entfaellt Kodas eigene RELATED_DEF; sie bleibt nur fuer ein vault-rag ohne Vertrag. Die
+ *  Route eines abgeschalteten Werkzeugs bleibt bekannt, damit ein halluzinierter Aufruf als
+ *  „abgeschaltet" abgelehnt wird und nicht als „unbekannt". */
+export function toolSet(opts: ToolSetOptions): ToolSet {
+  const providers = opts.providers ?? [];
+  const angeboten = new Set(providers.flatMap((p) => p.tools.map((t) => t.name)));
+  const eigene = opts.related && !angeboten.has(RELATED_DEF.name) ? [...TOOL_DEFS, RELATED_DEF] : [...TOOL_DEFS];
+  const m = mountProviderTools(eigene, providers);
   const aus = new Set(opts.disabled ?? []);
   const eigen = opts.descriptions ?? {};
-  return alle
+  const defs = m.defs
     .filter((d) => !aus.has(d.name))
     .map((d) => {
       const text = (eigen[d.name] ?? "").trim();
       return text === "" ? { ...d } : { ...d, description: text };
     });
+  return { ...m, defs, hostNames: new Set(HOST_TOOL_NAMES) };
 }
+
+/** Alle Werkzeuge, die Koda selbst ausfuehrt — unabhaengig davon, ob sie gerade gesendet
+ *  werden. Ein Name ausserhalb dieser Menge ist ein Anbieter-Werkzeug oder unbekannt. */
+export const HOST_TOOL_NAMES: ReadonlySet<string> = new Set([...TOOL_DEFS, RELATED_DEF].map((d) => d.name));

@@ -1,4 +1,6 @@
 import type { ToolOutcome, ToolRunner } from "../core/agent/types";
+import { HOST_TOOL_NAMES } from "../core/tools/defs";
+import { outcomeFromProvider, type ProviderConfirmPreview, type ToolProviderApi } from "../core/tools/provider";
 import { resolveFolderPath, resolveNotePath, READ_EXTENSIONS } from "../core/tools/path-guard";
 import { writePolicy } from "../core/tools/write-policy";
 import { movePolicy, planMove } from "../core/tools/move";
@@ -121,8 +123,30 @@ export class VaultTools implements ToolRunner {
        *  die Begruendung steht an `renderWorkspaceReport`. Fehlt das Feld, gilt der
        *  Auslieferungswert, also keine Abwahl (Tests, die nur den Vault-Kern messen). */
       contextFrontmatterChars?: () => number;
+      /** Werkzeug-Anbieter (Spike 2026-09-25): liefert fuer einen montierten Namen die API
+       *  des Anbieters — frisch je Aufruf, weil das Plugin zwischen Prompt-Bau und Aufruf
+       *  deaktiviert worden sein kann. `null` heisst: kein Anbieter (mehr) fuer diesen Namen. */
+      provider?: (name: string) => ToolProviderApi | null;
+      /** Bestaetigung fuer ein schreibendes Anbieter-Werkzeug; der Anbieter ruft sie mit
+       *  seiner Vorschau, BEVOR er schreibt. Fehlt sie, endet jedes `writes:true`-Werkzeug
+       *  beim Anbieter mit `needs-confirm` — das ist der Vertrag, nicht ein Defekt. */
+      confirmProvider?: (preview: ProviderConfirmPreview) => Promise<boolean>;
     },
   ) {}
+
+  /** Ein Name, den Koda nicht selbst traegt, gehoert einem Anbieter — oder niemandem. */
+  private async runProvided(name: string, args: Record<string, unknown>): Promise<ToolOutcome> {
+    const api = this.opts.provider?.(name) ?? null;
+    if (api === null) {
+      return { ok: false, error: `Werkzeug nicht mehr verfügbar: ${name} — das anbietende Plugin ist nicht (mehr) geladen. Nutze ein anderes.` };
+    }
+    const erlaubt = this.opts.allowed?.();
+    if (erlaubt !== undefined && !erlaubt.has(name)) {
+      return { ok: false, error: `Werkzeug abgeschaltet: ${name} — der Nutzer hat es in den Einstellungen deaktiviert. Nutze ein anderes.` };
+    }
+    const r = await api.execute(name, args, { lang: this.opts.lang?.(), confirm: this.opts.confirmProvider });
+    return outcomeFromProvider(r);
+  }
 
   async run(name: string, args: unknown): Promise<ToolOutcome> {
     const a = (typeof args === "object" && args !== null ? args : {}) as Record<string, unknown>;
@@ -132,6 +156,10 @@ export class VaultTools implements ToolRunner {
       // Verlauf aufgreifen — ohne diese Zeile schriebe `write_note` dann trotzdem, im
       // Koda-Ordner sogar ohne Rueckfrage. Die Oberflaeche verspricht „Was Koda tun darf";
       // gehalten wird das Versprechen hier (Spec E3: messen statt annehmen).
+      // Anbieter-Werkzeuge VOR dem Erlaubnis-Guard: ein verschwundener Anbieter soll
+      // „nicht mehr verfuegbar" melden, nicht „vom Nutzer abgeschaltet" — die Erlaubnis-Menge
+      // wird frisch gebaut und kennt den Namen dann ebenfalls nicht mehr.
+      if (!HOST_TOOL_NAMES.has(name)) return await this.runProvided(name, a);
       const erlaubt = this.opts.allowed?.();
       if (erlaubt !== undefined && !erlaubt.has(name) && !this.fehltAusFremdemGrund(name)) {
         return { ok: false, error: `Werkzeug abgeschaltet: ${name} — der Nutzer hat es in den Einstellungen deaktiviert. Nutze ein anderes.` };
