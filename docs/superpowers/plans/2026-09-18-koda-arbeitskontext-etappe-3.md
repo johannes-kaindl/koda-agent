@@ -10,6 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-02-koda-arbeitskontext-design.md`, besonders die Abschnitte **E1**, **E6**, **E7**, **E8** und **„Etappe 3 — Zuschnitt (Design-Session mit Johannes, 2026-09-18)"**. Spike-Befunde: `docs/LAB.md` § „2026-09-06 · Bases-View-API“. Beide lesen, bevor du anfängst.
 
+
+> ⚠️ **Nachtrag 2026-09-25: Prüfpunkt 42 ist belegt** (`list_notes` nennt Unterordner, außerhalb dieser Etappe). Alle Prüfpunkt-Nummern dieses Plans verschieben sich um eins: 3a baut **43–46** (Erwartung 46/46), 3b **47–48** (Erwartung 48/48). Die Nummern im Text unten sind nicht umgeschrieben.
+
 ## Global Constraints
 
 - **Zwei Teil-Etappen, nacheinander.** 3a = Tasks 1–8, 3b = Tasks 9–13. 3b beginnt erst, wenn 3a komplett ist (Gate grün, Smoke grün, committet). Beide ändern `candidates.ts`, `build.ts`, `render.ts`, `panel-vm.ts`, `main.ts` und `context-panel.ts`, deshalb nie parallel.

@@ -302,7 +302,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** echte Modell-Antwort. 41 Punkte (41 seit
+  Prüft die Naht zum Host, bewusst **ohne** echte Modell-Antwort. 42 Punkte (42 seit 2026-09-25: `list_notes` nennt die Unterordner eines flachen Ergebnisses, auch einen ohne Notiz, und meldet einen fehlenden Ordner als nicht existent — Naht `vault.getAllFolders()`, Gegenprobe gegen den alten Build in `docs/SMOKE.md`; 41 seit
   2026-09-17: llm-lab-Meldestrecke — ein `llm-lab`-Stub (Marker-Check gegen ein echtes
   Plugin) sieht `feature`/`model`/`endpointUrl`/`content`/`latencyMs`/`turnId`/
   `promptTemplate` und nur `system`/`user`/`assistant`-Nachrichten aus einem echten

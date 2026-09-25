@@ -769,6 +769,21 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-25 — `list_notes` nennt Unterordner (42/42), mit Gegenprobe
+
+Vault `koda-agent` (Staging, Zweitinstanz Port 9374, Obsidian 1.14.2), Gate 763/763 (von 743), GUI-Smoke 42/42.
+
+Anlass: `list_notes("_Koda")` meldete im Arbeits-Vault „4 von 4 Notizen", verschwieg drei bewohnte Unterordner (`Brain`, `Lab`, `Logs`), und Koda berichtete sie daraufhin als nicht existent und schlug vor, sie anzulegen. Ohne `recursive` verwarf das Werkzeug alles unterhalb des Ordners, ohne es zu erwähnen, und Ordner ohne Notiz sah es in keinem Modus. Jetzt nennt ein flaches Ergebnis die Unterordner schon in der Kopfzeile (Zahl, Notizen darunter, „NICHT mitgelistet") und in Zeile 2 einzeln; ein rekursives nennt die Ordner ohne Notiz. Die Ordner kommen aus `vault.getAllFolders()`, und ein Ordner, den es nicht gibt, heißt jetzt so, statt „dort liegt keine Notiz".
+
+**Punkt 42** baut seinen Zustand selbst (`Koda/smoke42` mit einer Notiz oben, `Voll/` mit einer Notiz, `Ohne/` ohne Notiz), prüft vorher, dass es ihn noch nicht gibt, und räumt nur weg, was er selbst angelegt hat. Gemessen wird die Naht zu Obsidian, die die Unit-Tests nicht erreichen: liefert `getAllFolders()` den Ordner ohne Notiz, taucht die Wurzel (`/`) nirgends als Unterordner auf, und meldet ein fehlender Ordner sich als nicht existent.
+
+### Gegenprobe
+
+Der erste Lauf fuhr — ungeplant — gegen den **alten** Build im Staging-Vault: **41/42, genau Punkt 42 rot** („Kopf OHNE Unterordnerzahl · Ohne FEHLT · Voll FEHLT · fehlender Ordner NICHT: Dort liegt keine Notiz …"), alle übrigen 41 grün. Nach Build und Deploy des Repo-Stands 42/42. Auf Unit-Ebene zusätzlich zwei Mutationen am Adapter (`subfolders: []` statt der gesammelten Liste; Existenzprüfung ersetzt durch „keine Notiz gefunden"), jede fing genau ein Test in `tests/vault_tools_list.test.ts`.
+
+**Nicht gemessen:** ob Koda sich mit der neuen Ausgabe tatsächlich anders verhält. Das braucht einen Praxistest (`gui:ask`) gegen ein echtes Modell mit der Frage vom 2026-09-25.
+
+
 ## Belegter Lauf: 2026-09-17 — Welle 6, llm-lab-Konsument (41/41), mit Gegenprobe
 
 Vault `koda-agent` (Staging, Zweitinstanz Port 9374), Gate 727/727 (von 715 — zwölf neue

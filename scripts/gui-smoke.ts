@@ -2455,6 +2455,71 @@ async function main(): Promise<void> {
       }
       record("41. llm-lab-Meldestrecke (Konsumenten-Seite): turnId/promptTemplate/Nachrichten korrekt gemeldet", ok41, detail41);
     }
+
+    // --- 42. list_notes nennt Unterordner — auch einen ohne Notiz -----------------
+    // Anlass 2026-09-25: `list_notes("_Koda")` meldete „4 von 4 Notizen", verschwieg drei
+    // bewohnte Unterordner, und Koda berichtete sie als nicht existent. Die pure Schicht ist
+    // unit-getestet; offen ist hier nur die NAHT: liefert `vault.getAllFolders()` einen Ordner
+    // ohne Notiz wirklich, und taucht die Wurzel ("/") nirgends als Unterordner auf?
+    // Der Punkt baut seinen Zustand selbst und prueft vorher, dass es ihn noch nicht gibt
+    // (CORE-TEST-21) — sonst misst ein Rest aus einem abgebrochenen Lauf statt des Prueflings.
+    const W42 = "Koda/smoke42";
+    let detail42 = "nicht gelaufen";
+    let ok42 = false;
+    let eigen42 = true; // aufgeraeumt wird nur, was dieser Lauf angelegt hat
+    try {
+      const r42 = await cdp.evaluate<{
+        vorher: boolean;
+        flat?: { ok: boolean; content?: string; error?: string };
+        root?: { ok: boolean; content?: string; error?: string };
+        fehlt?: { ok: boolean; content?: string; error?: string };
+      }>(`
+        const W = ${JSON.stringify(W42)};
+        if (app.vault.getAbstractFileByPath(W) !== null) return { vorher: true };
+        await app.vault.createFolder(W + "/Voll");
+        await app.vault.createFolder(W + "/Ohne");
+        await app.vault.create(W + "/Voll/a.md", "x");
+        await app.vault.create(W + "/oben.md", "x");
+        const t = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools();
+        return {
+          vorher: false,
+          flat: await t.run("list_notes", { folder: W }),
+          root: await t.run("list_notes", { folder: "" }),
+          fehlt: await t.run("list_notes", { folder: W + "/Gibtsnicht" }),
+        };
+      `);
+      eigen42 = !r42.vorher;
+      if (r42.vorher) {
+        detail42 = `${W42} existiert schon (Rest eines abgebrochenen Laufs?) — nicht gemessen, bitte von Hand entfernen`;
+      } else {
+        const flat = r42.flat?.content ?? r42.flat?.error ?? "";
+        const root = r42.root?.content ?? r42.root?.error ?? "";
+        const ohne = flat.includes(`${W42}/Ohne (keine Notiz)`);
+        const voll = flat.includes(`${W42}/Voll (1 Notiz)`);
+        const kopf = /2 Unterordner/.test(flat.split("\n")[0] ?? "");
+        // Die Wurzel-Liste muss Unterordner nennen (das Fixture hat welche), und keiner davon
+        // darf die Wurzel selbst sein — Obsidian fuehrt sie als "/", ein Filterfehler zeigte
+        // sie als "/ (…)" oder als leeren Namen " (…)".
+        const wurzelZeile = root.split("\n")[1] ?? "";
+        const wurzelSauber = wurzelZeile.startsWith("Unterordner: ")
+          && wurzelZeile.slice("Unterordner: ".length).split(" · ").every((e) => !e.startsWith("/") && !e.startsWith("("));
+        const fehlt = r42.fehlt?.ok === false && /gibt es nicht/.test(r42.fehlt.error ?? "");
+        ok42 = r42.flat?.ok === true && ohne && voll && kopf && wurzelSauber && fehlt;
+        const zweite = flat.split("\n")[1] ?? "";
+        detail42 = `Kopf ${kopf ? "nennt 2 Unterordner" : "OHNE Unterordnerzahl"} · „${zweite.slice(0, 90)}“ · `
+          + `Ohne ${ohne ? "gesehen" : "FEHLT"} · Voll ${voll ? "gesehen" : "FEHLT"} · Wurzel ${wurzelSauber ? "sauber" : "MIT „/“"} · `
+          + `fehlender Ordner ${fehlt ? "als nicht existent gemeldet" : `NICHT: ${(r42.fehlt?.error ?? r42.fehlt?.content ?? "").slice(0, 60)}`}`;
+      }
+    } catch (error) {
+      detail42 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      if (eigen42) await cdp.evaluate(`
+        const f = app.vault.getAbstractFileByPath(${JSON.stringify(W42)});
+        if (f) await app.vault.delete(f, true);
+        return true;
+      `).catch(() => undefined);
+    }
+    record("42. list_notes nennt Unterordner, auch einen ohne Notiz; fehlender Ordner als nicht existent", ok42, detail42);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
