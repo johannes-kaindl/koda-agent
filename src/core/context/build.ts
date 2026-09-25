@@ -10,9 +10,10 @@ import { collectCandidates } from "./candidates";
 import { allocateBudget, type LoadedCandidate } from "./select";
 import { renderFullContext, headerLine, cutMessage } from "./render";
 import { itemKey, type SelectionKey } from "./selection";
+import { NO_HITS, semanticNotice, type SemanticHits } from "./semantic";
 
 export interface BuildOptions {
-  mode: "note" | "tabs";
+  mode: "note" | "tabs" | "vault";
   snap: WorkspaceSnapshot;
   links: LinkPort;
   content: ContentPort;
@@ -21,6 +22,8 @@ export interface BuildOptions {
   linkDepth: number;
   budget: number;
   lang: "de" | "en";
+  /** vault-rag-Ergebnis (`fetchSemanticHits`). Fehlt es, verhaelt sich der Bau wie in Etappe 2. */
+  hits?: SemanticHits;
 }
 
 /** Fixe Zeichenlast eines Eintrags, die `allocateBudget` nicht sieht, weil sie erst beim
@@ -42,10 +45,15 @@ function overheadFor(c: LoadedCandidate, lang: BuildOptions["lang"]): number {
 }
 
 export async function buildFullContext(opts: BuildOptions): Promise<ContextAttachment> {
+  const hits = opts.hits ?? NO_HITS;
   const kandidaten = collectCandidates({
     mode: opts.mode, snap: opts.snap, links: opts.links,
     linkDepth: opts.linkDepth, manual: opts.manual,
+    semantic: hits.kind === "ok" ? hits.paths : [],
   }).filter((c) => !opts.off.has(itemKey(c.source, c.path)));
+  // Nur der Vault-Modus meldet einen Fehlschlag: dort IST die Suche der Modus. Im Modus Notiz
+  // sind die Nachbarn eine Zugabe und fehlen still (Etappe-3-Zuschnitt Punkt 4).
+  const notice = opts.mode === "vault" && hits.kind === "failed" ? semanticNotice(hits.reason, opts.lang) : undefined;
 
   const geladen: LoadedCandidate[] = [];
   for (const c of kandidaten) {
@@ -54,7 +62,7 @@ export async function buildFullContext(opts: BuildOptions): Promise<ContextAttac
     geladen.push({ ...c, content: text });
   }
 
-  const overhead = geladen.reduce((sum, c) => sum + overheadFor(c, opts.lang), 0);
+  const overhead = geladen.reduce((sum, c) => sum + overheadFor(c, opts.lang), 0) + (notice?.length ?? 0) + 1;
   const inhaltsBudget = Math.max(0, opts.budget - overhead);
-  return renderFullContext(allocateBudget(geladen, inhaltsBudget), opts.mode, opts.lang);
+  return renderFullContext(allocateBudget(geladen, inhaltsBudget), opts.mode, opts.lang, notice !== undefined ? { notice } : {});
 }

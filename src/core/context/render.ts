@@ -19,16 +19,16 @@ export interface EntryHead {
 const T = {
   de: {
     head: (m: string) => `[Arbeitskontext · ${m}]`,
-    mode: { note: "Notiz", tabs: "Alle Tabs" },
-    src: { active: "aktive Notiz", manual: "manuell hinzugefügt", tab: "offener Tab", link: "verlinkt", backlink: "verlinkt hierher" },
+    mode: { note: "Notiz", tabs: "Alle Tabs", vault: "Vault" },
+    src: { active: "aktive Notiz", manual: "manuell hinzugefügt", tab: "offener Tab", link: "verlinkt", backlink: "verlinkt hierher", related: "semantisch ähnlich", vault: "Treffer der Vault-Suche" },
     level: (n: number) => `, Ebene ${n}`,
     cut: (a: number, b: number, p: string) => `[gekürzt: ${a} von ${b} Zeichen — vollständig über read_note("${p}")]`,
     empty: "nichts ausgewählt — der Kontext-Tab in Kodas Seitenleiste zeigt, was zur Auswahl steht.",
   },
   en: {
     head: (m: string) => `[Working context · ${m}]`,
-    mode: { note: "Note", tabs: "All tabs" },
-    src: { active: "active note", manual: "added by hand", tab: "open tab", link: "linked from here", backlink: "links to here" },
+    mode: { note: "Note", tabs: "All tabs", vault: "Vault" },
+    src: { active: "active note", manual: "added by hand", tab: "open tab", link: "linked from here", backlink: "links to here", related: "semantically similar", vault: "vault search match" },
     level: (n: number) => `, level ${n}`,
     cut: (a: number, b: number, p: string) => `[cut: ${a} of ${b} chars — full text via read_note("${p}")]`,
     empty: "nothing selected — the Context tab in Koda's sidebar shows what is on offer.",
@@ -52,13 +52,23 @@ export function cutMessage(shown: number, full: number, path: string, lang: Lang
   return T[lang].cut(shown, full, path);
 }
 
+/** Was ein Block zusaetzlich zu den Eintraegen tragen kann. */
+export interface RenderExtras {
+  /** Eine Zeile direkt unter der Kopfzeile — z. B. „Vault-Suche nicht verfuegbar". */
+  notice?: string;
+}
+
 export function renderFullContext(
   entries: readonly AllocatedEntry[],
-  mode: "note" | "tabs",
+  mode: "note" | "tabs" | "vault",
   lang: Lang,
+  extras: RenderExtras = {},
 ): ContextAttachment {
   const t = T[lang];
-  const bloecke: string[] = [t.head(t.mode[mode])];
+  // Der Hinweis haengt mit EINEM Zeilenumbruch an der Kopfzeile, die Eintraege folgen wie
+  // bisher mit "\n\n".
+  const kopfzeile = t.head(t.mode[mode]);
+  const bloecke: string[] = [extras.notice !== undefined ? `${kopfzeile}\n${extras.notice}` : kopfzeile];
   const items: ContextItem[] = [];
 
   if (entries.length === 0) {

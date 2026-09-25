@@ -93,3 +93,44 @@ describe("buildFullContext", () => {
     expect(ctx.items.map((i) => i.path)).toEqual(["A.md", "T.md"]);
   });
 });
+
+describe("buildFullContext — Modus Vault", () => {
+  it("legt Treffer im Volltext in den Block, Quelle vault", async () => {
+    const content = inhalt({ "A.md": "Text A", "V.md": "Text V" });
+    const ctx = await buildFullContext({
+      mode: "vault", snap, links, content, manual: [], off: new Set(),
+      linkDepth: 1, budget: 10000, lang: "de", hits: { kind: "ok", paths: ["V.md"] },
+    });
+    expect(ctx.mode).toBe("vault");
+    expect(ctx.items.map((i) => `${i.source}:${i.path}`)).toEqual(["active:A.md", "vault:V.md"]);
+  });
+  it("meldet eine fehlgeschlagene Suche im Block, statt still leer zu bleiben", async () => {
+    const ctx = await buildFullContext({
+      mode: "vault", snap, links, content: inhalt({ "A.md": "Text A" }), manual: [], off: new Set(),
+      linkDepth: 1, budget: 10000, lang: "de", hits: { kind: "failed", reason: "offline" },
+    });
+    expect(ctx.text).toContain("Vault-Suche nicht verfügbar");
+    expect(ctx.items.map((i) => i.path)).toEqual(["A.md"]);
+  });
+  it("ein abgewaehlter Treffer wird nicht gelesen", async () => {
+    const content = inhalt({ "A.md": "Text A", "V.md": "Text V" });
+    await buildFullContext({
+      mode: "vault", snap, links, content, manual: [], off: new Set([itemKey("vault", "V.md")]),
+      linkDepth: 1, budget: 10000, lang: "de", hits: { kind: "ok", paths: ["V.md"] },
+    });
+    expect(content.read).not.toHaveBeenCalledWith("V.md");
+  });
+  it("Modus Notiz: related-Treffer kommen als Nachbarn, fehlgeschlagene schweigen", async () => {
+    const content = inhalt({ "A.md": "Text A", "B.md": "Text B", "R.md": "Text R" });
+    const ctx = await buildFullContext({
+      mode: "note", snap, links, content, manual: [], off: new Set(),
+      linkDepth: 1, budget: 10000, lang: "de", hits: { kind: "ok", paths: ["R.md"] },
+    });
+    expect(ctx.items.map((i) => i.source)).toEqual(["active", "link", "related"]);
+    const still = await buildFullContext({
+      mode: "note", snap, links, content, manual: [], off: new Set(),
+      linkDepth: 1, budget: 10000, lang: "de", hits: { kind: "failed", reason: "offline" },
+    });
+    expect(still.text).not.toContain("nicht verfügbar");
+  });
+});

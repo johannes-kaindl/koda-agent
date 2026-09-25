@@ -46,3 +46,18 @@ describe("renderFullContext", () => {
     expect(ctx.text).toContain("nichts ausgewählt");
   });
 });
+
+describe("renderFullContext — Modus Vault und Hinweiszeile", () => {
+  it("setzt den Hinweis direkt unter die Kopfzeile", () => {
+    const ctx = renderFullContext([], "vault", "de", { notice: "[Vault-Suche nicht verfügbar: x]" });
+    const zeilen = ctx.text.split("\n");
+    expect(zeilen[0]).toBe("[Arbeitskontext · Vault]");
+    expect(zeilen[1]).toBe("[Vault-Suche nicht verfügbar: x]");
+  });
+  it("benennt Vault-Treffer und semantische Nachbarn als Herkunft", () => {
+    const e = (source: "vault" | "related") => ({ source, path: `${source}.md`, shown: "x", fullChars: 1, cut: false });
+    const ctx = renderFullContext([e("vault"), e("related")], "vault", "de");
+    expect(ctx.text).toContain("## vault.md (Treffer der Vault-Suche)");
+    expect(ctx.text).toContain("## related.md (semantisch ähnlich)");
+  });
+});
