@@ -2702,6 +2702,86 @@ async function main(): Promise<void> {
       }
       record("46. Kontext-Tab: Vault-Vorschau folgt dem Entwurf im Eingabefeld (entprellt)", ok46, detail46);
     }
+
+    // --- 47. Werkzeug-Anbieter: ein fremdes Plugin wird montiert, geroutet, abgeschaltet, entfernt ---
+    // Spike 2026-09-25 (Cockpit-Task „Werkzeug-Anbieter-Vertrag"). Die pure Schicht ist
+    // unit-getestet; hier zaehlt die NAHT: liest `currentToolNames()` wirklich aus
+    // `app.plugins.plugins[*].api`, geht `buildTools().run()` an `execute()` des Anbieters,
+    // greift der Nutzer-Schalter aus `toolsDisabled` auch fuer ein montiertes Werkzeug, und
+    // verschwindet das Werkzeug samt Route, sobald der Anbieter weg ist? Ein Stub unter einer
+    // eigenen Plugin-Id — kein echtes Plugin traegt sie, also kann der Punkt nichts
+    // ueberschreiben (CORE-TEST-21). Stub-Form = Vertragsstand vault-rag 92c6c4d.
+    const PROV = "koda-smoke-provider";
+    let detail47 = "nicht gelaufen";
+    let ok47 = false;
+    const provVorher = await cdp.evaluate<boolean>(`return !!app.plugins.plugins[${JSON.stringify(PROV)}];`);
+    if (provVorher) {
+      detail47 = `uebersprungen — ${PROV} existiert bereits (Rest eines abgebrochenen Laufs)`;
+      record("47. Werkzeug-Anbieter: montiert, geroutet, abschaltbar, entfernt", true, detail47);
+    } else {
+      try {
+        const vorher = await cdp.evaluate<string[]>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].currentToolNames();`);
+        await cdp.evaluate(`
+          window.__kodaProvCalls = [];
+          app.plugins.plugins[${JSON.stringify(PROV)}] = {
+            api: {
+              tools: (opts) => [
+                { name: "smoke_echo", description: "Smoke: " + String(opts && opts.lang), parameters: { type: "object", properties: { text: { type: "string", description: "x" } }, required: ["text"] }, writes: false },
+                { name: "read_note", description: "Kollision mit dem Wirt — darf NICHT montiert werden", parameters: { type: "object", properties: {}, required: [] }, writes: false },
+              ],
+              execute: async (name, args, opts) => {
+                window.__kodaProvCalls.push({ name, args, lang: opts && opts.lang, hatConfirm: typeof (opts && opts.confirm) === "function" });
+                return { ok: true, content: "echo:" + String(args.text) };
+              },
+            },
+          };
+          return true;
+        `);
+        const p = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const mit = await cdp.evaluate<string[]>(`return ${p}.currentToolNames();`);
+        const defs = await cdp.evaluate<{ name: string; description: string }[]>(`return ${p}.currentToolDefs().filter(d => d.name === "smoke_echo" || d.name === "read_note");`);
+        const lauf = await cdp.evaluate<{ ok: boolean; content?: string; error?: string }>(`return await ${p}.buildTools().run("smoke_echo", { text: "hallo" });`);
+        const calls = await cdp.evaluate<{ name: string; args: unknown; lang: string; hatConfirm: boolean }[]>(`return window.__kodaProvCalls;`);
+        // Nutzer-Schalter: abgeschaltet heisst nicht gesendet UND nicht ausfuehrbar.
+        const aus = await cdp.evaluate<{ names: string[]; lauf: { ok: boolean; error?: string } }>(`
+          const p = ${p};
+          const alt = p.settings.toolsDisabled;
+          p.settings.toolsDisabled = [...alt, "smoke_echo"];
+          const names = p.currentToolNames();
+          const lauf = await p.buildTools().run("smoke_echo", { text: "x" });
+          p.settings.toolsDisabled = alt;
+          return { names, lauf };
+        `);
+        // Anbieter weg: Werkzeug weg, Aufruf meldet Klartext statt zu werfen.
+        const weg = await cdp.evaluate<{ names: string[]; lauf: { ok: boolean; error?: string } }>(`
+          delete app.plugins.plugins[${JSON.stringify(PROV)}];
+          const p = ${p};
+          return { names: p.currentToolNames(), lauf: await p.buildTools().run("smoke_echo", { text: "x" }) };
+        `);
+        const readNoteDef = defs.find((d) => d.name === "read_note");
+        ok47 = !vorher.includes("smoke_echo")
+          && mit.includes("smoke_echo")
+          && mit.filter((n) => n === "read_note").length === 1
+          && readNoteDef !== undefined && !readNoteDef.description.startsWith("Kollision")
+          && lauf.ok === true && lauf.content === "echo:hallo"
+          && calls.length === 1 && calls[0].name === "smoke_echo" && (calls[0].lang === "de" || calls[0].lang === "en") && calls[0].hatConfirm
+          && !aus.names.includes("smoke_echo") && aus.lauf.ok === false && /abgeschaltet/.test(aus.lauf.error ?? "")
+          && !weg.names.includes("smoke_echo") && weg.lauf.ok === false && /nicht mehr verf/.test(weg.lauf.error ?? "");
+        detail47 = `vorher ${vorher.length} Werkzeuge · mit Anbieter ${mit.length} (smoke_echo ${mit.includes("smoke_echo") ? "montiert" : "FEHLT"}, read_note ${mit.filter((n) => n === "read_note").length}× — ${readNoteDef?.description.startsWith("Kollision") ? "ANBIETER GEWANN" : "Wirt gewann"}) · `
+          + `run → ${lauf.ok ? `„${lauf.content}“` : `Fehler „${lauf.error}“`} · execute sah lang=${calls[0]?.lang}, confirm=${calls[0]?.hatConfirm} · `
+          + `abgeschaltet: gesendet ${aus.names.includes("smoke_echo")}, run „${aus.lauf.error ?? "ok?!"}“ · `
+          + `entfernt: gesendet ${weg.names.includes("smoke_echo")}, run „${weg.lauf.error ?? "ok?!"}“`;
+      } catch (error) {
+        detail47 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        await cdp.evaluate(`
+          delete app.plugins.plugins[${JSON.stringify(PROV)}];
+          delete window.__kodaProvCalls;
+          return true;
+        `).catch(() => undefined);
+      }
+      record("47. Werkzeug-Anbieter: montiert, geroutet, abschaltbar, entfernt", ok47, detail47);
+    }
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
