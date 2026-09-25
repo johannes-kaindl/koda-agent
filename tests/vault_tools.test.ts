@@ -23,6 +23,7 @@ function fakeVault(files: Record<string, string>): VaultPort & { files: Record<s
   return {
     files,
     listMarkdownPaths: () => Object.keys(files),
+    listFolderPaths: () => [],
     read: async (p) => {
       if (!(p in files)) throw new Error("not found");
       return files[p];

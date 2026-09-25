@@ -8,6 +8,7 @@ function fakeVault(
   return {
     fmCalls,
     listMarkdownPaths: () => Object.keys(files),
+    listFolderPaths: () => [],
     read: async (p) => files[p] ?? "",
     exists: async (p) => p in files,
     create: async () => undefined,
@@ -50,6 +51,25 @@ describe("list_notes", () => {
     const vault = fakeVault({ "P/A.md": "" });
     const r = await new VaultTools(vault, async () => true, opts).run("list_notes", { folder: "../geheim" });
     expect(r.ok).toBe(false);
+  });
+  it("nennt die Unterordner, die eine flache Liste nicht zeigt (Fall _Koda, 2026-09-25)", async () => {
+    const vault = {
+      ...fakeVault({ "_Koda/Memory.md": "", "_Koda/Brain/Patterns.md": "", "_Koda/Lab/Lab.md": "" }),
+      listFolderPaths: () => ["/", "_Koda", "_Koda/Brain", "_Koda/Lab", "_Koda/Sessions"],
+    };
+    const r = await new VaultTools(vault, async () => true, opts).run("list_notes", { folder: "_Koda" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.content.split("\n")[0]).toContain("3 Unterordner");
+      expect(r.content).toContain("_Koda/Brain (1 Notiz)");
+      expect(r.content).toContain("_Koda/Sessions (keine Notiz)");
+    }
+  });
+  it("meldet einen existierenden Ordner ohne Notiz als Befund, nicht als Fehler", async () => {
+    const vault = { ...fakeVault({ "P/A.md": "" }), listFolderPaths: () => ["P", "P/Leer"] };
+    const r = await new VaultTools(vault, async () => true, opts).run("list_notes", { folder: "P/Leer" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.content).toContain("existiert, enthält aber keine Notiz");
   });
   it("meldet einen leeren Ordner als Fehler MIT Vorschlaegen", async () => {
     const vault = fakeVault({ "P/_Tasks/A.md": "" });

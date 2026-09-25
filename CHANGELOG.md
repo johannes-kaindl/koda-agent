@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- `list_notes` verschweigt keine Unterordner mehr. Ohne `recursive` nennt das Ergebnis schon in der Kopfzeile, wie viele Unterordner es gibt und wie viele Notizen darunter liegen, und in der zweiten Zeile jeden einzeln — auch Ordner ohne eine einzige Notiz. Rekursiv werden die Ordner ohne Notiz genannt, die in den Pfaden nicht auftauchen können. Anlass: Koda hielt bewohnte Unterordner von `_Koda` für nicht existent, weil die flache Liste sie mit keinem Wort erwähnte.
+- Ein Ordner, den es nicht gibt, wird jetzt so gemeldet; ein existierender Ordner ohne Notiz ist ein Befund statt eines Fehlers.
+
 ## [0.15.1] — 2026-09-24
 
 ### Changed

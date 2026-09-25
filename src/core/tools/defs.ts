@@ -30,7 +30,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "list_notes",
     description:
-      "List every note in a vault folder in ONE call, with the frontmatter fields you ask for. Use this whenever completeness matters — all tasks in a folder and their status, all notes of a project — instead of opening notes one by one or inferring the list from prose you read elsewhere. If the result is capped, the first line says so.",
+      "List every note in a vault folder in ONE call, with the frontmatter fields you ask for. Use this whenever completeness matters — all tasks in a folder and their status, all notes of a project — instead of opening notes one by one or inferring the list from prose you read elsewhere. If the result is capped, the first line says so. Without recursive, the first lines also name the subfolders and how many notes each holds, including subfolders that hold no notes.",
     parameters: {
       type: "object",
       properties: {

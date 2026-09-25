@@ -5,6 +5,7 @@ import type { RetrievalApi } from "../src/core/tools/retrieval";
 function vault(files: Record<string, string>): VaultPort {
   return {
     listMarkdownPaths: () => Object.keys(files),
+    listFolderPaths: () => [],
     read: async (p) => {
       if (!(p in files)) throw new Error("not found");
       return files[p];

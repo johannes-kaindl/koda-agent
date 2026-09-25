@@ -121,26 +121,105 @@ function cell(s: string): string {
   return /[·=]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+export interface Subfolder { path: string; notes: number }
+
+/** Alle bekannten Ordner, normalisiert → Originalpfad. Zwei Quellen, weil jede allein
+ *  luegt: die Notizpfade kennen keinen Ordner ohne Notiz, und eine fehlende oder
+ *  unvollstaendige Ordnerliste soll nie Ordner VERSCHWINDEN lassen, die Notizen tragen.
+ *  Obsidian fuehrt die Wurzel als "/" — sie ist kein Unterordner von irgendetwas. */
+function knownFolders(allPaths: string[], folderPaths: string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const f of [...folderPaths, ...allFolders(allPaths)]) {
+    const clean = f.replace(/^\/+|\/+$/g, "");
+    if (clean !== "" && !out.has(nf(clean))) out.set(nf(clean), clean);
+  }
+  return out;
+}
+
+/** Existiert `folder`? Die Vault-Wurzel immer. */
+export function folderExists(allPaths: string[], folderPaths: string[], folder: string): boolean {
+  return folder === "" || knownFolders(allPaths, folderPaths).has(nf(folder));
+}
+
+/** Was eine Liste von `folder` NICHT zeigt, obwohl es dort liegt.
+ *
+ *  Warum: gemessen am 2026-09-25 meldete `list_notes("_Koda")` „4 von 4 Notizen" und
+ *  verschwieg drei bewohnte Unterordner — Koda schloss daraus, sie existierten nicht, und
+ *  schlug vor, sie anzulegen. Ein Werkzeug-Befund, der wie eine Tatsache aussah, also genau
+ *  die Fehlerklasse dieses Moduls. Die Abhilfe liegt im Ergebnis des Werkzeugs, das das
+ *  Modell ohnehin ruft, nicht in einem zweiten Werkzeug: `recursive:true` stand die ganze
+ *  Zeit zur Verfuegung und wurde nicht gewaehlt.
+ *
+ *  Flach: die direkten Unterordner, je mit der Zahl der Notizen darunter (rekursiv
+ *  gezaehlt — „3 Notizen" soll heissen: dort gibt es etwas zu holen).
+ *  Rekursiv: nur die Ordner ohne eine einzige Notiz; alle anderen stehen schon in den
+ *  Pfaden der Liste. */
+export function collectSubfolders(
+  allPaths: string[], folderPaths: string[], folder: string, recursive: boolean,
+): Subfolder[] {
+  const prefix = folder === "" ? "" : `${nf(folder)}/`;
+  const notesPaths = allPaths.map(nf);
+  const out: Subfolder[] = [];
+  for (const [n, original] of knownFolders(allPaths, folderPaths)) {
+    if (!n.startsWith(prefix)) continue;
+    const rest = n.slice(prefix.length);
+    if (rest === "" || (!recursive && rest.includes("/"))) continue;
+    const notes = notesPaths.filter((p) => p.startsWith(`${n}/`)).length;
+    if (recursive && notes > 0) continue;
+    out.push({ path: original, notes });
+  }
+  // Standard-Ordnung wie `collectFolderNotes` — deterministisch ueber ICU-Versionen.
+  return out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
+/** Nie „leer": ein Ordner ohne Notiz kann Anhaenge, Sitzungsdateien oder `.base`-Dateien
+ *  enthalten. Gemessen wird hier nur, was Notiz ist. */
+function countLabel(n: number): string {
+  return n === 0 ? "keine Notiz" : notesWord(n);
+}
+
+function notesWord(n: number): string {
+  return `${n} Notiz${n === 1 ? "" : "en"}`;
+}
+
 /** Die Kappungswarnung steht in ZEILE 1, nicht als Fussnote unter der Liste. Der
  *  Fehlertyp, gegen den dieses Werkzeug antritt, ist „unvollstaendig, sieht vollstaendig
- *  aus" — eine Warnung am Ende einer langen Liste reproduziert ihn. */
+ *  aus" — eine Warnung am Ende einer langen Liste reproduziert ihn. Aus demselben Grund
+ *  stehen nicht mitgelistete Unterordner schon in der Kopfzeile. */
 export function formatListResult(args: {
   folder: string; recursive: boolean; total: number; rows: NoteRow[];
+  subfolders?: Subfolder[]; subfolderMax?: number;
 }): string {
-  const { folder, recursive, total, rows } = args;
+  const { folder, recursive, total, rows, subfolders = [], subfolderMax = Infinity } = args;
   const where = folder === "" ? "in der Vault-Wurzel" : `in "${folder}"`;
   const folderNotes = rows.filter((r) => isFolderNote(r.path)).length;
   // Die Zahl steht im Kopf UND die Zeile traegt die Markierung. Das ist bewusst doppelt:
   // dasselbe Prinzip wie die Kappungswarnung — wer zaehlt, soll nicht erst am Ende merken,
   // dass eine Zeile keine Inhaltsnotiz war.
   const note = folderNotes === 0 ? "" : ` (davon ${folderNotes} Ordnernotiz${folderNotes === 1 ? "" : "en"})`;
-  const head = `${rows.length} von ${total} Notizen ${where}${recursive ? " (rekursiv)" : ""}${note}`;
+  let head = `${rows.length} von ${total} Notizen ${where}${recursive ? " (rekursiv)" : ""}${note}`;
+  let folderLine = "";
+  if (subfolders.length > 0) {
+    const shown = subfolders.slice(0, Math.max(1, subfolderMax));
+    const more = subfolders.length - shown.length;
+    const tail = more > 0 ? ` · … und ${more} weitere` : "";
+    if (recursive) {
+      folderLine = `Ordner ohne Notiz: ${shown.map((s) => cell(s.path)).join(", ")}${tail}`;
+    } else {
+      const below = subfolders.reduce((sum, s) => sum + s.notes, 0);
+      head += `; dazu ${subfolders.length} Unterordner mit ${notesWord(below)}, NICHT mitgelistet (recursive:true zeigt sie)`;
+      folderLine = `Unterordner: ${shown.map((s) => `${cell(s.path)} (${countLabel(s.notes)})`).join(" · ")}${tail}`;
+    }
+  } else if (total === 0) {
+    head += " — der Ordner existiert, enthält aber keine Notiz";
+  }
   const lines = rows.map((r) => {
     const cols = Object.entries(r.fields).map(([k, v]) => `${k}=${cell(v)}`);
     const path = `${cell(r.path)}${isFolderNote(r.path) ? " (Ordnernotiz)" : ""}`;
     return cols.length === 0 ? path : `${path} · ${cols.join(" · ")}`;
   });
-  const body = `${head}\n\n${lines.join("\n")}`;
+  const top = folderLine === "" ? head : `${head}\n${folderLine}`;
+  const body = lines.length === 0 ? top : `${top}\n\n${lines.join("\n")}`;
   if (rows.length >= total) return body;
 
   const hint = recursive
@@ -260,12 +339,15 @@ export function suggestFolders(allPaths: string[], folder: string, max: number =
   return [];
 }
 
-/** Bewusst keine Existenz-Aussage: aus einer Liste von Markdown-Pfaden ist ein leerer
- *  Ordner von einem falsch geschriebenen nicht unterscheidbar. Festgestellt wird, was
- *  messbar ist — dass dort keine Notiz liegt. */
-export function formatEmptyFolder(folder: string, suggestions: string[]): string {
+/** Eine Existenz-Aussage nur mit Beleg (`missing`): aus einer Liste von Markdown-Pfaden
+ *  allein ist ein Ordner ohne Notiz von einem falsch geschriebenen nicht unterscheidbar —
+ *  dann wird festgestellt, was messbar ist, naemlich dass dort keine Notiz liegt. Kennt der
+ *  Aufrufer die Ordnerliste des Vaults und steht der Ordner nicht darin, darf er es sagen. */
+export function formatEmptyFolder(folder: string, suggestions: string[], missing = false): string {
   const where = folder === "" ? "in der Vault-Wurzel" : `unter "${folder}"`;
-  const base = `Dort liegt keine Notiz: ${where} wurde keine Markdown-Datei gefunden.`;
+  const base = missing
+    ? `Einen Ordner "${folder}" gibt es nicht.`
+    : `Dort liegt keine Notiz: ${where} wurde keine Markdown-Datei gefunden.`;
   return suggestions.length === 0
     ? base
     : `${base} Gemeint sein könnte:\n${suggestions.join("\n")}`;

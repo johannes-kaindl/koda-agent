@@ -11,6 +11,7 @@ function erwarteWrite(req: WriteRequest): WriteFileRequest {
 function fakeVault(files: Record<string, string>): VaultPort {
   return {
     listMarkdownPaths: () => Object.keys(files),
+    listFolderPaths: () => [],
     read: async (p) => files[p],
     exists: async (p) => p in files,
     create: async (p, c) => void (files[p] = c),

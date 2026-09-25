@@ -4,6 +4,7 @@ function fakeVault(files: Record<string, string>, links: Record<string, number> 
   return {
     files,
     listMarkdownPaths: () => Object.keys(files),
+    listFolderPaths: () => [],
     read: async (p) => { if (!(p in files)) throw new Error("not found"); return files[p]; },
     exists: async (p) => p in files,
     create: async (p, c) => void (files[p] = c),

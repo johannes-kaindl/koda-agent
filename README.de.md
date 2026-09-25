@@ -37,7 +37,7 @@ keine signierten Builds. Derzeit **nicht** im Community-Store gelistet (siehe
   `edit_active_note` — das Modell ruft sie beim Antworten selbst auf, jeder Schritt
   erscheint im Chat. `read_note` liest alle drei Notiz-Formate — `.md`, `.base` und
   `.canvas`; geschrieben wird weiterhin nur `.md`. `list_notes` liefert alle Notizen unter einem Vault-Ordner,
-  wahlweise rekursiv, samt den angeforderten Frontmatter-Feldern, in einem Aufruf.
+  wahlweise rekursiv, samt den angeforderten Frontmatter-Feldern, in einem Aufruf; ohne `recursive` nennt es zusätzlich die Unterordner und wie viele Notizen darin liegen, auch Ordner ohne eine einzige Notiz.
   `move_note` verschiebt oder benennt um und lässt Obsidian die Wikilinks nachziehen;
   `delete_note` legt eine Notiz in den Papierkorb des Vaults und fragt immer vorher,
   auch im Koda-Ordner. Ein elftes, `related_notes`, kommt hinzu, wenn semantische Suche

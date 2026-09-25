@@ -33,7 +33,7 @@ catalogue, no signed builds. Not currently listed in the Community plugin store 
   step shown inline in the chat. `read_note` reads all three note formats — `.md`,
   `.base` and `.canvas`; writing stays `.md`-only. `list_notes` returns every note under a vault folder,
   optionally recursive, together with whichever frontmatter fields were asked for, in
-  one call; a folder note (a note named like its folder) is marked as one, so it is not
+  one call; a non-recursive listing also names the subfolders and how many notes each holds, including folders without any note; a folder note (a note named like its folder) is marked as one, so it is not
   counted as ordinary content. `move_note` renames or relocates a note and lets Obsidian
   update the wikilinks pointing at it; `delete_note` moves a note to the vault's trash and
   always asks first, even inside the Koda folder. An eleventh, `related_notes`, appears when

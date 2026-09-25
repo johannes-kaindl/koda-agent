@@ -454,6 +454,7 @@ export default class KodaPlugin extends Plugin {
   buildTools(): VaultTools {
     const vaultPort: VaultPort = {
       listMarkdownPaths: () => this.app.vault.getMarkdownFiles().map((f) => f.path),
+      listFolderPaths: () => this.app.vault.getAllFolders().map((f) => f.path),
       read: async (p) => {
         const f = this.app.vault.getFileByPath(p);
         if (f === null) throw new Error(`nicht gefunden: ${p}`);

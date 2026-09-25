@@ -11,6 +11,7 @@ import {
 } from "../core/tools/retrieval";
 import {
   collectFolderNotes, pickFields, formatListResult, suggestFolders, formatEmptyFolder,
+  collectSubfolders, folderExists,
 } from "../core/tools/list";
 import type { EditorPort, WorkspacePort } from "../core/context/ports";
 import { renderWorkspaceReport } from "../core/context/workspace-line";
@@ -18,6 +19,10 @@ import { DEFAULT_SETTINGS } from "../core/settings-types";
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
+  /** Alle Ordner des Vaults, auch die ohne eine einzige Notiz. Aus `listMarkdownPaths` sind
+   *  genau diese nicht ableitbar — und ein Ordner, den das Werkzeug nicht sieht, wird vom
+   *  Modell als „existiert nicht" berichtet (gemessen 2026-09-25, `_Koda/Brain`). */
+  listFolderPaths(): string[];
   read(path: string): Promise<string>;
   exists(path: string): Promise<boolean>;
   create(path: string, content: string): Promise<void>;
@@ -376,13 +381,21 @@ export class VaultTools implements ToolRunner {
   private async listNotes(folder: string, recursive: boolean, fields: string[]): Promise<ToolOutcome> {
     const norm = resolveFolderPath(folder);
     const all = this.vault.listMarkdownPaths();
-    const paths = collectFolderNotes(all, norm, recursive);
-    if (paths.length === 0) {
-      return { ok: false, error: formatEmptyFolder(norm, suggestFolders(all, norm)) };
+    const folders = this.vault.listFolderPaths();
+    // Ein Ordner ohne Notiz ist ein Befund, kein Fehler — nur ein Ordner, den es nicht gibt,
+    // ist einer. Erst die Ordnerliste macht die beiden unterscheidbar.
+    if (!folderExists(all, folders, norm)) {
+      return { ok: false, error: formatEmptyFolder(norm, suggestFolders(all, norm), true) };
     }
-    const shown = paths.slice(0, Math.max(1, this.opts.listMaxRows()));
+    const paths = collectFolderNotes(all, norm, recursive);
+    const max = Math.max(1, this.opts.listMaxRows());
+    const shown = paths.slice(0, max);
     const rows = shown.map((p) => ({ path: p, fields: pickFields(this.vault.frontmatterOf(p), fields) }));
-    return { ok: true, content: formatListResult({ folder: norm, recursive, total: paths.length, rows }) };
+    const subfolders = collectSubfolders(all, folders, norm, recursive);
+    return {
+      ok: true,
+      content: formatListResult({ folder: norm, recursive, total: paths.length, rows, subfolders, subfolderMax: max }),
+    };
   }
 
   private getWorkspace(radius: number): ToolOutcome {
