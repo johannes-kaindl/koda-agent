@@ -1,7 +1,8 @@
 /* Welche Notizen ein Modus anbietet — ohne Inhalte, ohne IO. Pure.
  *
  * Reihenfolge (Spec E3: „Quelle, dann Ebene, dann Pfad"): aktive Notiz · Manuelles ·
- * Tabs · Links · Backlinks. Innerhalb einer Gruppe bleibt die Eingangsreihenfolge stehen —
+ * Tabs · Links · Backlinks. Vault: aktiv · Manuelles · Treffer. Notiz: … · Backlinks ·
+ * semantische Nachbarn (Quelle `related`, ohne Ebene — sie haben keine). Innerhalb einer Gruppe bleibt die Eingangsreihenfolge stehen —
  * bei Tabs ist das die Reihenfolge des Workspace, und die ist selbst eine Aussage
  * („was liegt links, was rechts"), die eine alphabetische Sortierung zerstoeren wuerde.
  * Deterministisch ist sie trotzdem: sie kommt aus dem Snapshot, nicht aus einer Menge. */
@@ -9,13 +10,16 @@ import type { LinkPort, WorkspaceSnapshot } from "./ports";
 import type { Candidate } from "./select";
 
 export interface CandidateInput {
-  mode: "note" | "tabs";
+  mode: "note" | "tabs" | "vault";
   snap: WorkspaceSnapshot;
   links: LinkPort;
   /** Ebenen fuer Links und Backlinks (Einstellung `contextLinkDepth`). Nur im Modus Notiz. */
   linkDepth: number;
   /** Vom Nutzer hinzugefuegte Pfade, in der Reihenfolge des Hinzufuegens. */
   manual: readonly string[];
+  /** Pfade aus vault-rag (`semantic.ts`): im Modus Vault die Treffer zur Frage, im Modus
+   *  Notiz die Nachbarn der aktiven Notiz. Reihenfolge der API — Koda sortiert nicht um. */
+  semantic?: readonly string[];
 }
 
 export function collectCandidates(input: CandidateInput): Candidate[] {
@@ -36,6 +40,11 @@ export function collectCandidates(input: CandidateInput): Candidate[] {
 
   if (input.mode === "tabs") {
     for (const tab of input.snap.tabs) nimm({ source: "tab", path: tab.path });
+    return out;
+  }
+
+  if (input.mode === "vault") {
+    for (const p of input.semantic ?? []) nimm({ source: "vault", path: p });
     return out;
   }
 
@@ -77,5 +86,8 @@ export function collectCandidates(input: CandidateInput): Candidate[] {
     grenze = naechste;
     if (grenze.length === 0) break;
   }
+  // Semantische Nachbarn zuletzt: sie sind eine Zugabe zur Link-Nachbarschaft. Ein Pfad, den
+  // die Breitensuche schon gefunden hat, behaelt seine Link-Quelle — `nimm` entdoppelt.
+  for (const p of input.semantic ?? []) nimm({ source: "related", path: p });
   return out;
 }
