@@ -2,7 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: 0.14.0 released (Volltext-Quellen), Rescan weiter BLOCKIERT — main, Stand 2026-09-06
+## Status: 0.16.0 released (Arbeitskontext Etappe 3a), Werkzeug-Anbieter auf main — Stand 2026-09-25
+
+**0.16.0 ist am 2026-09-25 released** (Release-Commit `210537b`, Tag auf Forgejo und GitHub, GitHub-Release vom Skript abgewartet). Inhalt ist **Arbeitskontext Etappe 3a** (Modus Vault über vault-rags `search`, semantische Nachbarn über `related()`, `contextAutoK`, Kontext-Tab mit Vault-Abschnitt) plus der Fix, dass der Chat im Kontext-Tab ausgeblendet wird (seit 0.13.0 schob er das Panel aus dem Bild). Gebaut von der Minion-Session `koda3a-w8` nach `docs/superpowers/plans/2026-09-18-koda-arbeitskontext-etappe-3.md`, Gate 796/796, Smoke 46/46. Store-Rescan im Developer Dashboard ist Johannes' Handgriff. **Koda ist seit 0.15.2 wieder im Store** (Rescan passed, zero warnings); die Rescan-Blockade der Absätze darunter ist Chronik.
+
+**Direkt danach auf `main` (Unreleased): die Wirtsseite des Werkzeug-Anbieter-Vertrags** — Koda montiert Werkzeuge fremder Plugins statt sie nachzubauen (`src/core/tools/provider.ts`, `src/obsidian/providers.ts`, `toolSet()`; Struktur-Kurzüberblick unten). Gate 832/832, Smoke 47/47, Praxistest 4/4. Erster echter Anbieter ist vault-rag `feat/tool-provider` (Vertragsstand 92c6c4d, Merge dort über das Dach); calendar-notes braucht dafür erst eine kleinere Werkzeugmenge mit `writes` und Ziel in den Parametern (Task in dessen Cockpit). Festlegungen und Befunde: Cockpit-Task „Werkzeug-Anbieter-Vertrag" und `docs/SMOKE.md`. **Etappe 3b (Bases-Ansicht, Plan-Tasks 9–13) ist noch offen** und wird als Minion-Auftrag gebaut.
+
+### Vorgeschichte: 0.14.0 released (Volltext-Quellen), Rescan weiter BLOCKIERT — main, Stand 2026-09-06
 
 **0.14.0 ist am 2026-09-06 released** (Release-Commit `5da0108`, Tag `66e75ef` auf Forgejo
 und GitHub, Mirror vom Skript verifiziert, Forgejo-Release vorhanden — HTTP 200 mit Assets).
