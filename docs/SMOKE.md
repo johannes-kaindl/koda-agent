@@ -781,7 +781,9 @@ Anlass: `list_notes("_Koda")` meldete im Arbeits-Vault „4 von 4 Notizen", vers
 
 Der erste Lauf fuhr — ungeplant — gegen den **alten** Build im Staging-Vault: **41/42, genau Punkt 42 rot** („Kopf OHNE Unterordnerzahl · Ohne FEHLT · Voll FEHLT · fehlender Ordner NICHT: Dort liegt keine Notiz …"), alle übrigen 41 grün. Nach Build und Deploy des Repo-Stands 42/42. Auf Unit-Ebene zusätzlich zwei Mutationen am Adapter (`subfolders: []` statt der gesammelten Liste; Existenzprüfung ersetzt durch „keine Notiz gefunden"), jede fing genau ein Test in `tests/vault_tools_list.test.ts`.
 
-**Nicht gemessen:** ob Koda sich mit der neuen Ausgabe tatsächlich anders verhält. Das braucht einen Praxistest (`gui:ask`) gegen ein echtes Modell mit der Frage vom 2026-09-25.
+### Praxistest (`gui:ask`, qwen/qwen3.8-27b)
+
+Kulisse im Staging-Vault nachgestellt: `Koda/Brain/` mit zwei Notizen, `Koda/Lab/` ohne Notiz, dazu das vorhandene `Koda/Skills/`. Frage: „Schau dir dein Verzeichnis Koda an: Wie ist es aufgebaut, welche Unterordner gibt es?" Koda rief `list_notes({"folder":"Koda"})` — **flach, wie im Ausgangsfall** —, bekam in der Kopfzeile „dazu 3 Unterordner mit 3 Notizen, NICHT mitgelistet" und fragte daraufhin von selbst mit `recursive:true` nach. Die Antwort nennt Brain (mit beiden Notizen), Lab (ohne Notiz) und Skills; `--expect Brain`/`--expect Lab` grün. Die Gegenprobe ist der Ausgangsfall selbst (Arbeits-Vault, alter Build, gleiche Frageart: Unterordner als nicht existent berichtet) — eine Stichprobe, keine Statistik. Das Modell stand im Staging-Vault leer und wurde nur für den Lauf gesetzt, danach zurückgestellt; die Kulisse ist wieder entfernt.
 
 
 ## Belegter Lauf: 2026-09-17 — Welle 6, llm-lab-Konsument (41/41), mit Gegenprobe
