@@ -12,7 +12,7 @@ const snap: WorkspaceSnapshot = {
 };
 const opts = {
   lang: "de" as const, selectionMax: 600, tabsMax: 12, frontmatterMax: 300, windowTokens: 8192,
-  budget: 20000, linkDepth: 1, manual: [] as string[],
+  budget: 20000, linkDepth: 1, autoK: 5, manual: [] as string[],
   links: { outgoing: () => [] as string[], backlinks: () => [] as string[] },
   content: { read: () => Promise.resolve(null as string | null) },
 };
@@ -103,7 +103,7 @@ const content = { read: (p: string) => Promise.resolve(p === "A.md" ? "Text A" :
 function vollOpts(extra: Record<string, unknown> = {}) {
   return {
     lang: "de" as const, selectionMax: 600, tabsMax: 12, frontmatterMax: 300,
-    windowTokens: 8192, budget: 20000, linkDepth: 1, manual: [], links, content,
+    windowTokens: 8192, budget: 20000, linkDepth: 1, autoK: 5, manual: [], links, content,
     ...extra,
   };
 }
@@ -244,5 +244,56 @@ describe("Abschnitt Manuell", () => {
     const chip = vm.sections.find((s) => s.id === "manual")?.chips.find((c) => c.path === "M.md");
     expect(chip?.off).toBe(true);
     expect(chip?.hint).not.toContain("nicht lesbar");
+  });
+});
+
+describe("buildPanelViewModel — Modus Vault", () => {
+  const content = { read: (p: string) => Promise.resolve(p === "Notes/Tools.md" ? "Tools text" : "Plan text") };
+  it("zeigt aktive Notiz und Treffer im Abschnitt Vault", async () => {
+    const vm = await buildPanelViewModel("vault", snap, new Set(), {
+      ...opts, content, query: "Welche Werkzeuge gibt es?", hits: { kind: "ok", paths: ["Notes/Tools.md"] },
+    });
+    const sec = vm.sections.find((s) => s.id === "vault");
+    expect(sec?.title).toBe("Vault");
+    expect(sec?.chips.map((c) => `${c.source}:${c.path}`)).toEqual(["active:Notes/Project plan.md", "vault:Notes/Tools.md"]);
+    expect(sec?.note).toBe("");
+    expect(vm.autoK).toBe(5);
+  });
+  it("nennt eine fehlgeschlagene Suche in der Hinweiszeile — auch wenn die aktive Notiz als Chip dasteht", async () => {
+    const vm = await buildPanelViewModel("vault", snap, new Set(), {
+      ...opts, content, query: "Welche Werkzeuge?", hits: { kind: "failed", reason: "offline" },
+    });
+    const sec = vm.sections.find((s) => s.id === "vault");
+    expect(sec?.chips).toHaveLength(1);
+    expect(sec?.note).toContain("Vault-Suche nicht verfügbar");
+  });
+  it("bittet bei zu kurzer Frage ums Tippen", async () => {
+    const vm = await buildPanelViewModel("vault", snap, new Set(), { ...opts, content, query: "ab" });
+    expect(vm.sections.find((s) => s.id === "vault")?.note).toContain("Tippe eine Frage");
+  });
+  it("sagt es, wenn die Suche nichts fand", async () => {
+    const vm = await buildPanelViewModel("vault", snap, new Set(), {
+      ...opts, content, query: "Welche Werkzeuge?", hits: { kind: "ok", paths: [] },
+    });
+    expect(vm.sections.find((s) => s.id === "vault")?.note).toBe("Keine passenden Notizen im Index.");
+  });
+});
+
+describe("buildPanelViewModel — semantische Nachbarn und K", () => {
+  it("markiert related-Chips im Modus Notiz", async () => {
+    const vm = await buildPanelViewModel("note", snap, new Set(), {
+      ...opts, content: { read: () => Promise.resolve("x") }, hits: { kind: "ok", paths: ["Notes/Similar.md"] },
+    });
+    const chip = vm.sections.find((s) => s.id === "note")?.chips.find((c) => c.source === "related");
+    expect(chip?.hint).toContain("ähnlich");
+  });
+  it("zeigt den K-Stepper nur in Notiz und Vault", async () => {
+    expect((await buildPanelViewModel("note", snap, new Set(), opts)).autoK).toBe(5);
+    expect((await buildPanelViewModel("tabs", snap, new Set(), opts)).autoK).toBeNull();
+    expect((await buildPanelViewModel("workspace", snap, new Set(), opts)).autoK).toBeNull();
+  });
+  it("jeder Abschnitt hat ein note-Feld (leer, wenn nichts zu sagen ist)", async () => {
+    const vm = await buildPanelViewModel("workspace", snap, new Set(), opts);
+    for (const s of vm.sections) expect(s.note).toBe("");
   });
 });

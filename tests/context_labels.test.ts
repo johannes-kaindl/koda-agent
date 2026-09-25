@@ -52,3 +52,18 @@ describe("modeOptions", () => {
     expect(modeOptions("en", true).find((o) => o.value === "vault")).toEqual({ value: "vault", label: "Vault", disabled: false });
   });
 });
+
+describe("contextSummary — Modus Vault", () => {
+  const vaultCtx = (text: string, n: number): ContextAttachment => ({
+    mode: "vault",
+    items: [{ source: "active", path: "A.md", kind: "full", chars: 3 }, ...Array.from({ length: n }, (_, i) => ({ source: "vault" as const, path: `V${i}.md`, kind: "full" as const, chars: 3 }))],
+    text,
+  });
+  it("nennt die Quelle und die Trefferzahl", () => {
+    expect(contextSummary(vaultCtx("[Arbeitskontext · Vault]\n\n## A.md", 2), "de")).toBe("Vault · A · vault-rag · 2 Treffer");
+    expect(contextSummary(vaultCtx("[Working context · Vault]\n\n## A.md", 1), "en")).toBe("Vault · A · vault-rag · 1 match");
+  });
+  it("nennt den Fehlschlag statt 0 Treffer", () => {
+    expect(contextSummary(vaultCtx("[Arbeitskontext · Vault]\n[Vault-Suche nicht verfügbar: x]\n\n## A.md", 0), "de")).toBe("Vault · A · Vault-Suche nicht verfügbar");
+  });
+});

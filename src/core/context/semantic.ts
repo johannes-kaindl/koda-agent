@@ -83,3 +83,9 @@ export function semanticNotice(reason: SemanticFailure, lang: "de" | "en"): stri
   const t = NOTICE[lang];
   return `[${t.head}: ${t[reason]}]`;
 }
+
+/** Ist diese Zeile die Hinweiszeile eines Vault-Blocks? Die Kontextzeile unter der Blase liest
+ *  den Fehlschlag daran ab, statt ihn ein zweites Mal zu persistieren. */
+export function isSemanticNotice(line: string): boolean {
+  return line.startsWith(`[${NOTICE.de.head}`) || line.startsWith(`[${NOTICE.en.head}`);
+}

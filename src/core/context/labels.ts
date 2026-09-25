@@ -1,3 +1,4 @@
+import { isSemanticNotice } from "./semantic";
 import { AVAILABLE_MODES, type ContextAttachment, type ContextMode } from "./types";
 
 type Lang = "de" | "en";
@@ -47,6 +48,14 @@ export function contextSummary(ctx: ContextAttachment, lang: Lang): string {
   const tabs = ctx.items.filter((i) => i.source === "tab").length;
   if (tabs === 1) parts.push(lang === "de" ? "1 Tab" : "1 tab");
   else if (tabs > 1) parts.push(lang === "de" ? `${tabs} Tabs` : `${tabs} tabs`);
+  if (ctx.mode === "vault") {
+    // Ob und wie vault-rag angefragt wurde, gehoert in die Kontextzeile (Nachtrag Johannes,
+    // 2026-09-25): sonst sieht ein Vault-Block ohne Treffer wie ein Modus ohne Wirkung aus.
+    // Der Fehlschlag steht als zweite Zeile im gesendeten Block — dieselbe Quelle wie im Tab.
+    const treffer = ctx.items.filter((i) => i.source === "vault").length;
+    if (isSemanticNotice(ctx.text.split("\n")[1] ?? "")) parts.push(lang === "de" ? "Vault-Suche nicht verfügbar" : "vault search unavailable");
+    else parts.push(lang === "de" ? `vault-rag · ${treffer} Treffer` : `vault-rag · ${treffer} ${treffer === 1 ? "match" : "matches"}`);
+  }
   return parts.join(" · ");
 }
 

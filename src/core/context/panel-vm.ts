@@ -11,6 +11,7 @@ import { applySelection, itemKey, type SelectionKey } from "./selection";
 import { dedupeTabs, renderWorkspaceContext } from "./workspace-line";
 import { collectCandidates } from "./candidates";
 import { buildFullContext } from "./build";
+import { MIN_QUERY_CHARS, NO_HITS, semanticNotice, type SemanticHits } from "./semantic";
 
 export interface PanelChip {
   source: ContextSource;
@@ -27,6 +28,8 @@ export interface PanelSection {
   title: string;
   chips: PanelChip[];
   empty: string;
+  /** Eine Zeile ueber den Chips — z. B. warum der Vault-Abschnitt leer ist. "" = keine. */
+  note: string;
 }
 export interface PanelViewModel {
   sections: PanelSection[];
@@ -39,6 +42,8 @@ export interface PanelViewModel {
   /** Ob manuelle Eintraege im aktuellen Modus ueberhaupt mitgehen (Spec E1: der
    *  Arbeitsplatz-Block schickt Zeiger, keine Inhalte). */
   manualEnabled: boolean;
+  /** Trefferzahl fuer den K-Stepper; `null` ausserhalb von Notiz und Vault. */
+  autoK: number | null;
 }
 
 export interface PanelOptions {
@@ -49,6 +54,11 @@ export interface PanelOptions {
   windowTokens: number;
   budget: number;
   linkDepth: number;
+  autoK: number;
+  /** vault-rag-Ergebnis fuer Vault-Treffer bzw. Nachbarn. */
+  hits?: SemanticHits;
+  /** Der Entwurf im Eingabefeld — nur fuer den Hinweis „Tippe eine Frage". */
+  query?: string;
   manual: readonly string[];
   links: LinkPort;
   content: ContentPort;
@@ -64,11 +74,15 @@ const T = {
     note: "Notiz",
     tabs: "Tabs",
     manual: "Manuell",
+    vault: "Vault",
+    related: "ähnlich",
+    vaultQuery: "Tippe eine Frage (ab 3 Zeichen) — passende Notizen erscheinen hier.",
+    vaultNone: "Keine passenden Notizen im Index.",
     emptyNote: "Keine aktive Notiz — öffne eine Notiz im Hauptbereich.",
     emptyTabs: "Keine offenen Notizen.",
     emptyManual: "Nichts von Hand hinzugefügt.",
     level: (n: number) => `Ebene ${n}`,
-    manualOff: "wirkt in den Modi Notiz und Alle Tabs",
+    manualOff: "wirkt in den Modi Notiz, Alle Tabs und Vault",
     unreadable: "nicht lesbar",
   },
   en: {
@@ -80,11 +94,15 @@ const T = {
     note: "Note",
     tabs: "Tabs",
     manual: "Manual",
+    vault: "Vault",
+    related: "similar",
+    vaultQuery: "Type a question (3 characters or more) — matching notes appear here.",
+    vaultNone: "No matching notes in the index.",
     emptyNote: "No active note — open one in the main area.",
     emptyTabs: "No open notes.",
     emptyManual: "Nothing added by hand.",
     level: (n: number) => `level ${n}`,
-    manualOff: "takes effect in the Note and All tabs modes",
+    manualOff: "takes effect in the Note, All tabs and Vault modes",
     unreadable: "not readable",
   },
 } as const;
@@ -139,16 +157,17 @@ function workspaceSection(
       hint: isActive ? t.alsoTab : "", off: off.has(itemKey("tab", x.path)), removable: false,
     });
   }
-  return { id: "workspace", title: t.workspace, chips, empty: chips.length === 0 ? t.empty : "" };
+  return { id: "workspace", title: t.workspace, chips, empty: chips.length === 0 ? t.empty : "", note: "" };
 }
 
 function sourceSection(
-  mode: "note" | "tabs",
+  mode: "note" | "tabs" | "vault",
   kandidaten: readonly Candidate[],
   manual: ReadonlySet<string>,
   off: ReadonlySet<SelectionKey>,
   groessen: ReadonlyMap<string, { chars: number }>,
   t: (typeof T)[keyof typeof T],
+  note: string,
 ): PanelSection {
   // Ausgeblendet wird nach PFAD, nicht nach `c.source` (Ruling 2026-09-05, Korrektur zu
   // `0ab7e52`): `collectCandidates` nimmt die aktive Notiz VOR dem manuellen Eintrag und
@@ -170,15 +189,19 @@ function sourceSection(
       const teile: string[] = [];
       if (groesse !== undefined) teile.push(t.chars(groesse.chars));
       if (c.depth !== undefined) teile.push(t.level(c.depth));
+      if (c.source === "related") teile.push(t.related);
+      // Die Quelle steht am Chip: wer im Vault-Modus einen Treffer sieht, soll lesen koennen,
+      // dass er aus vault-rag kommt (Nachtrag Johannes, 2026-09-25).
+      if (c.source === "vault") teile.push("vault-rag");
       return {
         source: c.source, path: c.path, label: chipLabel(c.path),
         hint: teile.join(", "), off: chipOff, removable: false,
       };
     });
-  const id = mode === "note" ? "note" : "tabs";
-  const title = mode === "note" ? t.note : t.tabs;
-  const empty = mode === "note" ? t.emptyNote : t.emptyTabs;
-  return { id, title, chips, empty: chips.length === 0 ? empty : "" };
+  const id = mode;
+  const title = mode === "note" ? t.note : mode === "tabs" ? t.tabs : t.vault;
+  const empty = mode === "note" ? t.emptyNote : mode === "tabs" ? t.emptyTabs : "";
+  return { id, title, chips, empty: chips.length === 0 ? empty : "", note };
 }
 
 function manualSection(
@@ -222,11 +245,20 @@ function manualSection(
       removable: true,
     };
   });
-  return { id: "manual", title: t.manual, chips, empty: chips.length === 0 ? t.emptyManual : "" };
+  return { id: "manual", title: t.manual, chips, empty: chips.length === 0 ? t.emptyManual : "", note: "" };
+}
+
+/** Was der Vault-Abschnitt ueber seine Treffer sagt. Nur Vault meldet sich — die Nachbarn im
+ *  Modus Notiz sind eine Zugabe und schweigen (Etappe-3-Zuschnitt Punkt 4). */
+function vaultNote(hits: SemanticHits, query: string, lang: "de" | "en", t: (typeof T)[keyof typeof T]): string {
+  if (hits.kind === "failed") return semanticNotice(hits.reason, lang);
+  if (query.trim().length < MIN_QUERY_CHARS) return t.vaultQuery;
+  if (hits.kind === "ok" && hits.paths.length === 0) return t.vaultNone;
+  return "";
 }
 
 export async function buildPanelViewModel(
-  mode: Exclude<ContextMode, "off" | "vault">,
+  mode: Exclude<ContextMode, "off">,
   snap: WorkspaceSnapshot,
   off: ReadonlySet<SelectionKey>,
   opts: PanelOptions,
@@ -235,6 +267,7 @@ export async function buildPanelViewModel(
   const sections: PanelSection[] = [];
   const manualEnabled = mode !== "workspace";
   const manualSet = new Set(opts.manual);
+  const hits = opts.hits ?? NO_HITS;
   let kandidatenByPath: ReadonlyMap<string, Candidate> = new Map();
   let groessen: ReadonlyMap<string, { chars: number }> = new Map();
 
@@ -250,14 +283,15 @@ export async function buildPanelViewModel(
     // Riss auf, der kein Task-Review sah.
     const ctx = await buildFullContext({
       mode, snap, links: opts.links, content: opts.content,
-      manual: opts.manual, off, linkDepth: opts.linkDepth, budget: opts.budget, lang: opts.lang,
+      manual: opts.manual, off, linkDepth: opts.linkDepth, budget: opts.budget, lang: opts.lang, hits,
     });
     groessen = new Map(ctx.items.map((i) => [`${i.source}:${i.path}`, i]));
     const kandidaten = collectCandidates({
       mode, snap, links: opts.links, linkDepth: opts.linkDepth, manual: opts.manual,
+      semantic: hits.kind === "ok" ? hits.paths : [],
     });
     kandidatenByPath = new Map(kandidaten.map((c) => [c.path, c]));
-    sections.push(sourceSection(mode, kandidaten, manualSet, off, groessen, t));
+    sections.push(sourceSection(mode, kandidaten, manualSet, off, groessen, t, mode === "vault" ? vaultNote(hits, opts.query ?? "", opts.lang, t) : ""));
     text = ctx.text;
   }
   sections.push(manualSection(opts.manual, kandidatenByPath, off, groessen, manualEnabled, t));
@@ -272,5 +306,6 @@ export async function buildPanelViewModel(
     hasOff: off.size > 0 || opts.manual.length > 0,
     depth: mode === "note" ? opts.linkDepth : null,
     manualEnabled,
+    autoK: mode === "note" || mode === "vault" ? opts.autoK : null,
   };
 }
