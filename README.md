@@ -59,6 +59,7 @@ catalogue, no signed builds. Not currently listed in the Community plugin store 
   - **Note** and **All tabs** — the active note plus its linked neighbours (outgoing links and
     backlinks, depth 1–3), or every open note, go along in **full text**, not just as a
     pointer, capped by a character budget.
+  - **Vault** — needs the vault-rag plugin: the notes that best match the question you are sending go along in full text, next to the active note. The Context tab previews them while you type, and says so when the search is unavailable. In the Note mode, notes similar to the active one (from vault-rag) join the linked neighbours. The setting *Notes from vault-rag* controls how many (0 = off).
   - **Manual** — add a note or a whole folder by hand, from the Context tab or three
     commands; remove it again the same way.
 
@@ -197,11 +198,12 @@ The full settings list:
 | Text tool-call fallback | off | For models without native tool calling |
 | UI language | auto | Follows Obsidian, or force German/English |
 | Open on startup | off | Opt-in; the sidebar stays closed unless you ask for it |
-| Context mode on startup | Workspace | Off / Workspace / Note / All tabs (Vault reserved for a later stage) |
+| Context mode on startup | Workspace | Off / Workspace / Note / All tabs / Vault (Vault falls back to Workspace at startup when vault-rag is missing) |
 | Selection in the context | 600 chars (100–5000) | How many characters of the selected text to include in the context block |
 | Open tabs in the context | 12 (1–100) | How many open tabs to list in the context block |
 | Properties in the context | 300 chars (0–2000) | How many characters of the frontmatter properties to include (0 = none) |
 | Content budget per message | 20,000 chars (2000–200000) | How much note content the modes Note, All tabs and Manual may put into one message; cut entries are named, never dropped silently. Does not affect Workspace, which only sends pointers |
+| Notes from vault-rag | 5 (0–20) | How many notes vault-rag contributes: in the Vault mode the best matches for your question, in the Note mode the notes similar to the active one. 0 turns both off; without vault-rag no effect |
 | Link depth in the Note mode | 1 (1–3) | How many levels of outgoing links and backlinks are collected around the active note; each level multiplies the note count and splits the budget further |
 | Context window (tokens) | 8192 (2048–1000000) | Size of the model's context window; one number for all endpoints. "Test" on an endpoint row fills it in when the server reports it (LM Studio, Ollama) and the field is still on its default |
 | Compact at (% of window) | 75 (40–95) | Koda compacts the conversation before a model call once the estimate exceeds this share of the window |

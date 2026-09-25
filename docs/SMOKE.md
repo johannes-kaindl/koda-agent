@@ -769,6 +769,32 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-25 — Etappe 3a, Vault-Modus und semantische Nachbarn (46/46), mit Gegenproben
+
+Vault `koda-agent` (Staging, Zweitinstanz Port 9309, Obsidian 1.14.2), Gate 763/763 (von 763 vor der Etappe) auf **796/796**, GUI-Smoke 42/42 auf **46/46** (Baseline vor dem ersten Umbau: 42 grün, 0 rot, 0 übersprungen, 0 nichts gemessen). Deploy je Lauf per `cp main.js styles.css manifest.json` in den Staging-Vault, sha1 von `main.js` vor und nach dem Kopieren verglichen (Endstand `2b292a39235c`).
+
+Alle vier neuen Punkte fahren gegen einen Stub der vault-rag-API (Muster Punkt 41): ein echter Index wäre nicht deterministisch, und gemessen wird Kodas Seite der Naht, nicht die Trefferqualität. Steht unter `vault-retrieval` schon ein Eintrag, werden sie übersprungen und als übersprungen gemeldet.
+
+**Punkt 43** (Modus Vault): sucht mit der gesendeten Frage und K, legt den Treffer im Volltext in den Block, und die Gegenprobe im selben Punkt (Stub antwortet `offline`) meldet den Hinweis im Block. **44**: Vault ist ohne vault-rag gesperrt, im Dropdown und per Befehl. **45**: Modus Notiz holt `related()` für die aktive Notiz, K = 0 schaltet ab. **46**: die Vorschau im Kontext-Tab folgt dem Eingabefeld, und der Chat ist im Kontext-Tab `display:none` mit dem Panel im Bild.
+
+### Gegenproben (je eine Mutation, gebaut, deployt, gefahren, zurückgenommen)
+
+| Punkt | Mutation | Ergebnis |
+|---|---|---|
+| 43 | `notice` in `build.ts` fest `undefined` | 43 rot, 44–46 grün (45/46) |
+| 44 | Guard in `setContextMode` (`main.ts`) abgeschaltet | 44 rot, sonst grün (45/46) |
+| 45 | `related`-Schleife in `candidates.ts` auskommentiert | 45 rot, sonst grün (45/46) |
+| 46 | `input`-Listener in `view.ts` umbenannt | 46 rot („kein Vault-Chip binnen 5 s“), sonst grün (45/46) |
+| 46 (CSS) | Fix `.koda-hub .okit-hub-panel.is-hidden` aus `styles.css` entfernt | 46 rot, mit Fix grün (46/46) |
+
+### Was der erste Lauf falsch grün meldete
+
+Die Zeile `record("46. …", ok45, detail45)` trug beim Einfügen noch die Variablen von Punkt 45: 46/46 grün, und das Detail von 46 war wortgleich das von 45. Aufgefallen am Detailtext, nicht an der Bilanz. Der Umbau der Nummern im Plan (+1 seit Punkt 42) hatte die Variablennamen mitgezogen, aber einen Block zu früh aufgehört (CORE-TEST-15).
+
+### Sichtprüfung deckte einen Fehler auf, den der DOM-Smoke nie sah
+
+Der Screenshot des Kontext-Tabs zeigte einen leeren Tab: `.koda-hub .okit-hub-panel[data-tab="chat"] {display:flex}` (Spezifität 0,3,0) schlug `.okit-hub-panel.is-hidden {display:none}` (0,2,0), der Chat blieb stehen und schob das Kontext-Panel 801 px aus dem Bild — seit 0.13.0. Die Punkte 29–31 messen Existenz und Höhe der Tabs, nicht die Lage des Panels. Fix und der `display:none`-Teil in Punkt 46 stehen in eigenen Commits.
+
 ## Belegter Lauf: 2026-09-25 — `list_notes` nennt Unterordner (42/42), mit Gegenprobe
 
 Vault `koda-agent` (Staging, Zweitinstanz Port 9374, Obsidian 1.14.2), Gate 763/763 (von 743), GUI-Smoke 42/42.

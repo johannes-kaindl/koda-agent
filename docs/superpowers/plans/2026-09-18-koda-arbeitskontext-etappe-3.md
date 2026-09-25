@@ -67,7 +67,7 @@
 **Interfaces:**
 - Produces: `CONTEXT_AUTO_K_MIN = 0`, `CONTEXT_AUTO_K_MAX = 20`, `KodaSettings.contextAutoK: number` (Default 5)
 
-- [ ] **Step 1: Failing test** — in `tests/settings_types.test.ts` neben „klemmt contextLinkDepth auf 1..3“:
+- [x] **Step 1: Failing test** — in `tests/settings_types.test.ts` neben „klemmt contextLinkDepth auf 1..3“:
 
 ```ts
   it("klemmt contextAutoK auf 0..20, Default 5", () => {
@@ -78,9 +78,9 @@
   });
 ```
 
-- [ ] **Step 2:** `npx vitest run tests/settings_types.test.ts` → FAIL (`undefined` statt 5).
+- [x] **Step 2:** `npx vitest run tests/settings_types.test.ts` → FAIL (`undefined` statt 5).
 
-- [ ] **Step 3: Implementieren** — in `src/core/settings-types.ts`:
+- [x] **Step 3: Implementieren** — in `src/core/settings-types.ts`:
 
 ```ts
 /** Spanne fuer `contextAutoK` — wie viele Notizen vault-rag im Modus Vault (Treffer zur
@@ -117,9 +117,9 @@ DE:
     "settings.contextAutoK.desc": "Wie viele Notizen das Plugin vault-rag beisteuert: im Modus Vault die Notizen, die am besten zu deiner Frage passen, im Modus Notiz die Notizen, die der aktiven ähneln. 0 schaltet beides ab. Ohne vault-rag hat die Einstellung keine Wirkung.",
 ```
 
-- [ ] **Step 4:** `npx vitest run tests/settings_types.test.ts` → PASS. Danach `npm run gate`; schlägt dabei ein anderer Test fehl, weil er die vollständige Schlüsselliste von `DEFAULT_SETTINGS` vergleicht, dort `contextAutoK: 5` ergänzen.
+- [x] **Step 4:** `npx vitest run tests/settings_types.test.ts` → PASS. Danach `npm run gate`; schlägt dabei ein anderer Test fehl, weil er die vollständige Schlüsselliste von `DEFAULT_SETTINGS` vergleicht, dort `contextAutoK: 5` ergänzen.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/settings-types.ts src/obsidian/settings.ts src/i18n/strings.ts tests/settings_types.test.ts
@@ -145,21 +145,22 @@ git commit -m "feat(context): Einstellung contextAutoK (0-20, Default 5) fuer va
   - `fetchSemanticHits(api: RetrievalApi | null, req: SemanticRequest): Promise<SemanticHits>`
   - `semanticNotice(reason: SemanticFailure, lang: "de" | "en"): string`
 
-- [ ] **Step 1: Failing tests** — `tests/context_semantic.test.ts`:
+- [x] **Step 1: Failing tests** — `tests/context_semantic.test.ts`:
 
 ```ts
 /* Treffer aus vault-rag als WERT: der Vault-Modus meldet einen Fehler, der Modus Notiz
  * schweigt (Spec, Etappe-3-Zuschnitt Punkte 2 und 4). */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, type Mock } from "vitest";
 import { fetchSemanticHits, semanticNotice, NO_HITS } from "../src/core/context/semantic";
 import type { ApiResult, RetrievalApi } from "../src/core/tools/retrieval";
 
-function api(search: ApiResult, related: ApiResult = search, indexed = true): RetrievalApi & { search: ReturnType<typeof vi.fn>; related: ReturnType<typeof vi.fn> } {
+// gemessen 2026-09-25: mit `ReturnType<typeof vi.fn>` bricht typecheck:tests; tragende Fassung: Mock<unknown[], Promise<ApiResult>> und `vi.fn((..._args: unknown[]) => …)`
+function api(search: ApiResult, related: ApiResult = search, indexed = true): RetrievalApi & { search: Mock<unknown[], Promise<ApiResult>>; related: Mock<unknown[], Promise<ApiResult>> } {
   return {
     apiVersion: 1,
     status: () => ({ apiVersion: 1, indexed, noteCount: 3 }),
-    search: vi.fn(() => Promise.resolve(search)),
-    related: vi.fn(() => Promise.resolve(related)),
+    search: vi.fn((..._args: unknown[]) => Promise.resolve(search)),
+    related: vi.fn((..._args: unknown[]) => Promise.resolve(related)),
   };
 }
 const ok: ApiResult = { ok: true, hits: [{ path: "V1.md", score: 0.9 }, { path: "V2.md", score: 0.8 }] };
@@ -234,9 +235,9 @@ describe("semanticNotice", () => {
 });
 ```
 
-- [ ] **Step 2:** `npx vitest run tests/context_semantic.test.ts` → FAIL (Modul fehlt).
+- [x] **Step 2:** `npx vitest run tests/context_semantic.test.ts` → FAIL (Modul fehlt).
 
-- [ ] **Step 3: Implementieren** — `src/core/context/semantic.ts`:
+- [x] **Step 3: Implementieren** — `src/core/context/semantic.ts`:
 
 ```ts
 /* Semantische Kandidaten aus vault-rag — Treffer zur Frage (Modus Vault) und Nachbarn der
@@ -326,9 +327,9 @@ export function semanticNotice(reason: SemanticFailure, lang: "de" | "en"): stri
 }
 ```
 
-- [ ] **Step 4:** `npx vitest run tests/context_semantic.test.ts` → PASS; `npm run check:pure` → grün.
+- [x] **Step 4:** `npx vitest run tests/context_semantic.test.ts` → PASS; `npm run check:pure` → grün.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/context/semantic.ts tests/context_semantic.test.ts
@@ -346,7 +347,7 @@ git commit -m "feat(context): semantic.ts — vault-rag-Treffer und -Nachbarn al
 **Interfaces:**
 - Produces: `CandidateInput.mode: "note" | "tabs" | "vault"`, neues optionales Feld `CandidateInput.semantic?: readonly string[]`. Reihenfolge: aktiv · manuell · (Tabs | Vault-Treffer | Links, Backlinks, dann `related`).
 
-- [ ] **Step 1: Failing tests** — `tests/context_candidates_semantic.test.ts`:
+- [x] **Step 1: Failing tests** — `tests/context_candidates_semantic.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -410,9 +411,9 @@ describe("collectCandidates — semantische Nachbarn im Modus Notiz", () => {
 });
 ```
 
-- [ ] **Step 2:** `npx vitest run tests/context_candidates_semantic.test.ts` → FAIL (Typfehler/fehlende Einträge).
+- [x] **Step 2:** `npx vitest run tests/context_candidates_semantic.test.ts` → FAIL (Typfehler/fehlende Einträge).
 
-- [ ] **Step 3: Implementieren** — in `src/core/context/candidates.ts`:
+- [x] **Step 3: Implementieren** — in `src/core/context/candidates.ts`:
 
 `CandidateInput` wird zu:
 
@@ -450,9 +451,9 @@ Und direkt vor dem letzten `return out;` (nach der Breitensuche):
   for (const p of input.semantic ?? []) nimm({ source: "related", path: p });
 ```
 
-- [ ] **Step 4:** `npx vitest run tests/context_candidates_semantic.test.ts tests/context_candidates.test.ts` → PASS.
+- [x] **Step 4:** `npx vitest run tests/context_candidates_semantic.test.ts tests/context_candidates.test.ts` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/context/candidates.ts tests/context_candidates_semantic.test.ts
@@ -473,7 +474,7 @@ git commit -m "feat(context): Kandidaten fuer Modus Vault und semantische Nachba
   - `renderFullContext(entries, mode: "note" | "tabs" | "vault", lang, extras?: RenderExtras)` mit `export interface RenderExtras { notice?: string }`
   - `BuildOptions.mode: "note" | "tabs" | "vault"`, `BuildOptions.hits?: SemanticHits`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 An `tests/context_render.test.ts` anhängen (Import `renderFullContext` ist dort schon vorhanden — sonst ergänzen):
 
@@ -539,9 +540,9 @@ describe("buildFullContext — Modus Vault", () => {
 });
 ```
 
-- [ ] **Step 2:** `npx vitest run tests/context_render.test.ts tests/context_build.test.ts` → FAIL.
+- [x] **Step 2:** `npx vitest run tests/context_render.test.ts tests/context_build.test.ts` → FAIL.
 
-- [ ] **Step 3: Implementieren**
+- [x] **Step 3: Implementieren**
 
 `src/core/context/render.ts`:
 - In `T.de.mode` ergänzen: `vault: "Vault"`; in `T.en.mode`: `vault: "Vault"`.
@@ -608,9 +609,9 @@ und beim Budget die Hinweiszeile mit abziehen, dann rendern:
   return renderFullContext(allocateBudget(geladen, inhaltsBudget), opts.mode, opts.lang, notice !== undefined ? { notice } : {});
 ```
 
-- [ ] **Step 4:** `npx vitest run tests/context_render.test.ts tests/context_build.test.ts` → PASS; danach `npm test` (alle alten Build-Tests müssen unverändert grün bleiben — `+ 1` im Overhead ändert keine bestehende Erwartung, weil dort das Budget groß ist; prüfe `tests/context_build.test.ts` auf eine exakte Budget-Erwartung und melde, falls eine bricht, statt sie anzupassen).
+- [x] **Step 4:** `npx vitest run tests/context_render.test.ts tests/context_build.test.ts` → PASS; danach `npm test` (alle alten Build-Tests müssen unverändert grün bleiben — `+ 1` im Overhead ändert keine bestehende Erwartung, weil dort das Budget groß ist; prüfe `tests/context_build.test.ts` auf eine exakte Budget-Erwartung und melde, falls eine bricht, statt sie anzupassen).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/context/render.ts src/core/context/build.ts tests/context_render.test.ts tests/context_build.test.ts
@@ -638,7 +639,7 @@ git commit -m "feat(context): Volltext-Block fuer Modus Vault, Hinweiszeile bei 
   - `KodaPlugin.vaultAvailable(): boolean`
   - `ContextPanelHost.vaultAvailable(): boolean` (neu)
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 `tests/context_types.test.ts`, den Block `describe("AVAILABLE_MODES", …)` ersetzen durch:
 
@@ -667,9 +668,9 @@ describe("modeOptions", () => {
 });
 ```
 
-- [ ] **Step 2:** `npx vitest run tests/context_types.test.ts tests/context_labels.test.ts` → FAIL.
+- [x] **Step 2:** `npx vitest run tests/context_types.test.ts tests/context_labels.test.ts` → FAIL.
 
-- [ ] **Step 3: Implementieren**
+- [x] **Step 3: Implementieren**
 
 `src/core/context/types.ts` — Kommentar und Konstante:
 
@@ -786,9 +787,9 @@ export function fillModeSelect(sel: HTMLSelectElement, lang: "de" | "en", vaultA
 
 `src/i18n/strings.ts` — EN: `"context.vaultNeedsRag": "The Vault mode needs the vault-rag plugin.",` · DE: `"context.vaultNeedsRag": "Der Modus Vault braucht das Plugin vault-rag.",`
 
-- [ ] **Step 4:** `npx vitest run tests/context_types.test.ts tests/context_labels.test.ts` → PASS; `npm run gate` → grün.
+- [x] **Step 4:** `npx vitest run tests/context_types.test.ts tests/context_labels.test.ts` → PASS; `npm run gate` → grün.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/context/types.ts src/core/context/labels.ts src/obsidian/mode-select.ts src/obsidian/view.ts src/obsidian/context-panel.ts src/obsidian/settings.ts src/main.ts src/i18n/strings.ts tests/context_types.test.ts tests/context_labels.test.ts
@@ -811,7 +812,7 @@ git commit -m "feat(context): Modus Vault im Dropdown, gesperrt ohne vault-rag, 
   - `PanelSection.note: string` (Hinweiszeile über den Chips; `""` = keine)
   - `PanelViewModel.autoK: number | null` (in den Modi Notiz und Vault gesetzt, sonst `null`)
 
-- [ ] **Step 1: Failing tests** — an `tests/context_panel_vm.test.ts` anhängen. `opts` im Kopf der Datei bekommt zusätzlich `autoK: 5,` (ohne das Feld bricht der Typecheck der alten Fälle):
+- [x] **Step 1: Failing tests** — an `tests/context_panel_vm.test.ts` anhängen. `opts` im Kopf der Datei bekommt zusätzlich `autoK: 5,` (ohne das Feld bricht der Typecheck der alten Fälle):
 
 ```ts
 describe("buildPanelViewModel — Modus Vault", () => {
@@ -866,9 +867,9 @@ describe("buildPanelViewModel — semantische Nachbarn und K", () => {
 });
 ```
 
-- [ ] **Step 2:** `npx vitest run tests/context_panel_vm.test.ts` → FAIL.
+- [x] **Step 2:** `npx vitest run tests/context_panel_vm.test.ts` → FAIL.
 
-- [ ] **Step 3: Implementieren** — in `src/core/context/panel-vm.ts`:
+- [x] **Step 3: Implementieren** — in `src/core/context/panel-vm.ts`:
 
 - Import: `import { MIN_QUERY_CHARS, NO_HITS, semanticNotice, type SemanticHits } from "./semantic";`
 - `PanelSection` bekommt `/** Eine Zeile ueber den Chips — z. B. warum der Vault-Abschnitt leer ist. "" = keine. */ note: string;`
@@ -926,9 +927,9 @@ function vaultNote(hits: SemanticHits, query: string, lang: "de" | "en", t: (typ
 
 - In `buildPanelViewModel`: Signatur `mode: Exclude<ContextMode, "off">`; `const hits = opts.hits ?? NO_HITS;`. Im `else`-Zweig `buildFullContext({ …, hits })` und `collectCandidates({ …, semantic: hits.kind === "ok" ? hits.paths : [] })`; `sourceSection(mode, kandidaten, manualSet, off, groessen, t, mode === "vault" ? vaultNote(hits, opts.query ?? "", opts.lang, t) : "")`. Im Rückgabeobjekt `autoK: mode === "note" || mode === "vault" ? opts.autoK : null,`.
 
-- [ ] **Step 4:** `npx vitest run tests/context_panel_vm.test.ts tests/context_panel_visibility.test.ts` → PASS. (`context_panel_visibility` baut womöglich eigene `PanelOptions`/`PanelSection`-Objekte — dort `autoK: 5` bzw. `note: ""` ergänzen, falls der Typecheck es verlangt.)
+- [x] **Step 4:** `npx vitest run tests/context_panel_vm.test.ts tests/context_panel_visibility.test.ts` → PASS. (`context_panel_visibility` baut womöglich eigene `PanelOptions`/`PanelSection`-Objekte — dort `autoK: 5` bzw. `note: ""` ergänzen, falls der Typecheck es verlangt.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/context/panel-vm.ts tests/context_panel_vm.test.ts tests/context_panel_visibility.test.ts
@@ -951,7 +952,7 @@ git commit -m "feat(context): Kontext-Tab mit Vault-Abschnitt, Hinweiszeile und 
 
 Kein eigener Unit-Test: diese Schicht fasst Obsidian an. Belegt wird sie durch die Prüfpunkte 42–45 (Task 8). Die puren Teile sind in Tasks 2–6 getestet.
 
-- [ ] **Step 1: `main.ts`**
+- [x] **Step 1: `main.ts`**
 
 Imports ergänzen: `fetchSemanticHits, type SemanticHits` aus `./core/context/semantic`, `CONTEXT_AUTO_K_MIN, CONTEXT_AUTO_K_MAX` aus `./core/settings-types`, `WorkspaceSnapshot` (Typ) aus `./core/context/ports`.
 
@@ -1052,7 +1053,7 @@ Neben `contextManual`:
 
 Im Doc-Kommentar von `currentContext` einen Satz ergänzen: „`query` ist die Frage, die gerade gesendet wird; der Vault-Modus sucht mit ihr, nicht mit dem Entwurf.“ In `ask` die Zeile `const ctx = await this.currentContext();` ersetzen durch `const ctx = await this.currentContext(question);`.
 
-- [ ] **Step 2: `view.ts` — Debounce am Eingabefeld**
+- [x] **Step 2: `view.ts` — Debounce am Eingabefeld**
 
 Feld und Konstante:
 
@@ -1096,7 +1097,7 @@ In `mountChat` nach dem `keydown`-Listener:
 
 Im `ContextPanel`-Host-Objekt: `setAutoK: (n) => { this.plugin.setContextAutoK(n); },`.
 
-- [ ] **Step 3: `context-panel.ts` — Stepper-Helfer, K-Stepper, Hinweiszeile**
+- [x] **Step 3: `context-panel.ts` — Stepper-Helfer, K-Stepper, Hinweiszeile**
 
 `ContextPanelHost` um `setAutoK(n: number): void;` ergänzen.
 
@@ -1143,7 +1144,7 @@ In der Abschnittsschleife direkt nach `const inner = collapsibleSection(…);`:
       if (sec.note !== "") inner.createDiv({ cls: "koda-ctx-note", text: sec.note });
 ```
 
-- [ ] **Step 4: Strings und CSS**
+- [x] **Step 4: Strings und CSS**
 
 `src/i18n/strings.ts` — EN: `"context.autoK": "Notes from vault-rag"`, `"context.autoKDec": "Fewer notes from vault-rag"`, `"context.autoKInc": "More notes from vault-rag"` · DE: `"context.autoK": "Notizen aus vault-rag"`, `"context.autoKDec": "Weniger Notizen aus vault-rag"`, `"context.autoKInc": "Mehr Notizen aus vault-rag"`.
 
@@ -1153,11 +1154,11 @@ In der Abschnittsschleife direkt nach `const inner = collapsibleSection(…);`:
 .koda-ctx-note { font-size: var(--font-ui-smaller); color: var(--text-muted); margin: var(--size-2-1) 0; }
 ```
 
-- [ ] **Step 5: Gate**
+- [x] **Step 5: Gate**
 
 Run: `npm run gate` → 0 Errors, 0 Warnings, alle Tests grün.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main.ts src/obsidian/view.ts src/obsidian/context-panel.ts src/i18n/strings.ts styles.css
@@ -1174,9 +1175,9 @@ git commit -m "feat(context): Vault-Modus verdrahtet — Suche beim Senden, entp
 
 Alle vier Punkte benutzen einen **Stub** der vault-rag-API unter `app.plugins.plugins["vault-retrieval"]` (Muster: Punkt 41, llm-lab-Stub). Die Gründe sind dieselben wie dort: Der Punkt prüft Kodas Seite der Naht, nicht vault-rags Treffergüte, und ein echter Index im Staging-Vault wäre nicht deterministisch. Existiert dort bereits ein Eintrag (echtes Plugin oder Rest eines Laufs), werden die Punkte **übersprungen und als übersprungen gemeldet**, nicht grün gemeldet.
 
-- [ ] **Step 1: Baseline** — Zweitinstanz nach Rahmenregel 6 starten, Lock nehmen, `npm run smoke:gui -- --vault koda-agent --port <port>` fahren. Erwartung: **41/41**. Die Zahl in die Auftragsnote eintragen.
+- [x] **Step 1: Baseline** — Zweitinstanz nach Rahmenregel 6 starten, Lock nehmen, `npm run smoke:gui -- --vault koda-agent --port <port>` fahren. Erwartung: **41/41**. Die Zahl in die Auftragsnote eintragen.
 
-- [ ] **Step 2: Stub-Helfer und Prüfpunkte** — in `scripts/gui-smoke.ts` nach Punkt 41 einfügen:
+- [x] **Step 2: Stub-Helfer und Prüfpunkte** — in `scripts/gui-smoke.ts` nach Punkt 41 einfügen:
 
 ```ts
     // ── 42–45: Etappe 3a — vault-rag als Quelle (Stub, Muster Punkt 41) ─────────────────
@@ -1347,7 +1348,7 @@ Alle vier Punkte benutzen einen **Stub** der vault-rag-API unter `app.plugins.pl
 
 Den Kopfkommentar des Treibers (Liste der Punkte ~Zeile 100–140) um die vier Punkte ergänzen.
 
-- [ ] **Step 3: Lauf und Gegenproben** — `npm run smoke:gui -- --vault koda-agent --port <port>` → Erwartung **45/45**. Danach für jeden neuen Punkt eine Gegenprobe (CORE-TEST-01: ein Prüfpunkt, der nicht rot werden kann, belegt nichts). Jede Mutation einzeln einbauen, bauen mit `node esbuild.config.mjs production` (nicht `npm run build`, siehe Handoff-Kontext), Punkt muss **rot** werden, Mutation zurücknehmen:
+- [x] **Step 3: Lauf und Gegenproben** — `npm run smoke:gui -- --vault koda-agent --port <port>` → Erwartung **45/45**. Danach für jeden neuen Punkt eine Gegenprobe (CORE-TEST-01: ein Prüfpunkt, der nicht rot werden kann, belegt nichts). Jede Mutation einzeln einbauen, bauen mit `node esbuild.config.mjs production` (nicht `npm run build`, siehe Handoff-Kontext), Punkt muss **rot** werden, Mutation zurücknehmen:
   - 42: in `build.ts` den `notice` fest auf `undefined` setzen → 42 rot.
   - 43: in `main.ts` den `vaultAvailable`-Guard in `setContextMode` auskommentieren → 43 rot.
   - 44: in `candidates.ts` die `related`-Schleife auskommentieren → 44 rot.
@@ -1355,12 +1356,12 @@ Den Kopfkommentar des Treibers (Liste der Punkte ~Zeile 100–140) um die vier P
   
   Ergebnis (rot/grün je Mutation) in `docs/SMOKE.md` unter einem neuen Abschnitt „Belegter Lauf: <Datum> — Etappe 3a“ festhalten, samt Obsidian-Version der Zweitinstanz und Port. Lock sofort nach dem letzten Lauf freigeben, Zweitinstanz beenden.
 
-- [ ] **Step 4: Doku**
+- [x] **Step 4: Doku**
   - `CHANGELOG.md` unter `## [Unreleased]` → `### Added`: ein Eintrag für den **Vault-Modus**: Treffer von vault-rag zur gesendeten Frage im Volltext, Vorschau im Kontext-Tab während des Tippens, Hinweis im Block, wenn die Suche nicht verfügbar ist, gesperrt ohne vault-rag. Ein zweiter für die **semantischen Nachbarn** im Modus Notiz. Dazu die Einstellung **„Notizen aus vault-rag“** (0–20, Default 5, 0 = aus) und der Stepper im Kontext-Tab.
   - `README.md`: in der Modi-Liste (um Zeile 59) Vault ergänzen. Die Tabellenzeile „Context mode on startup“ (Zeile 200) ohne „(Vault reserved for a later stage)“, dazu eine Zeile für „Notes from vault-rag“.
   - `CLAUDE.md`: Abschnitt `npm run smoke:gui` von „41 Punkte“ auf „45 Punkte“ und die vier neuen Punkte in einem Satz, nach dem Muster der bestehenden Einträge.
 
-- [ ] **Step 5: Gate + Commit + Push**
+- [x] **Step 5: Gate + Commit + Push**
 
 ```bash
 npm run gate && git add scripts/gui-smoke.ts docs/SMOKE.md CHANGELOG.md README.md CLAUDE.md && git commit -m "test(smoke): Pruefpunkte 42-45 fuer Vault-Modus und semantische Nachbarn (Etappe 3a)" && git push origin main && git push github main

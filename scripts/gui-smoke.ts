@@ -100,6 +100,14 @@
  * npm run smoke:gui -- --vault koda-agent
  * ```
  *
+ * ## Pruefpunkte 43-46 (Etappe 3a, seit 2026-09-25)
+ *
+ * Alle vier fahren gegen einen Stub der vault-rag-API unter `app.plugins.plugins["vault-retrieval"]`
+ * (Muster Punkt 41): 43 Modus Vault sucht mit der GESENDETEN Frage und meldet einen Fehlschlag
+ * im Block, 44 Vault ist ohne vault-rag gesperrt (Dropdown und Befehl), 45 Modus Notiz holt
+ * Nachbarn per related() und K = 0 schaltet ab, 46 die Vorschau im Kontext-Tab folgt dem
+ * Entwurf im Eingabefeld (entprellt). Steht dort schon ein Eintrag, werden sie uebersprungen.
+ *
  * ## Pruefpunkte 20-23 (Arbeitskontext, seit 2026-09-02)
  *
  * Vier neue Punkte messen ueber `plugin.currentContext()`, `plugin.setContextMode()`,
@@ -2520,6 +2528,180 @@ async function main(): Promise<void> {
       `).catch(() => undefined);
     }
     record("42. list_notes nennt Unterordner, auch einen ohne Notiz; fehlender Ordner als nicht existent", ok42, detail42);
+
+    // ── 43–46: Etappe 3a — vault-rag als Quelle (Stub, Muster Punkt 41) ─────────────────
+    // Der Stub erfuellt `readRetrievalApi` (apiVersion 1, status/search/related als Funktionen)
+    // und protokolliert jede Anfrage in window.__kodaRagSeen. `window.__kodaRagFail` schaltet
+    // search() auf { ok:false, reason:"offline" } — die Gegenprobe fuer den Hinweis im Block.
+    const ragVorher = await cdp.evaluate<boolean>(`return !!app.plugins.plugins["vault-retrieval"];`);
+    const installRagStub = (): Promise<unknown> => cdp.evaluate(`
+      window.__kodaRagSeen = [];
+      window.__kodaRagFail = false;
+      app.plugins.plugins["vault-retrieval"] = {
+        __kodaSmokeStub: true,
+        api: {
+          apiVersion: 1,
+          status: () => ({ apiVersion: 1, indexed: true, noteCount: 4, reindexing: false }),
+          search: async (q, o) => {
+            window.__kodaRagSeen.push({ op: "search", q, k: o && o.k });
+            return window.__kodaRagFail
+              ? { ok: false, reason: "offline" }
+              : { ok: true, hits: [{ path: "Notes/Compaction.md", score: 0.9 }] };
+          },
+          related: async (p, o) => {
+            window.__kodaRagSeen.push({ op: "related", p, k: o && o.k });
+            return { ok: true, hits: [{ path: "Koda/Memory.md", score: 0.8 }] };
+          },
+        },
+      };
+      return true;
+    `);
+    const removeRagStub = (): Promise<unknown> => cdp.evaluate(`
+      if (app.plugins.plugins["vault-retrieval"]?.__kodaSmokeStub) delete app.plugins.plugins["vault-retrieval"];
+      delete window.__kodaRagSeen; delete window.__kodaRagFail;
+      return true;
+    `).catch(() => undefined);
+
+    if (ragVorher) {
+      const grund = "uebersprungen — ein vault-retrieval-Eintrag existiert bereits (echtes Plugin oder Rest eines abgebrochenen Laufs); Stub wuerde ihn ueberschreiben";
+      record("43. Modus Vault: Treffer zur gesendeten Frage im Volltext, Fehlschlag meldet sich", true, grund);
+      record("44. Modus Vault ist ohne vault-rag gesperrt (Dropdown und Befehl)", true, grund);
+      record("45. Modus Notiz: semantische Nachbarn aus related(), K = 0 schaltet ab", true, grund);
+      record("46. Kontext-Tab: Vault-Vorschau folgt dem Entwurf im Eingabefeld (entprellt)", true, grund);
+    } else {
+      // ── 43 ──
+      let ok43 = false; let detail43 = "";
+      try {
+        await installRagStub();
+        const r = await cdp.evaluate<{ mode: string; items: string[]; seen: { op: string; q: string; k: number }[]; k: number; failText: string; failItems: string[] }>(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.setContextMode("vault");
+          const frage = "Wie funktioniert die Verdichtung?";
+          const ctx = await p.currentContext(frage);
+          window.__kodaRagFail = true;
+          const fail = await p.currentContext(frage);
+          return {
+            mode: ctx?.mode ?? "",
+            items: (ctx?.items ?? []).map((i) => i.source + ":" + i.path + ":" + i.kind),
+            seen: window.__kodaRagSeen,
+            k: p.settings.contextAutoK,
+            failText: fail?.text ?? "",
+            failItems: (fail?.items ?? []).map((i) => i.source + ":" + i.path),
+          };
+        `);
+        const suche = r.seen.find((s) => s.op === "search");
+        ok43 = r.mode === "vault"
+          && r.items.includes("vault:Notes/Compaction.md:full")
+          && suche?.q === "Wie funktioniert die Verdichtung?" && suche.k === r.k
+          && /Vault-Suche nicht verfügbar|Vault search unavailable/.test(r.failText)
+          && !r.failItems.some((i) => i.startsWith("vault:"));
+        detail43 = `Modus ${r.mode} · Eintraege ${r.items.join(", ")} · Suche „${suche?.q ?? "—"}" k=${String(suche?.k)} · Gegenprobe offline: ${/nicht verfügbar|unavailable/.test(r.failText) ? "Hinweis im Block" : "KEIN Hinweis"}`;
+      } catch (error) {
+        detail43 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      record("43. Modus Vault: Treffer zur gesendeten Frage im Volltext, Fehlschlag meldet sich", ok43, detail43);
+
+      // ── 44 ── (Stub steht noch: erst MIT, dann OHNE vault-rag messen)
+      let ok44 = false; let detail44 = "";
+      try {
+        const mit = await cdp.evaluate<boolean>(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          for (const v of app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})) v.view.syncContextMode();
+          const opt = document.querySelector('.koda-input-bar select.koda-mode option[value="vault"]');
+          return opt !== null && opt.disabled === false;
+        `);
+        await removeRagStub();
+        const ohne = await cdp.evaluate<{ disabled: boolean; label: string; modeNachBefehl: string }>(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.setContextMode("workspace");
+          p.setContextMode("vault");
+          const opt = document.querySelector('.koda-input-bar select.koda-mode option[value="vault"]');
+          return { disabled: opt?.disabled === true, label: opt?.textContent ?? "", modeNachBefehl: p.contextMode };
+        `);
+        ok44 = mit && ohne.disabled && ohne.modeNachBefehl === "workspace" && /vault-rag/.test(ohne.label);
+        detail44 = `mit Stub waehlbar: ${String(mit)} · ohne: gesperrt ${String(ohne.disabled)} („${ohne.label}"), Befehl laesst Modus auf „${ohne.modeNachBefehl}"`;
+      } catch (error) {
+        detail44 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      record("44. Modus Vault ist ohne vault-rag gesperrt (Dropdown und Befehl)", ok44, detail44);
+
+      // ── 45 ──
+      let ok45 = false; let detail45 = "";
+      try {
+        await installRagStub();
+        const r = await cdp.evaluate<{ mit: string[]; ohne: string[]; seenRelated: boolean }>(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          const file = app.vault.getFileByPath("Notes/Project plan.md");
+          await app.workspace.getLeaf(false).openFile(file);
+          p.setContextMode("note");
+          const kVorher = p.settings.contextAutoK;
+          const mit = await p.currentContext();
+          p.settings.contextAutoK = 0;
+          const ohne = await p.currentContext();
+          p.settings.contextAutoK = kVorher;
+          return {
+            mit: (mit?.items ?? []).map((i) => i.source + ":" + i.path),
+            ohne: (ohne?.items ?? []).map((i) => i.source + ":" + i.path),
+            seenRelated: window.__kodaRagSeen.some((s) => s.op === "related" && s.p === "Notes/Project plan.md"),
+          };
+        `);
+        ok45 = r.seenRelated && r.mit.includes("related:Koda/Memory.md") && !r.ohne.some((i) => i.startsWith("related:"));
+        detail45 = `related() fuer die aktive Notiz: ${String(r.seenRelated)} · mit K: ${r.mit.join(", ")} · K=0: ${r.ohne.join(", ")}`;
+      } catch (error) {
+        detail45 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      record("45. Modus Notiz: semantische Nachbarn aus related(), K = 0 schaltet ab", ok45, detail45);
+
+      // ── 46 ──
+      let ok46 = false; let detail46 = "";
+      try {
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.setContextMode("vault");
+          window.__kodaRagSeen = [];
+          const view = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0].view;
+          view.setTab("context");
+          const input = view.containerEl.querySelector("textarea.koda-input");
+          input.value = "Welche Werkzeuge hat Koda?";
+          input.dispatchEvent(new Event("input"));
+          return true;
+        `);
+        const r = await pollUntil<{ chips: string[]; queries: string[] }>(cdp, `
+          const view = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0].view;
+          const chips = [...view.containerEl.querySelectorAll(".koda-ctx-chip")].map((c) => c.getAttribute("title"));
+          const queries = (window.__kodaRagSeen || []).filter((s) => s.op === "search").map((s) => s.q);
+          return chips.includes("Notes/Compaction.md") ? { chips, queries } : null;
+        `, 5_000);
+        // Der Chat muss im Kontext-Tab WEG sein (display none) — sonst steht das Kontext-Panel
+        // zwar im DOM, aber 800 px unterhalb des Sichtbaren (Spezifitaets-Fehler in styles.css,
+        // gemessen 2026-09-25; DOM-Existenz der Chips allein hatte ihn nie gefangen).
+        const chatWeg = await cdp.evaluate<boolean>(`
+          const view = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0].view;
+          const chat = view.containerEl.querySelector('.okit-hub-panel[data-tab="chat"]');
+          const kontext = view.containerEl.querySelector(".koda-ctx-body");
+          return chat !== null && getComputedStyle(chat).display === "none" && kontext !== null && kontext.getBoundingClientRect().top < window.innerHeight;
+        `);
+        ok46 = r !== null && r.queries.includes("Welche Werkzeuge hat Koda?") && chatWeg;
+        detail46 = r === null
+          ? "kein Vault-Chip binnen 5 s nach dem Tippen"
+          : `Chips ${r.chips.join(", ")} · Suchen ${r.queries.map((q) => `„${q}"`).join(", ")} · Chat im Kontext-Tab ausgeblendet und Panel im Bild: ${String(chatWeg)}`;
+      } catch (error) {
+        detail46 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          const view = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0].view;
+          const input = view.containerEl.querySelector("textarea.koda-input");
+          if (input) input.value = "";
+          p.setContextQuery("");
+          p.setContextMode("workspace");
+          view.setTab("chat");
+          return true;
+        `).catch(() => undefined);
+        await removeRagStub();
+      }
+      record("46. Kontext-Tab: Vault-Vorschau folgt dem Entwurf im Eingabefeld (entprellt)", ok46, detail46);
+    }
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte

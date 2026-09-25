@@ -65,6 +65,7 @@ keine signierten Builds. Derzeit **nicht** im Community-Store gelistet (siehe
     Links und Backlinks, Tiefe 1–3 über die Einstellung *Link-Tiefe im Modus Notiz*), oder
     jede offene Notiz, gehen im **Volltext** mit, nicht nur als Zeiger, begrenzt durch die
     Einstellung *Inhalts-Budget je Nachricht* (Standard 20 000 Zeichen).
+  - **Vault** — braucht das Plugin vault-rag: die Notizen, die am besten zu deiner gesendeten Frage passen, gehen neben der aktiven Notiz im Volltext mit. Der Kontext-Tab zeigt sie schon beim Tippen und sagt es, wenn die Suche nicht verfügbar ist. Im Modus Notiz kommen die Notizen dazu, die vault-rag der aktiven ähnlich findet. Die Einstellung *Notizen aus vault-rag* bestimmt, wie viele (0 = aus).
   - **Manuell** — eine Notiz oder einen ganzen Ordner von Hand hinzufügen, über den
     Kontext-Tab oder drei Befehle; genauso wieder entfernen.
 
