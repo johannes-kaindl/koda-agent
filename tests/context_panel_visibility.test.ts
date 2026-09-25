@@ -31,7 +31,7 @@ function withQuerySelector(el: any): any {
 }
 
 function leererVm(): PanelViewModel {
-  return { sections: [], chars: 0, summary: "0 Zeichen", state: "is-ok", hasOff: false, depth: null, manualEnabled: true };
+  return { sections: [], chars: 0, summary: "0 Zeichen", state: "is-ok", hasOff: false, depth: null, manualEnabled: true, autoK: null };
 }
 
 function flush(): Promise<void> {
@@ -42,6 +42,7 @@ function makeHost(vm: () => Promise<PanelViewModel>): ContextPanelHost {
   return {
     mode: () => "note",
     setMode: () => {},
+    setAutoK: () => {},
     vaultAvailable: () => true,
     viewModel: vm,
     toggle: () => {},

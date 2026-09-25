@@ -13,6 +13,9 @@ import { fillModeSelect } from "./mode-select";
 import { ContextPanel } from "./context-panel";
 import type KodaPlugin from "../main";
 
+// uebernommen aus vault-rag/src/chat_view.ts:103-106 (scheduleQuery, 400 ms), 2026-09-25
+const CONTEXT_QUERY_DEBOUNCE_MS = 400;
+
 export const VIEW_TYPE_KODA = "koda-agent-view";
 
 type KodaTab = "chat" | "context";
@@ -22,6 +25,7 @@ type KodaTab = "chat" | "context";
 export class KodaView extends ItemView {
   private logEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
+  private queryTimer: number | null = null;
   /** Lebensdauer-Anker fuer alles, was MarkdownRenderer im Log anlegt (Embeds, Hover-
    *  Handler). Wird bei jedem Voll-Redraw ausgetauscht, sonst wachsen die Kind-Komponenten
    *  mit jeder Antwort weiter an. */
@@ -92,6 +96,7 @@ export class KodaView extends ItemView {
     this.ctxPanel = new ContextPanel({
       mode: () => this.plugin.contextMode,
       setMode: (m) => { this.plugin.setContextMode(m); },
+      setAutoK: (n) => { this.plugin.setContextAutoK(n); },
       vaultAvailable: () => this.plugin.vaultAvailable(),
       viewModel: () => this.plugin.contextViewModel(),
       toggle: (s, p) => { this.plugin.toggleContextItem(s, p); },
@@ -123,6 +128,7 @@ export class KodaView extends ItemView {
   }
 
   onClose(): Promise<void> {
+    if (this.queryTimer !== null) { window.clearTimeout(this.queryTimer); this.queryTimer = null; }
     this.hub?.destroy();
     this.hub = null;
     return Promise.resolve();
@@ -160,6 +166,16 @@ export class KodaView extends ItemView {
     this.inputEl = bar.createEl("textarea", { cls: "koda-input", attr: { placeholder: t("view.placeholder"), rows: "2" } });
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
+    });
+    // Der Entwurf speist die Vault-Vorschau im Kontext-Tab — entprellt, damit nicht jeder
+    // Tastendruck eine Embedding-Anfrage ausloest. Der Generationszaehler im Panel verwirft
+    // eine verspaetete Antwort, falls die Anfragen sich ueberholen.
+    this.inputEl.addEventListener("input", () => {
+      if (this.queryTimer !== null) window.clearTimeout(this.queryTimer);
+      this.queryTimer = window.setTimeout(() => {
+        this.queryTimer = null;
+        this.plugin.setContextQuery(this.inputEl.value);
+      }, CONTEXT_QUERY_DEBOUNCE_MS);
     });
     // Nur noch Senden und Stopp. „Neues Gespraech" sass hier daneben und wurde regelmaessig
     // versehentlich getroffen — es steht jetzt in der Kopfzeile, hinter einer Bestaetigung.
@@ -288,7 +304,10 @@ export class KodaView extends ItemView {
     const q = this.inputEl.value.trim();
     if (q === "" || this.plugin.busy) return;
     this.inputEl.value = "";
+    if (this.queryTimer !== null) { window.clearTimeout(this.queryTimer); this.queryTimer = null; }
     void this.plugin.ask(q);
+    // Nach dem Start von ask(): der Block ist mit `q` gebaut, der Entwurf ist jetzt leer.
+    this.plugin.setContextQuery("");
   }
 
   /** Verdichtungs-Marke: Stufe 1 als Notizzeile, Stufe 2 aufklappbar mit dem Text — lesbar,

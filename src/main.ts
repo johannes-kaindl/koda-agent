@@ -23,7 +23,7 @@ import { readLabApi } from "./obsidian/lab";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
 import { selectSkills, type Selection } from "./core/skills/select";
-import { CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN, DEFAULT_SETTINGS, validateKodaSettings, type KodaSettings } from "./core/settings-types";
+import { CONTEXT_AUTO_K_MAX, CONTEXT_AUTO_K_MIN, CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN, DEFAULT_SETTINGS, validateKodaSettings, type KodaSettings } from "./core/settings-types";
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { readRetrievalApi } from "./obsidian/retrieval";
 import { confirmWrite } from "./obsidian/confirm-write";
@@ -36,6 +36,8 @@ import { AVAILABLE_MODES, type ContextAttachment, type ContextMode } from "./cor
 import { modeLabel } from "./core/context/labels";
 import { renderWorkspaceContext } from "./core/context/workspace-line";
 import { buildFullContext } from "./core/context/build";
+import { fetchSemanticHits, type SemanticHits } from "./core/context/semantic";
+import type { WorkspaceSnapshot } from "./core/context/ports";
 import { contentPort, linkPort } from "./obsidian/links";
 import { editorPort, linesAround, readWorkspace } from "./obsidian/workspace";
 import { applySelection, itemKey, type SelectionKey } from "./core/context/selection";
@@ -116,6 +118,35 @@ export default class KodaPlugin extends Plugin {
    *  Zeiger, keine Inhalte — Spec E1). */
   contextManual: string[] = [];
 
+  /** Der Entwurf im Eingabefeld, entprellt aus der View gemeldet. Speist NUR die Vorschau im
+   *  Kontext-Tab — gesendet wird mit dem echten Nachrichtentext (`ask(question)`), sonst
+   *  haette wer vor Ablauf der Verzoegerung sendet, Treffer zu einem halben Satz im Block
+   *  (Etappe-3-Zuschnitt Punkt 2). */
+  contextQuery = "";
+
+  setContextQuery(q: string): void {
+    if (q === this.contextQuery) return;
+    this.contextQuery = q;
+    // Nur der Vault-Modus haengt an der Frage — in allen anderen waere ein Neuzeichnen je
+    // Tastendruck reine Arbeit ohne sichtbare Aenderung.
+    if (this.contextMode === "vault") for (const v of this.views()) v.syncContextPanel();
+  }
+
+  /** vault-rag fragen, falls der Modus es verlangt. Ein Weg fuer Vorschau und Senden. */
+  private semanticHits(mode: ContextMode, query: string, snap: WorkspaceSnapshot): Promise<SemanticHits> {
+    return fetchSemanticHits(readRetrievalApi(this.app), {
+      mode, query, activePath: snap.active?.path ?? null, k: this.settings.contextAutoK,
+    });
+  }
+
+  setContextAutoK(n: number): void {
+    const geklemmt = Math.min(CONTEXT_AUTO_K_MAX, Math.max(CONTEXT_AUTO_K_MIN, Math.round(n)));
+    if (geklemmt === this.settings.contextAutoK) return;
+    this.settings.contextAutoK = geklemmt;
+    void this.saveSettings();
+    for (const v of this.views()) v.syncContextPanel();
+  }
+
   addContextPaths(paths: readonly string[]): void {
     const naechster = addPaths(this.contextManual, paths);
     if (naechster === this.contextManual) return;
@@ -186,10 +217,12 @@ export default class KodaPlugin extends Plugin {
 
   /** Speist den Kontext-Tab. Liest denselben Snapshot und dieselben Einstellungen wie
    *  `currentContext()` — es gibt keinen zweiten Weg zu dem, was angezeigt wird. */
-  contextViewModel(): Promise<PanelViewModel> {
+  async contextViewModel(): Promise<PanelViewModel> {
     const s = this.settings;
-    const modus = this.contextMode === "off" || this.contextMode === "vault" ? "workspace" : this.contextMode;
-    return buildPanelViewModel(modus, readWorkspace(this.app, VIEW_TYPE_KODA), this.contextOff, {
+    const modus = this.contextMode === "off" ? "workspace" : this.contextMode;
+    const snap = readWorkspace(this.app, VIEW_TYPE_KODA);
+    const hits = await this.semanticHits(modus, this.contextQuery, snap);
+    return buildPanelViewModel(modus, snap, this.contextOff, {
       lang: this.promptLang(),
       selectionMax: s.contextSelectionChars,
       tabsMax: s.contextTabsMax,
@@ -197,6 +230,9 @@ export default class KodaPlugin extends Plugin {
       windowTokens: s.contextWindowTokens,
       budget: s.contextBudgetChars,
       linkDepth: s.contextLinkDepth,
+      autoK: s.contextAutoK,
+      hits,
+      query: this.contextQuery,
       manual: this.contextManual,
       links: linkPort(this.app),
       content: contentPort(this.app),
@@ -227,8 +263,11 @@ export default class KodaPlugin extends Plugin {
    *
    *  Asynchron seit Etappe 2b: die Volltext-Modi lesen Notizen. Ein Inhalts-Cache im
    *  Plugin waere synchron geblieben und haette eine zweite Wahrheit neben der Datei
-   *  eingefuehrt — `ask()` ist ohnehin async und wartet hier an Ort und Stelle. */
-  async currentContext(): Promise<ContextAttachment | null> {
+   *  eingefuehrt — `ask()` ist ohnehin async und wartet hier an Ort und Stelle.
+   *
+   *  `query` ist die Frage, die gerade gesendet wird; der Vault-Modus sucht mit ihr, nicht
+   *  mit dem Entwurf. */
+  async currentContext(query?: string): Promise<ContextAttachment | null> {
     const s = this.settings;
     const snap = readWorkspace(this.app, VIEW_TYPE_KODA);
     switch (this.contextMode) {
@@ -243,6 +282,7 @@ export default class KodaPlugin extends Plugin {
         });
       case "note":
       case "tabs":
+      case "vault":
         return await buildFullContext({
           mode: this.contextMode,
           snap,
@@ -253,12 +293,9 @@ export default class KodaPlugin extends Plugin {
           linkDepth: s.contextLinkDepth,
           budget: s.contextBudgetChars,
           lang: this.promptLang(),
+          // `query` fehlt nur beim GUI-Smoke und bei gui:ask ohne Frage — dann gilt der Entwurf.
+          hits: await this.semanticHits(this.contextMode, query ?? this.contextQuery, snap),
         });
-      default:
-        // "vault" — Etappe 3. Kein Wurf: der Modus kann als gespeicherter Default aus
-        // einer spaeteren Version in einer aelteren stehen (der onload-Guard faengt das
-        // beim Laden ab, aber ein Nutzer kann `data.json` von Hand aendern).
-        return null;
     }
   }
 
@@ -664,7 +701,7 @@ export default class KodaPlugin extends Plugin {
       // Innerhalb des try: currentContext() kann werfen (z. B. ein Workspace-Adapter-Fehler),
       // und ausserhalb des try bliebe busy dann haengen — derselbe Fehler wie ein Wurf im Loop.
       const userMsg: ChatMessage = { role: "user", content: question };
-      const ctx = await this.currentContext();
+      const ctx = await this.currentContext(question);
       if (ctx !== null) userMsg.context = ctx;
       this.chatLog.push(userMsg);
       await this.store.appendMessages([userMsg]);

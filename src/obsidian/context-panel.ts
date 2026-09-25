@@ -21,6 +21,7 @@ export interface ContextPanelHost {
   addNote(): void;
   addFolder(): void;
   setDepth(n: number): void;
+  setAutoK(n: number): void;
   reset(): void;
   openNote(path: string): void;
   sectionStorage(): CollapsibleStorage;
@@ -127,6 +128,27 @@ export class ContextPanel implements HubPanel<"context"> {
     body.createDiv({ cls: "koda-empty", text: t("context.error") });
   }
 
+  /** Ein Stepper „Beschriftung − n +". Zwei Exemplare (Link-Tiefe, Trefferzahl) — derselbe
+   *  Aufbau samt aria-label (ohne das hoert ein Screenreader nur das Minuszeichen) und
+   *  Tastaturbedienung, deshalb EINE Methode. */
+  private stepper(body: HTMLElement, label: string, value: number, decAria: string, incAria: string, onStep: (n: number) => void): void {
+    const wrap = body.createDiv({ cls: "koda-ctx-depth" });
+    wrap.createSpan({ text: label });
+    const knopf = (text: string, aria: string, ziel: number): void => {
+      const b = wrap.createEl("button", { text });
+      b.setAttribute("role", "button");
+      b.setAttribute("tabindex", "0");
+      b.setAttribute("aria-label", aria);
+      b.addEventListener("click", () => { onStep(ziel); });
+      b.addEventListener("keydown", (evt: KeyboardEvent) => {
+        if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); onStep(ziel); }
+      });
+    };
+    knopf("−", decAria, value - 1);
+    wrap.createSpan({ text: String(value) });
+    knopf("+", incAria, value + 1);
+  }
+
   private paint(vm: PanelViewModel): void {
     if (this.modeEl !== null) fillModeSelect(this.modeEl, this.host.lang(), this.host.vaultAvailable(), this.host.mode());
 
@@ -148,29 +170,10 @@ export class ContextPanel implements HubPanel<"context"> {
     body.empty();
 
     if (vm.depth !== null) {
-      const depth = vm.depth;
-      const wrap = body.createDiv({ cls: "koda-ctx-depth" });
-      wrap.createSpan({ text: t("context.depth") });
-      const step = (n: number): void => { this.host.setDepth(n); };
-      const dec = wrap.createEl("button", { text: "−" });
-      dec.setAttribute("role", "button");
-      dec.setAttribute("tabindex", "0");
-      // Kleinigkeit (Review 2026-09-05): ohne aria-label hoert ein Screenreader nur das
-      // Minuszeichen — jedes andere Bedienelement in diesem Panel hat eines.
-      dec.setAttribute("aria-label", t("context.depthDec"));
-      dec.addEventListener("click", () => step(depth - 1));
-      dec.addEventListener("keydown", (evt: KeyboardEvent) => {
-        if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); step(depth - 1); }
-      });
-      wrap.createSpan({ text: String(depth) });
-      const inc = wrap.createEl("button", { text: "+" });
-      inc.setAttribute("role", "button");
-      inc.setAttribute("tabindex", "0");
-      inc.setAttribute("aria-label", t("context.depthInc"));
-      inc.addEventListener("click", () => step(depth + 1));
-      inc.addEventListener("keydown", (evt: KeyboardEvent) => {
-        if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); step(depth + 1); }
-      });
+      this.stepper(body, t("context.depth"), vm.depth, t("context.depthDec"), t("context.depthInc"), (n) => { this.host.setDepth(n); });
+    }
+    if (vm.autoK !== null) {
+      this.stepper(body, t("context.autoK"), vm.autoK, t("context.autoKDec"), t("context.autoKInc"), (n) => { this.host.setAutoK(n); });
     }
 
     for (const sec of vm.sections) {
@@ -180,8 +183,9 @@ export class ContextPanel implements HubPanel<"context"> {
         key: sec.id,
         storage: this.host.sectionStorage(),
       });
+      if (sec.note !== "") inner.createDiv({ cls: "koda-ctx-note", text: sec.note });
       if (sec.chips.length === 0) {
-        inner.createDiv({ cls: "koda-empty", text: sec.empty });
+        if (sec.empty !== "") inner.createDiv({ cls: "koda-empty", text: sec.empty });
       } else {
         const list = inner.createDiv({ cls: "koda-ctx-chips" });
         for (const chip of sec.chips) {

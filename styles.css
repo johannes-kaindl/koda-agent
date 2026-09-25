@@ -332,5 +332,7 @@
 .koda-empty { color: var(--text-muted); font-size: var(--font-ui-small); padding: var(--size-4-2) 0; }
 .koda-ctx-depth { display: flex; align-items: center; gap: var(--size-2-2); font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .koda-ctx-depth button { padding: 0 var(--size-2-2); font-size: var(--font-ui-smaller); }
+/* Hinweis ueber den Chips eines Abschnitts (Vault: warum leer, warum die Suche ausfiel). */
+.koda-ctx-note { font-size: var(--font-ui-smaller); color: var(--text-muted); margin: var(--size-2-1) 0; }
 .koda-ctx-add { display: flex; flex-wrap: wrap; gap: var(--size-2-2); margin-top: var(--size-2-2); }
 .koda-ctx-add button { font-size: var(--font-ui-smaller); }
