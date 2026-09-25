@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-09-25
+
 ### Added
 - **Modus Vault** im Arbeitskontext: Koda fragt vault-rag mit der Frage, die du gerade sendest, und legt die besten Treffer im Volltext in den Kontext. Im Kontext-Tab erscheinen die Treffer schon beim Tippen (400 ms entprellt), als Chips mit dem Hinweis „vault-rag“. Ist die Suche nicht verfügbar (Plugin fehlt, kein Index, Endpunkt nicht erreichbar), steht das als Hinweiszeile im Block und im Kontext-Tab statt still leer zu bleiben. Ohne vault-rag bleibt der Eintrag im Dropdown sichtbar, aber gesperrt („Vault (braucht vault-rag)“).
 - **Semantische Nachbarn im Modus Notiz**: zusätzlich zu Links und Backlinks nimmt Koda die Notizen mit, die vault-rag der aktiven Notiz ähnlich findet (im Kontext-Tab als „ähnlich“ markiert). Fehlen sie, fehlt nur dieser Abschnitt, ohne Meldung.
