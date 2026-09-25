@@ -769,6 +769,35 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-25 — Spike Werkzeug-Anbieter, Wirtsseite (47/47), mit Gegenprobe und Praxistest
+
+Vault `koda-agent` (Staging, Zweitinstanz Port 9374, Obsidian 1.14.2), Branch `feat/tool-host`, Gate 796/796 auf **832/832**, GUI-Smoke 46/46 auf **47/47** (Baseline im Worktree vor dem Umbau: Gate 796/796; Smoke-Baseline ist der 3a-Lauf vom selben Tag, 46 grün). Deploy je Lauf per `cp` mit Prüfsummen-Vergleich, Plugin-Reload macht der Treiber.
+
+**Punkt 47** misst die Naht der Montage gegen einen Stub-Anbieter unter der Plugin-Id `koda-smoke-provider` (kein echtes Plugin trägt sie, Form = vault-rag `feat/tool-provider` 92c6c4d): `currentToolNames()` liest aus `app.plugins.plugins[*].api`, `buildTools().run("smoke_echo")` erreicht `execute()` mit `lang` und einem `confirm`-Callback, eine Kollision mit `read_note` bleibt beim Wirt, das montierte `related_notes` geht an den Anbieter statt in Kodas eigenen Pfad, der Nutzer-Schalter aus `toolsDisabled` greift auch für ein montiertes Werkzeug („abgeschaltet"), und ein entfernter Anbieter meldet „nicht mehr verfügbar" statt zu werfen.
+
+**Was der erste Lauf falsch grün meldete und erst der Praxistest fand:** die erste Fassung routete im Runner nach `HOST_TOOL_NAMES`, und weil `related_notes` ein Wirts-Name ist, ging das montierte `related_notes` in Kodas eigenen Pfad, der ohne vault-rag-API ins Leere lief. Unit-Test und Punkt 47 sahen es nicht, weil beide nur fremde Namen montierten (`smoke_echo`). Aufgefallen ist es an der Aufrufliste des Stubs im Praxistest (zwei `semantic_search`, null `related_notes`, obwohl der Bericht `→ related_notes` zeigte). Seitdem routet der Runner nach der Route der Werkzeugmenge, nicht nach dem Namen; Punkt 47 ruft zusätzlich `related_notes` und prüft, dass der Stub es sah.
+
+### Gegenprobe (Mutation, gebaut, deployt, gefahren, zurückgenommen)
+
+| Punkt | Mutation | Ergebnis |
+|---|---|---|
+| 47 | Route zum Anbieter in `VaultTools.run` entfernt | 47 rot („unbekanntes Tool: smoke_echo", execute sah nichts), sonst grün (46/47); zurückgenommen 47/47 |
+
+Punkt 20 war in zwei Läufen rot („aktiv ist Koda: false") und wurde grün, sobald das Fenster der Zweitinstanz im Vordergrund stand (`System Events` → frontmost): `document.querySelector(".koda-input").focus()` ändert in einem Hintergrund-Fenster den aktiven Leaf nicht. Kein Plugin-Defekt, ein Treiber-Vorbehalt; gilt für jeden Lauf, in dem das Fenster hinter dem Terminal liegt.
+
+### Praxistest gegen `qwen/qwen3.8-27b` (LM Studio, Stub-Anbieter `koda-spike-rag` mit `semantic_search` und `related_notes`)
+
+Vier Fragen, je ein Lauf, `--full`; der Stub protokollierte seine Aufrufe im Renderer.
+
+| Frage | gewähltes Werkzeug | Befund |
+|---|---|---|
+| thematisch („Verdichtung des Gesprächsverlaufs, auch ohne das Wort") | `semantic_search` (montiert), dann `read_note` ×2 | Modell wählt das montierte Werkzeug für die semantische Frage |
+| wörtlich („In welchen Notizen kommt das Wort Compaction vor?") | `search_notes` (Wirt) | keine Verwechslung mit `semantic_search` |
+| verwandt („inhaltlich verwandt mit Notes/Project plan.md, ohne Link") | `related_notes` (montiert), `read_note` ×3 | nach dem Routing-Fix erreicht der Aufruf den Anbieter; vor dem Fix lief er ins Leere und das Modell wich auf `semantic_search` aus |
+| Faktenfrage („Wie viele Werkzeuge kennt Koda laut der Notiz Tools?") | `search_notes`, `read_note` | kein unnötiger Griff zum semantischen Werkzeug |
+
+Grenze der Messung: der Stub liefert feste Treffer, gemessen ist die Werkzeugwahl des Modells und Kodas Seite der Naht, nicht die Trefferqualität; ein Lauf gegen das echte vault-rag mit Index steht aus und braucht einen Embedding-Endpunkt im Staging.
+
 ## Belegter Lauf: 2026-09-25 — Etappe 3a, Vault-Modus und semantische Nachbarn (46/46), mit Gegenproben
 
 Vault `koda-agent` (Staging, Zweitinstanz Port 9309, Obsidian 1.14.2), Gate 763/763 (von 763 vor der Etappe) auf **796/796**, GUI-Smoke 42/42 auf **46/46** (Baseline vor dem ersten Umbau: 42 grün, 0 rot, 0 übersprungen, 0 nichts gemessen). Deploy je Lauf per `cp main.js styles.css manifest.json` in den Staging-Vault, sha1 von `main.js` vor und nach dem Kopieren verglichen (Endstand `2b292a39235c`).

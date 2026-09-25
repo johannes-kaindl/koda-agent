@@ -2728,10 +2728,11 @@ async function main(): Promise<void> {
               tools: (opts) => [
                 { name: "smoke_echo", description: "Smoke: " + String(opts && opts.lang), parameters: { type: "object", properties: { text: { type: "string", description: "x" } }, required: ["text"] }, writes: false },
                 { name: "read_note", description: "Kollision mit dem Wirt — darf NICHT montiert werden", parameters: { type: "object", properties: {}, required: [] }, writes: false },
+                { name: "related_notes", description: "Anbieter-Fassung — ersetzt Kodas eigene", parameters: { type: "object", properties: { path: { type: "string", description: "p" } }, required: ["path"] }, writes: false },
               ],
               execute: async (name, args, opts) => {
                 window.__kodaProvCalls.push({ name, args, lang: opts && opts.lang, hatConfirm: typeof (opts && opts.confirm) === "function" });
-                return { ok: true, content: "echo:" + String(args.text) };
+                return { ok: true, content: name === "related_notes" ? "related:" + String(args.path) : "echo:" + String(args.text) };
               },
             },
           };
@@ -2741,6 +2742,9 @@ async function main(): Promise<void> {
         const mit = await cdp.evaluate<string[]>(`return ${p}.currentToolNames();`);
         const defs = await cdp.evaluate<{ name: string; description: string }[]>(`return ${p}.currentToolDefs().filter(d => d.name === "smoke_echo" || d.name === "read_note");`);
         const lauf = await cdp.evaluate<{ ok: boolean; content?: string; error?: string }>(`return await ${p}.buildTools().run("smoke_echo", { text: "hallo" });`);
+        // Wirts-Name aus dem Anbieter: `related_notes` muss an den Anbieter gehen, nicht in
+        // Kodas eigenen Pfad (Praxistest-Befund 2026-09-25: die erste Fassung routete nach Name).
+        const related = await cdp.evaluate<{ ok: boolean; content?: string; error?: string }>(`return await ${p}.buildTools().run("related_notes", { path: "Notes/Tools.md" });`);
         const calls = await cdp.evaluate<{ name: string; args: unknown; lang: string; hatConfirm: boolean }[]>(`return window.__kodaProvCalls;`);
         // Nutzer-Schalter: abgeschaltet heisst nicht gesendet UND nicht ausfuehrbar.
         const aus = await cdp.evaluate<{ names: string[]; lauf: { ok: boolean; error?: string } }>(`
@@ -2764,11 +2768,13 @@ async function main(): Promise<void> {
           && mit.filter((n) => n === "read_note").length === 1
           && readNoteDef !== undefined && !readNoteDef.description.startsWith("Kollision")
           && lauf.ok === true && lauf.content === "echo:hallo"
-          && calls.length === 1 && calls[0].name === "smoke_echo" && (calls[0].lang === "de" || calls[0].lang === "en") && calls[0].hatConfirm
+          && related.ok === true && related.content === "related:Notes/Tools.md"
+          && calls.length === 2 && calls[0].name === "smoke_echo" && (calls[0].lang === "de" || calls[0].lang === "en") && calls[0].hatConfirm
+          && calls[1].name === "related_notes"
           && !aus.names.includes("smoke_echo") && aus.lauf.ok === false && /abgeschaltet/.test(aus.lauf.error ?? "")
           && !weg.names.includes("smoke_echo") && weg.lauf.ok === false && /nicht mehr verf/.test(weg.lauf.error ?? "");
         detail47 = `vorher ${vorher.length} Werkzeuge · mit Anbieter ${mit.length} (smoke_echo ${mit.includes("smoke_echo") ? "montiert" : "FEHLT"}, read_note ${mit.filter((n) => n === "read_note").length}× — ${readNoteDef?.description.startsWith("Kollision") ? "ANBIETER GEWANN" : "Wirt gewann"}) · `
-          + `run → ${lauf.ok ? `„${lauf.content}“` : `Fehler „${lauf.error}“`} · execute sah lang=${calls[0]?.lang}, confirm=${calls[0]?.hatConfirm} · `
+          + `run → ${lauf.ok ? `„${lauf.content}“` : `Fehler „${lauf.error}“`} · related_notes → ${related.ok ? `„${related.content}“` : `Fehler „${related.error}“`} · execute sah lang=${calls[0]?.lang}, confirm=${calls[0]?.hatConfirm} · `
           + `abgeschaltet: gesendet ${aus.names.includes("smoke_echo")}, run „${aus.lauf.error ?? "ok?!"}“ · `
           + `entfernt: gesendet ${weg.names.includes("smoke_echo")}, run „${weg.lauf.error ?? "ok?!"}“`;
       } catch (error) {

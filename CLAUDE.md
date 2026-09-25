@@ -302,7 +302,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
-  Prüft die Naht zum Host, bewusst **ohne** echte Modell-Antwort. 46 Punkte (43–46 seit 2026-09-25, Etappe 3a, alle gegen einen Stub der vault-rag-API unter `vault-retrieval` — übersprungen, wenn dort schon ein Eintrag steht: 43 Modus Vault sucht mit der gesendeten Frage und meldet einen Fehlschlag im Block, 44 Vault ist ohne vault-rag gesperrt (Dropdown und Befehl), 45 Modus Notiz holt related()-Nachbarn und K = 0 schaltet ab, 46 die Kontext-Tab-Vorschau folgt dem Eingabefeld (entprellt) und der Chat ist im Kontext-Tab `display:none`; vier Gegenproben je Mutation in `docs/SMOKE.md`, Belege gegen Spezifitätsfehler in `styles.css` inklusive; 42 seit 2026-09-25: `list_notes` nennt die Unterordner eines flachen Ergebnisses, auch einen ohne Notiz, und meldet einen fehlenden Ordner als nicht existent — Naht `vault.getAllFolders()`, Gegenprobe gegen den alten Build in `docs/SMOKE.md`; 41 seit
+  Prüft die Naht zum Host, bewusst **ohne** echte Modell-Antwort. 47 Punkte (47 seit 2026-09-25, Spike Werkzeug-Anbieter: ein Stub-Anbieter unter eigener Plugin-Id wird montiert, `run()` erreicht dessen `execute()` mit `lang` und `confirm`, das montierte `related_notes` geht an den Anbieter, eine Kollision mit `read_note` bleibt beim Wirt, Nutzer-Schalter und Entfernen des Anbieters melden Klartext; Gegenprobe und Praxistest in `docs/SMOKE.md`; 43–46 seit 2026-09-25, Etappe 3a, alle gegen einen Stub der vault-rag-API unter `vault-retrieval` — übersprungen, wenn dort schon ein Eintrag steht: 43 Modus Vault sucht mit der gesendeten Frage und meldet einen Fehlschlag im Block, 44 Vault ist ohne vault-rag gesperrt (Dropdown und Befehl), 45 Modus Notiz holt related()-Nachbarn und K = 0 schaltet ab, 46 die Kontext-Tab-Vorschau folgt dem Eingabefeld (entprellt) und der Chat ist im Kontext-Tab `display:none`; vier Gegenproben je Mutation in `docs/SMOKE.md`, Belege gegen Spezifitätsfehler in `styles.css` inklusive; 42 seit 2026-09-25: `list_notes` nennt die Unterordner eines flachen Ergebnisses, auch einen ohne Notiz, und meldet einen fehlenden Ordner als nicht existent — Naht `vault.getAllFolders()`, Gegenprobe gegen den alten Build in `docs/SMOKE.md`; 41 seit
   2026-09-17: llm-lab-Meldestrecke — ein `llm-lab`-Stub (Marker-Check gegen ein echtes
   Plugin) sieht `feature`/`model`/`endpointUrl`/`content`/`latencyMs`/`turnId`/
   `promptTemplate` und nur `system`/`user`/`assistant`-Nachrichten aus einem echten
@@ -399,6 +399,16 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   (`readLabApi`, **übernommen** aus `vault-rag/src/lab_client.ts`, apiVersion 4 mit
   `turnId`) liest llm-labs API defensiv aus `app.plugins`; verdrahtet in `main.ts`s
   `ask()` (`reportToLab`, fire-and-forget, ein `turnId` je Nutzer-Handlung).
+- `src/core/tools/provider.ts` — **Werkzeug-Anbieter, Wirtsseite** (Spike 2026-09-25, pure):
+  Vertrag `ToolProviderApi` (`tools({lang})` synchron, `execute(name,args,{lang,confirm})`,
+  Fehler als Werte), `isToolProviderApi` (Form-Prüfung inkl. `writes` je Definition),
+  `mountProviderTools` (Wirt gewinnt jede Kollision, unter Anbietern der zuerst gelesene;
+  Kollisionen werden gemeldet, nie überschrieben), `outcomeFromProvider`. `toolSet()` in
+  `defs.ts` ist die eine Menge für Draht UND Route; `src/obsidian/providers.ts` liest alle
+  Anbieter aus `app.plugins.plugins[*].api` (keine Plugin-Liste, sortiert nach Id, frisch je
+  Aufruf). Der Runner routet nach der Route, nicht nach dem Namen — sonst ginge ein montiertes
+  `related_notes` in Kodas eigenen Pfad (Praxistest-Befund). Vertragsstand: vault-rag
+  `feat/tool-provider` 92c6c4d; Festlegungen im Cockpit-Task „Werkzeug-Anbieter-Vertrag".
 - `src/core/tools/list.ts` — `list_notes`: Ordnerauswahl (flach/rekursiv), Kappung
   mit Warnung in Zeile 1, leerer Ordner als Fehler mit Vorschlägen (pure). Frontmatter
   kommt aus Obsidians `metadataCache`, kein Datei-Lesen je Notiz.

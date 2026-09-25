@@ -134,12 +134,12 @@ export class VaultTools implements ToolRunner {
     },
   ) {}
 
-  /** Ein Name, den Koda nicht selbst traegt, gehoert einem Anbieter — oder niemandem. */
-  private async runProvided(name: string, args: Record<string, unknown>): Promise<ToolOutcome> {
-    const api = this.opts.provider?.(name) ?? null;
-    if (api === null) {
-      return { ok: false, error: `Werkzeug nicht mehr verfügbar: ${name} — das anbietende Plugin ist nicht (mehr) geladen. Nutze ein anderes.` };
-    }
+  /** Ein montiertes Werkzeug geht an seinen Anbieter — auch wenn es einen Wirts-Namen traegt
+   *  (`related_notes` aus vault-rag ersetzt Kodas eigene Fassung, s. `toolSet`). Gemessen am
+   *  2026-09-25 im Praxistest: die erste Fassung routete nach HOST_TOOL_NAMES und schickte das
+   *  montierte `related_notes` in Kodas eigenen Pfad, der ohne vault-rag-API ins Leere lief;
+   *  der Unit-Test sah es nicht, weil er nur fremde Namen montierte. */
+  private async runProvided(api: ToolProviderApi, name: string, args: Record<string, unknown>): Promise<ToolOutcome> {
     const erlaubt = this.opts.allowed?.();
     if (erlaubt !== undefined && !erlaubt.has(name)) {
       return { ok: false, error: `Werkzeug abgeschaltet: ${name} — der Nutzer hat es in den Einstellungen deaktiviert. Nutze ein anderes.` };
@@ -156,10 +156,15 @@ export class VaultTools implements ToolRunner {
       // Verlauf aufgreifen — ohne diese Zeile schriebe `write_note` dann trotzdem, im
       // Koda-Ordner sogar ohne Rueckfrage. Die Oberflaeche verspricht „Was Koda tun darf";
       // gehalten wird das Versprechen hier (Spec E3: messen statt annehmen).
-      // Anbieter-Werkzeuge VOR dem Erlaubnis-Guard: ein verschwundener Anbieter soll
-      // „nicht mehr verfuegbar" melden, nicht „vom Nutzer abgeschaltet" — die Erlaubnis-Menge
-      // wird frisch gebaut und kennt den Namen dann ebenfalls nicht mehr.
-      if (!HOST_TOOL_NAMES.has(name)) return await this.runProvided(name, a);
+      // Anbieter-Werkzeuge VOR dem Erlaubnis-Guard: die Route entscheidet (frisch je Aufruf),
+      // nicht der Name. Ein verschwundener Anbieter soll „nicht mehr verfuegbar" melden, nicht
+      // „vom Nutzer abgeschaltet" — die Erlaubnis-Menge wird frisch gebaut und kennt den Namen
+      // dann ebenfalls nicht mehr.
+      const anbieter = this.opts.provider?.(name) ?? null;
+      if (anbieter !== null) return await this.runProvided(anbieter, name, a);
+      if (!HOST_TOOL_NAMES.has(name)) {
+        return { ok: false, error: `Werkzeug nicht mehr verfügbar: ${name} — das anbietende Plugin ist nicht (mehr) geladen. Nutze ein anderes.` };
+      }
       const erlaubt = this.opts.allowed?.();
       if (erlaubt !== undefined && !erlaubt.has(name) && !this.fehltAusFremdemGrund(name)) {
         return { ok: false, error: `Werkzeug abgeschaltet: ${name} — der Nutzer hat es in den Einstellungen deaktiviert. Nutze ein anderes.` };

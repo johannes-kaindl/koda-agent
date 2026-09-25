@@ -85,6 +85,20 @@ describe("VaultTools.run — Route zu einem Anbieter-Werkzeug", () => {
     expect((r as { error: string }).error).toMatch(/nicht mehr verfuegbar|nicht mehr verfügbar/);
   });
 
+  it("ein montiertes related_notes geht an den Anbieter, nicht in Kodas eigenen Pfad (Praxistest-Befund 2026-09-25)", async () => {
+    const spy = vi.fn();
+    const t = tools({ provider: (n) => (n === "related_notes" ? providerApi({ ok: true, content: "vom Anbieter" }, spy) : null) });
+    expect(await t.run("related_notes", { path: "a.md" })).toEqual({ ok: true, content: "vom Anbieter" });
+    expect(spy).toHaveBeenCalledWith("related_notes", { path: "a.md" }, expect.anything());
+  });
+
+  it("ohne Route bleibt related_notes Kodas eigener Pfad (vault-rag ohne Vertrag)", async () => {
+    const t = tools({ provider: () => null });
+    const r = await t.run("related_notes", { path: "a.md" });
+    expect(r.ok).toBe(false);
+    expect((r as { error: string }).error).not.toMatch(/nicht mehr verf/);
+  });
+
   it("faengt eine werfende execute() und meldet sie als Fehler", async () => {
     const api: ToolProviderApi = { tools: () => [], execute: async () => { throw new Error("kaputt"); } };
     const t = tools({ provider: () => api });
