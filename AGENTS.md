@@ -65,7 +65,7 @@ Alle mit Beleg in `CLAUDE.md`:
 ## Memory
 
 Projekt-Memory unter `~/.claude/projects/<slug>/memory/` (Index: `MEMORY.md`).
-Session-Handoff unter `.remember/` (gitignored).
+Session-Handoff unter `.remember/`.
 
 ## Abweichungen von der Leitkonvention
 
