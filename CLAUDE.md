@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status: 0.17.0 released und im Store (Werkzeug-Anbieter, `list_notes` mit `depth`) — Stand 2026-09-26
 
-**0.17.0 ist am 2026-09-26 released** (Release-Commit `888fc2b`, Tag auf Forgejo und GitHub, GitHub-Release mit Assets) und hat den **Store-Rescan mit „passed", Höchstwertung und zero warnings** bestanden. Inhalt: die Wirtsseite des Werkzeug-Anbieter-Vertrags (Absatz unten) und `list_notes` mit `depth` — ab 2 ein Ordnerbaum statt der Unterordner-Zeile, gekappt nach ganzen Ebenen (`src/core/tools/tree.ts`; Anlass: Koda selbst bat um eine „Landkarte" des Vaults und plädierte für ein eigenes `list_directory_structure` — bewusst ein Parameter, weil jedes weitere Werkzeug lokale Modelle bei der Auswahl unsicherer macht). Gate 848/848, Smoke 48/48, Praxistest: ein Aufruf mit `depth: 2`, Antwort trennt „fehlt" von „leer" (`docs/SMOKE.md`). **Offen:** README und Docs auf den `_docs`-Standard (Screenshots, Diátaxis-Guides, veralteter Statusabsatz) als eigene Session — Cockpit-Task „README und Docs nach _docs-Standard …". Etappe 3b baut ihre Prüfpunkte als 49–50.
+**0.17.0 ist am 2026-09-26 released** (Release-Commit `888fc2b`, Tag auf Forgejo und GitHub, GitHub-Release mit Assets) und hat den **Store-Rescan mit „passed", Höchstwertung und zero warnings** bestanden. Inhalt: die Wirtsseite des Werkzeug-Anbieter-Vertrags (Absatz unten) und `list_notes` mit `depth` — ab 2 ein Ordnerbaum statt der Unterordner-Zeile, gekappt nach ganzen Ebenen (`src/core/tools/tree.ts`; Anlass: Koda selbst bat um eine „Landkarte" des Vaults und plädierte für ein eigenes `list_directory_structure` — bewusst ein Parameter, weil jedes weitere Werkzeug lokale Modelle bei der Auswahl unsicherer macht). Gate 848/848, Smoke 48/48, Praxistest: ein Aufruf mit `depth: 2`, Antwort trennt „fehlt" von „leer" (`docs/SMOKE.md`). **README und Nutzer-Doku stehen seit 2026-09-26 auf dem `_docs`-Standard** (Welle 9, `3c39924`/`3cc6e4a`, als 0.17.1 released): README EN/DE gekürzt, Nutzer-Doku unter `docs/` (Index `docs/README.md`, Getting started, `how-to/troubleshooting.md` mit wörtlichen Meldungen, drei How-tos, Referenz, Erklärung), vier Bilder aus `npm run shots`. **Wer eine Meldung in `src/i18n/strings.ts` ändert, zieht `docs/how-to/troubleshooting.md` mit** — dort steht jeder Text wörtlich, damit Nutzer ihn per Suche finden. Offen aus dem Abgleich: Cockpit-Task „Werkzeuge anderer Plugins fehlen in der Werkzeugliste …" (Settings-Text zu Vault veraltet, fremde Werkzeuge ohne Schalter, vault-rag-Regler ohne vault-rag). Etappe 3b baut ihre Prüfpunkte als 49–50.
 
 ### Vorgeschichte: 0.16.0 released (Arbeitskontext Etappe 3a), Stand 2026-09-25
 
@@ -308,7 +308,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run gate` — voller Gate: `lint` + `typecheck` + `typecheck:scripts` + `test` +
   `check:pure` + `build`. Vor jedem Commit erwartet.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
-- `npm test` — `check-no-abs-paths` + vitest (558/558).
+- `npm test` — `check-no-abs-paths` + vitest (848/848, Stand 2026-09-26).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
   einen laufenden Endpoint (Befunde in `docs/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
