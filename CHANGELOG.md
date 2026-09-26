@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-09-26
+
 ### Changed
 - **Chat-Aufruf läuft über den Kit-Client** (obsidian-kit 0.43.0, `createChatClient` mit XHR-Transport): Kodas eigener Streaming-Client und -Transport entfallen, Kodas bisherige Reparaturen (Tool-Call-Argumente werden ohne Abbruch abgewartet, abgeschnittene Aufrufe, das Reasoning-Echo für Modelle wie `verdigado-pro`) stehen unverändert. Sichtbare Folgen: Antwortet ein Server mit HTTP 200, aber einem JSON-Fehler im Körper (z. B. „model not loaded“), meldet Koda jetzt die Servermeldung statt einer leeren Antwort. Eine Antwort ohne Stream (Server ignoriert `stream: true`) wird gelesen statt verworfen. Ein Abbruch vor dem Start des Streams erreicht den Server gar nicht mehr. Ein Transportfehler heißt weiter „nicht erreichbar“; einen Wechsel auf eine Anfrage ohne Stream bei Origin-Weigerung gibt es bewusst nicht.
 - **llm-lab-Anbindung über das Kit** (`lab-client`): gleiche Aufzeichnung wie bisher (apiVersion 4). Neu: Hat das installierte llm-lab eine andere Vertragsversion, schreibt Koda einmal je Sitzung eine Warnung in die Konsole, statt die Aufzeichnung still auszulassen.
