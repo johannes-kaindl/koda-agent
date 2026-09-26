@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-09-26
+
 ### Added
 - **`list_notes` zeigt den Ordnerbaum**: Mit `depth` (z. B. 2 oder 3) liefert `list_notes` den Aufbau eines Ordners über mehrere Ebenen in einem Aufruf — jeden Ordner mit vollem Pfad und der Zahl der Notizen darin, leere Ordner eingeschlossen. So sieht Koda auf einen Blick, ob jeder Projektordner dieselben Unterordner hat, statt jeden einzeln zu öffnen. Der Baum hält sich an die Höchstzahl aufgelisteter Notizen; wird er gekappt, sagt die erste Zeile das und nennt die Tiefe, bis zu der er vollständig ist. Ohne `depth` bleibt alles wie bisher.
 - **Werkzeuge aus anderen Plugins**: Ein Plugin, das seine Fähigkeiten nach dem Werkzeug-Vertrag anbietet (`api.tools()`/`api.execute()`, erstes Exemplar vault-rag), bekommt seine Werkzeuge in Koda montiert, ohne dass Koda sie nachbaut. Sie erscheinen in der gesendeten Liste hinter Kodas eigenen, lassen sich wie diese in den Einstellungen abschalten und umbeschreiben, und ein schreibendes Werkzeug fragt vorher mit der Vorschau des Anbieters nach. Bietet vault-rag `related_notes` selbst an, ersetzt es Kodas eingebaute Fassung. Ein Werkzeug, dessen Name mit einem Koda-Werkzeug kollidiert, wird nicht montiert.
