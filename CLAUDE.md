@@ -349,6 +349,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   Werkzeuge er wählt**. Das Gegenstück zum Smoke — langsam und nicht deterministisch,
   dafür die einzige Messung von Kodas Verhalten. Bei Gegenproben immer `--full`, sonst
   ist der Beleg abgeschnitten.
+- `npm run shots -- --port <p> --vault koda-agent [--only <bild>]` — README-Bilder (Rezept `scripts/shots.ts`, Vertrag `docs/images/README.md`); Modellantworten kommen aus einem Stub im Rezept, die Werkzeugaufrufe laufen echt. Nur in einer Zweitinstanz, Oberfläche Englisch. `npm run shots:check` prüft Vertrag, Dateien, Einbettung.
 - `npm run build` — Typecheck + Production-esbuild (`main.js`).
 
 ## Struktur-Kurzüberblick

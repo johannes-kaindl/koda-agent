@@ -5,3 +5,4 @@ coverage/
 .gui-smoke.mjs
 .gui-ask.mjs
 .superpowers/
+.shots.mjs

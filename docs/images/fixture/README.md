@@ -53,6 +53,10 @@ Plugin settings are *not* part of the fixture: `buildVault` deletes `data.json`,
 starts from the shipped defaults — including the default endpoint `http://127.0.0.1:1234`.
 That is deliberate: the smoke should measure what a fresh install does.
 
+## The `Garden/` notes are for the README images
+
+`Garden/` (three notes about raised beds) is the scenery of `scripts/shots.ts` (see `../README.md`). No smoke check reads it; it links only among itself, so it does not change what check 33 or 34 collect around `Notes/Project plan.md`. The smoke ran 48/48 with it on 2026-09-26.
+
 ## Keep the scenery generic and English
 
 Everything here can end up in a screenshot and travel with the repo: no real people,

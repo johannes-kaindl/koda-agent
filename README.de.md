@@ -10,6 +10,8 @@
 
 Koda arbeitet mit einem OpenAI-kompatiblen Modell deiner Wahl, typischerweise einem auf deinem eigenen Rechner ([LM Studio](https://lmstudio.ai), Ollama) — deine Notizen müssen ihn dann nicht verlassen. Alles, was Koda steuert — seine Anweisung, sein Gedächtnis, seine Skills —, ist eine Markdown-Notiz, die du lesen und ändern kannst.
 
+<p align="center"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/hero.png" width="820" alt="Eine Garten-Notiz in Obsidian; in Kodas Seitenleiste eine Frage, drei Werkzeugschritte (search_notes, zweimal read_note) und eine Antwort, die die benutzten Notizen verlinkt"></p>
+
 ## Features
 
 - **Mit dem Vault sprechen.** Koda schlägt selbst nach: Volltextsuche, Notizen lesen (auch Bases- und Canvas-Dateien), Ordner auflisten, mit Frontmatter oder als Ordnerbaum. Jeder Werkzeugaufruf erscheint im Chat, du siehst also, auf welchen Notizen eine Antwort beruht.
@@ -19,6 +21,8 @@ Koda arbeitet mit einem OpenAI-kompatiblen Modell deiner Wahl, typischerweise ei
 - **Lange Gespräche.** Bevor ein Gespräch das Modell überläuft, verdichtet Koda es: erst alte Werkzeug-Ergebnisse, dann eine Zusammenfassung älterer Antworten. Was du im Chat siehst und deine eigenen Nachrichten bleiben unangetastet.
 - **Einstellbar für kleine Modelle.** Anweisung ersetzen, einzelne Werkzeuge abschalten und die genaue Anweisung ansehen, die das Modell bekommt.
 - **Arbeitet mit Nachbarn, braucht keine.** Mit [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) sucht Koda zusätzlich nach Bedeutung; andere Plugins können Koda ihre Werkzeuge leihen. Ohne sie fehlt nichts.
+
+<p align="center"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/context-tab.png" width="470" alt="Der Kontext-Tab im Modus Notiz: die aktive Notiz und ihre zwei verlinkten Notizen als Chips mit Größe, Link-Tiefe 1 und Knöpfe, um Notizen oder Ordner von Hand hinzuzufügen"> <img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/confirm-write.png" width="600" alt="Koda fragt, bevor es Tasks/Watering this week.md anlegt, und zeigt die ganze Checkliste, die es schreiben will, mit Cancel und Write"></p>
 
 ## Voraussetzungen
 
@@ -44,7 +48,7 @@ Mit [AnySource Sideloader](https://github.com/johannes-kaindl/anysource-sideload
 
 ## Verwendung
 
-1. Modell-Server starten, **Einstellungen → Koda** öffnen, in der Endpunkt-Zeile (Standard `http://127.0.0.1:1234`) **Testen** drücken und unter **Modell → Modelle abrufen** das Modell wählen.
+1. Modell-Server starten, **Einstellungen → Koda** öffnen, prüfen, dass die Endpunkt-Zeile (Standard `http://127.0.0.1:1234`) ein grünes Häkchen zeigt, und unter **Modell → Modelle abrufen** das Modell wählen.
 2. Die Seitenleiste über das **Hunde-Symbol** in der Menüleiste oder den Befehl **Koda öffnen** öffnen.
 3. Eine Frage zu deinem Vault stellen. Die Statuszeile sagt, was Koda gerade tut; jeder Werkzeugaufruf erscheint im Chat.
 4. Im Tab **Kontext** oder über das Dropdown neben **Senden** prüfen und ändern, was mitgeht.
@@ -55,6 +59,8 @@ Die Anleitung [Getting started](https://github.com/johannes-kaindl/koda-agent/bl
 ## Konfiguration
 
 Alles liegt unter **Einstellungen → Koda**: Endpunkte und Modell, der Koda-Ordner (Standard `Koda`), wie viele Werkzeugaufrufe eine Antwort nehmen darf, die Verdichtung, der Arbeitskontext und die Modell-Steuerung. Die [Einstellungs-Referenz](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/reference/settings.md) führt jede Einstellung mit Standard und Wertebereich (auf Englisch).
+
+<a href="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/thumbs/settings.png" width="380" alt="Einstellungen → Koda: eine geprüfte Endpunkt-Zeile mit Active, die Knöpfe + LM Studio, + Ollama und Test, das Modellfeld und die ersten allgemeinen Einstellungen"></a><br><sub>Ein Klick auf die Vorschau zeigt die Einstellungsseite in voller Größe.</sub>
 
 ## Funktionsweise
 

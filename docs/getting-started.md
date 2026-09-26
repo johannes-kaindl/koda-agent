@@ -23,7 +23,7 @@ Koda talks to any OpenAI-compatible chat endpoint. The example uses [LM Studio](
 ## 3. Point Koda at the server
 
 1. Open **Settings → Koda**.
-2. Under **Endpoints**, the first row already reads `http://127.0.0.1:1234`. Press **Test** on that row. It should say **Connected**. If it says something else, the message names the cause; see [Troubleshooting](how-to/troubleshooting.md#the-test-button).
+2. Under **Endpoints**, the first row already reads `http://127.0.0.1:1234`. Koda checks it as soon as the settings open: a green check mark and **Active** under the row mean the server answers. A cross means it does not; hover over the cross for the reason, and see [Troubleshooting](how-to/troubleshooting.md#the-endpoint-check). After starting the server, press **Test** below the list to check again.
 3. Under **Model**, press **Fetch models** and pick the model you loaded. (If the server returns no list, type the model id as LM Studio shows it.)
 4. Leave **Koda folder** on `Koda` for now. This is the one folder Koda may write to without asking.
 

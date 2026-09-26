@@ -10,6 +10,8 @@
 
 Koda runs against an OpenAI-compatible model you choose, typically one on your own machine ([LM Studio](https://lmstudio.ai), Ollama), so your notes do not have to leave it. Everything that steers Koda — its instructions, its memory, its skills — is a Markdown note you can read and edit.
 
+<p align="center"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/hero.png" width="820" alt="A garden note open in Obsidian; in the Koda sidebar a question, three tool steps (search_notes, read_note twice) and an answer that links the notes it used"></p>
+
 ## Features
 
 - **Chat with your vault.** Koda looks things up itself: full-text search, reading notes (including Bases and Canvas files), listing folders with their frontmatter or as a folder tree. Every tool call shows up in the chat, so you see which notes an answer rests on.
@@ -19,6 +21,8 @@ Koda runs against an OpenAI-compatible model you choose, typically one on your o
 - **Long conversations.** Before a conversation overflows the model, Koda compacts it: old tool results first, then a summary of older replies. What you see in the chat and your own messages stay untouched.
 - **Tunable for small models.** Replace the instructions, switch single tools off, and see the exact prompt the model gets.
 - **Works with neighbours, needs none.** With [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) installed, Koda adds search by meaning; other plugins can lend Koda their tools. Without them, nothing is missing.
+
+<p align="center"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/context-tab.png" width="470" alt="The Context tab in mode Note: the active note and its two linked notes as chips with their sizes, link depth 1, and buttons to add notes or folders by hand"> <img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/confirm-write.png" width="600" alt="Koda asking before it creates Tasks/Watering this week.md, showing the full checklist it wants to write, with Cancel and Write"></p>
 
 ## Requirements
 
@@ -44,7 +48,7 @@ Download `main.js`, `manifest.json` and `styles.css` from the [latest release](h
 
 ## Usage
 
-1. Start your model server, open **Settings → Koda**, press **Test** on the endpoint row (default `http://127.0.0.1:1234`) and pick the model under **Model → Fetch models**.
+1. Start your model server, open **Settings → Koda**, check that the endpoint row (default `http://127.0.0.1:1234`) shows a green check mark, and pick the model under **Model → Fetch models**.
 2. Open the sidebar with the **dog icon** in the ribbon or the command **Open Koda**.
 3. Ask a question about your vault. The status line says what Koda is doing; each tool call appears in the chat.
 4. Check or change what goes along in the **Context** tab, or with the dropdown next to **Send**.
@@ -55,6 +59,8 @@ The [Getting started](https://github.com/johannes-kaindl/koda-agent/blob/main/do
 ## Configuration
 
 Everything is under **Settings → Koda**: endpoints and model, the Koda folder (default `Koda`), how many tool calls one answer may take, compaction, the working context and model control. The [settings reference](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/reference/settings.md) lists every setting with its default and range.
+
+<a href="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/thumbs/settings.png" width="380" alt="Settings → Koda: an endpoint row checked and marked Active, the buttons + LM Studio, + Ollama and Test, the model field and the first general settings"></a><br><sub>Click the preview for the full-size settings page.</sub>
 
 ## How it works
 

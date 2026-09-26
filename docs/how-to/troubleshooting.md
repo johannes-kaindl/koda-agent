@@ -4,16 +4,16 @@
 
 Each entry starts with the message as Koda shows it (English interface; the German wording says the same). Find yours with your browser's search.
 
-- [The Test button](#the-test-button)
+- [The endpoint check](#the-endpoint-check)
 - [In the chat](#in-the-chat)
 - [In the Context tab and the context modes](#in-the-context-tab-and-the-context-modes)
 - [Skills](#skills)
 - [Settings and tools](#settings-and-tools)
 - [Getting help](#getting-help)
 
-## The Test button
+## The endpoint check
 
-The **Test** button on an endpoint row (**Settings → Koda → Endpoints**) checks whether the server answers, and names the cause when it does not.
+When **Settings → Koda** opens, every endpoint row is checked: a check mark means the server answers, a cross means it does not. **Hover over the cross** for the reason; the messages below are what it says. **Test** below the list checks all rows again.
 
 ### "Connection refused — server not running, or wrong port."
 
@@ -51,11 +51,11 @@ The **Test** button on an endpoint row (**Settings → Koda → Endpoints**) che
 
 **Cause:** None of the endpoint rows answered.
 
-**Fix:** Press **Test** on each row; each row then says why it did not answer.
+**Fix:** Open **Settings → Koda** and hover over the cross next to each endpoint row; it says why that row does not answer.
 
 ### "The endpoint answers the connection test but not the chat request from Obsidian. A local server usually needs CORS enabled for that — …"
 
-**Cause:** CORS. Obsidian sends the chat with its own origin (`app://obsidian.md`), which a local server rejects until CORS is switched on. The Test button cannot show this, because it takes a different route that sends no origin.
+**Cause:** CORS. Obsidian sends the chat with its own origin (`app://obsidian.md`), which a local server rejects until CORS is switched on. The endpoint check in the settings cannot show this, because it takes a different route that sends no origin.
 
 **Fix:** LM Studio: switch on **Enable CORS** in the server settings, or start it with `lms server start --cors`. Ollama: set `OLLAMA_ORIGINS`.
 
@@ -69,7 +69,7 @@ The **Test** button on an endpoint row (**Settings → Koda → Endpoints**) che
 
 **Cause:** The conversation no longer fits the model. Koda compacts it before every call, but it can only estimate sizes, and it has to know the real window.
 
-**Fix:** Set **Context window (tokens)** to what the model actually has loaded (in LM Studio, the context length you loaded it with). **Test** on an endpoint row fills this in when the server reports it and the field is still on its default. Or start a **New chat**.
+**Fix:** Set **Context window (tokens)** to what the model actually has loaded (in LM Studio, the context length you loaded it with). The endpoint check fills this in when the server reports it and the field is still on its default. Or start a **New chat**.
 
 ### "Response cut off at the token limit — the text above may be incomplete."
 

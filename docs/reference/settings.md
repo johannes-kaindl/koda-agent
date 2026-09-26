@@ -6,7 +6,7 @@ All settings are under **Settings → Koda**, in this order. Numbers outside the
 
 | Setting | Default | Range | What it does |
 |---|---|---|---|
-| Endpoints | `http://127.0.0.1:1234` | | OpenAI-compatible servers, each with URL, optional API key and optional model override. **The first reachable entry wins**: Koda tries them top to bottom once per session and remembers the winner; if a request fails, it looks again once. Reorder with **Move to top**. **Test** checks a row and names the cause when it does not answer. |
+| Endpoints | `http://127.0.0.1:1234` | | OpenAI-compatible servers, each with URL, optional API key and optional model override. **The first reachable entry wins**: Koda tries them top to bottom once per session and remembers the winner; if a request fails, it looks again once. Reorder with **Move to top**. Every row is checked when the settings open: a check mark, or a cross whose tooltip names the cause; below the row its role (**Active**, **Unreachable**, **Standby — position N**). **Test** checks all rows again; **+ LM Studio** and **+ Ollama** add their default addresses. |
 | Model | *(empty)* | | Model id sent to the endpoint, unless the row has its own override. **Fetch models** fills a list to pick from. |
 | Suppress thinking | on | | Asks reasoning models not to think out loud, and hides the thinking block. |
 | Koda folder | `Koda` | | The folder Koda writes to without asking (memory, drafts). Skills in its `Skills/` subfolder still ask. |
@@ -21,7 +21,7 @@ Long conversations are compacted before they overflow the model. Compaction chan
 
 | Setting | Default | Range | What it does |
 |---|---|---|---|
-| Context window (tokens) | 8192 | 2048–1000000 | The model's context window, one number for all endpoints. **Test** on an endpoint row fills it in when the server reports it and the field is still on its default. |
+| Context window (tokens) | 8192 | 2048–1000000 | The model's context window, one number for all endpoints. The endpoint check fills it in when the server reports it and the field is still on its default. |
 | Compact at (% of window) | 75 | 40–95 | Koda compacts before a model call once the estimate (characters ÷ 4) exceeds this share. |
 | Keep tool results verbatim | 3 | 0–20 | How many recent tool results stay in full; older ones shrink to a one-line stub. |
 | Summarize older replies | on | | If shortening is not enough, the model summarizes older replies (an extra model call). |
