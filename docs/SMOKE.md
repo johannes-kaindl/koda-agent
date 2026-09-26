@@ -769,6 +769,31 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-09-26 — `list_notes` mit `depth`, Ordnerbaum (48/48), mit Gegenprobe und Praxistest
+
+Vault `koda-agent` (Staging, Zweitinstanz Port 9374, Obsidian 1.14.2), Branch `feat/list-depth`, Gate 832/832 auf **848/848**, GUI-Smoke 47/47 auf **48/48**. Deploy per `cp` mit Prüfsummen-Vergleich, Plugin-Reload macht der Treiber. Anlass: Koda fragte im Gespräch nach einer Landkarte des Vaults („ich sehe die Blätter, nicht die Äste").
+
+**Punkt 48** misst die Naht, nicht die pure Schicht (die ist mit sechs Mutationen an `tree.ts` gegengeprobt, jede von mindestens einem Unit-Test gefangen): zwei Projekte unter `Koda/smoke48`, eines mit `_Tasks` und leerem `_Meilensteine`, eines nur mit `_Tasks`. `depth: "2"` (als String, wie Modelle es schicken) muss über `run()` den Baum liefern — Kopf „Tiefe 2, 5 Ordner", der leere Ordner der zweiten Ebene aus `vault.getAllFolders()` —, und ohne `depth` bleibt die Liste flach wie vorher.
+
+### Gegenprobe
+
+| Punkt | Mutation | Ergebnis |
+|---|---|---|
+| 48 | Build von `main` (ohne `depth`) deployt | 48 rot („Kopf FALSCH … · leeres _Meilensteine FEHLT · B/_Tasks FEHLT · ohne depth unverändert flach"), sonst grün (47/48); zurückgenommen 48/48 |
+
+⚠️ **Falle beim Zurücknehmen:** nach der Gegenprobe lag die neue `main.js` wieder im Vault, im Speicher aber noch der alte Build — der Treiber lädt nur beim Lauf neu. Der erste Praxistest lief deshalb unbemerkt gegen den alten Code; aufgefallen ist es an der Kopfzeile, der der neue `depth`-Hinweis fehlte. Nach dem Zurückkopieren also `disablePlugin`/`enablePlugin`, bevor irgendetwas anderes misst.
+
+### Praxistest gegen `qwen/qwen3.8-27b` (LM Studio)
+
+Kulisse `Projekte/{Alpha,Beta,Gamma}`: Alpha mit `_Tasks` und `_Meilensteine`, Beta nur `_Tasks`, Gamma mit `_Tasks` und leerem `_Meilensteine`. Frage: „Haben alle Projekte unter Projekte/ jeweils einen Ordner _Tasks und _Meilensteine? Nenne jedes Projekt, dem einer fehlt."
+
+| Build | Aufrufe | Antwort |
+|---|---|---|
+| alt (versehentlich, s. o.) | `list_notes` flach, dann `recursive:true` | richtig im Ergebnis, aber die Tabelle führt Gammas leeren Ordner als „❌ fehlt" — „leer" und „fehlt" verschwimmen |
+| neu | **ein** `list_notes({"folder":"Projekte","depth":2})` | Beta fehlt `_Meilensteine`, Gammas `_Meilensteine` existiert, ist aber leer — beides getrennt benannt |
+
+Grenze der Messung: n=1 je Build, eine kleine Kulisse (8 Ordner, keine Kappung). Ob das Modell bei einem gekappten Baum die Warnung in Zeile 1 beachtet und tiefer einsteigt, ist ungemessen.
+
 ## Belegter Lauf: 2026-09-25 — Spike Werkzeug-Anbieter, Wirtsseite (47/47), mit Gegenprobe und Praxistest
 
 Vault `koda-agent` (Staging, Zweitinstanz Port 9374, Obsidian 1.14.2), Branch `feat/tool-host`, Gate 796/796 auf **832/832**, GUI-Smoke 46/46 auf **47/47** (Baseline im Worktree vor dem Umbau: Gate 796/796; Smoke-Baseline ist der 3a-Lauf vom selben Tag, 46 grün). Deploy je Lauf per `cp` mit Prüfsummen-Vergleich, Plugin-Reload macht der Treiber.

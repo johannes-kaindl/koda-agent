@@ -13,6 +13,8 @@
 
 > ⚠️ **Nachtrag 2026-09-25: Prüfpunkt 42 ist belegt** (`list_notes` nennt Unterordner, außerhalb dieser Etappe). Alle Prüfpunkt-Nummern dieses Plans verschieben sich um eins: 3a baut **43–46** (Erwartung 46/46), 3b **47–48** (Erwartung 48/48). Die Nummern im Text unten sind nicht umgeschrieben.
 
+> ⚠️ **Nachtrag 2026-09-26: Prüfpunkte 47 und 48 sind ebenfalls belegt** (47 Werkzeug-Anbieter, 48 `list_notes` mit `depth`, beide außerhalb dieser Etappe). 3b baut damit **49–50** (Erwartung 50/50) — gegenüber dem Text unten eine Verschiebung um drei.
+
 ## Global Constraints
 
 - **Zwei Teil-Etappen, nacheinander.** 3a = Tasks 1–8, 3b = Tasks 9–13. 3b beginnt erst, wenn 3a komplett ist (Gate grün, Smoke grün, committet). Beide ändern `candidates.ts`, `build.ts`, `render.ts`, `panel-vm.ts`, `main.ts` und `context-panel.ts`, deshalb nie parallel.

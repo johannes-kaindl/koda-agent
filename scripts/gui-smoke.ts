@@ -2788,6 +2788,64 @@ async function main(): Promise<void> {
       }
       record("47. Werkzeug-Anbieter: montiert, geroutet, abschaltbar, entfernt", ok47, detail47);
     }
+
+    // --- 48. list_notes mit depth zeigt den Ordnerbaum — auch einen leeren Ordner auf Ebene 2 ---
+    // Anlass 2026-09-26: Koda fragte nach einer Landkarte des Vaults. Die pure Schicht ist
+    // unit-getestet (Kappung nach Ebenen, Reihenfolge, Warnung); offen ist hier die NAHT:
+    // liefert `vault.getAllFolders()` einen Ordner ohne Notiz auch in der ZWEITEN Ebene, und
+    // kommt `depth` als String aus dem Modell ueber `run()` im Baum an? Gebaut wird zwei Projekte
+    // — eines mit `_Tasks` UND leerem `_Meilensteine`, eines nur mit `_Tasks` —, also genau die
+    // Frage „fehlt irgendwo ein Struktur-Ordner?". Eigenen Zustand vorher pruefen (CORE-TEST-21).
+    const W48 = "Koda/smoke48";
+    let detail48 = "nicht gelaufen";
+    let ok48 = false;
+    let eigen48 = true;
+    try {
+      const r48 = await cdp.evaluate<{
+        vorher: boolean;
+        tief?: { ok: boolean; content?: string; error?: string };
+        flach?: { ok: boolean; content?: string; error?: string };
+      }>(`
+        const W = ${JSON.stringify(W48)};
+        if (app.vault.getAbstractFileByPath(W) !== null) return { vorher: true };
+        await app.vault.createFolder(W + "/A/_Tasks");
+        await app.vault.createFolder(W + "/A/_Meilensteine");
+        await app.vault.createFolder(W + "/B/_Tasks");
+        await app.vault.create(W + "/A/_Tasks/t.md", "x");
+        await app.vault.create(W + "/B/_Tasks/u.md", "x");
+        const t = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools();
+        return {
+          vorher: false,
+          tief: await t.run("list_notes", { folder: W, depth: "2" }),
+          flach: await t.run("list_notes", { folder: W }),
+        };
+      `);
+      eigen48 = !r48.vorher;
+      if (r48.vorher) {
+        detail48 = `${W48} existiert schon (Rest eines abgebrochenen Laufs?) — nicht gemessen, bitte von Hand entfernen`;
+      } else {
+        const tief = r48.tief?.content ?? r48.tief?.error ?? "";
+        const flach = r48.flach?.content ?? r48.flach?.error ?? "";
+        const kopf = /Ordnerbaum bis Tiefe 2 \(5 Ordner/.test(tief);
+        const leer = tief.includes(`  ${W48}/A/_Meilensteine/ (keine Notiz)`);
+        const tasksB = tief.includes(`  ${W48}/B/_Tasks/ (1 Notiz)`);
+        // Die flache Liste bleibt, wie sie war — depth darf das Verhalten ohne Parameter nicht aendern.
+        const flachWieVorher = flach.includes("Unterordner: ") && !flach.includes("Ordnerbaum");
+        ok48 = r48.tief?.ok === true && kopf && leer && tasksB && flachWieVorher;
+        detail48 = `Kopf ${kopf ? "„Tiefe 2, 5 Ordner“" : `FALSCH: ${tief.split("\n").slice(0, 2).join(" ⏎ ").slice(0, 90)}`} · `
+          + `leeres _Meilensteine ${leer ? "gesehen" : "FEHLT"} · B/_Tasks ${tasksB ? "gesehen" : "FEHLT"} · `
+          + `ohne depth ${flachWieVorher ? "unverändert flach" : "VERÄNDERT"}`;
+      }
+    } catch (error) {
+      detail48 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      if (eigen48) await cdp.evaluate(`
+        const f = app.vault.getAbstractFileByPath(${JSON.stringify(W48)});
+        if (f) await app.vault.delete(f, true);
+        return true;
+      `).catch(() => undefined);
+    }
+    record("48. list_notes mit depth zeigt den Ordnerbaum, leere Ordner der zweiten Ebene inklusive", ok48, detail48);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
