@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.17.1] — 2026-09-26
+
 ### Changed
 - **README und Nutzer-Doku neu**: Die README ist auf das Wesentliche gekürzt (Features, Installation, Verwendung, Links) und nennt keinen veralteten Versionsstand mehr. Die Details stehen jetzt in einer Nutzer-Doku unter `docs/`: Getting started, Troubleshooting (jede Meldung wörtlich, mit Ursache und Abhilfe), How-tos zu Arbeitskontext, Skills und Modell-Steuerung, eine Referenz aller Einstellungen, Werkzeuge und Befehle, und eine Erklärung, wie Koda arbeitet. Korrigiert gegenüber der alten README: Die Endpunkt-Liste nimmt den ersten erreichbaren Eintrag (kein fester erster), der Antwort-Timeout misst Stille und keine Gesamtdauer, und `search_notes` fragt Vault Retrieval immer mit ab, nicht erst bei wenigen Treffern.
 
