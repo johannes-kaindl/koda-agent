@@ -1,353 +1,77 @@
 # Koda
 
-Koda ist ein agentischer Begleiter für deinen Obsidian-Vault — eine Chat-Seitenleiste,
-die deine Notizen durchsuchen, lesen und neue schreiben kann, immer mit einer klaren
-Regel dafür, wann sie vorher deine Zustimmung braucht. Sie läuft ausschließlich gegen
-einen OpenAI-kompatiblen LLM-Endpunkt, den du konfigurierst (ein lokaler Server wie
-[LM Studio](https://lmstudio.ai), oder ein gehosteter Anbieter, wenn du einen
-API-Schlüssel hinterlegst), und führt ihr Gedächtnis in einer schlichten
-Markdown-Notiz, die du selbst lesen und bearbeiten kannst.
+> 🇩🇪 Deutsch · [🇬🇧 English](https://github.com/johannes-kaindl/koda-agent/blob/main/README.md)
 
-*Stand: 0.11.0 — verteilt über Forgejo-Releases und den AnySource-Sideloader-Katalog,
-keine signierten Builds. Derzeit **nicht** im Community-Store gelistet (siehe
-[Installation](#installation)). Aktueller Umfang und Entwurfsentscheidungen stehen in
-`CLAUDE.md`.*
+**Ein Begleiter in deinem Obsidian-Vault: eine Chat-Seitenleiste, die deine Notizen durchsucht, liest und schreibt, und fragt, bevor sie etwas von dir anfasst.**
 
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/gitea/v/release/jkaindl/koda-agent?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/koda-agent/releases)
-[![Obsidian](https://img.shields.io/badge/obsidian-1.8.7%2B-purple)](https://obsidian.md)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://github.com/johannes-kaindl/koda-agent/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/johannes-kaindl/koda-agent)](https://github.com/johannes-kaindl/koda-agent/releases/latest)
+![Obsidian](https://img.shields.io/badge/obsidian-1.8.7%2B%20%C2%B7%20desktop%20%26%20mobile-7c3aed)
 
-> **Hinweis:** Diese Übersetzung folgt der englischen [`README.md`](README.md).
-> Bei Abweichungen gilt die englische Fassung.
+Koda arbeitet mit einem OpenAI-kompatiblen Modell deiner Wahl, typischerweise einem auf deinem eigenen Rechner ([LM Studio](https://lmstudio.ai), Ollama) — deine Notizen müssen ihn dann nicht verlassen. Alles, was Koda steuert — seine Anweisung, sein Gedächtnis, seine Skills —, ist eine Markdown-Notiz, die du lesen und ändern kannst.
 
 ## Features
 
-- **Chat-Seitenleiste** (Ribbon-Icon + Befehl) mit gestreamten Antworten, einem
-  einklappbaren „Denken"-Block für Reasoning-Modelle und einer Stopp-Schaltfläche, die
-  die Teilantwort stehen lässt.
-- **Ein Kontext-Tab neben dem Chat.** Die Seitenleiste hat zwei Tabs. Der Kontext-Tab
-  zeigt, was deine nächste Nachricht mitnimmt — die aktive Notiz, deine Markierung, die
-  offenen Tabs — als Chips, die du einzeln wegklicken kannst, dazu eine Zeile, wie viel
-  vom Kontextfenster des Modells das belegt. Was du abwählst, verlässt den Block, den Koda
-  sendet; **Auswahl zurücksetzen** (oder ein neues Gespräch) holt alles zurück. Die
-  Einstellung *Kontext-Auswahl behalten* entscheidet, ob eine Abwahl die Nachricht
-  überdauert, für die sie gemacht wurde.
-- **Zehn Werkzeuge:** `search_notes`, `read_note`, `write_note`, `move_note`,
-  `delete_note`, `save_memory`, `write_skill`, `list_notes`, `get_workspace`,
-  `edit_active_note` — das Modell ruft sie beim Antworten selbst auf, jeder Schritt
-  erscheint im Chat. `read_note` liest alle drei Notiz-Formate — `.md`, `.base` und
-  `.canvas`; geschrieben wird weiterhin nur `.md`. `list_notes` liefert alle Notizen unter einem Vault-Ordner,
-  wahlweise rekursiv, samt den angeforderten Frontmatter-Feldern, in einem Aufruf; ohne `recursive` nennt es zusätzlich die Unterordner und wie viele Notizen darin liegen, auch Ordner ohne eine einzige Notiz; mit `depth` zeigt es den Ordnerbaum über mehrere Ebenen in einem Aufruf (nur Ordner, je mit ihrer Notizzahl).
-  `move_note` verschiebt oder benennt um und lässt Obsidian die Wikilinks nachziehen;
-  `delete_note` legt eine Notiz in den Papierkorb des Vaults und fragt immer vorher,
-  auch im Koda-Ordner. Ein elftes, `related_notes`, kommt hinzu, wenn semantische Suche
-  verfügbar ist (siehe unten).
-- **Semantische Suche, falls du sie schon hast** *(optional)* — ist das Plugin
-  [Vault Retrieval](https://git.jkaindl.de/jkaindl/vault-rag) installiert und dein
-  Vault indiziert, nutzt Koda dessen Embedding-Index: `search_notes` ergänzt
-  bedeutungsbasierte Treffer, wenn die wörtliche Suche dünn ausfällt (weniger als drei
-  Treffer), und ein Werkzeug `related_notes` beantwortet „was gibt es noch dazu?" direkt
-  aus dem Index — offline, ohne Endpunkt. Wörtliche und semantische Treffer erscheinen
-  als **getrennte, beschriftete Blöcke**, nie zu einer Rangliste vermischt: ein
-  wörtlicher Treffer beweist, dass eine Formulierung existiert, ein semantischer nicht.
-  Ohne dieses Plugin verhält sich Koda exakt wie vorher — nichts zu konfigurieren, und
-  kein totes Werkzeug im Prompt.
-- **Arbeitskontext** — jede Frage kann mitnehmen, was du gerade vor dir hast. Das Dropdown
-  neben Senden schaltet den Modus je Frage um (Befehle und ein Rechtsklick-Eintrag auf
-  Markiertem gehen auch), und der mitgesendete Block steht unter jeder deiner Nachrichten,
-  einklappbar, auch nach einem Neustart:
-  - **Arbeitsplatz** — die aktive Notiz mit ihren Kopfdaten, die Markierung, die Cursorzeile
-    und die offenen Tabs, nur als Zeiger. `get_workspace` liefert die volle Markierung, die
-    Zeilen rund um den Cursor und jeden Tab; `edit_active_note` ersetzt die Markierung oder
-    fügt am Cursor ein — nach dem üblichen Bestätigungsdialog, und nur wenn die Markierung
-    noch die ist, die es zuvor angezeigt hat.
-  - **Notiz** und **Alle Tabs** — die aktive Notiz mit ihren verlinkten Nachbarn (ausgehende
-    Links und Backlinks, Tiefe 1–3 über die Einstellung *Link-Tiefe im Modus Notiz*), oder
-    jede offene Notiz, gehen im **Volltext** mit, nicht nur als Zeiger, begrenzt durch die
-    Einstellung *Inhalts-Budget je Nachricht* (Standard 20 000 Zeichen).
-  - **Vault** — braucht das Plugin vault-rag: die Notizen, die am besten zu deiner gesendeten Frage passen, gehen neben der aktiven Notiz im Volltext mit. Der Kontext-Tab zeigt sie schon beim Tippen und sagt es, wenn die Suche nicht verfügbar ist. Im Modus Notiz kommen die Notizen dazu, die vault-rag der aktiven ähnlich findet. Die Einstellung *Notizen aus vault-rag* bestimmt, wie viele (0 = aus).
-  - **Manuell** — eine Notiz oder einen ganzen Ordner von Hand hinzufügen, über den
-    Kontext-Tab oder drei Befehle; genauso wieder entfernen.
-
-  Kappungen (Markierungslänge, Tab-Zahl, Kopfdaten, dazu das Inhalts-Budget für
-  Notiz/Alle Tabs/Manuell) sind Einstellungen und melden sich im Block: nichts fällt
-  stillschweigend weg, eine Kürzung nennt immer beide Zahlen und den Weg zum Rest.
-  **Quellen-Chips** unter der Antwort nennen, welche Notizen im Volltext mitgingen — ein
-  Klick öffnet die Notiz.
-- **Ein dauerhaftes, einsehbares Gedächtnis** — `save_memory` hängt datierte Zeilen an
-  `<Koda-Ordner>/Memory.md` an, das bei jeder Frage wieder in den System-Prompt
-  einfließt. Nichts wird irgendwo abgelegt, wo du es nicht öffnen und ändern kannst.
-- **Sitzungen bleiben erhalten** — der Chatverlauf wird als JSONL-Log im Plugin-Ordner
-  geschrieben und beim Neustart von Obsidian wiederhergestellt. „Neuer Chat" beginnt ein
-  frisches Log.
-- **Einstellungen:** ein oder mehrere Endpunkte (URL, optionaler API-Schlüssel,
-  optionale Modell-Übersteuerung je Endpunkt — Reihenfolge bestimmt, welcher genutzt
-  wird), globale Modell-ID, maximale Werkzeugrunden pro Frage, Schalter zum Ausblenden
-  des Denkens, Text-Fallback für Modelle ohne natives Tool-Calling, Sprache der
-  Oberfläche und ein optionales „beim Start öffnen" (standardmäßig aus).
+- **Mit dem Vault sprechen.** Koda schlägt selbst nach: Volltextsuche, Notizen lesen (auch Bases- und Canvas-Dateien), Ordner auflisten, mit Frontmatter oder als Ordnerbaum. Jeder Werkzeugaufruf erscheint im Chat, du siehst also, auf welchen Notizen eine Antwort beruht.
+- **Schreibt mit deiner Zustimmung.** Frei schreibt Koda nur in seinem eigenen Ordner. Alles andere — schreiben, verschieben, die gerade offene Notiz bearbeiten — öffnet zuerst einen Dialog mit dem Text oder einem Zeilen-Diff. Löschen und Skills schreiben fragen immer.
+- **Arbeitskontext.** Jede Frage kann mitnehmen, was du gerade vor dir hast: Zeiger auf die offene Notiz und die Markierung, oder ganze Notizen samt verlinkter Nachbarn, alle offenen Tabs oder die Notizen, die inhaltlich zu deiner Frage passen. Der Tab **Kontext** zeigt, was mitgeht, und du kannst jedes Stück herausnehmen.
+- **Gedächtnis und Skills als Notizen.** *„Merk dir, dass …"* hängt eine datierte Zeile an `Koda/Memory.md`. Skills sind Markdown-Notizen mit dauerhaften Anweisungen; Koda kann sie für dich schreiben, mit Bestätigung.
+- **Lange Gespräche.** Bevor ein Gespräch das Modell überläuft, verdichtet Koda es: erst alte Werkzeug-Ergebnisse, dann eine Zusammenfassung älterer Antworten. Was du im Chat siehst und deine eigenen Nachrichten bleiben unangetastet.
+- **Einstellbar für kleine Modelle.** Anweisung ersetzen, einzelne Werkzeuge abschalten und die genaue Anweisung ansehen, die das Modell bekommt.
+- **Arbeitet mit Nachbarn, braucht keine.** Mit [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) sucht Koda zusätzlich nach Bedeutung; andere Plugins können Koda ihre Werkzeuge leihen. Ohne sie fehlt nichts.
 
 ## Voraussetzungen
 
-- **Obsidian 1.8.7** oder neuer. Desktop und Mobil — Koda ist nicht desktop-only.
-- **Ein OpenAI-kompatibler Chat-Endpunkt** mit einem **tool-calling-fähigen Modell**.
-  Das kann ein lokaler Server sein ([LM Studio](https://lmstudio.ai), Ollama, …) oder
-  ein gehosteter Anbieter, wenn du einen API-Schlüssel hinterlegst. Modelle ohne natives
-  Tool-Calling lassen sich über den Text-Fallback nutzen, weniger zuverlässig.
-- *Optional:* das Plugin
-  [Vault Retrieval](https://git.jkaindl.de/jkaindl/vault-rag) mit indiziertem Vault,
-  das semantische Suche und das Werkzeug `related_notes` beisteuert. Koda funktioniert
-  vollständig ohne es.
+- **Obsidian 1.8.7** oder neuer, Desktop oder Mobil.
+- **Ein OpenAI-kompatibler Chat-Endpunkt mit einem Modell, das Werkzeuge aufrufen kann**: ein lokaler Server (LM Studio, Ollama, …) oder ein gehosteter Anbieter mit API-Schlüssel. Modelle ohne natives Tool-Calling gehen über einen Text-Fallback, weniger zuverlässig.
+- **Ein lokaler Server braucht eingeschaltetes CORS** (LM Studio: *Enable CORS* oder `lms server start --cors`; Ollama: `OLLAMA_ORIGINS`). Der Verbindungstest geht auch ohne, der Chat nicht; Koda benennt diesen Fall, wenn er eintritt.
+- *Optional:* [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) mit indiziertem Vault — für die Suche nach Bedeutung, den Kontext-Modus **Vault** und das Werkzeug `related_notes`.
 
 ## Installation
 
-Repository: [git.jkaindl.de/jkaindl/koda-agent](https://git.jkaindl.de/jkaindl/koda-agent)
-(GitHub-Spiegel: derzeit nicht erreichbar)
-
-> **Hinweis (2026-09-03):** Koda ist derzeit **nicht** im Community-Plugin-Browser
-> gelistet. Das GitHub-Konto, auf dem der Spiegel liegt, ist nicht erreichbar, und damit
-> ist auch der Store-Eintrag verschwunden. Das Plugin selbst ist davon unberührt und wird
-> weiter gepflegt — Releases erscheinen auf Forgejo, und die beiden Wege unten
-> funktionieren beide heute.
-
-### Mit dem AnySource Sideloader (empfohlen)
-
-Der [AnySource Sideloader](https://git.jkaindl.de/jkaindl/anysource-sideloader)
-installiert und aktualisiert Plugins von beliebigen Git-Forges, unabhängig vom
-Community-Store.
-
-1. AnySource Sideloader installieren und aktivieren. (Seine eigene Erstinstallation ist
-   Handarbeit — unabhängig vom Store zu sein ist ja der Zweck —, aber sie fällt nur
-   einmal an; danach hält er sich und alles andere selbst aktuell.)
-2. Den Katalog abonnieren, der Koda zusammen mit den übrigen Plugins desselben Autors
-   führt:
-   `https://git.jkaindl.de/jkaindl/obsidian-catalog/raw/branch/main/catalog.json`
-   — oder nur dieses eine Repository als Quelle hinzufügen:
-   `https://git.jkaindl.de/jkaindl/koda-agent`
-3. Koda installieren und in den Einstellungen auf einen LLM-Endpunkt zeigen lassen.
-
-Aktualisierungen kommen danach wie bei jedem anderen Plugin.
-
-### Über Obsidians Community-Plugin-Browser
-
-Wieder verfügbar, sobald der Store-Eintrag zurück ist:
+### Community-Plugins (empfohlen)
 
 1. **Einstellungen → Community-Plugins → Durchsuchen** öffnen.
-2. Nach **„Koda"** suchen und **Installieren** wählen.
-3. Koda **aktivieren** und in den Einstellungen auf einen LLM-Endpunkt zeigen lassen.
+2. Nach **Koda** suchen, **Installieren**, dann **Aktivieren**.
 
-### Manuelle Installation
+### AnySource Sideloader
 
-`main.js`, `manifest.json` und `styles.css` aus dem
-[neuesten Forgejo-Release](https://git.jkaindl.de/jkaindl/koda-agent/releases/latest)
-herunterladen und in den Vault kopieren. Jedes Release liefert zusätzlich
-`checksums.sha256`, du kannst das Heruntergeladene also mit
-`shasum -a 256 -c checksums.sha256` prüfen.
+Mit [AnySource Sideloader](https://github.com/johannes-kaindl/anysource-sideloader) `https://github.com/johannes-kaindl/koda-agent` als Quelle eintragen und Koda von dort installieren. Updates kommen dann wie bei jedem anderen Plugin.
 
-```bash
-cp manifest.json main.js styles.css "<dein-vault>/.obsidian/plugins/koda-agent/"
-```
+### Von Hand
 
-Danach Koda unter **Einstellungen → Community-Plugins** aktivieren.
+`main.js`, `manifest.json` und `styles.css` aus dem [neuesten Release](https://github.com/johannes-kaindl/koda-agent/releases/latest) nach `<dein Vault>/.obsidian/plugins/koda-agent/` legen, dann unter **Einstellungen → Community-Plugins** aktivieren. Jedes Release enthält zusätzlich `checksums.sha256` (`shasum -a 256 -c checksums.sha256`).
 
 ## Verwendung
 
-1. Die Seitenleiste öffnen — Ribbon-Icon (Hund) oder Befehl **Koda öffnen**.
-2. Eine Frage stellen. Koda streamt die Antwort; bei Reasoning-Modellen sitzt der
-   „Denken"-Block eingeklappt darüber, und **Stopp** beendet den Stream, ohne das
-   Angekommene zu verwerfen.
-3. **Nachsehen, was mitgeht.** Der **Kontext**-Tab listet die aktive Notiz, deine
-   Markierung, die offenen Tabs und — im Modus Notiz/Alle Tabs/Manuell — die Notizen, die
-   im Volltext mitgehen, alle als Chips. Ein Klick auf das × lässt einen Eintrag aus der
-   nächsten Nachricht heraus, ein Klick auf den Namen öffnet die Notiz. Drei Befehle und
-   Knöpfe im Tab fügen eine Notiz oder einen Ordner von Hand hinzu. Die Befehle
-   *Chat-Tab zeigen* und *Kontext-Tab zeigen* schalten ohne Maus um.
-4. **Den Werkzeugen zusehen.** Jeder Aufruf von `search_notes` / `read_note` /
-   `write_note` / `list_notes` erscheint im Chat, während er passiert — du siehst also,
-   auf welchen Notizen eine Antwort beruht, statt es glauben zu müssen.
-5. **Schreibvorgänge außerhalb des Koda-Ordners bestätigen.** Ein Dialog zeigt vorher
-   den neuen Text (Anlegen und Anhängen) oder ein Zeilen-Diff (Ersetzen) — siehe
-   [Die Schreibregel](#die-schreibregel).
-6. **Neuer Chat** beginnt ein frisches Sitzungs-Log. Alte Sitzungen werden nach einem
-   Obsidian-Neustart wiederhergestellt; es sind einfache JSONL-Dateien im Plugin-Ordner.
+1. Modell-Server starten, **Einstellungen → Koda** öffnen, in der Endpunkt-Zeile (Standard `http://127.0.0.1:1234`) **Testen** drücken und unter **Modell → Modelle abrufen** das Modell wählen.
+2. Die Seitenleiste über das **Hunde-Symbol** in der Menüleiste oder den Befehl **Koda öffnen** öffnen.
+3. Eine Frage zu deinem Vault stellen. Die Statuszeile sagt, was Koda gerade tut; jeder Werkzeugaufruf erscheint im Chat.
+4. Im Tab **Kontext** oder über das Dropdown neben **Senden** prüfen und ändern, was mitgeht.
+5. Schreibvorgänge im Dialog erlauben oder abbrechen, der sich vor jeder Änderung außerhalb des Koda-Ordners öffnet.
 
-Bittest du Koda, sich etwas zu merken, hängt es eine datierte Zeile an
-`<Koda-Ordner>/Memory.md` an — eine gewöhnliche Notiz, die du öffnen, ändern oder
-löschen kannst.
+Die Anleitung [Getting started](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/getting-started.md) geht das Schritt für Schritt durch (auf Englisch).
 
 ## Konfiguration
 
-Ersteinrichtung:
-
-1. Einen OpenAI-kompatiblen LLM-Server mit einem tool-calling-fähigen Modell starten
-   (z.B. LM Studio, standardmäßig auf `http://127.0.0.1:1234`).
-2. In Obsidian Koda aktivieren und **Einstellungen → Koda** öffnen.
-3. Die Endpunkt-URL eintragen (und den API-Schlüssel, falls nötig). Das Feld **Modell**
-   auf die Modell-ID setzen, die der Server meldet — außer die Endpunkt-Zeile trägt
-   bereits eine eigene Übersteuerung.
-4. Optional den **Koda-Ordner** ändern (Standard `Koda`) — dort liegen Gedächtnis und
-   freie Schreibvorgänge.
-5. Die Seitenleiste über das Hunde-Icon im Ribbon oder den Befehl **Koda öffnen**
-   aufrufen und eine Frage stellen.
-
-Die vollständige Liste der Einstellungen:
-
-| Einstellung | Standard | Bedeutung |
-|---|---|---|
-| Endpunkte | `http://127.0.0.1:1234` | URL, optionaler API-Schlüssel, optionale Modell-Übersteuerung je Zeile. Eine Prioritätsliste — siehe [Endpunkte](#endpunkte) |
-| Modell | *(leer)* | Modell-ID, die an den Endpunkt geht, sofern die Zeile sie nicht übersteuert |
-| Koda-Ordner | `Koda` | Wo Gedächtnis, Skills und freie Schreibvorgänge liegen |
-| Maximale Werkzeugrunden | 8 (1–50) | Wie viele Werkzeugaufrufe Koda je Frage verketten darf, bevor es antworten muss |
-| Zeitlimit je Anfrage | 300 s (30–900) | Hartes Limit pro Modellaufruf |
-| Skill-Budget | 6000 Zeichen (1000–100000) | Wie viel Skill-Text in den System-Prompt passt |
-| Denken ausblenden | an | Blendet den Reasoning-Block standardmäßig aus |
-| Text-Fallback für Tool-Calls | aus | Für Modelle ohne natives Tool-Calling |
-| Sprache der Oberfläche | automatisch | Folgt Obsidian, oder fest Deutsch/Englisch |
-| Beim Start öffnen | aus | Opt-in; die Seitenleiste bleibt zu, bis du sie holst |
+Alles liegt unter **Einstellungen → Koda**: Endpunkte und Modell, der Koda-Ordner (Standard `Koda`), wie viele Werkzeugaufrufe eine Antwort nehmen darf, die Verdichtung, der Arbeitskontext und die Modell-Steuerung. Die [Einstellungs-Referenz](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/reference/settings.md) führt jede Einstellung mit Standard und Wertebereich (auf Englisch).
 
 ## Funktionsweise
 
-Eine Frage startet eine **Agenten-Schleife**: Koda schickt deine Nachricht plus einen
-System-Prompt an den Endpunkt, und das Modell antwortet entweder direkt oder ruft eines
-seiner Werkzeuge auf. Ein Werkzeugaufruf wird gegen den Vault ausgeführt, sein Ergebnis
-wandert zurück ins Gespräch, und das Modell ist wieder dran — bis zu **Maximale
-Werkzeugrunden**, danach muss es mit dem antworten, was es hat. Genau das hindert ein
-festgefahrenes Modell daran, endlos auf deinem Vault zu kreisen.
+Eine Frage startet eine Agenten-Schleife: das Modell antwortet oder ruft ein Werkzeug auf, Koda führt es gegen den Vault aus und gibt das Ergebnis zurück, bis zu einer Grenze, die du einstellst. Geschrieben wird über eine einzige Regel — frei im Koda-Ordner, überall sonst ein Dialog —, die kein Werkzeug umgehen kann. Die Anweisung an das Modell entsteht für jedes Gespräch neu aus Kodas Regeln, deiner Memory-Notiz und deinen Skills. Mehr in [How Koda works](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/explanation/how-koda-works.md).
 
-Der System-Prompt wird für jede Frage frisch aus drei Quellen zusammengesetzt: Kodas
-eigene Anweisungen, der Inhalt von `Memory.md` und die aktiven Skills, die ins
-Skill-Budget passen. Alle drei sind schlichtes Markdown in deinem Vault — was Koda
-steuert, ist also lesbar und änderbar; es gibt keinen verborgenen Zustand.
+## Dokumentation
 
-Schreibvorgänge laufen nie einfach durch. `write_note` wird zuerst gegen den Koda-Ordner
-geprüft; alles außerhalb geht durch den Bestätigungsdialog, und eine Ablehnung wird dem
-Modell als abgelehnter Schreibvorgang zurückgemeldet statt stillschweigend geschluckt.
+Die Nutzer-Dokumentation ist auf Englisch.
 
-Die Suche fällt weich zurück statt zu brechen: Koda schlägt die Plugin-API von Vault
-Retrieval zur Laufzeit defensiv nach. Ist sie da, füllt `search_notes` dünne wörtliche
-Ergebnisse mit semantischen auf (in einem eigenen, beschrifteten Block) und
-`related_notes` wird als siebtes Werkzeug registriert; ist sie nicht da, taucht beides
-im Prompt gar nicht erst auf.
+- **[Dokumentation](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/README.md)** — Einstieg, nach Diátaxis gegliedert: Anleitung, How-tos, Referenz, Erklärung.
+- **[Erste Schritte](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/getting-started.md)** — von der Installation bis zur ersten Antwort und zum ersten bestätigten Schreibvorgang.
+- **[Fehlerbehebung](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/how-to/troubleshooting.md)** — eine Meldung oder ein Symptom, die Ursache und was zu tun ist.
 
-## Die Schreibregel
+## Mitmachen
 
-Koda schreibt frei innerhalb des **Koda-Ordners**, den du in den Einstellungen festlegst
-(Standard: `Koda`) — dort liegen sein Gedächtnis und seine Entwürfe. Jeder
-Schreibvorgang **außerhalb** dieses Ordners öffnet zuerst einen Bestätigungsdialog: eine
-Vorschau des neuen Textes bei Anlegen/Anhängen, ein Zeilen-Diff beim Ersetzen. Lehnst du
-ab, wird Koda mitgeteilt, dass der Schreibvorgang abgelehnt wurde (die Datei bleibt
-unberührt); bestätigst du, geht er durch. Einen anderen Weg, eine Notiz außerhalb seines
-eigenen Ordners anzufassen, hat Koda nicht.
-
-## Endpunkte
-
-Die Endpunktliste in den Einstellungen ist eine Prioritätsliste, keine Ausfallkette:
-**der erste Eintrag ist immer der genutzte.** Sortiere die Liste um (Schaltfläche „nach
-oben" in jeder Zeile), um zu wechseln, mit welchem Server Koda spricht — ein
-automatisches Ausweichen auf den nächsten Eintrag gibt es im MVP nicht.
-
-## Skills
-
-Ein Skill ist eine Markdown-Notiz in `<Koda-Ordner>/Skills/`, die Kodas Verhalten
-steuert. Du schreibst sie selbst — oder lässt Koda sie schreiben, was immer eine
-Bestätigung verlangt.
-
-```markdown
----
-description: Antworte immer mit einem Ausrufezeichen am Ende
-enabled: true
----
-
-Hänge an jede Antwort ein „!" an.
-```
-
-- Der **Name ist der Dateiname** ohne `.md`.
-- `description` ist Pflicht — sie erklärt in einem Satz, was sich ändert, und ist das,
-  was du im Bestätigungsdialog siehst.
-- `enabled: false` schaltet einen Skill ab, ohne ihn zu löschen.
-- Unterordner werden nicht gelesen.
-
-Zu Beginn eines Gesprächs wandern alle aktiven Skills in Kodas System-Prompt. Wie viel
-Text dort höchstens Platz hat, steuert **Skill-Budget** in den Einstellungen (Standard
-6000 Zeichen); was nicht mehr hineinpasst, erscheint nur mit seiner Beschreibung — Koda
-weiß dann, dass es den Skill gibt, kann ihm aber nicht folgen. Welche Skills gerade
-wirken, steht oben im Gespräch.
-
-**Skills verlangen immer eine Bestätigung**, auch innerhalb des Koda-Ordners, wo Koda
-sonst frei schreiben darf. Der Grund: ein Skill ist kein Entwurf — er ändert, was Koda
-künftig tut.
-
-## Modell-Steuerung
-
-**Einstellungen → Koda → Modell-Steuerung** lässt dich die Anweisungen ersetzen, denen
-Koda folgt, und einzelne Werkzeuge abschalten — nützlich für ein schwächeres oder
-kleineres Modell, das ausführlichere Anleitung und weniger Auswahl braucht.
-
-Die Anweisungs-Textarea startet **leer**, mit der ausgelieferten Fassung ausgegraut als
-Platzhalter dahinter. Ein leeres Feld heißt immer „die ausgelieferte Fassung gilt" —
-nie „keine Anweisungen". Das reicht über den Moment hinaus, in dem du das Feld öffnest:
-weil nichts übernommen wird, bevor du selbst etwas tippst, erreicht dich eine spätere
-Verbesserung der ausgelieferten Fassung auch dann noch, wenn du das Feld nie angerührt
-hast — und der Knopf „Ausgelieferte Fassung wiederherstellen" (↺) setzt dich jederzeit
-auf genau diesen Stand zurück. Zwei Platzhalter, `{{sprache}}` und `{{ordner}}`, stehen
-für deine Sprach- und Koda-Ordner-Einstellung und werden bei jedem Lauf eingesetzt —
-lässt du sie in einer eigenen Fassung stehen, folgt sie dir auch dann noch, wenn du eine
-der beiden Einstellungen später änderst.
-
-Unter der Textarea erscheint eine Warnzeile (ohne irgendetwas zu verbieten), wenn die
-Anweisungen Werkzeuge nie erwähnen, einen der beiden Platzhalter fallen lassen, kein
-lesendes Werkzeug mehr aktiv ist, oder wenn nur einzelne lesende Werkzeuge abgeschaltet
-sind — im letzten Fall nennt die Zeile sie beim Namen, denn Koda selbst erfährt von der
-Abschaltung nichts und würde sonst stillschweigend weiter bei den übrigen Werkzeugen
-anklopfen, bis die Runden aufgebraucht sind. „Aktive Anweisungen ansehen" öffnet eine
-Vorschau genau des Prompts, mit dem das nächste Gespräch beginnt — inklusive des
-aktuellen Gedächtnis- und Skill-Blocks.
-
-Jedes Werkzeug — auch die lesenden (`search_notes`, `read_note`, `list_notes`,
-`related_notes`) — hat einen eigenen Schalter und ein eigenes Beschreibungsfeld, das
-derselben Leer-heißt-ausgeliefert-Regel folgt wie die Anweisungs-Textarea. Ein
-abgeschaltetes Werkzeug fehlt in dem, was ans Modell geht, vollständig — es wird nicht
-nur ignoriert. `related_notes` bleibt auch ohne installiertes vault-rag sichtbar,
-ausgegraut mit einem Hinweis, warum, damit es nie wie eine still verschwundene
-Einstellung wirkt.
-
-## Entwicklung
-
-```bash
-npm install
-npm run gate       # lint + typecheck + typecheck:scripts + test + check:pure + build
-npm run dev        # esbuild watch build
-npm test           # vitest + no-abs-paths-Prüfung
-npm run lab:tools  # skriptgesteuerte Tool-Calling-Sonde gegen einen laufenden Endpunkt (siehe docs/LAB.md)
-```
-
-### Struktur
-
-- `src/core/` — pure Logik: Agenten-Schleife, Werkzeug-Policy, Gedächtnis, Sitzungen,
-  Diff, Zusammenführung der Suchergebnisse (keine Obsidian-Importe; erzwungen von
-  `check:pure`).
-- `src/llm/` — `KodaChatClient` + `XhrSseTransport` (streamender Chat-Client).
-- `src/obsidian/` — View, Werkzeug-Adapter zum Vault, Bestätigungsdialog,
-  Einstellungs-Tab und das defensive Nachschlagen der Plugin-API von Vault Retrieval.
-- `src/vendor/kit` + `src/vendor/kit-obsidian/` — eine wortgleiche Momentaufnahme von
-  `../obsidian-kit` (Endpunkt-Konfiguration, i18n, Reasoning-/Think-Splitter,
-  Bestätigungsdialog, Ordner-Vorschlag, …), erneuert über `tools/sync-kit.sh`. Diese
-  Dateien nie von Hand ändern.
-- `src/i18n/` — DE-/EN-Strings der Oberfläche.
-- `scripts/koda-lab.ts` — die Tool-Calling-Sonde hinter `npm run lab:tools`; Befunde
-  stehen in [`docs/LAB.md`](docs/LAB.md).
-
-Die manuelle GUI-Smoke-Checkliste vor jedem Release steht in
-[`docs/SMOKE.md`](docs/SMOKE.md).
-
-## Grenzen (bewusst, noch nicht, oder nie)
-
-- Kein Terminal-/Vollsystem-Zugriff — dauerhaft außerhalb des Umfangs (Store-Richtlinie
-  + Sicherheit).
-- Noch keine Verdichtungs- oder Synthese-Abläufe — für spätere Stufen geplant, siehe
-  `CLAUDE.md`.
-- Kein Heartbeat, keine geplante Hintergrundarbeit — Koda handelt nur, wenn du es
-  bittest.
+Das kanonische Repository ist [git.jkaindl.de/jkaindl/koda-agent](https://git.jkaindl.de/jkaindl/koda-agent); GitHub ist sein Spiegel. Issues gern auf [GitHub](https://github.com/johannes-kaindl/koda-agent/issues). Entwicklungsnotizen (Befehle, Struktur, Smoke-Checkliste) stehen in `CLAUDE.md` im Repository.
 
 ## Lizenz
 
-[AGPL-3.0-or-later](LICENSE) — © 2026 Jay.
+[AGPL-3.0-or-later](https://github.com/johannes-kaindl/koda-agent/blob/main/LICENSE) — © 2026 Jay.
