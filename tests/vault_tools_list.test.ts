@@ -65,6 +65,38 @@ describe("list_notes", () => {
       expect(r.content).toContain("_Koda/Sessions (keine Notiz)");
     }
   });
+  it("zeigt mit depth den Ordnerbaum statt der Unterordner-Zeile (Kodas Frage, 2026-09-26)", async () => {
+    const vault = {
+      ...fakeVault({ "P/A/A.md": "", "P/A/_Tasks/t.md": "", "P/B/B.md": "" }),
+      listFolderPaths: () => ["P", "P/A", "P/A/_Tasks", "P/A/_Meilensteine", "P/B"],
+    };
+    const r = await new VaultTools(vault, async () => true, opts)
+      .run("list_notes", { folder: "P", depth: 2 });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.content).toContain("Ordnerbaum bis Tiefe 2");
+      expect(r.content).toContain("  P/A/_Meilensteine/ (keine Notiz)");
+      expect(r.content).toContain("P/B/ (1 Notiz)");
+      expect(r.content).not.toContain("Unterordner: ");
+    }
+  });
+  it("nimmt depth auch als String an und faellt bei Unsinn auf 1 zurueck", async () => {
+    const vault = { ...fakeVault({ "P/A/_Tasks/t.md": "" }), listFolderPaths: () => ["P", "P/A", "P/A/_Tasks"] };
+    const tools = new VaultTools(vault, async () => true, opts);
+    const asString = await tools.run("list_notes", { folder: "P", depth: "2" });
+    const nonsense = await tools.run("list_notes", { folder: "P", depth: "tief" });
+    expect(asString.ok && asString.content).toContain("  P/A/_Tasks/");
+    expect(nonsense.ok && nonsense.content).toContain("Unterordner: P/A (1 Notiz)");
+  });
+  it("teilt sich die Zeilengrenze mit der Notizliste und meldet den gekappten Baum in Zeile 1", async () => {
+    const folders = ["P"];
+    for (let i = 0; i < 4; i++) folders.push(`P/${i}`, `P/${i}/_Tasks`);
+    const vault = { ...fakeVault({ "P/0/x.md": "" }), listFolderPaths: () => folders };
+    const r = await new VaultTools(vault, async () => true, { ...opts, listMaxRows: () => 5 })
+      .run("list_notes", { folder: "P", depth: 2 });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.content.split("\n")[0]).toContain("ORDNERBAUM GEKAPPT: 8 Ordner bis Tiefe 2, 4 gezeigt — vollständig bis Tiefe 1");
+  });
   it("meldet einen existierenden Ordner ohne Notiz als Befund, nicht als Fehler", async () => {
     const vault = { ...fakeVault({ "P/A.md": "" }), listFolderPaths: () => ["P", "P/Leer"] };
     const r = await new VaultTools(vault, async () => true, opts).run("list_notes", { folder: "P/Leer" });

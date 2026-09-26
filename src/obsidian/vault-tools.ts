@@ -15,6 +15,7 @@ import {
   collectFolderNotes, pickFields, formatListResult, suggestFolders, formatEmptyFolder,
   collectSubfolders, folderExists,
 } from "../core/tools/list";
+import { collectFolderTree, renderTreeBlock } from "../core/tools/tree";
 import type { EditorPort, WorkspacePort } from "../core/context/ports";
 import { renderWorkspaceReport } from "../core/context/workspace-line";
 import { DEFAULT_SETTINGS } from "../core/settings-types";
@@ -190,7 +191,7 @@ export class VaultTools implements ToolRunner {
           // SYNCHRON innerhalb der async-Methode, was ohne await eine abgelehnte Promise
           // ausserhalb dieses try/catch ergibt (Traversal wuerde nicht als Fehler-Result
           // gemeldet, sondern als unbehandelte Ablehnung durchschlagen).
-          return await this.listNotes(str(a.folder), bool(a.recursive), strArray(a.fields));
+          return await this.listNotes(str(a.folder), bool(a.recursive), strArray(a.fields), depthOf(a.depth));
         case "get_workspace": {
           // Eigene Spanne statt num(): num() kappt bei 25 (fuer max_results gedacht) und
           // behandelt 0 als "fehlt" — around_cursor: 0 ("nur die Cursor-Zeile") ist aber ein
@@ -411,7 +412,7 @@ export class VaultTools implements ToolRunner {
 
   /** Ordnerinhalt in EINEM Aufruf. Die Kappung liegt vor dem Frontmatter-Holen: gezaehlt
    *  wird ueber die Pfadliste (billig), geholt nur fuer die Zeilen, die auch erscheinen. */
-  private async listNotes(folder: string, recursive: boolean, fields: string[]): Promise<ToolOutcome> {
+  private async listNotes(folder: string, recursive: boolean, fields: string[], depth: number): Promise<ToolOutcome> {
     const norm = resolveFolderPath(folder);
     const all = this.vault.listMarkdownPaths();
     const folders = this.vault.listFolderPaths();
@@ -425,9 +426,12 @@ export class VaultTools implements ToolRunner {
     const shown = paths.slice(0, max);
     const rows = shown.map((p) => ({ path: p, fields: pickFields(this.vault.frontmatterOf(p), fields) }));
     const subfolders = collectSubfolders(all, folders, norm, recursive);
+    // Tiefe 1 ist die Unterordner-Zeile, die es schon gibt — ein Baum lohnt erst ab 2. Er
+    // teilt sich die Zeilengrenze mit der Notizliste: beides landet im selben Kontextfenster.
+    const tree = depth >= 2 ? renderTreeBlock(collectFolderTree(all, folders, norm, depth, max), depth) : undefined;
     return {
       ok: true,
-      content: formatListResult({ folder: norm, recursive, total: paths.length, rows, subfolders, subfolderMax: max }),
+      content: formatListResult({ folder: norm, recursive, total: paths.length, rows, subfolders, subfolderMax: max, tree }),
     };
   }
 
@@ -501,6 +505,14 @@ function bool(v: unknown): boolean {
   if (typeof v === "string") return v.toLowerCase() === "true";
   if (typeof v === "number") return v === 1;
   return false;
+}
+
+/** `depth` tolerant wie `bool`: Modelle schicken Zahlen auch als String. Fehlend, kaputt
+ *  oder kleiner 1 heisst 1 — das bisherige Verhalten, nie ein Fehler. Keine Obergrenze: die
+ *  Zeilengrenze kappt den Baum ohnehin, und die Kappung meldet sich in Zeile 1. */
+function depthOf(v: unknown): number {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  return Number.isFinite(n) && n >= 1 ? Math.trunc(n) : 1;
 }
 
 function strArray(v: unknown): string[] {

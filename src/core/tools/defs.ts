@@ -32,12 +32,16 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "list_notes",
     description:
-      "List every note in a vault folder in ONE call, with the frontmatter fields you ask for. Use this whenever completeness matters — all tasks in a folder and their status, all notes of a project — instead of opening notes one by one or inferring the list from prose you read elsewhere. If the result is capped, the first line says so. Without recursive, the first lines also name the subfolders and how many notes each holds, including subfolders that hold no notes.",
+      "List every note in a vault folder in ONE call, with the frontmatter fields you ask for. Use this whenever completeness matters — all tasks in a folder and their status, all notes of a project — instead of opening notes one by one or inferring the list from prose you read elsewhere. If the result is capped, the first line says so. Without recursive, the first lines also name the subfolders and how many notes each holds, including subfolders that hold no notes. To see how a folder is organised several levels deep — e.g. whether every project folder has the same subfolders — set depth instead of calling list_notes on each subfolder.",
     parameters: {
       type: "object",
       properties: {
         folder: { type: "string", description: "Vault-relative folder, e.g. Projekt/_Tasks. Empty string means the vault root." },
         recursive: { type: "boolean", description: "Include subfolders. Default false." },
+        depth: {
+          type: "integer",
+          description: "Show the folder tree this many levels deep (folders only, each with its note count, empty folders included). Default 1 = only the direct subfolders. Try 2 or 3 first; a capped tree says so in the first line.",
+        },
         fields: {
           type: "array",
           items: { type: "string" },

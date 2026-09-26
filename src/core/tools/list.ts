@@ -13,7 +13,9 @@
  *  leerer Ordner, also wieder ein Befund, der wie eine Tatsache aussieht.
  *  Nur fuer den VERGLEICH: ausgegeben wird immer der Originalpfad, denn mit dem muss
  *  `read_note` anschliessend die Datei finden. */
-const nf = (s: string): string => s.normalize("NFC");
+import type { TreeBlock } from "./tree";
+
+export const nf = (s: string): string => s.normalize("NFC");
 
 /** Eine Notiz, die so heisst wie der Ordner, in dem sie liegt (`_Tasks/_Tasks.md`) —
  *  in Obsidian die uebliche Form einer Ordner-/Hub-Notiz.
@@ -117,7 +119,7 @@ export interface NoteRow { path: string; fields: Record<string, string> }
  *  sonst kann ein Leser die Zeile `a.md · titel=Alpha · Beta` nicht von einer mit zwei
  *  Feldern unterscheiden. Innere Anfuehrungszeichen werden nach CSV-Art verdoppelt.
  *  Bewusst KEIN Ersetzen der Zeichen im Wert: der Wert soll wahr bleiben. */
-function cell(s: string): string {
+export function cell(s: string): string {
   return /[·=]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
@@ -127,7 +129,7 @@ export interface Subfolder { path: string; notes: number }
  *  luegt: die Notizpfade kennen keinen Ordner ohne Notiz, und eine fehlende oder
  *  unvollstaendige Ordnerliste soll nie Ordner VERSCHWINDEN lassen, die Notizen tragen.
  *  Obsidian fuehrt die Wurzel als "/" — sie ist kein Unterordner von irgendetwas. */
-function knownFolders(allPaths: string[], folderPaths: string[]): Map<string, string> {
+export function knownFolders(allPaths: string[], folderPaths: string[]): Map<string, string> {
   const out = new Map<string, string>();
   for (const f of [...folderPaths, ...allFolders(allPaths)]) {
     const clean = f.replace(/^\/+|\/+$/g, "");
@@ -174,7 +176,7 @@ export function collectSubfolders(
 
 /** Nie „leer": ein Ordner ohne Notiz kann Anhaenge, Sitzungsdateien oder `.base`-Dateien
  *  enthalten. Gemessen wird hier nur, was Notiz ist. */
-function countLabel(n: number): string {
+export function countLabel(n: number): string {
   return n === 0 ? "keine Notiz" : notesWord(n);
 }
 
@@ -189,8 +191,10 @@ function notesWord(n: number): string {
 export function formatListResult(args: {
   folder: string; recursive: boolean; total: number; rows: NoteRow[];
   subfolders?: Subfolder[]; subfolderMax?: number;
+  /** Ordnerbaum (`depth` >= 2): ersetzt die Unterordner-Zeile bzw. „Ordner ohne Notiz". */
+  tree?: TreeBlock;
 }): string {
-  const { folder, recursive, total, rows, subfolders = [], subfolderMax = Infinity } = args;
+  const { folder, recursive, total, rows, subfolders = [], subfolderMax = Infinity, tree } = args;
   const where = folder === "" ? "in der Vault-Wurzel" : `in "${folder}"`;
   const folderNotes = rows.filter((r) => isFolderNote(r.path)).length;
   // Die Zahl steht im Kopf UND die Zeile traegt die Markierung. Das ist bewusst doppelt:
@@ -207,7 +211,7 @@ export function formatListResult(args: {
       folderLine = `Ordner ohne Notiz: ${shown.map((s) => cell(s.path)).join(", ")}${tail}`;
     } else {
       const below = subfolders.reduce((sum, s) => sum + s.notes, 0);
-      head += `; dazu ${subfolders.length} Unterordner mit ${notesWord(below)}, NICHT mitgelistet (recursive:true zeigt sie)`;
+      head += `; dazu ${subfolders.length} Unterordner mit ${notesWord(below)}, NICHT mitgelistet (recursive:true zeigt sie, depth:2 ihren Aufbau)`;
       folderLine = `Unterordner: ${shown.map((s) => `${cell(s.path)} (${countLabel(s.notes)})`).join(" · ")}${tail}`;
     }
   } else if (total === 0) {
@@ -218,14 +222,24 @@ export function formatListResult(args: {
     const path = `${cell(r.path)}${isFolderNote(r.path) ? " (Ordnernotiz)" : ""}`;
     return cols.length === 0 ? path : `${path} · ${cols.join(" · ")}`;
   });
+  // Der Baum ersetzt die Ordnerzeile, statt neben ihr zu stehen: dieselbe Auskunft zweimal
+  // in verschiedener Form laedt ein Modell ein, die beiden gegeneinander abzugleichen.
+  if (tree !== undefined) folderLine = tree.text;
   const top = folderLine === "" ? head : `${head}\n${folderLine}`;
   const body = lines.length === 0 ? top : `${top}\n\n${lines.join("\n")}`;
-  if (rows.length >= total) return body;
 
-  const hint = recursive
-    ? "Grenze den Ordner ein oder setze recursive:false"
-    : "Grenze den Ordner ein";
-  return `⚠ UNVOLLSTÄNDIG: ${total} Notizen gefunden, ${rows.length} gezeigt. ${hint}, bevor du über Vollständigkeit sprichst.\n\n${body}`;
+  // Beide Warnungen stehen VOR allem anderen, untereinander — auch wenn nur der Baum gekappt
+  // ist, sonst stuende dessen Warnung mitten im Ergebnis, nach einer vollstaendig aussehenden
+  // Kopfzeile.
+  const warnings: string[] = [];
+  if (rows.length < total) {
+    const hint = recursive
+      ? "Grenze den Ordner ein oder setze recursive:false"
+      : "Grenze den Ordner ein";
+    warnings.push(`⚠ UNVOLLSTÄNDIG: ${total} Notizen gefunden, ${rows.length} gezeigt. ${hint}, bevor du über Vollständigkeit sprichst.`);
+  }
+  if (tree?.warning) warnings.push(tree.warning);
+  return warnings.length === 0 ? body : `${warnings.join("\n")}\n\n${body}`;
 }
 
 const SUGGEST_MAX = 5;
