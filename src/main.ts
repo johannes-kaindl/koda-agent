@@ -21,7 +21,7 @@ import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/prompt/build";
 import { effectiveRules, renderRules } from "./core/prompt/rules";
 import { toLabMessages, describeLlmFailure, readNotePathOf } from "./core/agent/lab-trace";
-import { readLabApi } from "./obsidian/lab";
+import { logToLab } from "./vendor/kit-obsidian/lab-client";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
 import { selectSkills, type Selection } from "./core/skills/select";
@@ -312,6 +312,7 @@ export default class KodaPlugin extends Plugin {
   }
 
   private abort: AbortController | null = null;
+  private labMismatchWarned = false;
   private readonly transport = xhrSseTransport;
 
   /** Loest "erster erreichbarer Endpunkt" auf und merkt sich das Ergebnis fuer die Sitzung.
@@ -690,9 +691,9 @@ export default class KodaPlugin extends Plugin {
     contextPaths: string[];
   }): void {
     try {
-      const api = readLabApi(this.app);
-      if (api === null) return;
-      const id: unknown = api.log({
+      // `logToLab` wirft nie und faengt eine Promise ab, die ein fremdes Plugin entgegen dem
+      // Vertrag zurueckgibt (Kit lab-client). Telemetrie darf einen Chat nie mitreissen.
+      const out = logToLab(this.app, {
         plugin: "koda-agent",
         feature: input.feature,
         model: input.model,
@@ -709,10 +710,13 @@ export default class KodaPlugin extends Plugin {
         ...(input.promptTemplate !== "" ? { promptTemplate: input.promptTemplate } : {}),
         turnId: input.turnId,
       });
-      // Vertrag: log() gibt synchron eine id zurueck — ein fremdes Plugin bekommt trotzdem
-      // keinen blinden Vorschuss (Muster vault-rag).
-      void Promise.resolve(id).catch(() => undefined);
-    } catch { /* Telemetrie darf einen Chat nie mitreissen. */ }
+      // Ein Lab mit anderer Vertragsversion sah bisher aus wie „kein Lab installiert": einmal je
+      // Sitzung melden, sonst bleibt die Aufzeichnung still aus (vault-rag: 22 Tage unbemerkt).
+      if (!out.ok && out.reason === "version-mismatch" && !this.labMismatchWarned) {
+        this.labMismatchWarned = true;
+        console.warn(`Koda: ${out.detail} — Aufrufe werden nicht aufgezeichnet.`);
+      }
+    } catch { /* Telemetrie darf einen Chat nie mitreissen — auch nicht, wenn der Aufbau der Felder wirft. */ }
   }
 
   async ask(question: string): Promise<void> {

@@ -2416,7 +2416,7 @@ async function main(): Promise<void> {
     // anschliessen", apiVersion 4: turnId, promptTemplate, contextPaths).
     //
     // Ein Stub statt eines echten Lab, aus demselben Grund wie in vault-rags Treiber: die
-    // Zusage ist "wir rufen readLabApi(app)?.log(...) mit diesen Feldern", nicht "das Lab
+    // Zusage ist "wir rufen logToLab(app, {...}) mit diesen Feldern", nicht "das Lab
     // verhaelt sich richtig" — und ein echtes Lab im Fixture wuerde dessen Aufzeichnung mit
     // Testzeilen verunreinigen. Das Fixture fuehrt llm-lab nicht (community-plugins.json),
     // der Zweig laeuft hier also immer; ein spaeter installiertes echtes Lab wird trotzdem

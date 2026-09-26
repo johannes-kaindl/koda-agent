@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readLabApi } from "../src/obsidian/lab";
+import { readLabApi } from "../src/vendor/kit-obsidian/lab-client";
 
 const good = { apiVersion: 4, status: () => ({}), log: () => "id" };
 
