@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **Chat-Aufruf läuft über den Kit-Client** (obsidian-kit 0.43.0, `createChatClient` mit XHR-Transport): Kodas eigener Streaming-Client und -Transport entfallen, Kodas bisherige Reparaturen (Tool-Call-Argumente werden ohne Abbruch abgewartet, abgeschnittene Aufrufe, das Reasoning-Echo für Modelle wie `verdigado-pro`) stehen unverändert. Sichtbare Folgen: Antwortet ein Server mit HTTP 200, aber einem JSON-Fehler im Körper (z. B. „model not loaded“), meldet Koda jetzt die Servermeldung statt einer leeren Antwort. Eine Antwort ohne Stream (Server ignoriert `stream: true`) wird gelesen statt verworfen. Ein Abbruch vor dem Start des Streams erreicht den Server gar nicht mehr. Ein Transportfehler heißt weiter „nicht erreichbar“; einen Wechsel auf eine Anfrage ohne Stream bei Origin-Weigerung gibt es bewusst nicht.
+- Die Endpunkt-Liste und der Antwortbereich in den Einstellungen und im Chat tragen den Stil von Kit 0.43.0 (Endpunkt-Zeile: Kindselektoren; leere Statuszeile im Antwortbereich blendet sich aus).
+
 ## [0.18.0] — 2026-09-26
 
 ### Added

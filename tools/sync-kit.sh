@@ -111,7 +111,7 @@ mkdir -p src/vendor/kit src/vendor/kit-obsidian
 PURE_MODULE="think-splitter reasoning capabilities endpoint endpoint_config endpoint_diagnostics settings i18n num timeout frontmatter model-context error_body diff settings_schema model-choice model-list-cache stream-blocks"
 # Die gekoppelte Schicht (importiert `obsidian`). stable-writer traegt einen Querimport auf
 # ../vendor/code-kit/pure/stream-blocks und braucht deshalb den relayer (Fallgruppe unten).
-OBSIDIAN_MODULE="clock confirm folder-suggest settings_walker endpoint-list model-picker hub collapsible stream-area stable-writer"
+OBSIDIAN_MODULE="clock confirm folder-suggest settings_walker model-picker hub collapsible stable-writer"
 
 # Die "vendored"-Zeile der VENDOR.json wird aus derselben Liste erzeugt, aus der kopiert wird.
 # Zwei Orte fuer dieselbe Wahrheit driften (CORE-META-16) — und zwar leise: die Datei, in der
@@ -171,6 +171,35 @@ printf '%s\n' "// vendored from obsidian-kit@$KIT_HELP_REF, src/obsidian/help-se
 mv "$f.tmp" "$f"
 echo "vendored obsidian-kit@$KIT_HELP_REF/obsidian/help-setting.ts"
 
+# Zweiter Einzelpin: Chat-Client-Tausch (Welle 11) und die zwei Bausteine, deren CSS-Konstante sich
+# seit 0.35.0 geaendert hat (pin-rueckstand). Alles auf KIT_CHAT_REF, NICHT auf VER — ein Heben der
+# uebrigen Module waere eine inhaltliche Aenderung an Produktivcode. Die Header tragen den Pin;
+# die VENDOR.json listet diese Dateien bewusst NICHT unter "vendored" (sonst gaelte dort VER).
+# sse.ts (parseSSE) braucht chat-client neu; code-kit-Pin dafuer 0.7.0 (Rezept MIGRATION 0.42.0).
+CODE_SSE_REF="${CODE_SSE_REF:-0.7.0}"
+git -C "$CODE_KIT" cat-file -e "$CODE_SSE_REF:src/ts/pure/sse.ts" 2>/dev/null || {
+  echo "FEHLER: $CODE_SSE_REF:src/ts/pure/sse.ts fehlt in $CODE_KIT (CODE_SSE_REF setzen)." >&2; exit 2; }
+hole "$CODE_KIT" "$CODE_SSE_REF" "src/ts/pure/sse.ts" "src/vendor/kit/sse.ts" || {
+  echo "FEHLER: $CODE_SSE_REF:src/ts/pure/sse.ts nicht lesbar" >&2; exit 2; }
+stamp "src/vendor/kit/sse.ts" "src/ts/pure/sse.ts" "code-kit" "$CODE_SSE_REF"
+echo "vendored code-kit@$CODE_SSE_REF/src/ts/pure/sse.ts"
+
+KIT_CHAT_REF="${KIT_CHAT_REF:-0.43.0}"
+CHAT_MODULE="chat-client chat-transport lab-client endpoint-list stream-area"
+for m in $CHAT_MODULE; do
+  git -C "$KIT" cat-file -e "$KIT_CHAT_REF:src/obsidian/$m.ts" 2>/dev/null || {
+    echo "FEHLER: $KIT_CHAT_REF:src/obsidian/$m.ts fehlt in $KIT (KIT_CHAT_REF setzen)." >&2; exit 2; }
+done
+CHAT_SHA=$(git -C "$KIT" rev-parse --short "$KIT_CHAT_REF^{commit}")
+for m in $CHAT_MODULE; do
+  f="src/vendor/kit-obsidian/$m.ts"
+  hole "$KIT" "$KIT_CHAT_REF" "src/obsidian/$m.ts" "$f" || {
+    echo "FEHLER: $KIT_CHAT_REF:src/obsidian/$m.ts nicht lesbar" >&2; exit 2; }
+  case "$m" in chat-client|endpoint-list) relayer "$f" ;; esac
+  printf '%s\n' "// vendored from obsidian-kit@$KIT_CHAT_REF, src/obsidian/$m.ts — do not hand-edit; re-vendor via tools/sync-kit.sh" | cat - "$f" > "$f.tmp"
+  mv "$f.tmp" "$f"
+  echo "vendored obsidian-kit@$KIT_CHAT_REF/obsidian/$m.ts"
+done
 cat > src/vendor/kit/VENDOR.json <<JSON
 {
   "source": "obsidian-kit",
@@ -184,6 +213,12 @@ cat > src/vendor/kit/VENDOR.json <<JSON
       "version": "0.38.0",
       "sha": "4988fa0",
       "note": "Einzeln vendoriert (git show 0.38.0:src/pure/explain-texts.ts), NICHT ueber tools/sync-kit.sh — das Skript berechnet eine gemeinsame VER fuer PURE_MODULE+OBSIDIAN_MODULE und haette beim Aufnehmen dieser Datei alle 18 anderen ebenfalls auf 0.38.0 gehoben. Datei ist dependenzfrei (keine Kit-internen Importe), Einzel-Vendoring deshalb gefahrlos. Re-vendor manuell mit demselben git-show-Befehl gegen einen neuen Tag; Kopf-Stempel und dieser Eintrag von Hand nachziehen."
+    },
+    {
+      "file": "sse.ts",
+      "version": "$CODE_SSE_REF",
+      "sha": "$(git -C "$CODE_KIT" rev-parse --short "$CODE_SSE_REF^{commit}")",
+      "note": "Aus code-kit@$CODE_SSE_REF (src/ts/pure/sse.ts), Einzelpin CODE_SSE_REF im Skript — chat-client.ts braucht parseSSE, die uebrigen pure-Module bleiben auf code_kit_version. Der Kopf der Datei nennt den Pin."
     }
   ],
   "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit (Ausnahme: \"vendored_mixed_version\"-Eintraege, die per Definition ausserhalb von tools/sync-kit.sh liegen). Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; \"vendored_mixed_version\" traegt seine Version/SHA je Eintrag selbst. kit-obsidian/ siehe dortige VENDOR.json."
@@ -196,7 +231,8 @@ cat > src/vendor/kit-obsidian/VENDOR.json <<JSON
   "sha": "$SHA",
   "vendored": "$(liste "$OBSIDIAN_MODULE")",
   "help_setting": "help-setting.ts (Kit $KIT_HELP_REF, $HELP_SHA)",
-  "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; help-setting.ts liegt auf eigenem Pin (Feld help_setting). endpoint-list.ts, model-picker.ts und stable-writer.ts tragen EINE mechanische Abweichung: kit-interne Importe ../vendor/code-kit/{pure,web}/ sind auf ../kit/ umgeschrieben (Vendor-Layout). Bei jedem Re-Vendoring reproduzieren; sonst darf nichts abweichen. Praezedenz: vim-dojo, markdown-presentation, vault-crews, kuro-gamification, lingotuner."
+  "chat_pin": "$CHAT_MODULE (Kit $KIT_CHAT_REF, $CHAT_SHA)",
+  "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; help-setting.ts (Feld help_setting) und die Chat-Client-Module (Feld chat_pin) liegen auf eigenem Pin; ihr Header nennt ihn. endpoint-list.ts, chat-client.ts, model-picker.ts und stable-writer.ts tragen EINE mechanische Abweichung: kit-interne Importe ../vendor/code-kit/{pure,web}/ sind auf ../kit/ umgeschrieben (Vendor-Layout). Bei jedem Re-Vendoring reproduzieren; sonst darf nichts abweichen. Praezedenz: vim-dojo, markdown-presentation, vault-crews, kuro-gamification, lingotuner."
 }
 JSON
 cat > tests/vendor/kit/VENDOR.json <<JSON

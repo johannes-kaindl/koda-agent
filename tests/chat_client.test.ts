@@ -225,4 +225,74 @@ describe("KodaChatClient.complete", () => {
     const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
     if (r.ok) expect(r.reasoning).toBeUndefined();
   });
+
+  // Die drei Reparaturen aus 0.15.0 — nach dem Tausch auf den Kit-Client je EIN Test, der
+  // vor dem Tausch lokal gruen war (Welle 11, Verhaltensinventar).
+  it("(0.15.0) schickt das reasoning einer Assistenten-Runde mit Tool-Calls als reasoning UND reasoning_content zurueck", async () => {
+    let sent: { messages: Record<string, unknown>[] } | undefined;
+    const t: SseTransport = {
+      async postStream(_u, body, _h, onChunk) {
+        sent = body as typeof sent;
+        onChunk(line({ choices: [{ delta: { content: "ok" } }] }) + "data: [DONE]\n");
+        return 200;
+      },
+    };
+    const history: ChatMessage[] = [
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read_note", arguments: "{}" }], reasoning: "Ich lese zuerst." },
+      { role: "tool", toolCallId: "c1", content: "Text" },
+    ];
+    await new KodaChatClient(t, 1000, fakeClock).complete(cfg, history, [], () => {}, () => {}, new AbortController().signal);
+    const assistant = sent?.messages[1];
+    expect(assistant).toMatchObject({ role: "assistant", reasoning: "Ich lese zuerst.", reasoning_content: "Ich lese zuerst." });
+  });
+
+  it("(0.15.0) ein abgeschnittener Tool-Call ohne Text ist kind truncated, nicht ein Aufruf mit halben Argumenten", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "write_note", arguments: '{"path":"A.md","content":"halb' } }] } }] })
+        + line({ choices: [{ delta: {}, finish_reason: "length" }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: false, kind: "truncated", partial: "" });
+  });
+
+  it("(0.15.0) die Tool-Call-Frist gilt auch beim Kopf-Chunk OHNE Argumente, danach keine Chunks mehr", async () => {
+    const ms: number[] = [];
+    const clock = { now: () => 0, setTimeout: (_fn: () => void, m: number) => { ms.push(m); return 1; }, clearTimeout: () => {} };
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "write_note", arguments: "" } }] } }] }),
+    ]), 1000, clock);
+    await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(ms[ms.length - 1]).toBe(TOOL_CALL_IDLE_TIMEOUT_MS);
+  });
+
+  // Was der Kit-Client dazugibt: kein Verlust, aber sichtbar — CHANGELOG.
+  it("HTTP 200 mit JSON-Fehlerkoerper ist kind http und nennt die Servermeldung, nicht „HTTP 200“", async () => {
+    const client = new KodaChatClient(transportOf(['{"error":{"message":"model not loaded"}}'], 200), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: false, kind: "http" });
+    if (!r.ok) {
+      expect(r.detail).toContain("model not loaded");
+      expect(r.detail).not.toContain("HTTP 200");
+    }
+  });
+
+  it("formuliert Timeout und Netzfehler deutsch (das Kit liefert englische Kurztexte)", async () => {
+    const t: SseTransport = { async postStream() { throw Object.assign(new Error("boom"), { name: "StreamNetworkError" }); } };
+    const net = await new KodaChatClient(t, 1000, fakeClock).complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(net).toMatchObject({ ok: false, kind: "network", detail: expect.stringContaining("nicht erreichbar") });
+
+    let fire: (() => void) | undefined;
+    const clock = { now: () => 0, setTimeout: (fn: () => void) => { fire = fn; return 1; }, clearTimeout: () => {} };
+    const hang: SseTransport = {
+      postStream(_u, _b, _h, _c, signal) {
+        return new Promise<number>((_res, rej) => {
+          signal.addEventListener("abort", () => rej(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true });
+          fire?.();
+        });
+      },
+    };
+    const to = await new KodaChatClient(hang, 30_000, clock).complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(to).toMatchObject({ ok: false, kind: "timeout", detail: "keine Antwort seit 30s" });
+  });
 });

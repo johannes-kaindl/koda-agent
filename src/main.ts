@@ -11,7 +11,7 @@ import { probeEndpoint, probeModels } from "./core/llm/probe";
 import { probeModelContext } from "./core/llm/context-probe";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
-import { XhrSseTransport } from "./llm/XhrSseTransport";
+import { xhrSseTransport } from "./vendor/kit-obsidian/chat-transport";
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
 import { type ChatMessage, type LogEntry } from "./core/agent/types";
 import { toolSet, toWireTools, type ToolDef, type ToolSet } from "./core/tools/defs";
@@ -312,7 +312,7 @@ export default class KodaPlugin extends Plugin {
   }
 
   private abort: AbortController | null = null;
-  private readonly transport = new XhrSseTransport();
+  private readonly transport = xhrSseTransport;
 
   /** Loest "erster erreichbarer Endpunkt" auf und merkt sich das Ergebnis fuer die Sitzung.
    *  Liest `this.settings` bei jedem Durchlauf frisch — eine im Editor geaenderte Liste

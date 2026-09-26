@@ -1,27 +1,21 @@
-/* Streaming-Call gegen /v1/chat/completions mit Tool-Calling — pure, kein Obsidian-Import.
-   Struktur nach dem KuroChatClient-Muster (Transport + ClockPort injiziert, n=4 im Oekosystem). */
-import { ThinkSplitter } from "../vendor/kit/think-splitter";
-import { normalizeEndpoint } from "../vendor/kit/endpoint";
-import { authHeaders } from "../vendor/kit/endpoint_config";
+/* Kodas Chat-Aufruf: duenne Schicht ueber dem Kit-Client (`createChatClient`, obsidian-kit 0.43.0).
+   Was hier bleibt, ist genau das, was nur Koda weiss: die festen `params` (Sampling-Werte gehoeren
+   ins Plugin, nicht in den Kit-Client), der Denk-Schalter, die deutschen Fehlertexte und die
+   Form `LlmResult`, an der Loop, Kompaktierung und Lab-Meldung haengen. Streaming, Tool-Call-
+   Puffer, Idle-Frist, Abbruch und Fehlerkoerper-Lesen liegen im Kit — Kodas alter Client war die
+   Vorlage dieser Extraktion (Welle 11: rueckgetauscht).
+   Kein Obsidian-Import: der Transport wird injiziert (`chat-transport` liefert XHR). */
+import { createChatClient, type ChatResult, type ChatWireMessage, type SseTransport } from "../vendor/kit-obsidian/chat-client";
 import { suppressParams } from "../vendor/kit/reasoning";
 // Anzeige- und Request-Seite treffen dieselbe Entscheidung — deshalb EINE Definition,
 // im uebernommenen Toggle-Modul (REGISTRY: „wer nur die Anzeige uebernimmt, hat die Haelfte").
 import { effectiveSuppress } from "../core/chat/reasoning-toggle";
 import { realClock, type ClockPort } from "../vendor/kit-obsidian/clock";
-import { parseAgentSSE, ToolCallAssembler } from "../core/agent/stream";
 import { toWireMessages, type ChatMessage, type ToolCall } from "../core/agent/types";
 import { toWireTools, type ToolDef } from "../core/tools/defs";
-import { ChatHttpError, chatErrorMessage, isContextOverflow } from "../core/llm/chat-error";
+import { ChatHttpError, chatErrorMessage } from "../core/llm/chat-error";
 
-export interface SseTransport {
-  postStream(
-    url: string,
-    body: unknown,
-    headers: Record<string, string>,
-    onChunk: (raw: string) => void,
-    signal: AbortSignal,
-  ): Promise<number>;
-}
+export type { SseTransport };
 
 export interface ChatConfig {
   endpoint: string;
@@ -34,7 +28,6 @@ export type LlmResult =
   | { ok: true; content: string; toolCalls: ToolCall[]; finishReason?: string; reasoning?: string }
   | { ok: false; kind: "aborted" | "http" | "network" | "timeout" | "overflow" | "truncated"; detail: string; partial: string };
 
-const ERROR_BODY_CAP = 2048;
 export const DEFAULT_TIMEOUT_MS = 120_000;
 /** LM Studio streamt Tool-Call-Argumente nicht, es puffert sie: der Kopf-Chunk (`id`, `name`,
  *  leere Argumente) kommt, sobald der Name feststeht, danach kein Byte, bis die kompletten
@@ -43,15 +36,65 @@ export const DEFAULT_TIMEOUT_MS = 120_000;
  *  Das normale Idle-Timeout wuerde einen gesunden Schreib-Call darin abbrechen; ab dem
  *  Kopf-Chunk gilt deshalb diese laengere Frist — Groessenordnung von OpenCodes
  *  `chunkTimeout`-Default (llm-setup `docs/explanation/qwen3.8-27b-toolcall-loop.md`
- *  § „Gegenmittel"). */
+ *  § „Gegenmittel"). Der Kit-Client kennt dieselbe Frist (`toolCallIdleTimeoutMs`); sie wird
+ *  hier ausdruecklich gesetzt, damit ein Kit-Default sie nicht still verschieben kann. */
 export const TOOL_CALL_IDLE_TIMEOUT_MS = 900_000;
 
+/** Kit-Ergebnis → Kodas `LlmResult`. Der Text von `detail` ist hier deutsch und bleibt es: der
+ *  Kit-Client liefert Servermeldung bzw. englischen Kurztext, den Satz baut der Konsument. */
+function toLlmResult(r: ChatResult): LlmResult {
+  if (r.ok) {
+    return {
+      ok: true,
+      content: r.content,
+      toolCalls: r.toolCalls,
+      ...(r.finishReason !== undefined ? { finishReason: r.finishReason } : {}),
+      // Das Kit liefert "" statt fehlend — der Loop und die Sitzung unterscheiden „kein reasoning".
+      ...(r.reasoning !== "" ? { reasoning: r.reasoning } : {}),
+    };
+  }
+  const partial = r.partial;
+  switch (r.kind) {
+    case "aborted":
+      return { ok: false, kind: "aborted", detail: "stream aborted", partial };
+    case "timeout": {
+      const seconds = /^no data for (.+)s$/.exec(r.detail)?.[1];
+      return { ok: false, kind: "timeout", detail: seconds !== undefined ? `keine Antwort seit ${seconds}s` : r.detail, partial };
+    }
+    case "network":
+      return { ok: false, kind: "network", detail: chatErrorMessage(new Error(r.detail)), partial };
+    case "truncated":
+      return { ok: false, kind: "truncated", detail: "finish_reason: length, kein Text", partial: "" };
+    case "http":
+    case "overflow": {
+      // Ein echter Nicht-2xx-Status bekommt Kodas deutschen Text samt Serverbegruendung.
+      // Status 2xx heisst „der Server meldete Erfolg, der Koerper ist ein Fehler" — dort waere
+      // „Anfrage abgelehnt (HTTP 200)" falsch, die Servermeldung selbst ist die Auskunft.
+      const failedStatus = r.status !== undefined && (r.status < 200 || r.status >= 300);
+      const detail = failedStatus ? chatErrorMessage(new ChatHttpError(r.status ?? 0, r.body ?? "")) : r.detail;
+      return { ok: false, kind: r.kind, detail, partial };
+    }
+  }
+}
+
 export class KodaChatClient {
+  private readonly chat: ReturnType<typeof createChatClient>;
+
   constructor(
-    private readonly transport: SseTransport,
-    private readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
-    private readonly clock: ClockPort = realClock,
-  ) {}
+    transport: SseTransport,
+    timeoutMs: number = DEFAULT_TIMEOUT_MS,
+    clock: ClockPort = realClock,
+  ) {
+    // Kein `fallbackTransport`, bewusst: ein Chat, den der Server per Origin-Pruefung (CORS)
+    // abweist, soll als „Probe gruen, Chat rot" sichtbar bleiben (`error.chatBlocked`), statt
+    // still ohne Stream weiterzulaufen — der Nutzer soll den Server richtig einstellen.
+    this.chat = createChatClient({
+      transport,
+      clock,
+      idleTimeoutMs: timeoutMs,
+      toolCallIdleTimeoutMs: TOOL_CALL_IDLE_TIMEOUT_MS,
+    });
+  }
 
   async complete(
     cfg: ChatConfig,
@@ -63,121 +106,28 @@ export class KodaChatClient {
     // Nur der Status-Zeile gedacht (UI-STANDARD §8 Status-Indikator): feuert einmal je
     // Tool-Call-Index, sobald dessen Name feststeht — also genau am Kopf-Chunk, bevor die
     // lange Stille der gepufferten Argumente beginnt. Optional, weil kein Aufrufer sie
-    // BRAUCHT (der Timeout-Wechsel unten haengt nicht daran).
+    // BRAUCHT (der Timeout-Wechsel haengt nicht daran).
     onToolCallHead?: (name: string) => void,
   ): Promise<LlmResult> {
-    if (signal.aborted) return { ok: false, kind: "aborted", detail: "stream aborted", partial: "" };
-
-    const url = `${normalizeEndpoint(cfg.endpoint)}/v1/chat/completions`;
-    const headers = authHeaders(cfg.apiKey === "" ? undefined : cfg.apiKey);
-    const body: Record<string, unknown> = {
+    const result = await this.chat.complete({
+      endpoint: { url: cfg.endpoint, ...(cfg.apiKey === "" ? {} : { apiKey: cfg.apiKey }) },
       model: cfg.model,
-      messages: toWireMessages(messages),
-      stream: true,
-      temperature: 0.2,
-      // 2048 reichte nicht fuer ein write_note mit ~9 KB Text (~2000 Tokens allein fuer den
-      // Inhalt). Vorlaeufiger Wert — die Sampling-Spec (Design-Session obsidian-kit-d8) legt
-      // Budgets spaeter je Modus fest; llm-setup empfahl mindestens 8192, siehe Befundnotiz
-      // "Tool-Use-Budget und Gemma-Schemas" 2026-09-23.
-      max_tokens: 8192,
-      ...suppressParams(effectiveSuppress(cfg.model, cfg.suppressThinking)),
-    };
-    if (tools.length > 0) body.tools = toWireTools(tools);
-
-    const ctrl = new AbortController();
-    let timedOut = false;
-    const onCallerAbort = (): void => ctrl.abort();
-    signal.addEventListener("abort", onCallerAbort, { once: true });
-
-    /* Der Timeout ist ein IDLE-Timeout, kein Gesamt-Timeout: er misst die Stille seit dem
-       letzten Byte, nicht die Dauer der Antwort. Ein lokales Modell, das zwei Minuten am
-       Stueck schreibt, ist gesund — ein Endpoint, der zwei Minuten schweigt, ist es nicht.
-       (Als Gesamt-Timeout brach er eine laufende Antwort mitten im Satz ab; GUI-Smoke
-       2026-08-06.) Fuer den Abbruch einer gesunden, aber unerwuenschten Antwort ist der
-       Stopp-Knopf zustaendig, nicht die Uhr. */
-    let idleTimeoutMs = this.timeoutMs;
-    const fire = (): void => { timedOut = true; ctrl.abort(); };
-    let timer = this.clock.setTimeout(fire, idleTimeoutMs);
-    const bumpIdleTimer = (): void => {
-      this.clock.clearTimeout(timer);
-      timer = this.clock.setTimeout(fire, idleTimeoutMs);
-    };
-
-    const splitter = new ThinkSplitter();
-    const assembler = new ToolCallAssembler();
-    const notifiedToolCallHeads = new Set<number>();
-    let content = "";
-    let reasoning = "";
-    let finishReason: string | undefined;
-    let rest = "";
-    let rawBody = "";
-
-    const emit = (c: string, r: string): void => {
-      if (c !== "") { content += c; onToken(c); }
-      if (r !== "") { reasoning += r; onReasoning(r); }
-    };
-    const drainSplitter = (): void => {
-      const tail = splitter.flush();
-      emit(tail.content, tail.reasoning);
-    };
-    const consume = (raw: string): void => {
-      if (rawBody.length < ERROR_BODY_CAP) rawBody += raw;
-      const p = parseAgentSSE(rest + raw);
-      rest = p.rest;
-      if (p.finishReason !== undefined && finishReason === undefined) finishReason = p.finishReason;
-      for (const r of p.reasoning) emit("", r);
-      for (const c of p.content) { const s = splitter.push(c); emit(s.content, s.reasoning); }
-      for (const d of p.toolCalls) {
-        assembler.push(d);
-        // Ab hier gilt die lange Frist (s. TOOL_CALL_IDLE_TIMEOUT_MS): dieser Chunk KANN der
-        // Kopf-Chunk sein, danach kommt kein Byte mehr, bis die Argumente fertig sind.
-        idleTimeoutMs = TOOL_CALL_IDLE_TIMEOUT_MS;
-        if (d.name !== undefined && !notifiedToolCallHeads.has(d.index)) {
-          notifiedToolCallHeads.add(d.index);
-          onToolCallHead?.(d.name);
-        }
-      }
-      bumpIdleTimer();
-    };
-
-    let status: number;
-    try {
-      status = await this.transport.postStream(url, body, headers, consume, ctrl.signal);
-    } catch (e) {
-      const err = e instanceof Error ? e : new Error("unknown stream error");
-      drainSplitter();
-      if (err.name === "AbortError") {
-        return timedOut
-          ? { ok: false, kind: "timeout", detail: `keine Antwort seit ${idleTimeoutMs / 1000}s`, partial: content }
-          : { ok: false, kind: "aborted", detail: "stream aborted", partial: content };
-      }
-      return { ok: false, kind: "network", detail: chatErrorMessage(err), partial: content };
-    } finally {
-      this.clock.clearTimeout(timer);
-      signal.removeEventListener("abort", onCallerAbort);
-    }
-
-    drainSplitter();
-
-    if (status < 200 || status >= 300) {
-      const detail = chatErrorMessage(new ChatHttpError(status, rawBody.slice(0, ERROR_BODY_CAP)));
-      // Ueberlauf ist ein HTTP-Fehler mit eigener Bedeutung: der Loop kann darauf mit
-      // Verdichtung reagieren, auf einen 401 nicht. Der Server-Text bleibt im detail.
-      return { ok: false, kind: isContextOverflow(rawBody) ? "overflow" : "http", detail, partial: content };
-    }
-    // Drei Faelle statt zwei (REGISTRY „Abgeschnittene LLM-Antwort als eigene Fehlerklasse",
-    // n=3): abgeschnitten MIT Text bleibt ok — die Meldung ist unten am Hinweis-Text der
-    // UI-Schicht, nicht hier. Abgeschnitten OHNE Text (bei Reasoning-Modellen der Normalfall:
-    // das Denken verbraucht das Budget vor der Antwort) ist ein Fehler, keine leere Erfolgsmeldung.
-    if (finishReason === "length" && content === "") {
-      return { ok: false, kind: "truncated", detail: "finish_reason: length, kein Text", partial: "" };
-    }
-    return {
-      ok: true,
-      content,
-      toolCalls: assembler.finish(),
-      ...(finishReason !== undefined ? { finishReason } : {}),
-      ...(reasoning !== "" ? { reasoning } : {}),
-    };
+      messages: toWireMessages(messages) as ChatWireMessage[],
+      params: {
+        temperature: 0.2,
+        // 2048 reichte nicht fuer ein write_note mit ~9 KB Text (~2000 Tokens allein fuer den
+        // Inhalt). Vorlaeufiger Wert — die Sampling-Spec (Design-Session obsidian-kit-d8) legt
+        // Budgets spaeter je Modus fest; llm-setup empfahl mindestens 8192, siehe Befundnotiz
+        // "Tool-Use-Budget und Gemma-Schemas" 2026-09-23.
+        max_tokens: 8192,
+        ...suppressParams(effectiveSuppress(cfg.model, cfg.suppressThinking)),
+      },
+      tools: tools.length > 0 ? toWireTools(tools) : [],
+      signal,
+      onToken,
+      onReasoning,
+      ...(onToolCallHead !== undefined ? { onToolCallHead } : {}),
+    });
+    return toLlmResult(result);
   }
 }

@@ -259,7 +259,9 @@ async function startFakeEndpoint(
   wunschPort = 0,
   // Nur fuer Pruefpunkt 40: eine kanonische OpenAI-SSE-Antwort auf POST /v1/chat/completions,
   // mit finish_reason "length" — der Rest bleibt unveraendert (Verbindungsprobe, /v1/models).
-  chatStub?: { content: string; finishReason: string },
+  // Fuer Pruefpunkt 50 statt dessen `errorBody`: HTTP 200 mit einem JSON-Fehler im Koerper
+  // (LM Studio meldet z. B. „model not loaded“ so) — der Kit-Client liest ihn als Fehler.
+  chatStub?: { content: string; finishReason: string; errorBody?: string },
 ): Promise<{ url: string; port: number; close: () => Promise<void> }> {
   const server: Server = createServer((req, res) => {
     // CORS-Preflight nur relevant, seit Pruefpunkt 40 echte POSTs aus dem Renderer schickt
@@ -273,6 +275,11 @@ async function startFakeEndpoint(
         "Access-Control-Allow-Headers": "*",
       });
       res.end();
+      return;
+    }
+    if (chatStub?.errorBody !== undefined && req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
+      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(chatStub.errorBody);
       return;
     }
     if (chatStub !== undefined && req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
@@ -2865,6 +2872,55 @@ async function main(): Promise<void> {
       `).catch(() => undefined);
     }
     record("48. list_notes mit depth zeigt den Ordnerbaum, leere Ordner der zweiten Ebene inklusive", ok48, detail48);
+
+    // --- 50. Kit-Chat-Client (Welle 11): HTTP 200 mit JSON-Fehlerkoerper wird als Fehler
+    // gemeldet, mit der Servermeldung ----------------------------------------------------
+    // Der alte Client las den Koerper als SSE, fand keine `data:`-Zeile und lieferte eine
+    // LEERE Erfolgsantwort — der Nutzer sah eine leere Blase ohne Grund. Der Kit-Client
+    // (`createChatClient`) prueft den Koerper und meldet `http` mit der Servermeldung. Wie
+    // Punkt 40 ein echter p.ask()-Roundtrip aus dem Renderer (XHR-Transport) gegen einen
+    // eigenen Server — die Obsidian-Kante (main.ts setzt lastNotice, view.ts rendert) ist
+    // durch Unit-Tests nicht zu sehen.
+    const errStub = { content: "", finishReason: "stop", errorBody: JSON.stringify({ error: { message: "model not loaded" } }) };
+    const fake50 = await startFakeEndpoint(0, errStub);
+    let detail50 = "";
+    let ok50 = false;
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.endpoints = [{ url: ${JSON.stringify(fake50.url)} }];
+        await p.saveSettings();
+        await p.newChat();
+        void p.ask("Smoke-Test: bitte antworten.");
+        return true;
+      `);
+      const getroffen50 = await pollUntil<{ noticeText: string; noticeKlasse: string; busy: boolean }>(
+        cdp,
+        `
+          const p2 = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          if (p2.busy) return null;
+          const el = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0]?.view?.containerEl;
+          // Ein Anfragefehler steht als ".koda-msg.koda-error" im Verlauf (view.ts), nicht als Notiz.
+          const notice = el?.querySelector(".koda-msg.koda-error");
+          if (!notice) return null;
+          return { noticeText: notice.textContent.trim(), noticeKlasse: notice.className, busy: p2.busy };
+        `,
+        15_000,
+      );
+      ok50 =
+        getroffen50 !== null
+        && getroffen50.busy === false
+        && getroffen50.noticeKlasse.includes("koda-error")
+        && getroffen50.noticeText.includes("model not loaded");
+      detail50 = getroffen50
+        ? `Notiz „${getroffen50.noticeText.slice(0, 120)}“ (${getroffen50.noticeKlasse})`
+        : "kein Fehlerhinweis innerhalb 15s (leere Antwort ohne Grund?)";
+    } catch (error) {
+      detail50 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await fake50.close();
+    }
+    record("50. HTTP 200 mit JSON-Fehlerkörper meldet die Servermeldung statt einer leeren Antwort (Kit-Chat-Client)", ok50, detail50);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
