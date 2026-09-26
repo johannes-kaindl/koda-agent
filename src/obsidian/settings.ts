@@ -29,6 +29,7 @@ import {
   type SettingDefinitionItem,
 } from "obsidian";
 import { t, getLang } from "../vendor/kit/i18n";
+import { githubHelpUrls, helpSettingDefinition } from "../vendor/kit-obsidian/help-setting";
 import { modeLabel } from "../core/context/labels";
 import { AVAILABLE_MODES } from "../core/context/types";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
@@ -99,6 +100,16 @@ export class KodaSettingsTab extends PluginSettingTab {
   // zu werden.
   getSettingDefinitions(): SettingDefinitionItem<keyof KodaSettings>[] {
     return [
+      // UI-STANDARD §8: die Hilfe-Zeile steht vor jeder anderen Zeile.
+      helpSettingDefinition({
+        ...githubHelpUrls("koda-agent"),
+        texts: {
+          name: t("settings.help.name"),
+          desc: t("settings.help.desc"),
+          openDocs: t("settings.help.openDocs"),
+          reportIssue: t("settings.help.reportIssue"),
+        },
+      }),
       {
         name: t("settings.endpoints"),
         desc: t("settings.endpoints.desc"),

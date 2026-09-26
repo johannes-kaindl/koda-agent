@@ -769,6 +769,25 @@ async function main(): Promise<void> {
             group.heading && group.field !== null,
             JSON.stringify(group),
           );
+
+          // --- 49. Hilfe-Zeile (UI-STANDARD §8) ------------------------------
+          // Gemessen wird die POSITION und die Bedienung, nicht der Wortlaut: die Zeile muss die
+          // erste des Tabs sein und einen Text-Knopf plus den Icon-Knopf (`bug`, Tooltip als
+          // Name) tragen. Sprachfrei, damit der Punkt in einer EN- und einer DE-Instanz laeuft.
+          const hilfe = await settings.evaluate<{ name: string; knoepfe: number; icon: string | null } | null>(`
+            const erste = document.querySelector(".setting-item");
+            if (!erste) return null;
+            return {
+              name: erste.querySelector(".setting-item-name")?.textContent?.trim() ?? "",
+              knoepfe: erste.querySelectorAll("button").length,
+              icon: erste.querySelector(".extra-setting-button")?.getAttribute("aria-label") ?? null,
+            };
+          `);
+          record(
+            "49. Die Hilfe-Zeile steht als erste Zeile im Tab, mit Text-Knopf und Icon-Knopf",
+            hilfe !== null && hilfe.name !== "" && hilfe.knoepfe === 1 && hilfe.icon !== null && hilfe.icon !== "",
+            hilfe ? `erste Zeile „${hilfe.name}“ · Text-Knöpfe ${hilfe.knoepfe} · Icon „${hilfe.icon ?? "keiner"}“` : "kein Settings-DOM",
+          );
         }
       }
     } finally {

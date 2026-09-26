@@ -158,6 +158,19 @@ hole "$KIT" "$VER" "src/testing/obsidian-mock.ts" "tests/vendor/kit/obsidian-moc
 stamp "tests/vendor/kit/obsidian-mock.ts" "src/testing/obsidian-mock.ts"
 echo "vendored obsidian-kit@$VER/testing/obsidian-mock.ts"
 
+# help-setting.ts (UI-STANDARD §8, Hilfe-Zeile) auf einem EIGENEN Pin: es zieht mit 0.43.0 ein,
+# die uebrigen Module behalten ihre Ref. Ein Pin, der nur fuer dieses eine Modul gilt.
+KIT_HELP_REF="${KIT_HELP_REF:-0.43.0}"
+git -C "$KIT" cat-file -e "$KIT_HELP_REF:src/obsidian/help-setting.ts" 2>/dev/null || {
+  echo "FEHLER: $KIT_HELP_REF:src/obsidian/help-setting.ts fehlt in $KIT (KIT_HELP_REF setzen)." >&2; exit 2; }
+HELP_SHA=$(git -C "$KIT" rev-parse --short "$KIT_HELP_REF^{commit}")
+hole "$KIT" "$KIT_HELP_REF" "src/obsidian/help-setting.ts" "src/vendor/kit-obsidian/help-setting.ts" || {
+  echo "FEHLER: $KIT_HELP_REF:src/obsidian/help-setting.ts nicht lesbar" >&2; exit 2; }
+f="src/vendor/kit-obsidian/help-setting.ts"
+printf '%s\n' "// vendored from obsidian-kit@$KIT_HELP_REF, src/obsidian/help-setting.ts — do not hand-edit; re-vendor via tools/sync-kit.sh" | cat - "$f" > "$f.tmp"
+mv "$f.tmp" "$f"
+echo "vendored obsidian-kit@$KIT_HELP_REF/obsidian/help-setting.ts"
+
 cat > src/vendor/kit/VENDOR.json <<JSON
 {
   "source": "obsidian-kit",
@@ -165,7 +178,15 @@ cat > src/vendor/kit/VENDOR.json <<JSON
   "sha": "$SHA",
   "code_kit_version": "$CODE_VER",
   "vendored": "$(liste "$PURE_MODULE")",
-  "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien. kit-obsidian/ siehe dortige VENDOR.json."
+  "vendored_mixed_version": [
+    {
+      "file": "explain-texts.ts",
+      "version": "0.38.0",
+      "sha": "4988fa0",
+      "note": "Einzeln vendoriert (git show 0.38.0:src/pure/explain-texts.ts), NICHT ueber tools/sync-kit.sh — das Skript berechnet eine gemeinsame VER fuer PURE_MODULE+OBSIDIAN_MODULE und haette beim Aufnehmen dieser Datei alle 18 anderen ebenfalls auf 0.38.0 gehoben. Datei ist dependenzfrei (keine Kit-internen Importe), Einzel-Vendoring deshalb gefahrlos. Re-vendor manuell mit demselben git-show-Befehl gegen einen neuen Tag; Kopf-Stempel und dieser Eintrag von Hand nachziehen."
+    }
+  ],
+  "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit (Ausnahme: \"vendored_mixed_version\"-Eintraege, die per Definition ausserhalb von tools/sync-kit.sh liegen). Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; \"vendored_mixed_version\" traegt seine Version/SHA je Eintrag selbst. kit-obsidian/ siehe dortige VENDOR.json."
 }
 JSON
 cat > src/vendor/kit-obsidian/VENDOR.json <<JSON
@@ -174,7 +195,8 @@ cat > src/vendor/kit-obsidian/VENDOR.json <<JSON
   "version": "$VER",
   "sha": "$SHA",
   "vendored": "$(liste "$OBSIDIAN_MODULE")",
-  "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien. endpoint-list.ts, model-picker.ts und stable-writer.ts tragen EINE mechanische Abweichung: kit-interne Importe ../vendor/code-kit/{pure,web}/ sind auf ../kit/ umgeschrieben (Vendor-Layout). Bei jedem Re-Vendoring reproduzieren; sonst darf nichts abweichen. Praezedenz: vim-dojo, markdown-presentation, vault-crews, kuro-gamification, lingotuner."
+  "help_setting": "help-setting.ts (Kit $KIT_HELP_REF, $HELP_SHA)",
+  "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; help-setting.ts liegt auf eigenem Pin (Feld help_setting). endpoint-list.ts, model-picker.ts und stable-writer.ts tragen EINE mechanische Abweichung: kit-interne Importe ../vendor/code-kit/{pure,web}/ sind auf ../kit/ umgeschrieben (Vendor-Layout). Bei jedem Re-Vendoring reproduzieren; sonst darf nichts abweichen. Praezedenz: vim-dojo, markdown-presentation, vault-crews, kuro-gamification, lingotuner."
 }
 JSON
 cat > tests/vendor/kit/VENDOR.json <<JSON

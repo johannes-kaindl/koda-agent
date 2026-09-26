@@ -3,5 +3,6 @@
   "version": "0.35.0",
   "sha": "e7e3e19",
   "vendored": "clock.ts, confirm.ts, folder-suggest.ts, settings_walker.ts, endpoint-list.ts, model-picker.ts, hub.ts, collapsible.ts, stream-area.ts, stable-writer.ts",
-  "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien. endpoint-list.ts, model-picker.ts und stable-writer.ts tragen EINE mechanische Abweichung: kit-interne Importe ../vendor/code-kit/{pure,web}/ sind auf ../kit/ umgeschrieben (Vendor-Layout). Bei jedem Re-Vendoring reproduzieren; sonst darf nichts abweichen. Praezedenz: vim-dojo, markdown-presentation, vault-crews, kuro-gamification, lingotuner."
+  "help_setting": "help-setting.ts (Kit 0.43.0, bcd1805)",
+  "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; help-setting.ts liegt auf eigenem Pin (Feld help_setting). endpoint-list.ts, model-picker.ts und stable-writer.ts tragen EINE mechanische Abweichung: kit-interne Importe ../vendor/code-kit/{pure,web}/ sind auf ../kit/ umgeschrieben (Vendor-Layout). Bei jedem Re-Vendoring reproduzieren; sonst darf nichts abweichen. Praezedenz: vim-dojo, markdown-presentation, vault-crews, kuro-gamification, lingotuner."
 }
