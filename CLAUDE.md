@@ -437,17 +437,13 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   dem Kit** (`buildEndpointList`), nicht mehr aus Eigenbau; Kodas Kontextfenster-Uebernahme
   haengt im `clientFor().probe()` der Zeile. Das CSS liegt nach Kit-Vertrag in `styles.css`
   (Herkunftsstempel dort) — nie von Hand aendern, sondern den Block ersetzen.
-- `src/vendor/kit` + `src/vendor/kit-obsidian/` — verbatim vendorter `../obsidian-kit`
-  (0.27.0; maßgeblich ist immer `src/vendor/kit/VENDOR.json`, nicht diese Zeile),
-  Re-Sync über `tools/sync-kit.sh` — nie von Hand editieren. **Das Skript liest aus einer
-  festen Ref (`KIT_REF`, Default `0.27.0`), nicht aus dem Arbeitsstand des Nachbar-Repos:
-  obsidian-kit steht auf 0.31.0 und hat die pure-Module seit 0.28.0 nach `code-kit` verschoben,
-  ein `cp`-Lauf zoege also andere Dateien und stempelte sie falsch. Gegenprobe nach jedem Umbau
-  am Skript: ein zweiter Lauf mit denselben Refs darf keine vendorte Datei aendern.**
-  ⚠️ **Zwei Refs seit 2026-09-03, und das ist Absicht:** `MOCK_REF` (Default `0.31.0`) zieht
-  allein `tests/vendor/kit/obsidian-mock.ts`. Die pure-Schicht zu heben wäre eine inhaltliche
-  Änderung an Produktivcode und bräche heute an den nach `code-kit` abgewanderten Modulen; das
-  Test-Double liegt dagegen unter `src/testing/`, ist dort geblieben und hat null Importe. Ablesbar
-  ist die Trennung am Stempel: der Mock trägt seinen Pin in Zeile 1, die beiden `VENDOR.json`
-  nennen den Stand der Produktivschicht. Muster übernommen aus `epub-exporter/tools/sync-kit.sh`.
+- `src/vendor/kit` + `src/vendor/kit-obsidian/` — verbatim vendorter `../obsidian-kit` +
+  `../../libs/code-kit` (maßgeblich ist immer `src/vendor/kit/VENDOR.json` bzw.
+  `src/vendor/kit-obsidian/VENDOR.json`, nicht diese Zeile). **Seit Welle 12 (2026-09-27)
+  liegen die Pins in `tools/kit-sync.json`** (Sammelpin je Quelle, Einzelpins am Modul —
+  `explain-texts`, `sse`, `help-setting` und die Chat-Client-Module auf eigenem Stand),
+  Re-Sync über `tools/sync-kit.sh` (Wrapper, ruft `../tools/kit-sync/kit-sync.mjs`) — nie
+  von Hand editieren. Das zentrale Werkzeug prüft Abhängigkeiten und schreibt
+  `VENDOR.json` selbst; ein Testdouble (`tests/vendor/kit/obsidian-mock.ts`) läuft über
+  denselben Mechanismus, eigener Zielordner, eigener Pin.
 - `src/i18n/` — DE/EN-Strings.
