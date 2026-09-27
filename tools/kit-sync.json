@@ -12,7 +12,7 @@
         "endpoint_diagnostics", "settings", "i18n", "num", "timeout",
         "model-context", "error_body", "diff", "settings_schema", "model-choice",
         "model-list-cache", "stream-blocks",
-        { "name": "sse", "ref": "0.7.0" }
+        { "name": "sse", "ref": "0.8.0" }
       ]
     },
     {
@@ -20,7 +20,7 @@
       "modules": [
         "clock", "confirm", "folder-suggest", "settings_walker", "model-picker", "hub", "collapsible", "stable-writer",
         { "name": "help-setting", "ref": "0.43.0" },
-        { "name": "chat-client", "ref": "0.43.0" },
+        { "name": "chat-client", "ref": "0.44.0" },
         { "name": "chat-transport", "ref": "0.43.0" },
         { "name": "lab-client", "ref": "0.43.0" },
         { "name": "endpoint-list", "ref": "0.43.0" },
