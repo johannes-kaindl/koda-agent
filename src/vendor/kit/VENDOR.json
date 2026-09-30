@@ -3,7 +3,7 @@
   "version": "0.35.0",
   "sha": "e7e3e19",
   "code_kit_version": "0.6.0",
-  "vendored": "frontmatter.ts, explain-texts.ts (obsidian-kit@0.38.0, 4988fa0)",
+  "vendored": "frontmatter.ts, explain-texts.ts (obsidian-kit@0.38.0, 4988fa0), ocr-provider.ts (obsidian-kit@0.45.1, 325d3ff), image-gen-provider.ts (obsidian-kit@0.45.1, 325d3ff)",
   "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). Never hand-edit. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; explain-texts.ts und sse.ts tragen ihren eigenen Pin im \"vendored\"-Text und im Header. kit-obsidian/ siehe dortige VENDOR.json.",
   "code_kit_sha": "918ed85",
   "code_kit_vendored": "think-splitter.ts, reasoning.ts, capabilities.ts, endpoint.ts, endpoint_config.ts, endpoint_diagnostics.ts, settings.ts, i18n.ts, num.ts, timeout.ts, model-context.ts, error_body.ts, diff.ts, settings_schema.ts, model-choice.ts, model-list-cache.ts, stream-blocks.ts, sse.ts (code-kit@0.8.0, fdffb9d)"
