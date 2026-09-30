@@ -11,6 +11,7 @@
  * docs/superpowers/specs/2026-08-18-koda-compaction-design.md */
 import { isCompactionRecord, type ChatMessage, type CompactionRecord, type LogEntry } from "../types";
 import { modeLabel } from "../../context/labels";
+import { IMAGE_EST_CHARS } from "../../tools/images";
 import type { ContextAttachment } from "../../context/types";
 
 /** Unter dieser Laenge spart ein Stub nichts — Fehler-Ergebnisse (`ERROR: …`) bleiben. */
@@ -20,14 +21,16 @@ export const MERGED_HEADER = "Frühere Anfragen (wörtlich):";
 
 /** Ein Kontextblock ist Material wie ein Tool-Ergebnis, kein Nutzertext (Spec E4). */
 export function shouldStub(m: ChatMessage): boolean {
-  if (m.role === "tool") return m.stubbed !== true && m.content.length > STUB_MIN_CHARS;
+  // Ein Bild ist der Hauptteil seines Ergebnisses, der Text daneben nur ein kurzer Marker:
+  // ohne diese Zeile bliebe es unter der Laengenschwelle und damit fuer immer im Kontext.
+  if (m.role === "tool") return m.stubbed !== true && (m.content.length > STUB_MIN_CHARS || (m.images?.length ?? 0) > 0);
   if (m.role === "user" && m.context !== undefined) return m.contextStubbed !== true && m.context.text.length > STUB_MIN_CHARS;
   return false;
 }
 
 /** Zeichen, die ein Stub an dieser Nachricht spart. */
 export function stubbableChars(m: ChatMessage): number {
-  if (m.role === "tool") return m.content.length;
+  if (m.role === "tool") return m.content.length + (m.images?.length ?? 0) * IMAGE_EST_CHARS;
   return m.context?.text.length ?? 0;
 }
 

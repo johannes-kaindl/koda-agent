@@ -25,6 +25,11 @@ export interface ChatMessage {
    *  Vorrunde nicht zurueckgeschickt wird — nur ueber die naechste(n) Folgerunde(n) desselben
    *  Laufs hinweg relevant, nicht ueber Sitzungsgrenzen. */
   reasoning?: string;
+  /** Bilder, die an diesem Tool-Ergebnis haengen (`read_image` im Vision-Modus). PERSISTIERT,
+   *  aber nur als Vault-PFAD — nie als Base64 in der JSONL-Sitzung. Erst `toWireMessages`
+   *  macht daraus `image_url`-Parts, am Transport-Rand. Die Projektion entfernt das Feld
+   *  beim Stubbing (Stufe 1), das Bild kostet sonst Kontext ohne Ende. */
+  images?: { path: string }[];
 }
 
 /** Verdichtungs-Marke im Verlauf. Referenziert nichts — ihre POSITION ist die Referenz:
@@ -57,7 +62,7 @@ export function isChatMessage(e: LogEntry): e is ChatMessage {
   return !isCompactionRecord(e);
 }
 
-export type ToolOutcome = { ok: true; content: string } | { ok: false; error: string };
+export type ToolOutcome = { ok: true; content: string; images?: { path: string }[] } | { ok: false; error: string };
 
 export interface ToolRunner {
   run(name: string, args: unknown): Promise<ToolOutcome>;
@@ -79,9 +84,18 @@ function wireArguments(raw: string): string {
   }
 }
 
+/** Ein Tool-Ergebnis mit Bild geht als Part-Array `[text, image_url…]` — gemessen am 2026-10-01
+ *  (LM Studio, Ollama): beide nehmen Bild-Parts in `role:tool`. Ohne aufgeloeste URL (Datei
+ *  weg, zu gross, Schaetzung ohne Lesezugriff) bleibt es beim reinen Text. */
+function toolContent(m: ChatMessage, imageUrls: ReadonlyMap<string, string> | undefined): unknown {
+  const urls = (m.images ?? []).map((i) => imageUrls?.get(i.path)).filter((u): u is string => u !== undefined);
+  if (urls.length === 0) return m.content;
+  return [{ type: "text", text: m.content }, ...urls.map((url) => ({ type: "image_url", image_url: { url } }))];
+}
+
 /** ChatMessage → OpenAI-Wire-Format. Die interne Form bleibt flach und testbar,
  *  die Wire-Form entsteht nur am Transport-Rand. */
-export function toWireMessages(msgs: ChatMessage[]): unknown[] {
+export function toWireMessages(msgs: ChatMessage[], imageUrls?: ReadonlyMap<string, string>): unknown[] {
   return msgs.map((m) => {
     if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
       return {
@@ -100,7 +114,7 @@ export function toWireMessages(msgs: ChatMessage[]): unknown[] {
         })),
       };
     }
-    if (m.role === "tool") return { role: "tool", content: m.content, tool_call_id: m.toolCallId ?? "" };
+    if (m.role === "tool") return { role: "tool", content: toolContent(m, imageUrls), tool_call_id: m.toolCallId ?? "" };
     return { role: m.role, content: m.content };
   });
 }

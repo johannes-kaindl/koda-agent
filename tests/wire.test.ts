@@ -28,3 +28,24 @@ describe("toWireMessages", () => {
     expect(wire[0].tool_calls.map((c) => c.function.arguments)).toEqual(["{}", "{}", "{}"]);
   });
 });
+
+describe("toWireMessages — Bilder am Tool-Ergebnis", () => {
+  const tool = { role: "tool" as const, content: "Bild a.png angehängt", toolCallId: "c1", images: [{ path: "a.png" }] };
+  it("baut Parts [text, image_url] aus den aufgeloesten URLs", () => {
+    const wire = toWireMessages([tool], new Map([["a.png", "data:image/png;base64,AAA"]]));
+    expect(wire[0]).toEqual({
+      role: "tool",
+      content: [{ type: "text", text: "Bild a.png angehängt" }, { type: "image_url", image_url: { url: "data:image/png;base64,AAA" } }],
+      tool_call_id: "c1",
+    });
+  });
+  it("faellt ohne aufgeloeste URL auf reinen Text zurueck (keine kaputte Nachricht)", () => {
+    expect(toWireMessages([tool])[0]).toEqual({ role: "tool", content: "Bild a.png angehängt", tool_call_id: "c1" });
+    expect(toWireMessages([tool], new Map())[0]).toMatchObject({ content: "Bild a.png angehängt" });
+  });
+  it("laesst Pfade, die nicht aufgeloest wurden, aus den Parts heraus", () => {
+    const two = { ...tool, images: [{ path: "a.png" }, { path: "fehlt.png" }] };
+    const wire = toWireMessages([two], new Map([["a.png", "data:x"]])) as { content: unknown[] }[];
+    expect(wire[0].content).toHaveLength(2);
+  });
+});

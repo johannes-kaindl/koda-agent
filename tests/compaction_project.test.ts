@@ -205,3 +205,27 @@ describe("formatContextStub", () => {
     expect(text).toBe("[Arbeitskontext · Notiz — 1 Einträge, 1,0 KB, verdichtet; bei Bedarf über read_note erneut lesen]");
   });
 });
+
+describe("Bilder an Tool-Ergebnissen (Stufe 1)", () => {
+  it("stubbt ein Ergebnis mit Bild auch unter der Laengenschwelle und streicht die Bilder", () => {
+    const log: LogEntry[] = [
+      { role: "user", content: "schau" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read_image", arguments: '{"path":"a.png"}' }] },
+      { role: "tool", toolCallId: "c1", content: "Bild a.png angehängt", images: [{ path: "a.png" }] },
+      { role: "assistant", content: "ok" },
+      s1(0),
+    ];
+    const tool = projectForModel(log).find((m) => m.role === "tool")!;
+    expect(tool.stubbed).toBe(true);
+    expect(tool.images).toBeUndefined();
+  });
+  it("laesst ein Bild innerhalb der K juengsten Ergebnisse unangetastet", () => {
+    const log: LogEntry[] = [
+      { role: "user", content: "schau" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read_image", arguments: '{"path":"a.png"}' }] },
+      { role: "tool", toolCallId: "c1", content: "Bild a.png angehängt", images: [{ path: "a.png" }] },
+      s1(3),
+    ];
+    expect(projectForModel(log).find((m) => m.role === "tool")!.images).toEqual([{ path: "a.png" }]);
+  });
+});
