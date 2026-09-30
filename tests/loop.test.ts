@@ -558,3 +558,94 @@ describe("runAgent · Stufe 2", () => {
     expect(events[events.length - 1]).toBe("final");
   });
 });
+
+describe("runAgent — Bilder", () => {
+  const imageCall: LlmResult = { ok: true, content: "", toolCalls: [{ id: "c1", name: "read_image", arguments: '{"path":"a.png"}' }] };
+  const imageTools: ToolRunner = {
+    run: async (): Promise<ToolOutcome> => ({ ok: true, content: "Bild a.png angehängt", images: [{ path: "a.png" }] }),
+  };
+  const deps = (llm: LoopLlm, extra: object = {}) => ({ llm, tools: imageTools, maxRounds: 8, textFallback: false, ...extra });
+
+  it("haengt die Bilder des Werkzeug-Ergebnisses an die tool-Nachricht", async () => {
+    const out = msgsOf(await runAgent(
+      deps(scripted([imageCall, { ok: true, content: "Ein Hund", toolCalls: [] }])),
+      user, () => {}, () => {}, () => {}, sig(),
+    ));
+    expect(out[1]).toMatchObject({ role: "tool", images: [{ path: "a.png" }] });
+  });
+
+  it("ein HTTP-Fehler mit Bild im Verlauf: Bild durch Texterkennung ersetzen, Runde wiederholen", async () => {
+    const seen: ChatMessage[][] = [];
+    const llm: LoopLlm = {
+      complete: async (messages) => {
+        seen.push(messages.map((m) => ({ ...m })));
+        if (seen.length === 1) return imageCall;
+        if (seen.length === 2) return { ok: false, kind: "http", detail: "400 image_url wird nicht unterstuetzt", partial: "" };
+        return { ok: true, content: "Rechnung 42", toolCalls: [] };
+      },
+    };
+    const events: string[] = [];
+    const out = msgsOf(await runAgent(
+      deps(llm, { ocrFallback: async (p: string) => ({ ok: true, content: `Text aus ${p}: Rechnung 42` }) }),
+      user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
+    ));
+    expect(events).toContain("vision-fallback");
+    expect(events).not.toContain("error");
+    expect(seen).toHaveLength(3);
+    const retried = seen[2].find((m) => m.role === "tool")!;
+    expect(retried.images).toBeUndefined();
+    expect(retried.content).toContain("Rechnung 42");
+    // die persistierte Nachricht ist geheilt, nicht nur die Projektion
+    expect(out.find((m) => m.role === "tool")!.images).toBeUndefined();
+    expect(out.at(-1)).toMatchObject({ role: "assistant", content: "Rechnung 42" });
+  });
+
+  it("ohne OCR-Rueckfall bleibt der HTTP-Fehler ein Fehler", async () => {
+    const events: string[] = [];
+    await runAgent(
+      deps(scripted([imageCall, { ok: false, kind: "http", detail: "400", partial: "" }])),
+      user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
+    );
+    expect(events).toContain("error");
+    expect(events).not.toContain("vision-fallback");
+  });
+
+  it("faellt nur einmal zurueck: ein zweiter HTTP-Fehler endet als Fehler", async () => {
+    const events: string[] = [];
+    const llm = scripted([imageCall, { ok: false, kind: "http", detail: "500", partial: "" }]);
+    await runAgent(
+      deps(llm, { ocrFallback: async () => ({ ok: true, content: "Text" }) }),
+      user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
+    );
+    expect(events.filter((k) => k === "vision-fallback")).toHaveLength(1);
+    expect(events).toContain("error");
+  });
+
+  it("ein Netzwerkfehler ist kein Vision-Fehler und loest keinen Rueckfall aus", async () => {
+    const events: string[] = [];
+    await runAgent(
+      deps(scripted([imageCall, { ok: false, kind: "network", detail: "weg", partial: "" }]), { ocrFallback: async () => ({ ok: true, content: "T" }) }),
+      user, () => {}, () => {}, (e) => events.push(e.kind), sig(),
+    );
+    expect(events).not.toContain("vision-fallback");
+  });
+
+  it("scheitert auch die Texterkennung, steht der Grund im Ergebnis statt eines Bildes", async () => {
+    const seen: ChatMessage[][] = [];
+    const llm: LoopLlm = {
+      complete: async (messages) => {
+        seen.push(messages.map((m) => ({ ...m })));
+        if (seen.length === 1) return imageCall;
+        if (seen.length === 2) return { ok: false, kind: "http", detail: "400", partial: "" };
+        return { ok: true, content: "ok", toolCalls: [] };
+      },
+    };
+    await runAgent(
+      deps(llm, { ocrFallback: async () => ({ ok: false, error: "Texterkennung nicht verfügbar" }) }),
+      user, () => {}, () => {}, () => {}, sig(),
+    );
+    const t = seen[2].find((m) => m.role === "tool")!;
+    expect(t.images).toBeUndefined();
+    expect(t.content).toContain("Texterkennung nicht verfügbar");
+  });
+});

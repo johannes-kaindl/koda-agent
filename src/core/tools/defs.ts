@@ -210,6 +210,38 @@ const RELATED_DEF: ToolDef = {
   },
 };
 
+/** Bild ansehen — nur angeboten, wenn Koda ein Bild auch lesen KANN: das Modell sieht Bilder
+ *  wahrscheinlich selbst, oder ein OCR-Anbieter (image-to-markdown) ist aktiv. Eigener Name
+ *  statt `read_note` zu erweitern: `read_note` hat einen klaren Vertrag (Text), ein Bild ist
+ *  etwas anderes, und ein Modell waehlt ein Werkzeug nach seinem Namen. */
+const READ_IMAGE_DEF: ToolDef = {
+  name: "read_image",
+  description:
+    "Look at one image in the vault (png, jpg, jpeg, gif or webp). Returns what the image shows — or, if the model cannot see images, the text recognised in it. Use it when the user mentions an image, a screenshot, a scan or a photo in the vault; read_note cannot open images.",
+  parameters: {
+    type: "object",
+    properties: { path: { type: "string", description: "Vault-relative path of the image, e.g. Anhang/Rechnung.png" } },
+    required: ["path"],
+  },
+};
+
+/** Bild erzeugen — nur angeboten, wenn local-image-generator seinen Vertrag erfuellt. Der
+ *  Nutzer bestaetigt VOR der Erzeugung (ausser im Koda-Ordner), weil eine Erzeugung Minuten
+ *  Rechenzeit kostet und eine Datei in den Vault legt. */
+const GENERATE_IMAGE_DEF: ToolDef = {
+  name: "generate_image",
+  description:
+    "Generate an image from a text prompt and save it in the vault. Returns the vault path of the new image as an embed (![[path]]) — repeat that embed in your answer so the user sees the picture. Outside the Koda folder the user is asked first. Describe the picture in the prompt; do not ask for text in the image.",
+  parameters: {
+    type: "object",
+    properties: {
+      prompt: { type: "string", description: "What the image should show" },
+      folder: { type: "string", description: "Vault-relative target folder. Optional; default is an images folder inside the Koda folder." },
+    },
+    required: ["prompt"],
+  },
+};
+
 /** Die Werkzeugliste haengt am Zustand der Nachbarplugins UND an der Wahl des Nutzers und
  *  wird deshalb je Gespraech gebaut statt als Konstante ausgeliefert. Sie ist der einzige
  *  Ort, an dem sie entsteht — abgeschaltet heisst hier: nicht gesendet, das Modell erfaehrt
@@ -221,6 +253,10 @@ export function toolDefs(opts: ToolSetOptions): ToolDef[] {
 
 export interface ToolSetOptions {
   related: boolean;
+  /** `read_image` anbieten: Vision wahrscheinlich ODER ein OCR-Anbieter da. */
+  readImage?: boolean;
+  /** `generate_image` anbieten: der Bildgenerierungs-Anbieter erfuellt seinen Vertrag. */
+  generateImage?: boolean;
   disabled?: string[];
   descriptions?: Record<string, string>;
   /** Werkzeug-Anbieter (Spike 2026-09-25): was fremde Plugins ueber den Vertrag anbieten,
@@ -245,7 +281,12 @@ export interface ToolSet extends MountedTools {
 export function toolSet(opts: ToolSetOptions): ToolSet {
   const providers = opts.providers ?? [];
   const angeboten = new Set(providers.flatMap((p) => p.tools.map((t) => t.name)));
-  const eigene = opts.related && !angeboten.has(RELATED_DEF.name) ? [...TOOL_DEFS, RELATED_DEF] : [...TOOL_DEFS];
+  const eigene = [
+    ...TOOL_DEFS,
+    ...(opts.related && !angeboten.has(RELATED_DEF.name) ? [RELATED_DEF] : []),
+    ...(opts.readImage === true ? [READ_IMAGE_DEF] : []),
+    ...(opts.generateImage === true ? [GENERATE_IMAGE_DEF] : []),
+  ];
   const m = mountProviderTools(eigene, providers);
   const aus = new Set(opts.disabled ?? []);
   const eigen = opts.descriptions ?? {};
@@ -260,4 +301,4 @@ export function toolSet(opts: ToolSetOptions): ToolSet {
 
 /** Alle Werkzeuge, die Koda selbst ausfuehrt — unabhaengig davon, ob sie gerade gesendet
  *  werden. Ein Name ausserhalb dieser Menge ist ein Anbieter-Werkzeug oder unbekannt. */
-export const HOST_TOOL_NAMES: ReadonlySet<string> = new Set([...TOOL_DEFS, RELATED_DEF].map((d) => d.name));
+export const HOST_TOOL_NAMES: ReadonlySet<string> = new Set([...TOOL_DEFS, RELATED_DEF, READ_IMAGE_DEF, GENERATE_IMAGE_DEF].map((d) => d.name));

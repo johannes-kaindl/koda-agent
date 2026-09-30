@@ -204,3 +204,16 @@ describe("Etappe 2b: Budget und Link-Tiefe", () => {
     expect(s.contextLinkDepth).toBe(1);
   });
 });
+
+describe("imageMaxKb", () => {
+  it("Default 4096", () => {
+    expect(validateKodaSettings({}).imageMaxKb).toBe(4096);
+  });
+  it("klemmt auf die Spanne", () => {
+    expect(validateKodaSettings({ imageMaxKb: 1 }).imageMaxKb).toBe(256);
+    expect(validateKodaSettings({ imageMaxKb: 999999 }).imageMaxKb).toBe(20480);
+  });
+  it("faellt bei Unsinn auf den Default", () => {
+    expect(validateKodaSettings({ imageMaxKb: "gross" }).imageMaxKb).toBe(4096);
+  });
+});

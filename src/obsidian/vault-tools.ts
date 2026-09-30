@@ -24,6 +24,9 @@ import { renderNow } from "../core/prompt/now";
 import type { EditorPort, WorkspacePort } from "../core/context/ports";
 import { renderWorkspaceReport } from "../core/context/workspace-line";
 import { DEFAULT_SETTINGS } from "../core/settings-types";
+import { ocrResult, visionResult, type ImageMode } from "../core/tools/images";
+import type { OcrProviderApi } from "../vendor/kit/ocr-provider";
+import type { ImageGenProviderApi, ImageGenProviderError } from "../vendor/kit/image-gen-provider";
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
@@ -97,6 +100,18 @@ export interface DeleteRequest {
 export type ConfirmWritePort = (req: WriteRequest) => Promise<boolean>;
 
 const SEARCH_CAP = 10;
+/** Endungen, die `read_image` annimmt — dieselbe Menge wie `isImagePath`. */
+const IMAGE_READ_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
+function describeImageGenError(e: ImageGenProviderError): string {
+  switch (e.error) {
+    case "backend-unavailable": return `Bildgenerierung nicht verfügbar: ${e.message}`;
+    case "timeout": return `Bildgenerierung hat zu lange gebraucht: ${e.message}`;
+    case "busy": return `Bildgenerierung ist beschäftigt, später erneut versuchen: ${e.message}`;
+    case "refused": return `Bildgenerierung hat den Auftrag abgelehnt: ${e.message}`;
+    case "failed": return `Bildgenerierung fehlgeschlagen: ${e.message}`;
+  }
+}
 const SNIPPET = 80;
 
 export class VaultTools implements ToolRunner {
@@ -141,6 +156,21 @@ export class VaultTools implements ToolRunner {
        *  seiner Vorschau, BEVOR er schreibt. Fehlt sie, endet jedes `writes:true`-Werkzeug
        *  beim Anbieter mit `needs-confirm` — das ist der Vertrag, nicht ein Defekt. */
       confirmProvider?: (preview: ProviderConfirmPreview) => Promise<boolean>;
+      /** Wie Koda ein Bild liest: Vision (das Bild haengt am Ergebnis), OCR (Text) oder gar
+       *  nicht. Frisch je Aufruf — Modellwahl und OCR-Plugin aendern sich zur Laufzeit. */
+      imageMode?: () => ImageMode;
+      /** OCR-Anbieter (image-to-markdown) und Bildgenerierungs-Anbieter (local-image-generator),
+       *  frisch je Aufruf aus dem Plugin-Register; `null` = nicht (mehr) da. */
+      ocr?: () => OcrProviderApi | null;
+      imageGen?: () => ImageGenProviderApi | null;
+      /** Dateigroesse des Bildes in Byte, `null` wenn es nicht existiert. Synchron aus dem
+       *  Datei-Index — kein Lesen, bevor die Grenze geprueft ist. */
+      imageSize?: (path: string) => number | null;
+      /** Einstellung `imageMaxKb`, frisch je Aufruf. */
+      imageMaxKb?: () => number;
+      /** Bestaetigung VOR einer Bilderzeugung ausserhalb des Koda-Ordners. Fehlt der Port,
+       *  wird dort nie erzeugt — dieselbe Regel wie beim Schreiben ohne Modal. */
+      confirmImage?: (req: { prompt: string; folder: string }) => Promise<boolean>;
     },
   ) {}
 
@@ -212,6 +242,8 @@ export class VaultTools implements ToolRunner {
         }
         case "load_skill": return await this.loadSkill(str(a.name));
         case "get_datetime": return { ok: true, content: renderNow((this.opts.now ?? Date.now)(), this.opts.timeZone?.()) };
+        case "read_image": return await this.readImage(str(a.path));
+        case "generate_image": return await this.generateImage(str(a.prompt), a.folder === undefined ? undefined : str(a.folder));
         case "edit_active_note": return await this.editActiveNote(str(a.path), str(a.mode), str(a.text));
         default: return { ok: false, error: `unbekanntes Tool: ${name}` };
       }
@@ -234,7 +266,59 @@ export class VaultTools implements ToolRunner {
    *  Die bewusste Abschaltung durch den Nutzer bleibt gedeckt: laeuft vault-rag, ist der
    *  fremde Grund nicht gegeben und der Guard greift wie fuer jedes andere Werkzeug. */
   private fehltAusFremdemGrund(name: string): boolean {
+    if (name === "read_image") return (this.opts.imageMode?.() ?? "none") === "none";
+    if (name === "generate_image") return (this.opts.imageGen?.() ?? null) === null;
     return name === "related_notes" && (this.opts.retrieval?.() ?? null) === null;
+  }
+
+  /** Ein Bild ansehen. Vision: das Bild haengt als Pfad am Ergebnis (nie als Base64 — das
+   *  entsteht erst am Transport-Rand). OCR: der Anbieter liefert Text. Ueber der Groessen-
+   *  grenze geht Vision nicht (der Request wuerde zu gross) — dann, wenn moeglich, OCR. */
+  private async readImage(path: string): Promise<ToolOutcome> {
+    if (path.trim() === "") return { ok: false, error: "path fehlt" };
+    const norm = resolveNotePath(path, IMAGE_READ_EXTENSIONS);
+    const mode = this.opts.imageMode?.() ?? "none";
+    if (mode === "none") {
+      return { ok: false, error: "Koda kann dieses Bild nicht lesen: das Modell sieht keine Bilder und kein Texterkennungs-Plugin (image-to-markdown) ist aktiv." };
+    }
+    const size = this.opts.imageSize?.(norm) ?? null;
+    if (size === null) return { ok: false, error: `nicht gefunden: "${norm}"` };
+    const maxKb = this.opts.imageMaxKb?.() ?? DEFAULT_SETTINGS.imageMaxKb;
+    const ocr = this.opts.ocr?.() ?? null;
+    const tooBig = size > maxKb * 1024;
+    if (mode === "ocr" || (tooBig && ocr !== null)) {
+      if (ocr === null) return { ok: false, error: "Texterkennung nicht verfügbar: das Plugin image-to-markdown ist nicht (mehr) aktiv." };
+      return await ocrResult(ocr, norm);
+    }
+    if (tooBig) {
+      return { ok: false, error: `Bild zu groß: "${norm}" hat ${Math.ceil(size / 1024)} KB, die Grenze liegt bei ${maxKb} KB (Einstellung „Größtes Bild, das Koda liest“).` };
+    }
+    return visionResult(norm);
+  }
+
+  /** Bild erzeugen ueber den Kit-Vertrag `generateImage` (schreibt sofort). Koda-Zusage:
+   *  Bestaetigung VOR der Erzeugung, wo auch ein Schreiben bestaetigt wuerde. */
+  private async generateImage(prompt: string, folder: string | undefined): Promise<ToolOutcome> {
+    const api = this.opts.imageGen?.() ?? null;
+    if (api === null) return { ok: false, error: "Bildgenerierung nicht verfügbar: das Plugin local-image-generator ist nicht (mehr) aktiv." };
+    const text = prompt.trim();
+    if (text === "") return { ok: false, error: "prompt fehlt" };
+    const target = folder === undefined || folder.trim() === ""
+      ? `${resolveFolderPath(this.opts.kodaFolder())}/images`.replace(/^\//, "")
+      : resolveFolderPath(folder);
+    if (writePolicy(target, this.opts.kodaFolder()) === "confirm") {
+      if (this.opts.confirmImage === undefined) return { ok: false, error: `Erzeugen außerhalb des Koda-Ordners braucht die Bestätigung des Nutzers, und die ist hier nicht möglich: "${target}"` };
+      const approved = await this.opts.confirmImage({ prompt: text, folder: target });
+      if (!approved) return { ok: false, error: "vom Nutzer abgelehnt" };
+    }
+    let r: string | ImageGenProviderError;
+    try {
+      r = await api.generateImage(text, { targetFolder: target });
+    } catch (e) {
+      return { ok: false, error: `Bildgenerierung fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    if (typeof r !== "string") return { ok: false, error: describeImageGenError(r) };
+    return { ok: true, content: `Bild erzeugt: ${r}\n\n![[${r}]]` };
   }
 
   private async search(query: string, cap: number): Promise<ToolOutcome> {

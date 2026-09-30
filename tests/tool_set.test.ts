@@ -56,3 +56,29 @@ describe("toolSet — Wirts-Werkzeuge plus montierte Anbieter, eine Quelle fuer 
     expect(s.skipped).toEqual([{ name: "read_note", providerId: "p", reason: "collision-host" }]);
   });
 });
+
+describe("toolSet — Bild-Werkzeuge sind bedingt", () => {
+  const names = (o: Parameters<typeof toolSet>[0]) => toolSet(o).defs.map((d) => d.name);
+  it("ohne Bedingung fehlen read_image und generate_image", () => {
+    expect(names({ related: false })).not.toContain("read_image");
+    expect(names({ related: false })).not.toContain("generate_image");
+  });
+  it("readImage und generateImage schalten je eines zu, keins zieht das andere mit", () => {
+    expect(names({ related: false, readImage: true })).toContain("read_image");
+    expect(names({ related: false, readImage: true })).not.toContain("generate_image");
+    expect(names({ related: false, generateImage: true })).toContain("generate_image");
+    expect(names({ related: false, generateImage: true })).not.toContain("read_image");
+  });
+  it("der Nutzerschalter nimmt sie aus der Liste, die Route des Wirts bleibt bekannt", () => {
+    const s = toolSet({ related: false, readImage: true, generateImage: true, disabled: ["read_image"] });
+    expect(s.defs.map((d) => d.name)).not.toContain("read_image");
+    expect(s.hostNames.has("read_image")).toBe(true);
+    expect(s.hostNames.has("generate_image")).toBe(true);
+  });
+  it("ein Anbieter mit gleichem Namen verdraengt den Wirt nicht (Wirt gewinnt)", () => {
+    const s = toolSet({ related: false, readImage: true, providers: [{ id: "x", tools: [pdef("read_image")] }] });
+    expect(s.defs.filter((d) => d.name === "read_image")).toHaveLength(1);
+    expect(s.routes.has("read_image")).toBe(false);
+    expect(s.skipped.length).toBe(1);
+  });
+});

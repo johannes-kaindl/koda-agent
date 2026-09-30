@@ -30,6 +30,11 @@ import { selectSkills, type Selection } from "./core/skills/select";
 import { CONTEXT_AUTO_K_MAX, CONTEXT_AUTO_K_MIN, CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN, DEFAULT_SETTINGS, validateKodaSettings, type KodaSettings } from "./core/settings-types";
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { readRetrievalApi } from "./obsidian/retrieval";
+import { readOcrApi } from "./obsidian/ocr";
+import { readImageGenApi } from "./obsidian/image-gen";
+import { createImageUrlResolver } from "./obsidian/image-urls";
+import { chooseImageMode, ocrResult, type ImageMode } from "./core/tools/images";
+import { guessFromName } from "./vendor/kit/capabilities";
 import { confirmWrite } from "./obsidian/confirm-write";
 import { estimateTokens } from "./core/agent/compaction/estimate";
 import { contextUsage, type ContextUsage } from "./core/chat/context-usage";
@@ -551,10 +556,19 @@ export default class KodaPlugin extends Plugin {
     const lang = this.promptLang();
     return toolSet({
       related: readRetrievalApi(this.app)?.status().indexed === true,
+      readImage: this.imageMode() !== "none",
+      generateImage: readImageGenApi(this.app) !== null,
       disabled: this.settings.toolsDisabled,
       descriptions: this.settings.toolDescriptions,
       providers: readToolProviders(this.app).map((p) => ({ id: p.id, tools: p.api.tools({ lang }) })),
     });
+  }
+
+  /** Wie Koda ein Bild liest: Vision (Namens-Heuristik des Kits, `likely` genuegt), sonst OCR,
+   *  wenn image-to-markdown aktiv ist. Das Modell ist das globale (`settings.model`) — dasselbe
+   *  wie beim Thinking-Schalter; ein Modell-Override je Endpunkt geht erst beim Senden ein. */
+  imageMode(): ImageMode {
+    return chooseImageMode(guessFromName(this.settings.model).vision, readOcrApi(this.app) !== null);
   }
 
   /** Nur die Namen — was der GUI-Smoke braucht (Pruefpunkt 17). */
@@ -665,6 +679,17 @@ export default class KodaPlugin extends Plugin {
         if (id === undefined) return null;
         return readToolProviders(this.app).find((p) => p.id === id)?.api ?? null;
       },
+      imageMode: () => this.imageMode(),
+      ocr: () => readOcrApi(this.app),
+      imageGen: () => readImageGenApi(this.app),
+      imageSize: (p) => this.app.vault.getFileByPath(p)?.stat.size ?? null,
+      imageMaxKb: () => this.settings.imageMaxKb,
+      confirmImage: (req) => confirmAction(this.app, {
+        title: t("image.confirm.title"),
+        message: [t("image.confirm.prompt", req.prompt), t("image.confirm.folder", req.folder === "" ? "/" : req.folder)],
+        confirmLabel: t("image.confirm.ok"),
+        warning: false,
+      }),
       confirmProvider: (preview) => confirmAction(this.app, {
         title: t("provider.confirm.title"),
         message: [preview.summary, ...(preview.paths.length > 0 ? [t("provider.confirm.paths", preview.paths.join(", "))] : [])],
@@ -830,9 +855,11 @@ export default class KodaPlugin extends Plugin {
       // plugin_api.ts, contextPaths-Kommentar).
       const readPaths: string[] = [];
 
+      const imageUrls = createImageUrlResolver(this.app, () => s.imageMaxKb);
       const llm: LoopLlm = {
-        complete: (messages, onToken, onReasoning, signal, onToolCallHead) =>
-          withFailover(
+        complete: async (messages, onToken, onReasoning, signal, onToolCallHead) => {
+          const urls = await imageUrls(messages);
+          return withFailover(
             this.resolver,
             (ep) => {
               const started = Date.now();
@@ -846,7 +873,7 @@ export default class KodaPlugin extends Plugin {
                 model: effectiveModel(ep, s.model),
                 suppressThinking: s.suppressThinking,
               };
-              return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal, onToolCallHead).then((r) => {
+              return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal, onToolCallHead, urls).then((r) => {
                 void this.checkContextWindow(ep, cfg.model, r.ok ? r.model : undefined);
                 this.reportToLab({
                   feature: this.labFeature(selection),
@@ -873,7 +900,8 @@ export default class KodaPlugin extends Plugin {
             () => ({ ok: false, kind: "network", detail: t("error.noEndpoint"), partial: "" }),
             // Probe gruen, Chat rot: „Server aus" waere der falsche Rat (siehe withFailover).
             () => ({ ok: false, kind: "network", detail: t("error.chatBlocked"), partial: "" }),
-          ),
+          );
+        },
       };
 
       // Stufe 2 laeuft ueber DENSELBEN Client und Failover, ohne Werkzeuge und mit
@@ -913,7 +941,19 @@ export default class KodaPlugin extends Plugin {
       const tools = this.buildTools();
 
       const appended = await runAgent(
-        { llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback, compaction },
+        {
+          llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback, compaction,
+          // Nur mit aktivem OCR-Anbieter: ein Vision-Aufruf, den der Server mit HTTP-Fehler
+          // quittiert, faellt auf den Text im Bild zurueck. Frisch gelesen — der Anbieter
+          // kann waehrend des Laufs weg sein, dann scheitert die Texterkennung mit Klartext.
+          ...(readOcrApi(this.app) === null ? {} : {
+            ocrFallback: async (path: string) => {
+              const api = readOcrApi(this.app);
+              if (api === null) return { ok: false as const, error: "Texterkennung nicht verfügbar" };
+              return ocrResult(api, path);
+            },
+          }),
+        },
         [system, ...this.chatLog],
         (tok) => { for (const v of this.views()) { v.activity({ kind: "token" }); v.streamToken(tok); } },
         (r) => { for (const v of this.views()) { v.activity({ kind: "reasoning" }); v.streamReasoning(r); } },
@@ -945,6 +985,7 @@ export default class KodaPlugin extends Plugin {
           if (e.kind === "round-limit") this.lastNotice = { text: t("view.roundLimit", s.maxRounds), kind: "error" };
           if (e.kind === "compaction") for (const v of this.views()) v.compactionMark(e.record);
           if (e.kind === "summarizing") for (const v of this.views()) v.activity({ kind: "summarizing" });
+          if (e.kind === "vision-fallback") this.lastNotice = { text: t("view.visionFallback", e.paths.join(", ")), kind: "neutral" };
         },
         this.abort.signal,
       );

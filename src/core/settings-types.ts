@@ -101,6 +101,14 @@ export const CONTEXT_LINK_DEPTH_MAX = 3;
 export const CONTEXT_AUTO_K_MIN = 0;
 export const CONTEXT_AUTO_K_MAX = 20;
 
+/** Spanne fuer `imageMaxKb` — groesser als diese Dateigroesse liest `read_image` ein Bild nicht
+ *  als Bild (Base64 blaeht um ein Drittel auf, und ein lokaler Server bricht bei zu grossen
+ *  Anfragen ab). Eine Einstellung statt einer Konstante: die Grenze laesst Verhalten weg, und
+ *  ein Scan ist schnell 5 MB gross. */
+export const IMAGE_MAX_KB_MIN = 256;
+export const IMAGE_MAX_KB_MAX = 20480;
+export const IMAGE_MAX_KB_STEP = 256;
+
 export interface KodaSettings {
   endpoints: EndpointConfig[];
   model: string;
@@ -110,6 +118,7 @@ export interface KodaSettings {
   timeoutSec: number;
   skillBudgetChars: number;
   listNotesMaxRows: number;
+  imageMaxKb: number;
   textFallback: boolean;
   language: "auto" | "de" | "en";
   openOnStartup: boolean;
@@ -156,6 +165,7 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   timeoutSec: 300,
   skillBudgetChars: 6000,
   listNotesMaxRows: 150,
+  imageMaxKb: 4096,
   textFallback: false, // Default laut koda-lab-Befund setzen (docs/LAB.md)
   language: "auto",
   openOnStartup: false,
@@ -217,6 +227,7 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
   timeoutSec: clampIntField(TIMEOUT_SEC_MIN, TIMEOUT_SEC_MAX),
   skillBudgetChars: clampIntField(SKILL_BUDGET_MIN, SKILL_BUDGET_MAX),
   listNotesMaxRows: clampIntField(LIST_ROWS_MIN, LIST_ROWS_MAX),
+  imageMaxKb: clampIntField(IMAGE_MAX_KB_MIN, IMAGE_MAX_KB_MAX),
   // Ohne Enum-Pruefung liesse die generische Pruefung jeden String durch (typeof passt) —
   // `applyLanguage()` bekaeme dann "klingonisch" bis in `setLang()` gereicht.
   language: oneOf(["auto", "de", "en"]),

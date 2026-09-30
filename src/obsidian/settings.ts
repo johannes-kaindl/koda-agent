@@ -56,6 +56,9 @@ import {
   LIST_ROWS_MIN,
   LIST_ROWS_MAX,
   LIST_ROWS_STEP,
+  IMAGE_MAX_KB_MIN,
+  IMAGE_MAX_KB_MAX,
+  IMAGE_MAX_KB_STEP,
   COMPACT_AT_MIN,
   COMPACT_AT_MAX,
   COMPACT_AT_STEP,
@@ -170,6 +173,17 @@ export class KodaSettingsTab extends PluginSettingTab {
           min: LIST_ROWS_MIN,
           max: LIST_ROWS_MAX,
           step: LIST_ROWS_STEP,
+        },
+      },
+      {
+        name: t("settings.imageMax"),
+        desc: t("settings.imageMax.desc"),
+        control: {
+          type: "slider",
+          key: "imageMaxKb",
+          min: IMAGE_MAX_KB_MIN,
+          max: IMAGE_MAX_KB_MAX,
+          step: IMAGE_MAX_KB_STEP,
         },
       },
       {

@@ -41,7 +41,10 @@ export type AgentEvent =
   | { kind: "compaction"; record: CompactionRecord }
   /** Vor dem Stufe-2-Modellaufruf — der kann lokal Minuten dauern, ohne dieses Ereignis
    *  steht der Chat solange ohne jedes Lebenszeichen da. */
-  | { kind: "summarizing" };
+  | { kind: "summarizing" }
+  /** Ein Vision-Aufruf scheiterte mit HTTP-Fehler; die Bilder wurden durch Texterkennung
+   *  ersetzt und die Runde wiederholt. `paths`: welche Bilder betroffen waren. */
+  | { kind: "vision-fallback"; paths: string[] };
 
 /** Verdichtung — alle Zahlen kommen aus den Settings, umgerechnet in `main.ts`.
  *  `summarize === null` heisst: Stufe 2 ist aus. */
@@ -70,6 +73,9 @@ export interface AgentDeps {
   textFallback: boolean;
   /** Fehlt: keine Verdichtung (Bestandsverhalten, alte Tests). */
   compaction?: CompactionDeps;
+  /** Rueckfall fuer Bilder: liest ein Bild per Texterkennung. Fehlt er (kein OCR-Anbieter),
+   *  bleibt ein HTTP-Fehler nach einem Bild ein Fehler. */
+  ocrFallback?: (path: string) => Promise<ToolOutcome>;
 }
 
 /** Der Agent-Loop: LLM → Tools → LLM … bis finale Antwort, Fehler oder Runden-Limit.
@@ -106,7 +112,10 @@ async function runAgentImpl(
   signal: AbortSignal,
 ): Promise<LogEntry[]> {
   const appended: LogEntry[] = [];
-  const entries = (): LogEntry[] => [...history, ...appended];
+  // Geheilte Nachrichten AUS dem uebergebenen Verlauf: der Aufrufer besitzt ihn, der Loop
+  // ueberschreibt ihn nicht — sie gelten nur fuer die Projektion dieses Laufs.
+  const healed = new Map<number, LogEntry>();
+  const entries = (): LogEntry[] => [...history.map((e, i) => healed.get(i) ?? e), ...appended];
   const c = deps.compaction;
 
   const overBudget = (msgs: ChatMessage[]): boolean =>
@@ -153,8 +162,38 @@ async function runAgentImpl(
     return did;
   };
 
+  /** Ersetzt die Bilder aller Nachrichten durch Texterkennung. true, wenn es etwas zu ersetzen gab. */
+  const degradeImages = async (): Promise<boolean> => {
+    const ocr = deps.ocrFallback;
+    if (ocr === undefined) return false;
+    const paths: string[] = [];
+    const heal = async (e: LogEntry): Promise<LogEntry | null> => {
+      if (!isChatMessage(e) || e.images === undefined || e.images.length === 0) return null;
+      const parts: string[] = [];
+      for (const img of e.images) {
+        paths.push(img.path);
+        const r = await ocr(img.path).catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : "Texterkennung fehlgeschlagen" }));
+        parts.push(r.ok ? r.content : `Bild ${img.path} konnte nicht gesehen und nicht per Texterkennung gelesen werden: ${r.error}`);
+      }
+      const { images: _images, ...rest } = e;
+      return { ...rest, content: [e.content, ...parts].join("\n\n") };
+    };
+    for (let i = 0; i < history.length; i++) {
+      const h = await heal(healed.get(i) ?? history[i]);
+      if (h !== null) healed.set(i, h);
+    }
+    for (let i = 0; i < appended.length; i++) {
+      const h = await heal(appended[i]);
+      if (h !== null) appended[i] = h;
+    }
+    if (paths.length === 0) return false;
+    onEvent({ kind: "vision-fallback", paths });
+    return true;
+  };
+
   let round = 0;
   let overflowRetried = false;
+  let visionRetried = false;
   while (round < deps.maxRounds) {
     await compact(false);
     const r = await deps.llm.complete(
@@ -172,6 +211,13 @@ async function runAgentImpl(
       if (r.kind === "overflow" && r.partial === "" && !overflowRetried) {
         overflowRetried = true;
         if (await compact(true)) continue;
+      }
+      // Ein HTTP-Fehler (4xx/5xx), solange ein Bild im Verlauf steht: der Server nimmt keine
+      // Bilder. Einmal auf Texterkennung zurueckfallen, dieselbe Runde wiederholen — nie nach
+      // Antwortinhalt entscheiden, nur nach dem Transportfehler.
+      if (r.kind === "http" && r.partial === "" && !visionRetried) {
+        visionRetried = true;
+        if (await degradeImages()) continue;
       }
       if (r.partial !== "") appended.push({ role: "assistant", content: r.partial });
       onEvent({ kind: "error", message: r.detail, partial: r.partial, errorKind: r.kind });
@@ -219,6 +265,7 @@ async function runAgentImpl(
         role: "tool",
         toolCallId: call.id,
         content: outcome.ok ? outcome.content : `ERROR: ${outcome.error}`,
+        ...(outcome.ok && outcome.images !== undefined && outcome.images.length > 0 ? { images: outcome.images } : {}),
       });
     }
     round++;

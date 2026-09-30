@@ -110,11 +110,14 @@ export class KodaChatClient {
     // lange Stille der gepufferten Argumente beginnt. Optional, weil kein Aufrufer sie
     // BRAUCHT (der Timeout-Wechsel haengt nicht daran).
     onToolCallHead?: (name: string) => void,
+    // Aufgeloeste Bild-URLs (Pfad → Data-URL) fuer Tool-Ergebnisse mit Bild; ohne sie geht
+    // jede Nachricht als reiner Text (siehe `toWireMessages`).
+    imageUrls?: ReadonlyMap<string, string>,
   ): Promise<LlmResult> {
     const result = await this.chat.complete({
       endpoint: { url: cfg.endpoint, ...(cfg.apiKey === "" ? {} : { apiKey: cfg.apiKey }) },
       model: cfg.model,
-      messages: toWireMessages(messages) as ChatWireMessage[],
+      messages: toWireMessages(messages, imageUrls) as ChatWireMessage[],
       params: {
         temperature: 0.2,
         // 2048 reichte nicht fuer ein write_note mit ~9 KB Text (~2000 Tokens allein fuer den
