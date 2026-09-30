@@ -169,3 +169,24 @@ describe("edit_active_note", () => {
     expect(state.doc).toBe("a");
   });
 });
+
+describe("edit_active_note: Byte-Token-Guard", () => {
+  it("dekodiert vor dem Confirm — Vorschau == eingefuegter Text", async () => {
+    const state = { path: "Notes/Plan.md", selection: "alt", doc: "alt" };
+    const calls: WriteRequest[] = [];
+    const tools = new VaultTools(fakeVault({}), async (req) => { calls.push(req); return true; }, { ...base, editor: fakeEditor(state) });
+    const r = await tools.run("edit_active_note", { path: "Notes/Plan.md", mode: "replace_selection", text: "<0xF0><0x9F><0x97><0x82>" });
+    expect(r.ok).toBe(true);
+    expect(erwarteWrite(calls[0]).newText).toBe("\u{1F5C2}");
+    expect(state.doc).toBe("\u{1F5C2}");
+  });
+  it("lehnt eine unvollstaendige Folge ab, ohne zu fragen", async () => {
+    const state = { path: "Notes/Plan.md", selection: "alt", doc: "alt" };
+    let asked = 0;
+    const tools = new VaultTools(fakeVault({}), async () => { asked++; return true; }, { ...base, editor: fakeEditor(state) });
+    const r = await tools.run("edit_active_note", { path: "Notes/Plan.md", mode: "replace_selection", text: "<0xF0><0x9F>" });
+    expect(r.ok).toBe(false);
+    expect(asked).toBe(0);
+    expect(state.doc).toBe("alt");
+  });
+});

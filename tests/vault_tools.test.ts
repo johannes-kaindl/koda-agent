@@ -274,3 +274,66 @@ describe("Pfad-Guard: Schreiben bleibt .md", () => {
     if (!r.ok) expect(r.error).toBe('Nur .md erlaubt: "Notes/Overview.canvas"');
   });
 });
+
+// Das Modell schreibt Nicht-ASCII mitunter als literale Byte-Token. Belege: koda-start.md
+// (U+1F5C2) und koda-dashboard.md (U+202F) im Vault Arbeit. Dekodiert wird VOR dem Confirm,
+// damit die Vorschau das Geschriebene byte-genau zeigt.
+describe("Byte-Token-Guard", () => {
+  const kaputt = "Ordner <0xF0><0x9F> kaputt";
+
+  it("write_note dekodiert vor dem Confirm — Vorschau == geschriebener Inhalt", async () => {
+    const vault = fakeVault({});
+    const cap = capturingConfirm();
+    const tools = new VaultTools(vault, cap.confirm, opts);
+    const r = await tools.run("write_note", { path: "Notes/A.md", content: "Start <0xF0><0x9F><0x97><0x82>", mode: "create" });
+    expect(r.ok).toBe(true);
+    expect(vault.files["Notes/A.md"]).toBe("Start \u{1F5C2}");
+    expect(erwarteWrite(cap.calls[0]).newText).toBe("Start \u{1F5C2}");
+  });
+
+  it("write_note append dekodiert ebenfalls", async () => {
+    const vault = fakeVault({ "Koda/A.md": "x" });
+    const tools = new VaultTools(vault, yes, opts);
+    await tools.run("write_note", { path: "Koda/A.md", content: "Koda<0xE2><0x80><0xAF>Dashboard", mode: "append" });
+    expect(vault.files["Koda/A.md"]).toBe("x\nKoda Dashboard");
+  });
+
+  it("write_note lehnt eine unvollstaendige Folge ab, ohne zu fragen und ohne zu schreiben", async () => {
+    const vault = fakeVault({});
+    const cap = capturingConfirm();
+    const tools = new VaultTools(vault, cap.confirm, opts);
+    const r = await tools.run("write_note", { path: "Notes/A.md", content: kaputt, mode: "create" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("<0xF0><0x9F>");
+    expect(cap.calls).toHaveLength(0);
+    expect(vault.files).toEqual({});
+  });
+
+  it("write_skill dekodiert Body und Beschreibung", async () => {
+    const vault = fakeVault({});
+    const tools = new VaultTools(vault, yes, opts);
+    const r = await tools.run("write_skill", { name: "X", description: "Kopf<0xE2><0x80><0xAF>Zeile", body: "<0xF0><0x9F><0x97><0x82> Start", mode: "create" });
+    expect(r.ok).toBe(true);
+    expect(vault.files["Koda/Skills/X.md"]).toContain("description: Kopf Zeile");
+    expect(vault.files["Koda/Skills/X.md"]).toContain("\u{1F5C2} Start");
+    expect(vault.files["Koda/Skills/X.md"]).not.toContain("<0x");
+  });
+
+  it("write_skill lehnt eine unvollstaendige Folge im Body ab", async () => {
+    const vault = fakeVault({});
+    const tools = new VaultTools(vault, yes, opts);
+    const r = await tools.run("write_skill", { name: "X", description: "d", body: kaputt, mode: "create" });
+    expect(r.ok).toBe(false);
+    expect(vault.files).toEqual({});
+  });
+
+  it("save_memory dekodiert direkt vor dem Schreiben und lehnt Kaputtes ab", async () => {
+    const vault = fakeVault({});
+    const tools = new VaultTools(vault, yes, opts);
+    expect((await tools.run("save_memory", { text: kaputt })).ok).toBe(false);
+    expect(vault.files).toEqual({});
+    const r = await tools.run("save_memory", { text: "Liebt <0xC3><0xA4>pfel" });
+    expect(r).toEqual({ ok: true, content: "gemerkt: Liebt äpfel" });
+    expect(vault.files["Koda/Memory.md"]).toContain("Liebt äpfel");
+  });
+});

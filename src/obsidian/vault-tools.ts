@@ -16,6 +16,7 @@ import {
   collectSubfolders, folderExists,
 } from "../core/tools/list";
 import { collectFolderTree, renderTreeBlock } from "../core/tools/tree";
+import { decodeByteTokens } from "../core/tools/decode-byte-tokens";
 import type { EditorPort, WorkspacePort } from "../core/context/ports";
 import { renderWorkspaceReport } from "../core/context/workspace-line";
 import { DEFAULT_SETTINGS } from "../core/settings-types";
@@ -289,6 +290,9 @@ export class VaultTools implements ToolRunner {
     if (mode !== "create" && mode !== "append" && mode !== "replace") {
       return { ok: false, error: `mode muss create|append|replace sein, war: "${mode}"` };
     }
+    const decoded = decodeByteTokens(content);
+    if (!decoded.ok) return { ok: false, error: decoded.error };
+    content = decoded.text;
     const norm = resolveNotePath(path);
     const exists = await this.vault.exists(norm);
     if (mode === "create" && exists) return { ok: false, error: `existiert schon: "${norm}" — nutze append oder replace` };
@@ -371,6 +375,13 @@ export class VaultTools implements ToolRunner {
     if (mode !== "create" && mode !== "replace") {
       return { ok: false, error: `mode muss create|replace sein, war: "${mode}"` };
     }
+    // Vor allem anderen und vor dem Confirm: die Vorschau zeigt, was geschrieben wird.
+    const decBody = decodeByteTokens(body);
+    if (!decBody.ok) return { ok: false, error: decBody.error };
+    const decDesc = decodeByteTokens(description);
+    if (!decDesc.ok) return { ok: false, error: decDesc.error };
+    body = decBody.text;
+    description = decDesc.text;
     const clean = sanitizeSkillName(name);
     if (clean === "") return { ok: false, error: "name fehlt oder besteht nur aus unerlaubten Zeichen" };
     const desc = description.trim().replace(/\s*\n\s*/g, " ");
@@ -398,6 +409,10 @@ export class VaultTools implements ToolRunner {
 
   private async saveMemory(text: string): Promise<ToolOutcome> {
     if (text.trim() === "") return { ok: false, error: "text fehlt" };
+    // Kein Confirm auf diesem Pfad: direkt vor dem Schreiben dekodieren.
+    const decoded = decodeByteTokens(text);
+    if (!decoded.ok) return { ok: false, error: decoded.error };
+    text = decoded.text;
     // Abweichung vom Brief: LLM-Text kann eingebettete Zeilenumbrueche enthalten;
     // appendMemoryLine setzt genau EINE Zeile pro Eintrag voraus (Bullet-Format).
     // Ein bloßes trim() liesse Folgezeilen als nicht-Bullet-Text im Memory-File
@@ -451,6 +466,9 @@ export class VaultTools implements ToolRunner {
     if (mode !== "replace_selection" && mode !== "insert_at_cursor") {
       return { ok: false, error: `unbekannter Modus: ${mode} — erlaubt sind replace_selection und insert_at_cursor` };
     }
+    const decoded = decodeByteTokens(text);
+    if (!decoded.ok) return { ok: false, error: decoded.error };
+    text = decoded.text;
     const target = resolveNotePath(path);
     const active = ed.path();
     if (active === null) return { ok: false, error: "Keine aktive Notiz mit Editor im Hauptbereich — nichts geschrieben." };
