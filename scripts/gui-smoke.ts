@@ -310,6 +310,49 @@ async function startFakeEndpoint(
   };
 }
 
+/** Eine SSE-Antwort je Anfrage, vom Test geschrieben: `respond(body, n)` sieht die Anfrage (als
+ *  JSON) und ihre Nummer und liefert Text, einen Tool-Call oder einen HTTP-Fehler. Jede Anfrage
+ *  landet in `bodies` — Punkte 55-58 messen damit, WAS Koda auf den Draht schickt (Bild-Parts im
+ *  Tool-Ergebnis, Werkzeugliste), nicht nur, was ankommt. Kein Modell noetig. */
+interface ScriptedReply { status?: number; content?: string; toolCall?: { name: string; args: string }; errorMessage?: string }
+async function startScriptedEndpoint(
+  respond: (body: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }, n: number) => ScriptedReply,
+): Promise<{ url: string; bodies: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }[]; close: () => Promise<void> }> {
+  const bodies: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }[] = [];
+  const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "*" };
+  const server: Server = createServer((req, res) => {
+    if (req.method === "OPTIONS") { res.writeHead(204, cors); res.end(); return; }
+    if (req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as (typeof bodies)[number];
+        bodies.push(body);
+        const r = respond(body, bodies.length);
+        if (r.status !== undefined && r.status >= 400) {
+          res.writeHead(r.status, { "Content-Type": "application/json", ...cors });
+          res.end(JSON.stringify({ error: { message: r.errorMessage ?? "Fehler" } }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/event-stream", ...cors });
+        const chunk = (delta: object, finish: string | null): string => `data: ${JSON.stringify({ choices: [{ delta, finish_reason: finish }] })}\n\n`;
+        res.end(
+          r.toolCall !== undefined
+            ? chunk({ tool_calls: [{ index: 0, id: "call_smoke", type: "function", function: { name: r.toolCall.name, arguments: r.toolCall.args } }] }, null)
+              + chunk({}, "tool_calls") + "data: [DONE]\n\n"
+            : chunk({ content: r.content ?? "" }, null) + chunk({}, "stop") + "data: [DONE]\n\n",
+        );
+      });
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json", ...cors });
+    res.end(req.url?.includes("/v1/models") === true ? JSON.stringify({ data: [{ id: "smoke-model", object: "model" }] }) : JSON.stringify({ ok: true }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as AddressInfo).port;
+  return { url: `http://127.0.0.1:${port}`, bodies, close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }) };
+}
+
 /**
  * Wie `pollUntil`, nur auf ZWEI Fenstern zugleich — fuer Punkt 18: die Settings-Bruecke hat
  * kein `window.app` (s. Kopfkommentar von `attachTo`), also ist von hier aus nicht sicher
@@ -3130,6 +3173,217 @@ async function main(): Promise<void> {
       `).catch(() => undefined);
     }
     record("54. Kontextfenster-Hinweis: Notice mit Übernehmen-Knopf, Einstellung bleibt bis zum Klick, zweiter Aufruf schweigt", ok53, detail53);
+
+    // --- 55–58. Bilder ansehen und erzeugen (Welle 14) ---------------------------------------
+    // Gemessen wird die Naht zum Host: Bild aus dem Vault lesen, als Data-URL in den Request
+    // bringen, Plugin-Register der Anbieter. Modell und Anbieter sind Stubs — die Stubs tragen
+    // die ID des ECHTEN Besitzers (`image-to-markdown`, `local-image-generator`), weil Koda nur
+    // dort liest; existiert dort schon ein Eintrag, uebersprungen wie bei Punkt 43.
+    const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const BILD = "Koda/smoke55.png";
+    const modellVorher = await cdp.evaluate<string>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.model;`);
+    const setzeModell = (model: string, url: string): Promise<unknown> => cdp.evaluate(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      p.settings.endpoints = [{ url: ${JSON.stringify(url)} }];
+      p.settings.model = ${JSON.stringify(model)};
+      await p.saveSettings();
+      await p.newChat();
+      return true;
+    `);
+    const legeBildAn = (): Promise<unknown> => cdp.evaluate(`
+      if (!app.vault.getFolderByPath("Koda")) await app.vault.createFolder("Koda");
+      const alt = app.vault.getFileByPath(${JSON.stringify(BILD)});
+      if (alt) await app.vault.delete(alt);
+      const bin = atob(${JSON.stringify(PNG_B64)});
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      await app.vault.createBinary(${JSON.stringify(BILD)}, bytes.buffer);
+      return true;
+    `);
+    const raeumeBildAuf = (): Promise<unknown> => cdp.evaluate(`
+      const f = app.vault.getFileByPath(${JSON.stringify(BILD)});
+      if (f) await app.vault.delete(f);
+      return true;
+    `).catch(() => undefined);
+    const frageUndWarte = async (frage: string, fake: { bodies: unknown[] }, anzahl: number): Promise<void> => {
+      await cdp.evaluate(`void app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].ask(${JSON.stringify(frage)}); return true;`);
+      await pollUntil<boolean>(cdp, `return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].busy ? null : true;`, 20_000);
+      for (let i = 0; i < 40 && fake.bodies.length < anzahl; i++) await new Promise((r) => setTimeout(r, 250));
+    };
+    type Wire = { role: string; content: unknown };
+    const toolNachricht = (b: { messages: Wire[] }): Wire | undefined => b.messages.find((m) => m.role === "tool");
+    const installOcrStub = (text: string): Promise<unknown> => cdp.evaluate(`
+      window.__kodaOcrSeen = [];
+      app.plugins.plugins["image-to-markdown"] = { __kodaSmokeStub: true, api: { version: 1, extractText: async (p) => { window.__kodaOcrSeen.push(p); return ${JSON.stringify(text)}; } } };
+      return true;
+    `);
+    const removeOcrStub = (): Promise<unknown> => cdp.evaluate(`
+      if (app.plugins.plugins["image-to-markdown"]?.__kodaSmokeStub) delete app.plugins.plugins["image-to-markdown"];
+      delete window.__kodaOcrSeen;
+      return true;
+    `).catch(() => undefined);
+    const ocrVorher = await cdp.evaluate<boolean>(`return !!app.plugins.plugins["image-to-markdown"];`);
+    const genVorher = await cdp.evaluate<boolean>(`return !!app.plugins.plugins["local-image-generator"];`);
+
+    try {
+      // ── 55: Vision-Kette — das Bild kommt als image_url-Part im Tool-Ergebnis an ──
+      let ok55 = false; let detail55 = "nicht gelaufen";
+      const fake55 = await startScriptedEndpoint((_b, n) => n === 1
+        ? { toolCall: { name: "read_image", args: JSON.stringify({ path: BILD }) } }
+        : { content: "Ich sehe ein rotes Pixel." });
+      try {
+        await legeBildAn();
+        await setzeModell("google/gemma-4-e4b", fake55.url);
+        await frageUndWarte("Was zeigt " + BILD + "?", fake55, 2);
+        const b1 = fake55.bodies[0]; const b2 = fake55.bodies[1];
+        const angeboten = b1?.tools?.some((t) => t.function.name === "read_image") === true;
+        const tn = b2 === undefined ? undefined : toolNachricht(b2);
+        const parts = Array.isArray(tn?.content) ? (tn.content as { type: string; image_url?: { url: string } }[]) : [];
+        const url = parts.find((x) => x.type === "image_url")?.image_url?.url ?? "";
+        const log = await cdp.evaluate<{ images: unknown; base64: boolean }>(`
+          const log = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].chatLog;
+          return { images: log.find((m) => m.role === "tool")?.images ?? null, base64: JSON.stringify(log).includes("base64") };
+        `);
+        ok55 = angeboten && url === `data:image/png;base64,${PNG_B64}` && parts[0]?.type === "text"
+          && JSON.stringify(log.images) === JSON.stringify([{ path: BILD }]) && !log.base64;
+        detail55 = `read_image in der Werkzeugliste: ${angeboten} · Tool-Ergebnis als Parts [${parts.map((x) => x.type).join(", ")}] · URL ${url === `data:image/png;base64,${PNG_B64}` ? "= Datei" : `ABWEICHEND (${url.slice(0, 40)})`} · Verlauf traegt ${JSON.stringify(log.images)}, Base64 im Verlauf: ${log.base64}`;
+      } catch (error) {
+        detail55 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        await fake55.close();
+      }
+      record("55. Vision: read_image bringt das Bild als image_url-Part im Tool-Ergebnis, der Verlauf traegt nur den Pfad", ok55, detail55);
+
+      // ── 56: OCR-Kette — ein Modell ohne Vision bekommt den erkannten Text ──
+      if (ocrVorher) {
+        record("56. OCR: read_image liefert dem Text-Modell den erkannten Text, ohne Anbieter fehlt das Werkzeug", true, "uebersprungen — ein image-to-markdown-Eintrag existiert bereits (echtes Plugin oder Rest eines abgebrochenen Laufs)");
+      } else {
+        let ok56 = false; let detail56 = "nicht gelaufen";
+        const fake56 = await startScriptedEndpoint((_b, n) => n === 1
+          ? { toolCall: { name: "read_image", args: JSON.stringify({ path: BILD }) } }
+          : { content: "Die Rechnung hat die Nummer 42." });
+        try {
+          await installOcrStub("Smoke-Rechnung 42");
+          await setzeModell("qwen/qwen3.8-27b", fake56.url);
+          await frageUndWarte("Lies " + BILD, fake56, 2);
+          const b2 = fake56.bodies[1];
+          const tn = b2 === undefined ? undefined : toolNachricht(b2);
+          const text = typeof tn?.content === "string" ? tn.content : "";
+          const angeboten = fake56.bodies[0]?.tools?.some((t) => t.function.name === "read_image") === true;
+          const gesehen = await cdp.evaluate<string[]>(`return window.__kodaOcrSeen;`);
+          // Gegenstueck: Anbieter weg → das Werkzeug verschwindet aus der Liste, ein Aufruf meldet Klartext.
+          await removeOcrStub();
+          const ohne = await cdp.evaluate<{ names: boolean; run: string }>(`
+            const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+            const r = await p.buildTools().run("read_image", { path: ${JSON.stringify(BILD)} });
+            return { names: p.currentToolNames().includes("read_image"), run: r.ok ? "ok" : r.error };
+          `);
+          ok56 = angeboten && text.includes("Smoke-Rechnung 42") && !JSON.stringify(b2).includes("image_url")
+            && gesehen.length === 1 && gesehen[0] === BILD && ohne.names === false && ohne.run !== "ok";
+          detail56 = `Werkzeug angeboten: ${angeboten} · Tool-Ergebnis „${text.slice(0, 70).replace(/\s+/g, " ")}“ · image_url im Request: ${JSON.stringify(b2).includes("image_url")} · Anbieter gerufen mit ${JSON.stringify(gesehen)} · ohne Anbieter in der Liste: ${ohne.names}, Aufruf „${ohne.run.slice(0, 60)}“`;
+        } catch (error) {
+          detail56 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        } finally {
+          await fake56.close();
+          await removeOcrStub();
+        }
+        record("56. OCR: read_image liefert dem Text-Modell den erkannten Text, ohne Anbieter fehlt das Werkzeug", ok56, detail56);
+      }
+
+      // ── 57: Bilderzeugung — frei im Koda-Ordner, sonst erst fragen (vor der Erzeugung) ──
+      if (genVorher) {
+        record("57. generate_image: im Koda-Ordner frei, sonst Rueckfrage VOR der Erzeugung, Ablehnung erzeugt nichts", true, "uebersprungen — ein local-image-generator-Eintrag existiert bereits");
+      } else {
+        let ok57 = false; let detail57 = "nicht gelaufen";
+        try {
+          await cdp.evaluate(`
+            window.__kodaGenSeen = [];
+            app.plugins.plugins["local-image-generator"] = { __kodaSmokeStub: true, api: { version: 1, generateImage: async (prompt, o) => { window.__kodaGenSeen.push({ prompt, folder: o.targetFolder }); return o.targetFolder + "/smoke57.png"; } } };
+            return true;
+          `);
+          const angeboten = await cdp.evaluate<boolean>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].currentToolNames().includes("generate_image");`);
+          const frei = await cdp.evaluate<{ r: { ok: boolean; content?: string }; modal: boolean }>(`
+            const r = await app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools().run("generate_image", { prompt: "Smoke Hund" });
+            return { r, modal: !!document.querySelector(".modal-container") };
+          `);
+          // Ausserhalb: das Modal erscheint, BEVOR der Anbieter gerufen wurde.
+          const starte = (folder: string): Promise<unknown> => cdp.evaluate(`
+            window.__kodaGen57 = null;
+            app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools().run("generate_image", { prompt: "Smoke Logo", folder: ${JSON.stringify(folder)} }).then((r) => { window.__kodaGen57 = r; });
+            return true;
+          `);
+          await starte("Projekte57");
+          const modal = await pollUntil<string>(cdp, `const m = document.querySelector(".modal-container"); return m ? m.textContent : null;`, 8000);
+          const vorClick = await cdp.evaluate<number>(`return window.__kodaGenSeen.length;`);
+          await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:last-child") ?? null`);
+          const erlaubt = await pollUntil<{ ok: boolean; content?: string }>(cdp, `return window.__kodaGen57;`, 8000);
+          await starte("Projekte57b");
+          await pollUntil<boolean>(cdp, `return document.querySelector(".modal-container") ? true : null;`, 8000);
+          await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:first-child") ?? null`);
+          const abgelehnt = await pollUntil<{ ok: boolean; error?: string }>(cdp, `return window.__kodaGen57;`, 8000);
+          const seen = await cdp.evaluate<{ prompt: string; folder: string }[]>(`return window.__kodaGenSeen;`);
+          ok57 = angeboten && frei.r.ok === true && (frei.r.content ?? "").includes("![[Koda/images/smoke57.png]]") && frei.modal === false
+            && modal !== null && modal.includes("Smoke Logo") && modal.includes("Projekte57") && vorClick === 1
+            && erlaubt?.ok === true && abgelehnt?.ok === false && abgelehnt.error === "vom Nutzer abgelehnt"
+            && seen.length === 2 && seen[0].folder === "Koda/images" && seen[1].folder === "Projekte57";
+          detail57 = `angeboten: ${angeboten} · Koda-Ordner: ${frei.r.ok ? `Embed ${(frei.r.content ?? "").includes("![[Koda/images/smoke57.png]]")}` : "FEHLER"}, Modal ${frei.modal} · ausserhalb: Modal mit Prompt+Ordner ${modal !== null && modal.includes("Smoke Logo") && modal.includes("Projekte57")}, Anbieter vor dem Klick gerufen: ${vorClick} Mal · nach Zustimmung ok ${erlaubt?.ok} · Ablehnung „${abgelehnt?.error}“ · Anbieter insgesamt ${JSON.stringify(seen.map((x) => x.folder))}`;
+        } catch (error) {
+          detail57 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        } finally {
+          await cdp.evaluate(`
+            document.querySelector(".modal-container .modal-close-button")?.click();
+            if (app.plugins.plugins["local-image-generator"]?.__kodaSmokeStub) delete app.plugins.plugins["local-image-generator"];
+            delete window.__kodaGenSeen; delete window.__kodaGen57;
+            return true;
+          `).catch(() => undefined);
+        }
+        record("57. generate_image: im Koda-Ordner frei, sonst Rueckfrage VOR der Erzeugung, Ablehnung erzeugt nichts", ok57, detail57);
+      }
+
+      // ── 58: Vision-Fehler → Rueckfall auf Texterkennung ──
+      if (ocrVorher) {
+        record("58. Vision-Fehler: HTTP 400 nach einem Bild faellt auf Texterkennung zurueck, die Runde wiederholt sich", true, "uebersprungen — ein image-to-markdown-Eintrag existiert bereits");
+      } else {
+        let ok58 = false; let detail58 = "nicht gelaufen";
+        const fake58 = await startScriptedEndpoint((b, n) => n === 1
+          ? { toolCall: { name: "read_image", args: JSON.stringify({ path: BILD }) } }
+          : JSON.stringify(b).includes("image_url")
+            ? { status: 400, errorMessage: "image input is not supported" }
+            : { content: "Laut Text: Rechnung 42." });
+        try {
+          await installOcrStub("Smoke-Rechnung 42");
+          await setzeModell("google/gemma-4-e4b", fake58.url);
+          await frageUndWarte("Lies " + BILD, fake58, 3);
+          const [b2, b3] = [fake58.bodies[1], fake58.bodies[2]];
+          const t3 = b3 === undefined ? undefined : toolNachricht(b3);
+          const text3 = typeof t3?.content === "string" ? t3.content : "";
+          const log = await cdp.evaluate<{ images: unknown; text: string; letzte: string }>(`
+            const log = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].chatLog;
+            const t = log.find((m) => m.role === "tool");
+            return { images: t?.images ?? null, text: t?.content ?? "", letzte: log[log.length - 1]?.content ?? "" };
+          `);
+          ok58 = fake58.bodies.length === 3 && b2 !== undefined && JSON.stringify(b2).includes("image_url")
+            && !JSON.stringify(b3).includes("image_url") && text3.includes("Smoke-Rechnung 42")
+            && log.images === null && log.text.includes("Smoke-Rechnung 42") && log.letzte.includes("Rechnung 42");
+          detail58 = `Anfragen ${fake58.bodies.length} · 2. mit image_url: ${b2 !== undefined && JSON.stringify(b2).includes("image_url")} (→ HTTP 400) · 3. ohne Bild, Text „${text3.slice(0, 60).replace(/\s+/g, " ")}“ · Verlauf geheilt: images ${JSON.stringify(log.images)} · Antwort „${log.letzte.slice(0, 40)}“`;
+        } catch (error) {
+          detail58 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        } finally {
+          await fake58.close();
+          await removeOcrStub();
+        }
+        record("58. Vision-Fehler: HTTP 400 nach einem Bild faellt auf Texterkennung zurueck, die Runde wiederholt sich", ok58, detail58);
+      }
+    } finally {
+      await raeumeBildAuf();
+      await removeOcrStub();
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.model = ${JSON.stringify(modellVorher)};
+        await p.saveSettings();
+        return true;
+      `).catch(() => undefined);
+    }
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
