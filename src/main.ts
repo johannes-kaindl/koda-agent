@@ -20,6 +20,7 @@ import { confirmAction } from "./vendor/kit-obsidian/confirm";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/prompt/build";
 import { renderLocalDate } from "./core/prompt/now";
+import { contextHintFromModelName, lowerContextHint } from "./core/llm/context-hint";
 import { effectiveRules, renderRules } from "./core/prompt/rules";
 import { toLabMessages, describeLlmFailure, readNotePathOf } from "./core/agent/lab-trace";
 import { logToLab } from "./vendor/kit-obsidian/lab-client";
@@ -333,6 +334,48 @@ export default class KodaPlugin extends Plugin {
   /** Erreichbarkeit UND Modell-Liste aus einem Aufruf (Settings-Modellauswahl). */
   probeModels(ep: EndpointConfig): Promise<{ status: EndpointStatus; models: string[] }> {
     return probeModels(ep, requestUrlProbe, realClock);
+  }
+
+  /** Endpunkt|Modell, fuer die in dieser Laufzeit schon geprueft wurde — „einmal je Sitzung"
+   *  heisst einmal je Plugin-Laufzeit UND Modellname, sonst meldete jede Runde der
+   *  Agenten-Schleife dieselbe Notice. Der Schluessel wird VOR der Probe gesetzt: zwei
+   *  Runden kurz hintereinander duerfen nicht beide fragen. */
+  private contextChecked = new Set<string>();
+
+  /** Warnt, wenn das Modell ein kleineres Kontextfenster hat als `contextWindowTokens`.
+   *  Quellen: das Suffix `-ctxNNNk` im gesendeten oder vom Server gemeldeten Modellnamen und
+   *  die Probe des Endpunkts. Koda WARNT nur — der Vertrag „wer bewusst kleiner einstellt,
+   *  wird nicht ueberschrieben" bleibt, geschrieben wird erst auf Klick. Wirft nie: ein
+   *  Hinweis darf den Chat nicht mitreissen. */
+  async checkContextWindow(ep: EndpointConfig, sentModel: string, reportedModel?: string): Promise<void> {
+    const key = `${ep.url}|${reportedModel ?? sentModel}`;
+    if (this.contextChecked.has(key)) return;
+    this.contextChecked.add(key);
+    try {
+      const probed = await this.probeContext(ep).catch(() => null);
+      const hint = lowerContextHint(this.settings.contextWindowTokens, [
+        contextHintFromModelName(reportedModel),
+        contextHintFromModelName(sentModel),
+        probed,
+      ]);
+      if (hint === null) return;
+      const current = this.settings.contextWindowTokens;
+      const notice = new Notice(
+        createFragment((f) => {
+          f.createSpan({ text: t("context.hint", reportedModel ?? sentModel, String(hint), String(current)) });
+          const btn = f.createEl("button", { text: t("context.hint.apply", String(hint)) });
+          btn.addEventListener("click", () => {
+            this.settings.contextWindowTokens = hint;
+            void this.saveSettings();
+            notice.hide();
+            new Notice(t("context.hint.applied", String(hint)));
+          });
+        }),
+        0,
+      );
+    } catch (e) {
+      console.warn("Koda: Kontextfenster-Pruefung fehlgeschlagen", e);
+    }
   }
 
   /** Kontextfenster laut Endpunkt (LM Studio/Ollama), sonst null. Nutzt das Modell, das fuer
@@ -804,6 +847,7 @@ export default class KodaPlugin extends Plugin {
                 suppressThinking: s.suppressThinking,
               };
               return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal, onToolCallHead).then((r) => {
+                void this.checkContextWindow(ep, cfg.model, r.ok ? r.model : undefined);
                 this.reportToLab({
                   feature: this.labFeature(selection),
                   model: cfg.model,

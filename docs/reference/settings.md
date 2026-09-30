@@ -21,7 +21,7 @@ Long conversations are compacted before they overflow the model. Compaction chan
 
 | Setting | Default | Range | What it does |
 |---|---|---|---|
-| Context window (tokens) | 8192 | 2048–1000000 | The model's context window, one number for all endpoints. The endpoint check fills it in when the server reports it and the field is still on its default. |
+| Context window (tokens) | 8192 | 2048–1000000 | The model's context window, one number for all endpoints. The endpoint check fills it in when the server reports it and the field is still on its default. If the model turns out to have a smaller window than the setting, a notice offers to adopt it. |
 | Compact at (% of window) | 75 | 40–95 | Koda compacts before a model call once the estimate (characters ÷ 4) exceeds this share. |
 | Keep tool results verbatim | 3 | 0–20 | How many recent tool results stay in full; older ones shrink to a one-line stub. |
 | Summarize older replies | on | | If shortening is not enough, the model summarizes older replies (an extra model call). |

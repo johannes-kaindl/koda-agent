@@ -71,6 +71,12 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 
 **Fix:** Set **Context window (tokens)** to what the model actually has loaded (in LM Studio, the context length you loaded it with). The endpoint check fills this in when the server reports it and the field is still on its default. Or start a **New chat**.
 
+### "The model "…" has a context window of … tokens, but Koda is set to …. Koda may send more than the model can take."
+
+**Cause:** The model name (a suffix like `-ctx128k`) or the endpoint says the model's context window is smaller than **Context window** in the settings. Koda sizes its compaction by the setting, so it would send more than the model accepts. The notice shows once per model and session.
+
+**Fix:** Select **Use …** in the notice to adopt the model's value, or set **Context window** yourself. Koda never changes the setting on its own.
+
 ### "Response cut off at the token limit — the text above may be incomplete."
 
 **Cause:** The model hit its output limit mid-answer.

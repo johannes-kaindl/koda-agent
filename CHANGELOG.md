@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Koda warns when the model's context window is smaller than the setting. If the model name says so (a suffix like `-ctx128k`, as in `gpt-oss:120b-ctx128k`) or the endpoint reports a smaller window, a notice names the model and both numbers and offers **Use N** to adopt the model's value. Koda never changes the setting by itself; the notice shows once per model and session.
+- Memory lines (`save_memory`) were dated with the UTC date, so between 00:00 and 02:00 (summer time, Central Europe) they carried the previous day. They now use your local date.
 - Some local models write non-ASCII characters into notes as literal byte tokens (`<0xF0><0x9F><0x97><0x82>` instead of 🗂). Koda now decodes such sequences before writing (`write_note`, `write_skill`, `save_memory`, `edit_active_note`), so the confirmation preview shows exactly what lands in the file. An incomplete sequence is rejected with a message naming the line, instead of being silently repaired; nothing is written.
 
 ### Changed

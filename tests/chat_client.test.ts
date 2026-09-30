@@ -28,6 +28,14 @@ describe("KodaChatClient.complete", () => {
     expect(tokens.join("")).toBe("Hallo");
   });
 
+  it("reicht das vom Server gemeldete Modell durch (Grundlage des Kontextfenster-Hinweises)", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ model: "gpt-oss:120b-ctx128k", choices: [{ delta: { content: "Hi" } }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(r).toMatchObject({ ok: true, model: "gpt-oss:120b-ctx128k" });
+  });
+
   it("assembliert tool_calls ueber mehrere Chunks", async () => {
     const client = new KodaChatClient(transportOf([
       line({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "read_note", arguments: '{"path":' } }] } }] }),

@@ -25,7 +25,7 @@ export interface ChatConfig {
 }
 
 export type LlmResult =
-  | { ok: true; content: string; toolCalls: ToolCall[]; finishReason?: string; reasoning?: string }
+  | { ok: true; content: string; toolCalls: ToolCall[]; finishReason?: string; reasoning?: string; model?: string }
   | { ok: false; kind: "aborted" | "http" | "network" | "timeout" | "overflow" | "truncated"; detail: string; partial: string };
 
 export const DEFAULT_TIMEOUT_MS = 120_000;
@@ -51,6 +51,8 @@ function toLlmResult(r: ChatResult): LlmResult {
       ...(r.finishReason !== undefined ? { finishReason: r.finishReason } : {}),
       // Das Kit liefert "" statt fehlend — der Loop und die Sitzung unterscheiden „kein reasoning".
       ...(r.reasoning !== "" ? { reasoning: r.reasoning } : {}),
+      // Das Modell, das der SERVER nennt (Alias, Router) — Grundlage des Kontextfenster-Hinweises.
+      ...(r.model !== undefined && r.model !== "" ? { model: r.model } : {}),
     };
   }
   const partial = r.partial;
