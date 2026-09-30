@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.21.0] — 2026-09-30
+
 ### Added
 
 - **Koda can look at images.** A new tool `read_image` opens a `.png`, `.jpg`, `.jpeg`, `.gif` or `.webp` from the vault. If the model sees images (judged by its name; "probably" is enough), the picture goes to the model together with the tool result. Otherwise, with [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown) active, Koda reads the text in the image instead. Without either, the tool is not offered. The session file keeps only the image's path, never the picture itself.
