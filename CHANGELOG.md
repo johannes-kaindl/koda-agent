@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-09-30
+
 ### Added
 
 - Koda knows the date and time. Every conversation's prompt ends with a `## Now` section (for example `2026-09-30 (Wednesday) 23:45, Europe/Berlin`), and a new tool `get_datetime` answers again when a long conversation needs it. Before, Koda had no clock and made dates up (session logs dated `2026-10-01`). The section sits outside the editable rules block, so the rules comparison does not report a daily change.
