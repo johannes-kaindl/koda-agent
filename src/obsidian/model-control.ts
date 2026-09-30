@@ -9,6 +9,9 @@ export interface ModelControlCtx {
   save(): Promise<void>;
   refresh(): void;
   relatedAvailable: boolean;
+  /** `read_image` ist moeglich (Vision wahrscheinlich oder OCR-Anbieter) / `generate_image`
+   *  ist moeglich (Bildgenerierungs-Anbieter). Fehlt das Feld, gilt beides als verfuegbar. */
+  imagesAvailable?: { read: boolean; generate: boolean };
   openPreview(): void;
 }
 
@@ -114,7 +117,7 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
   setting.setName(t("settings.tools")).setDesc(t("settings.tools.desc"));
   const host = setting.settingEl.createDiv({ cls: "koda-tool-list" });
   const handles: ToolRowHandle[] = [];
-  for (const row_ of toolRows(ctx.settings, ctx.relatedAvailable)) {
+  for (const row_ of toolRows(ctx.settings, ctx.relatedAvailable, ctx.imagesAvailable)) {
     const row = host.createDiv({ cls: "koda-tool-row" });
     // `setAttribute` statt `dataset`: der Fake-DOM des Mocks kennt Attribute, kein dataset.
     row.setAttribute("data-tool", row_.name);
@@ -122,7 +125,10 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
 
     const kopf = row.createDiv({ cls: "koda-tool-head" });
     kopf.createSpan({ cls: "koda-tool-name", text: row_.name });
-    if (row_.unavailable) kopf.createSpan({ cls: "koda-tool-hint", text: t("settings.tools.needsRag") });
+    if (row_.unavailable) kopf.createSpan({
+      cls: "koda-tool-hint",
+      text: t(row_.needs === "image-read" ? "settings.tools.needsImageRead" : row_.needs === "image-gen" ? "settings.tools.needsImageGen" : "settings.tools.needsRag"),
+    });
 
     const zeile = new Setting(row);
     zeile.setClass("koda-tool-controls");

@@ -45,22 +45,34 @@ export interface ToolRowModel {
   own: string;
   enabled: boolean;
   unavailable: boolean;
+  /** Was fehlt, wenn `unavailable`: benennt den Hinweis neben dem Namen. */
+  needs: "vault-rag" | "image-read" | "image-gen" | null;
 }
 
 export function toolRows(
   s: { toolsDisabled: string[]; toolDescriptions: Record<string, string> },
   related: boolean,
+  // Standard: verfuegbar — nur ein Aufrufer, der es anders weiss (Settings-Tab), graut aus.
+  images: { read: boolean; generate: boolean } = { read: true, generate: true },
 ): ToolRowModel[] {
   const aus = new Set(s.toolsDisabled);
   // `related: true` liefert die ganze Liste; die Verfuegbarkeit entscheidet nur ueber die
   // Ausgrauung, nicht ueber die Sichtbarkeit. Ohne `descriptions` — der Platzhalter MUSS
   // der Auslieferungsstand bleiben, sonst ist er nach einer eigenen Beschreibung
   // unwiederbringlich weg.
-  return toolDefs({ related: true }).map((d) => ({
-    name: d.name,
-    placeholder: d.description,
-    own: s.toolDescriptions[d.name] ?? "",
-    enabled: !aus.has(d.name),
-    unavailable: d.name === "related_notes" && !related,
-  }));
+  return toolDefs({ related: true, readImage: true, generateImage: true }).map((d) => {
+    const needs: ToolRowModel["needs"] =
+      d.name === "related_notes" && !related ? "vault-rag"
+        : d.name === "read_image" && !images.read ? "image-read"
+          : d.name === "generate_image" && !images.generate ? "image-gen"
+            : null;
+    return {
+      name: d.name,
+      placeholder: d.description,
+      own: s.toolDescriptions[d.name] ?? "",
+      enabled: !aus.has(d.name),
+      unavailable: needs !== null,
+      needs,
+    };
+  });
 }

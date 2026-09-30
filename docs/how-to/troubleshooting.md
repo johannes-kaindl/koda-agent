@@ -7,6 +7,7 @@ Each entry starts with the message as Koda shows it (English interface; the Germ
 - [The endpoint check](#the-endpoint-check)
 - [In the chat](#in-the-chat)
 - [In the Context tab and the context modes](#in-the-context-tab-and-the-context-modes)
+- [Images](#images)
 - [Skills](#skills)
 - [Settings and tools](#settings-and-tools)
 - [Getting help](#getting-help)
@@ -156,6 +157,38 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 **Cause:** Building the preview of what goes along failed.
 
 **Fix:** Switch to another note and back, or reopen the note. If it persists, report it with the steps that led there.
+
+## Images
+
+### "The model could not take the image — Koda read the text in it instead (…)."
+
+**Cause:** The server answered a request carrying an image with an HTTP error, so the model behind it cannot take images (or not in this form). Koda replaced the image by the text Image to Markdown recognised and repeated the round.
+
+**Fix:** Nothing is needed. To let the model see images, pick a vision model; a model name without a clear vision hint counts as "probably not", and Koda then offers text recognition first.
+
+### "Koda kann dieses Bild nicht lesen: das Modell sieht keine Bilder und kein Texterkennungs-Plugin (image-to-markdown) ist aktiv."
+
+**Cause:** `read_image` was called, but the model name gives no hint that it sees images and Image to Markdown is not active. (Tool results are in German; the tool appears in the list only when one of the two is possible, so this message means the situation changed during the conversation.)
+
+**Fix:** Activate Image to Markdown, or choose a model that sees images, and start a new chat.
+
+### "Bild zu groß: "…" hat … KB, die Grenze liegt bei … KB (Einstellung „Größtes Bild, das Koda liest“)."
+
+**Cause:** The image is larger than **Largest image Koda reads** and no text recognition is active to fall back on.
+
+**Fix:** Raise the setting (a local server may still refuse a very large request), shrink the image, or activate Image to Markdown, which then reads the text.
+
+### "Bildgenerierung nicht verfügbar: das Plugin local-image-generator ist nicht (mehr) aktiv." and its siblings
+
+**Cause:** Local Image Generator is off, or its backend is not reachable. The siblings say the same in other words: "…hat zu lange gebraucht", "…ist beschäftigt, später erneut versuchen", "…hat den Auftrag abgelehnt", "…fehlgeschlagen" — each followed by the plugin's own reason.
+
+**Fix:** Start the plugin's backend (see its settings), wait if it says busy, then ask again. The message goes back to the model, which usually tells you.
+
+### "vom Nutzer abgelehnt" after asking for an image
+
+**Cause:** You answered **Cancel** in the dialog "Koda wants to generate an image". Nothing was generated.
+
+**Fix:** Ask again, or name a folder inside the Koda folder, where Koda does not ask.
 
 ## Skills
 

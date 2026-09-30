@@ -17,6 +17,7 @@ Koda arbeitet mit einem OpenAI-kompatiblen Modell deiner Wahl, typischerweise ei
 - **Mit dem Vault sprechen.** Koda schlägt selbst nach: Volltextsuche, Notizen lesen (auch Bases- und Canvas-Dateien), Ordner auflisten, mit Frontmatter oder als Ordnerbaum. Jeder Werkzeugaufruf erscheint im Chat, du siehst also, auf welchen Notizen eine Antwort beruht.
 - **Schreibt mit deiner Zustimmung.** Frei schreibt Koda nur in seinem eigenen Ordner. Alles andere — schreiben, verschieben, die gerade offene Notiz bearbeiten — öffnet zuerst einen Dialog mit dem Text oder einem Zeilen-Diff. Löschen und Skills schreiben fragen immer.
 - **Arbeitskontext.** Jede Frage kann mitnehmen, was du gerade vor dir hast: Zeiger auf die offene Notiz und die Markierung, oder ganze Notizen samt verlinkter Nachbarn, alle offenen Tabs oder die Notizen, die inhaltlich zu deiner Frage passen. Der Tab **Kontext** zeigt, was mitgeht, und du kannst jedes Stück herausnehmen.
+- **Sieht Bilder und erzeugt welche.** `read_image` öffnet ein Bild aus deinem Vault: ein Modell, das Bilder sieht, bekommt das Bild selbst, jedes andere den Text, den [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown) erkennt. `generate_image` bittet [Local Image Generator](https://github.com/johannes-kaindl/local-image-generator) um ein Bild und zeigt es im Chat, außerhalb des Koda-Ordners nach deiner Bestätigung.
 - **Gedächtnis und Skills als Notizen.** *„Merk dir, dass …"* hängt eine datierte Zeile an `Koda/Memory.md`. Skills sind Markdown-Notizen mit dauerhaften Anweisungen; Koda kann sie für dich schreiben, mit Bestätigung. Ein Skill mit `pinned: true` im Frontmatter (etwa deine Start-Routine) wird immer vollständig geladen; alle anderen kennt Koda mit Name und Beschreibung und liest sie bei Bedarf mit `load_skill`.
 - **Lange Gespräche.** Bevor ein Gespräch das Modell überläuft, verdichtet Koda es: erst alte Werkzeug-Ergebnisse, dann eine Zusammenfassung älterer Antworten. Was du im Chat siehst und deine eigenen Nachrichten bleiben unangetastet.
 - **Einstellbar für kleine Modelle.** Anweisung ersetzen, einzelne Werkzeuge abschalten und die genaue Anweisung ansehen, die das Modell bekommt.
@@ -30,6 +31,7 @@ Koda arbeitet mit einem OpenAI-kompatiblen Modell deiner Wahl, typischerweise ei
 - **Ein OpenAI-kompatibler Chat-Endpunkt mit einem Modell, das Werkzeuge aufrufen kann**: ein lokaler Server (LM Studio, Ollama, …) oder ein gehosteter Anbieter mit API-Schlüssel. Modelle ohne natives Tool-Calling gehen über einen Text-Fallback, weniger zuverlässig.
 - **Ein lokaler Server braucht eingeschaltetes CORS** (LM Studio: *Enable CORS* oder `lms server start --cors`; Ollama: `OLLAMA_ORIGINS`). Der Verbindungstest geht auch ohne, der Chat nicht; Koda benennt diesen Fall, wenn er eintritt.
 - *Optional:* [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) mit indiziertem Vault — für die Suche nach Bedeutung, den Kontext-Modus **Vault** und das Werkzeug `related_notes`.
+- *Optional:* [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown), um Bilder mit einem Modell zu lesen, das keine sieht, und [Local Image Generator](https://github.com/johannes-kaindl/local-image-generator) für das Werkzeug `generate_image`.
 
 ## Installation
 
@@ -73,6 +75,7 @@ Die Nutzer-Dokumentation ist auf Englisch.
 - **[Dokumentation](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/README.md)** — Einstieg, nach Diátaxis gegliedert: Anleitung, How-tos, Referenz, Erklärung.
 - **[Erste Schritte](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/getting-started.md)** — von der Installation bis zur ersten Antwort und zum ersten bestätigten Schreibvorgang.
 - **[Fehlerbehebung](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/how-to/troubleshooting.md)** — eine Meldung oder ein Symptom, die Ursache und was zu tun ist.
+- **[Koda Bilder ansehen und erzeugen lassen](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/how-to/images.md)** — was ein Modell mit und eines ohne Bildsicht bekommt und wie ein erzeugtes Bild bestätigt wird (englisch).
 
 ## Mitmachen
 

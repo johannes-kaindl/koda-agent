@@ -14,6 +14,7 @@ The pages below follow [Diátaxis](https://diataxis.fr/): learning something, do
 
 - **[Troubleshooting](how-to/troubleshooting.md)**: symptom → cause → fix, sorted by where the message appears.
 - **[Choose what goes along with a question](how-to/working-context.md)**: the context modes, the Context tab, adding notes and folders by hand.
+- **[Let Koda look at images and make them](how-to/images.md)**: what a model that sees images and one that does not get, and how a generated image is approved.
 - **[Write a skill](how-to/skills.md)**: steer Koda with a Markdown note, and let Koda write one for you.
 - **[Tune Koda for a smaller model](how-to/model-control.md)**: replace the instructions, switch tools off, see the exact prompt.
 

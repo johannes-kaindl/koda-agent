@@ -17,6 +17,7 @@ Koda runs against an OpenAI-compatible model you choose, typically one on your o
 - **Chat with your vault.** Koda looks things up itself: full-text search, reading notes (including Bases and Canvas files), listing folders with their frontmatter or as a folder tree. Every tool call shows up in the chat, so you see which notes an answer rests on.
 - **Writes with your approval.** Koda writes freely only in its own folder. Anything else — writing, moving, editing the note you are in — opens a dialog with the text or a line diff first. Deleting and writing skills always ask.
 - **Working context.** Each question can carry what you are looking at: pointers to the open note and selection, or whole notes with their linked neighbours, all open tabs, or the notes that match your question by meaning. The **Context** tab shows what will go along, and you can leave anything out.
+- **Looks at images and makes them.** `read_image` opens an image from your vault: a model that sees images gets the picture, any other model gets the text recognised by [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown). `generate_image` asks [Local Image Generator](https://github.com/johannes-kaindl/local-image-generator) for a picture and shows it in the chat, after your approval outside the Koda folder.
 - **Memory and skills as notes.** *"Remember that …"* appends a dated line to `Koda/Memory.md`. Skills are Markdown notes with standing instructions; Koda can write them for you, with confirmation. A skill with `pinned: true` in its frontmatter (for example your start routine) is always loaded in full; all others Koda sees by name and description and reads with `load_skill` when a task matches.
 - **Long conversations.** Before a conversation overflows the model, Koda compacts it: old tool results first, then a summary of older replies. What you see in the chat and your own messages stay untouched.
 - **Tunable for small models.** Replace the instructions, switch single tools off, and see the exact prompt the model gets.
@@ -30,6 +31,7 @@ Koda runs against an OpenAI-compatible model you choose, typically one on your o
 - **An OpenAI-compatible chat endpoint with a tool-calling model**: a local server (LM Studio, Ollama, …) or a hosted provider with an API key. Models without native tool calling work through a text fallback, less reliably.
 - **A local server needs CORS switched on** (LM Studio: *Enable CORS*, or `lms server start --cors`; Ollama: `OLLAMA_ORIGINS`). The connection test passes without it, the chat does not; Koda names this case when it happens.
 - *Optional:* [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) with an indexed vault, for search by meaning, the **Vault** context mode and the `related_notes` tool.
+- *Optional:* [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown) for reading images with a model that cannot see them, and [Local Image Generator](https://github.com/johannes-kaindl/local-image-generator) for the `generate_image` tool.
 
 ## Install
 
@@ -71,6 +73,7 @@ A question starts an agent loop: the model answers or calls a tool, Koda runs th
 - **[Documentation index](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/README.md)** — tutorial, how-to guides, reference and explanation.
 - **[Getting started](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/getting-started.md)** — from installing Koda to its first answer and first approved write.
 - **[Troubleshooting](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/how-to/troubleshooting.md)** — a message or symptom, its cause, and what to do.
+- **[Let Koda look at images and make them](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/how-to/images.md)** — what a model that sees images and one that does not get, and how a generated image is approved.
 
 ## Contributing
 

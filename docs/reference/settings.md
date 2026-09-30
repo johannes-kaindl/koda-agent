@@ -14,6 +14,7 @@ All settings are under **Settings → Koda**, in this order. Numbers outside the
 | Response timeout (seconds) | 300 | 30–900 | How long Koda waits for the endpoint to say anything. The clock restarts with every piece received, so only silence runs into it, not a long answer. Raise it for models that load on demand. |
 | Skill budget | 6000 characters | 1000–100000 | Upper limit for pinned skills (`pinned: true`). They always load in full; if together they exceed the budget they still load and the chat names the overshoot. Other skills are listed with their description only. |
 | Maximum listed notes | 150 | 20–1000 | How many notes (and folders) `list_notes` returns at most. A capped result says so in its first line. |
+| Largest image Koda reads (KB) | 4096 | 256–20480 | `read_image` does not hand an image to the model above this file size. With Image to Markdown active the text is read instead; otherwise the answer says the image is too large. |
 
 ## Shorten history
 

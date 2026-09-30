@@ -769,6 +769,41 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-10-01 — Welle 14, Bilder ansehen und erzeugen (58/58), mit Gegenproben und Praxistests
+
+Vault `koda-agent-vision` (eigener Staging-Vault, Zweitinstanz Port 9341, Profil `/tmp/obs-test-koda-agent-vision`, Obsidian 1.14.3, Sitzung `kodavision-w14`, Branch `feat/vision-w14`), Gate **856/856 auf 957/957** (nach dem Rebase auf 0.20.0), GUI-Smoke **50/50 auf 58/58**. Baseline vor dem ersten Umbau: Gate 856/856, Smoke 50 grün · 0 rot · 0 übersprungen · 0 nichts gemessen (zählender Lauf nach einem Aufwärmlauf, frische Instanz).
+
+### Messung B, die die Bauart entschied
+
+Node-Skript direkt gegen `/v1/chat/completions`, Gesprächsform user → assistant(tool_call `read_image`) → Ergebnis, Testbild ein 640-px-Screenshot. **Bild-Parts in einer `role:tool`-Nachricht nehmen beide Server an:** LM Studio mit `google/gemma-4-e4b` 3/3 HTTP 200 mit richtiger Beschreibung, Ollama mit `qwen3-vl:2b` 3/3 HTTP 200 (2× Beschreibung, 1× `finish_reason: length` mit leerem Inhalt — das Denkbudget, nicht das Format). `qwen2.5vl:3b` schied aus, weil Ollama es mit „does not support tools" ablehnt. Die Rückfallform (Text-Marker plus nachgeschobene `role:user`-Nachricht) ging ebenfalls und wird nicht gebaut. Nebenbefund: lud eine parallele Session in LM Studio ein anderes Modell, kam mitten in der Messung HTTP 400 „Model unloaded" — Modell vor jeder Messung selbst laden.
+
+### Die vier neuen Punkte
+
+Alle vier laufen gegen einen eigenen Scripted-Endpoint des Treibers (`startScriptedEndpoint`: je Anfrage eine SSE-Antwort, jede Anfrage protokolliert) — gemessen wird, **was Koda auf den Draht schickt**. Die Stubs der Anbieter tragen die **echten Besitzer-Ids** (`image-to-markdown`, `local-image-generator`), weil Koda nur dort liest (nicht `koda-smoke-*`); steht dort schon ein Eintrag, ist der Punkt übersprungen (Muster Punkt 43).
+
+- **55 Vision-Kette:** Modell `google/gemma-4-e4b` (Name → Vision wahrscheinlich), das Skript ruft `read_image`; die zweite Anfrage trägt im Tool-Ergebnis `[text, image_url]`, die URL ist **byte-gleich** `data:image/png;base64,<Datei>`, der Verlauf (`chatLog`) trägt nur `[{path}]` und kein Base64.
+- **56 OCR-Kette:** Modell `qwen/qwen3.8-27b` (kein Vision), OCR-Stub; das Tool-Ergebnis ist der erkannte Text, kein `image_url` im Request. Dazu das Gegenstück: Stub weg → `read_image` fehlt in der Liste, ein Aufruf meldet Klartext.
+- **57 Bilderzeugung:** im Koda-Ordner frei (Ziel `Koda/images`, Ergebnis enthält `![[…]]`, kein Modal), außerhalb ein Modal mit Prompt **und** Zielordner **bevor** der Anbieter gerufen wird; Zustimmung erzeugt, Ablehnung liefert „vom Nutzer abgelehnt" und erzeugt nichts.
+- **58 Vision-Fehler → Rückfall:** das Skript quittiert die Anfrage mit Bild mit HTTP 400; Koda ersetzt das Bild durch den OCR-Text und wiederholt die Runde (3 Anfragen, die dritte ohne `image_url`), der Verlauf ist geheilt (`images` weg, OCR-Text im Ergebnis).
+
+### Gegenproben (je eine Mutation, gebaut, deployt, in frischer Instanz gefahren, zurückgenommen)
+
+| Mutation | Ergebnis |
+|---|---|
+| `toolContent` in `types.ts` schickt nie Parts | 55 **und** 58 rot (58 hängt am `image_url` der zweiten Anfrage), 56/57 grün |
+| `chooseImageMode` wählt nie OCR | 56 rot (`image_url` im Request, Anbieter nie gerufen), Rest grün |
+| `generate_image` fragt nie | 57 rot (Anbieter vor dem Klick zweimal gerufen, Modal fehlt), Rest grün |
+| `visionRetried` von Anfang an `true` | 58 rot (2 Anfragen, Bild bleibt im Verlauf), Rest grün |
+
+Der erste Lauf mit dem Endstand war 57/58: **Punkt 20 rot** („aktiv ist Koda: false"), ein Fenster-Fokus-Flake (der Punkt braucht das Fenster vorn, s. Dach-REGISTRY); die Wiederholung in einer frischen Instanz war 58/58. Gemessen, nicht geschönt.
+
+### Praxistests (`gui:ask`, ungekürzt mit `--full`)
+
+1. **`google/gemma-4-e4b` (Vision):** `read_image({"path":"Koda/garten.png"})` → Marker „Bild … — es ist diesem Ergebnis angehängt"; das Modell beschreibt den Gartenplan richtig. Es bemerkte in seinem Denken, dass die Beschreibung „nicht gerendert" sei und folgerte sie aus dem angehängten Bild — der Marker ist also brauchbar, aber nicht ideal formuliert.
+2. **`qwen/qwen3.8-27b` (kein Vision) mit OCR-Stub:** `read_image` → „Text aus … (Texterkennung): …", Antwort fasst den Plan korrekt zusammen.
+3. **`qwen/qwen3.8-27b` mit dem ECHTEN `image-to-markdown` 0.27.0** (Repo-Build von 00:18, Vision-LLM-Weg über `google/gemma-4-e4b`): Koda bekommt den vollständigen Markdown-Text und antwortet daraus. **Befund an i2m:** `extractText("Koda/garten.png")` lieferte bei gemma-4-e4b das Denken mit im Ergebnis („Here's a thinking process to arrive at the desired Markdown output: …") — dort fehlt offenbar ein Reasoning-Strip im Vision-Weg.
+4. **Echtes `local-image-generator`** (0.16.0 plus `generateImage` von `main`, von Hand gebaut): der Vertrag ist erfüllt (`version: 1`), `generate_image` wird angeboten, der Fehlerpfad liefert Klartext „Bildgenerierung nicht verfügbar: not ready: model-not-downloaded". **Eine erfolgreiche Erzeugung ist nicht gemessen** (nichts gemessen, Grund: die eingebaute Engine braucht einen Mehr-GB-Modelldownload, ComfyUI und DrawThings liefen nicht); Entscheidung Master: Der Erfolgspfad gehört lig, die Naht ist der Kit-Vertrag, Kodas Seite belegt der Stub-Punkt 57 plus dieser Fehlerpfad.
+
 ## Belegter Lauf: 2026-10-01 — Welle 14, Koda-Hygiene (54/54), mit Gegenprobe gegen den alten Build
 
 Vault `koda-agent` (Staging, Zweitinstanz Port 9340, Obsidian 1.14.3, Sitzung `kodabugs-w14`), Gate **856/856 auf 902/902**, GUI-Smoke **50/50 auf 54/54**. Baseline vor dem ersten Umbau (Master-Regel 5, 23:46): Gate 856/856, Smoke 50/50 — der erste Messlauf stand 49/50 mit Punkt 20 rot („aktiv ist Koda: false", der bekannte Fokus-Vorbehalt), nach `System Events` → frontmost 50/50.

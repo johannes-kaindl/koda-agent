@@ -58,7 +58,7 @@ describe("toolRows", () => {
 
   it("fuehrt jedes Werkzeug, auch related_notes ohne Index", () => {
     const rows = toolRows(leer, false);
-    expect(rows).toHaveLength(13);
+    expect(rows).toHaveLength(15);
     expect(rows.map((r) => r.name)).toContain("related_notes");
   });
   it("markiert related_notes ohne Index als nicht verfuegbar — und sonst nichts", () => {
@@ -86,5 +86,20 @@ describe("toolRows", () => {
     // und koennte den Auslieferungsstand nie mehr nachlesen.
     const rows = toolRows({ toolsDisabled: [], toolDescriptions: { read_note: "Liest." } }, false);
     expect(rows.find((r) => r.name === "read_note")?.placeholder).not.toBe("Liest.");
+  });
+});
+
+describe("toolRows — Bild-Werkzeuge", () => {
+  const leer = { toolsDisabled: [], toolDescriptions: {} };
+  it("fuehrt read_image und generate_image immer, graut sie nur aus, wenn sie nicht moeglich sind", () => {
+    const rows = toolRows(leer, true, { read: false, generate: false });
+    expect(rows.find((r) => r.name === "read_image")).toMatchObject({ unavailable: true, needs: "image-read" });
+    expect(rows.find((r) => r.name === "generate_image")).toMatchObject({ unavailable: true, needs: "image-gen" });
+    const ok = toolRows(leer, true, { read: true, generate: true });
+    expect(ok.filter((r) => r.unavailable)).toHaveLength(0);
+  });
+  it("der Schalter wirkt auch auf ein gerade nicht angebotenes Werkzeug", () => {
+    const rows = toolRows({ toolsDisabled: ["read_image"], toolDescriptions: {} }, true, { read: false, generate: true });
+    expect(rows.find((r) => r.name === "read_image")?.enabled).toBe(false);
   });
 });

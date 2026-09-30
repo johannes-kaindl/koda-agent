@@ -42,6 +42,7 @@ import { endpointStatusView } from "../core/llm/endpoint-status-view";
 import { resolveModelChoice, type ModelOption } from "../vendor/kit/model-choice";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "./model-control";
 import { PromptPreviewModal } from "./prompt-modal";
+import { readImageGenApi } from "./image-gen";
 import { readRetrievalApi } from "./retrieval";
 import {
   DEFAULT_SETTINGS,
@@ -362,6 +363,7 @@ export class KodaSettingsTab extends PluginSettingTab {
       save: () => this.plugin.saveSettings(),
       refresh: () => this.refreshUi(),
       relatedAvailable: readRetrievalApi(this.app)?.status().indexed === true,
+      imagesAvailable: { read: this.plugin.imageMode() !== "none", generate: readImageGenApi(this.app) !== null },
       openPreview: () => { new PromptPreviewModal(this.app, this.plugin).open(); },
     };
   }

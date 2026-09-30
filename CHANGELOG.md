@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Koda can look at images.** A new tool `read_image` opens a `.png`, `.jpg`, `.jpeg`, `.gif` or `.webp` from the vault. If the model sees images (judged by its name; "probably" is enough), the picture goes to the model together with the tool result. Otherwise, with [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown) active, Koda reads the text in the image instead. Without either, the tool is not offered. The session file keeps only the image's path, never the picture itself.
+- If the server rejects a request that carries an image (HTTP error) and text recognition is available, Koda swaps the image for the recognised text and repeats the round once; a notice says so.
+- **Koda can generate images.** A new tool `generate_image` asks [Local Image Generator](https://github.com/johannes-kaindl/local-image-generator) for a picture and answers with an embed so the image shows in the chat. Inside the Koda folder (default: `Koda/images`) it runs without asking; anywhere else a dialog shows the prompt and the target folder **before** anything is generated. The tool appears only while that plugin is active.
+- Setting **Largest image Koda reads (KB)** (default 4096). Above it, `read_image` does not hand the picture to the model: with text recognition active it reads the text, otherwise it says the image is too large.
+
+### Changed
+
+- **Settings → Koda → Model control → Tools** lists `read_image` and `generate_image` with a switch like the other tools, greyed out with the reason while the tool cannot work (no vision model and no Image to Markdown, or no Local Image Generator).
+- Kit modules `ocr-provider` and `image-gen-provider` 0.45.1 (the contracts the two neighbour plugins answer to).
+
 ## [0.20.0] — 2026-09-30
 
 ### Added
