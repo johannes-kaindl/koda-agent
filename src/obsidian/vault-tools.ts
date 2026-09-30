@@ -17,6 +17,7 @@ import {
 } from "../core/tools/list";
 import { collectFolderTree, renderTreeBlock } from "../core/tools/tree";
 import { decodeByteTokens } from "../core/tools/decode-byte-tokens";
+import { renderNow } from "../core/prompt/now";
 import type { EditorPort, WorkspacePort } from "../core/context/ports";
 import { renderWorkspaceReport } from "../core/context/workspace-line";
 import { DEFAULT_SETTINGS } from "../core/settings-types";
@@ -118,6 +119,10 @@ export class VaultTools implements ToolRunner {
       workspace?: WorkspacePort;
       /** Editor fuer `edit_active_note`; jede Methode liest frisch (Invariante, Spec E5). */
       editor?: EditorPort;
+      /** Uhr fuer `get_datetime` (`ClockPort.now()`); fehlt → `Date.now`. Tests injizieren sie. */
+      now?: () => number;
+      /** IANA-Zeitzone fuer `get_datetime`; fehlt → die des Rechners. */
+      timeZone?: () => string;
       /** Sprache der Werkzeug-Texte; fehlt → deutsch wie die Stubs. */
       lang?: () => "de" | "en";
       /** Einstellung `contextFrontmatterChars`, frisch je Aufruf gelesen. Sie wird hier
@@ -202,6 +207,7 @@ export class VaultTools implements ToolRunner {
             : 20;
           return this.getWorkspace(radius);
         }
+        case "get_datetime": return { ok: true, content: renderNow((this.opts.now ?? Date.now)(), this.opts.timeZone?.()) };
         case "edit_active_note": return await this.editActiveNote(str(a.path), str(a.mode), str(a.text));
         default: return { ok: false, error: `unbekanntes Tool: ${name}` };
       }

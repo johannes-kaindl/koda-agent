@@ -337,3 +337,15 @@ describe("Byte-Token-Guard", () => {
     expect(vault.files["Koda/Memory.md"]).toContain("Liebt äpfel");
   });
 });
+
+describe("get_datetime", () => {
+  it("liefert Datum, Wochentag, Uhrzeit und Zeitzone aus der injizierten Uhr", async () => {
+    const tools = new VaultTools(fakeVault({}), yes, { ...opts, now: () => Date.UTC(2026, 8, 30, 21, 45), timeZone: () => "Europe/Berlin" });
+    expect(await tools.run("get_datetime", {})).toEqual({ ok: true, content: "2026-09-30 (Wednesday) 23:45, Europe/Berlin" });
+  });
+  it("braucht keine Parameter und steht in TOOL_DEFS ohne Pflichtfeld", async () => {
+    const { TOOL_DEFS } = await import("../src/core/tools/defs");
+    const d = TOOL_DEFS.find((t) => t.name === "get_datetime")!;
+    expect(d.parameters.required).toEqual([]);
+  });
+});

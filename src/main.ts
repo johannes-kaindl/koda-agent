@@ -596,6 +596,7 @@ export default class KodaPlugin extends Plugin {
     return new VaultTools(vaultPort, (req) => confirmWrite(this.app, req), {
       kodaFolder: () => this.settings.kodaFolder,
       today: () => new Date().toISOString().slice(0, 10),
+      now: () => realClock.now(),
       // Bewusst als Callback, nicht als Wert: zwischen Prompt-Bau und Tool-Aufruf
       // kann vault-rag deaktiviert worden sein. Der Adapter prueft dann erneut und
       // meldet Klartext, statt zu werfen.
@@ -641,6 +642,7 @@ export default class KodaPlugin extends Plugin {
       kodaFolder: this.settings.kodaFolder,
       skills: selection,
       rulesOverride: this.settings.systemPromptOverride,
+      now: realClock.now(),
     });
   }
 
@@ -751,7 +753,7 @@ export default class KodaPlugin extends Plugin {
         role: "system",
         content: buildSystemPrompt({
           lang, memory, kodaFolder: s.kodaFolder, skills: selection,
-          rulesOverride: s.systemPromptOverride,
+          rulesOverride: s.systemPromptOverride, now: realClock.now(),
         }),
       };
       // Fuer `gui:ask`: der Treiber liest chatLog, und dort steht der System-Prompt nicht.

@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Koda knows the date and time. Every conversation's prompt ends with a `## Now` section (for example `2026-09-30 (Wednesday) 23:45, Europe/Berlin`), and a new tool `get_datetime` answers again when a long conversation needs it. Before, Koda had no clock and made dates up (session logs dated `2026-10-01`). The section sits outside the editable rules block, so the rules comparison does not report a daily change.
 - The GitHub release now also carries a ready-to-unpack `koda-agent.zip` (the plugin folder with `main.js`, `manifest.json` and `styles.css`) and a `checksums.sha256` file. For a manual install, download the zip and unpack it into `.obsidian/plugins/` instead of creating the folder and saving three files by hand.
 
 ### Fixed

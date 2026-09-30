@@ -12,6 +12,7 @@ The model decides which tool to call while it answers; every call appears as a s
 | `read_note` | Reads one note in full: `.md`, `.base` (a Bases view, YAML) or `.canvas` (JSON). | never |
 | `list_notes` | Lists the notes in a folder, optionally recursive, with the frontmatter fields asked for. A flat listing also names the subfolders with their note counts, empty folders included. With `depth` 2 or 3 it shows the folder tree instead. A note named like its folder is marked as the folder note. Capped by **Maximum listed notes**; a capped list says so in its first line. | never |
 | `get_workspace` | What you are looking at: the active note with its properties, the full selection, the lines around the cursor, every open tab. | never |
+| `get_datetime` | Today's date, weekday, local time and time zone. Koda also gets this line in every prompt (section `## Now`), so it does not invent dates; the tool is for asking again during a long conversation. | never |
 | `related_notes` | Notes similar to a given note, from Vault Retrieval's index. Only present while Vault Retrieval is installed and has an index. | never |
 | `write_note` | Creates, appends to or replaces a Markdown note. Replacing shows a line diff. | outside the Koda folder |
 | `edit_active_note` | Replaces the selection in the note you are working in, or inserts at the cursor. Fails if another note became active or the selection changed since the preview. | always |
