@@ -61,4 +61,12 @@ describe("readSkills / skillStatusText — Lesefehler vs. fehlende description",
     expect(text).toContain("1 skill(s) on demand");
     expect(text).toContain("over budget: 30 characters");
   });
+
+  it("ohne jeden Pin sagt die Meldung ausdruecklich, dass kein Skill voll geladen ist", async () => {
+    const plugin = makePlugin({ "Koda/Skills/A.md": "---\ndescription: x\n---\nbody", "Koda/Skills/B.md": "---\ndescription: y\n---\nbody" });
+    const { selection, failed } = await (plugin as any).readSkills();
+    const text = (plugin as any).skillStatusText(selection, failed) as string;
+    expect(text).toContain("No skill is loaded in full");
+    expect(text).toContain("2 skill(s) on demand");
+  });
 });

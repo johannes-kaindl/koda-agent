@@ -19,6 +19,7 @@ import { readToolProviders } from "./obsidian/providers";
 import { confirmAction } from "./vendor/kit-obsidian/confirm";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/prompt/build";
+import { renderLocalDate } from "./core/prompt/now";
 import { effectiveRules, renderRules } from "./core/prompt/rules";
 import { toLabMessages, describeLlmFailure, readNotePathOf } from "./core/agent/lab-trace";
 import { logToLab } from "./vendor/kit-obsidian/lab-client";
@@ -595,7 +596,7 @@ export default class KodaPlugin extends Plugin {
     };
     return new VaultTools(vaultPort, (req) => confirmWrite(this.app, req), {
       kodaFolder: () => this.settings.kodaFolder,
-      today: () => new Date().toISOString().slice(0, 10),
+      today: () => renderLocalDate(realClock.now()),
       now: () => realClock.now(),
       // Bewusst als Callback, nicht als Wert: zwischen Prompt-Bau und Tool-Aufruf
       // kann vault-rag deaktiviert worden sein. Der Adapter prueft dann erneut und
@@ -965,7 +966,9 @@ export default class KodaPlugin extends Plugin {
     const lines: string[] = [];
     if (sel.loaded.length > 0) lines.push(t("skills.active", sel.loaded.map((s) => s.name).join(", ")));
     if (sel.descriptionOnly.length > 0) {
-      lines.push(t("skills.onDemand", String(sel.descriptionOnly.length)));
+      // Ohne Pin laedt KEIN Skill voll — das muss sichtbar sein, nicht zu erraten (0.20.0
+      // hat den Standard von „alles voll" auf „nichts voll" gedreht).
+      lines.push(t(sel.loaded.length === 0 ? "skills.nonePinned" : "skills.onDemand", String(sel.descriptionOnly.length)));
     }
     // Pin gewinnt ueber Budget: geladen wird trotzdem, aber der Ueberhang wird genannt.
     if (sel.overBudget > 0) lines.push(t("skills.overBudget", String(sel.overBudget)));

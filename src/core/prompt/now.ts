@@ -19,3 +19,9 @@ export function renderNow(ms: number, timeZone?: string): string {
   const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")} (${get("weekday")}) ${get("hour")}:${get("minute")}, ${zone}`;
 }
+
+/** Das Kalenderdatum (`YYYY-MM-DD`) in der Zeitzone des Nutzers. `toISOString()` liefert das
+ *  UTC-Datum — zwischen 00:00 und 02:00 Sommerzeit also den Vortag (die Memory-Zeile trug ihn). */
+export function renderLocalDate(ms: number, timeZone?: string): string {
+  return renderNow(ms, timeZone).slice(0, 10);
+}

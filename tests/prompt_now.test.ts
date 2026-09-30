@@ -41,3 +41,12 @@ describe("buildSystemPrompt: Anhang ## Now", () => {
     expect(p.indexOf("## Memory")).toBeLessThan(p.indexOf("## Now"));
   });
 });
+
+import { renderLocalDate } from "../src/core/prompt/now";
+describe("renderLocalDate", () => {
+  it("zwischen 00:00 und 02:00 Sommerzeit gilt schon der neue Tag, nicht das UTC-Datum", () => {
+    const t = Date.UTC(2026, 8, 30, 22, 30); // 00:30 am 1.10. in Berlin, noch 30.09. in UTC
+    expect(new Date(t).toISOString().slice(0, 10)).toBe("2026-09-30");
+    expect(renderLocalDate(t, "Europe/Berlin")).toBe("2026-10-01");
+  });
+});
