@@ -769,6 +769,20 @@ und nicht deterministisch. Ebenfalls Handarbeit bleibt das Bestätigungs-Modal (
   rot. Details im Kopfkommentar von `scripts/gui-smoke.ts`.
 
 
+## Belegter Lauf: 2026-10-01 — Welle 14, Koda-Hygiene (54/54), mit Gegenprobe gegen den alten Build
+
+Vault `koda-agent` (Staging, Zweitinstanz Port 9340, Obsidian 1.14.3, Sitzung `kodabugs-w14`), Gate **856/856 auf 902/902**, GUI-Smoke **50/50 auf 54/54**. Baseline vor dem ersten Umbau (Master-Regel 5, 23:46): Gate 856/856, Smoke 50/50 — der erste Messlauf stand 49/50 mit Punkt 20 rot („aktiv ist Koda: false", der bekannte Fokus-Vorbehalt), nach `System Events` → frontmost 50/50.
+
+**Vier neue Punkte, alle an der Naht zum Host** (die pure Schicht ist unit-getestet): **51** `## Now` im Prompt und `get_datetime` nennen denselben Kalendertag wie die Uhr des Renderers (`new Date()` lokal gelesen, nicht noch einmal durch `renderNow` gerechnet); **52** zwei echte Skill-Dateien, eine gepinnt, eine nicht — der Prompt trägt nur den Body der gepinnten, `load_skill` holt den anderen, ein gepinnter Skill liefert idempotent, `../x` und `Ordner/Name` liefern keine Notiz außerhalb von `Skills/`, ein unbekannter Name nennt die Liste, der Ladezustand der Sidebar meldet „auf Abruf"; **53** Byte-Token über den echten Schreibweg (`run("write_note")` in den Koda-Ordner, gelesen wird die Datei): 🗂 und U+202F kommen an, ein literales `<0x0A>` bleibt stehen, eine abgeschnittene Folge erzeugt keine Datei; **54** der Kontextfenster-Hinweis mit echtem `createFragment` im Renderer — Notice im DOM, Knopf „Übernehmen (65536)", Einstellung vor dem Klick unverändert, nach dem Klick geschrieben, zweiter Aufruf schweigt. Eigener Zustand wird vorher geprüft und im `finally` aufgeräumt (CORE-TEST-21); Punkt 54 merkt sich `contextWindowTokens` und stellt es zurück.
+
+**Nummern:** Der Auftrag nannte „ab 49". 49 ist seit Welle 12 die Hilfe-Zeile, gemessen am ersten Lauf (zwei Punkte mit der Nummer 49); die neuen Punkte heißen deshalb 51–54, `kodavision` beginnt bei 55.
+
+### Gegenprobe
+
+Der Treiber deployt nicht. Der erste Lauf der neuen Punkte lief **versehentlich gegen den Build 0.19.0 im Staging-Vault** und ist damit die Gegenprobe gegen den alten Stand: alle vier neuen Punkte rot (Werkzeug `get_datetime` „nicht mehr verfügbar", `## Now` fehlt; ungepinnter Skill stand mit Body im Prompt, `load_skill` unbekannt; Byte-Folge blieb literal in der Datei und die abgeschnittene wurde geschrieben; `p.checkContextWindow is not a function`), die übrigen 50 grün. Nach `cp main.js manifest.json styles.css` in den Plugin-Ordner und Neustart des Prozesses: 53/54, dann nach einer Korrektur des Treibers (das Muster für die Ladezustands-Meldung kannte nur die englische Fassung, die Zweitinstanz läuft auf Deutsch) **54/54**.
+
+⚠️ Ein Lauf brach mit „Zeitüberschreitung: Runtime.evaluate" ab (nach Punkt 16, im Fenster derselben Instanz, die schon zwei Läufe hinter sich hatte) und kam im frischen Prozess nicht wieder — die Regel „Prozessneustart je Messlauf" (Dach-AGENTS.md, Welle 11) gilt auch hier.
+
 ## Belegter Lauf: 2026-09-26 — `list_notes` mit `depth`, Ordnerbaum (48/48), mit Gegenprobe und Praxistest
 
 Vault `koda-agent` (Staging, Zweitinstanz Port 9374, Obsidian 1.14.2), Branch `feat/list-depth`, Gate 832/832 auf **848/848**, GUI-Smoke 47/47 auf **48/48**. Deploy per `cp` mit Prüfsummen-Vergleich, Plugin-Reload macht der Treiber. Anlass: Koda fragte im Gespräch nach einer Landkarte des Vaults („ich sehe die Blätter, nicht die Äste").

@@ -2921,6 +2921,215 @@ async function main(): Promise<void> {
       await fake50.close();
     }
     record("50. HTTP 200 mit JSON-Fehlerkörper meldet die Servermeldung statt einer leeren Antwort (Kit-Chat-Client)", ok50, detail50);
+
+    // --- 51. Datum und Uhrzeit (Welle 14): `## Now` im Prompt, `get_datetime` als Werkzeug ---
+    // Die pure Schicht ist unit-getestet (Format, Zeitzone, Hash-Stabilitaet). Offen ist die NAHT:
+    // kommt der Anhang ueber `previewSystemPrompt()` im echten Host an — Zeitzone aus dem Renderer,
+    // `realClock` aus dem vendorten Kit —, steht das Werkzeug in der gesendeten Liste, und nennen
+    // beide dasselbe Datum wie die Uhr des Renderers? Die Gegenprobe ist der Kalendertag selbst:
+    // `new Date()` im Renderer, lokal formatiert, nicht ein zweites Mal durch renderNow gerechnet.
+    let detail49 = "nicht gelaufen";
+    let ok49 = false;
+    try {
+      const r49 = await cdp.evaluate<{
+        inListe: boolean;
+        lauf: { ok: boolean; content?: string; error?: string };
+        prompt: string;
+        heute: string;
+      }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const d = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        return {
+          inListe: p.currentToolNames().includes("get_datetime"),
+          lauf: await p.buildTools().run("get_datetime", {}),
+          prompt: await p.previewSystemPrompt(),
+          heute: d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()),
+        };
+      `);
+      const FORM = /^(\d{4}-\d{2}-\d{2}) \((Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\) \d{2}:\d{2}, \S+$/;
+      const zeile = r49.lauf.content ?? "";
+      const nowAnhang = r49.prompt.split("\n## Now\n")[1]?.split("\n")[0] ?? "";
+      const datumLauf = FORM.exec(zeile)?.[1];
+      const datumPrompt = FORM.exec(nowAnhang)?.[1];
+      ok49 = r49.inListe && r49.lauf.ok === true && datumLauf === r49.heute && datumPrompt === r49.heute
+        && r49.prompt.trimEnd().endsWith(nowAnhang);
+      detail49 = `Werkzeug in der Liste: ${r49.inListe} · get_datetime → ${r49.lauf.ok ? `„${zeile}“` : `Fehler „${r49.lauf.error}“`} · `
+        + `## Now im Prompt: ${nowAnhang !== "" ? `„${nowAnhang}“` : "FEHLT"}${r49.prompt.trimEnd().endsWith(nowAnhang) ? " (letzter Abschnitt)" : " (NICHT am Ende)"} · `
+        + `Kalendertag der Renderer-Uhr ${r49.heute}${datumLauf === r49.heute && datumPrompt === r49.heute ? " stimmt" : " WEICHT AB"}`;
+    } catch (error) {
+      detail49 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    record("51. Datum und Uhrzeit: ## Now im Prompt und get_datetime nennen den Kalendertag der Renderer-Uhr", ok49, detail49);
+
+    // --- 52. Zweistufiges Skill-Laden (Welle 14): pinned voll, der Rest auf Abruf via load_skill ---
+    // Zwei echte Dateien unter `<Koda>/Skills/`: eine gepinnt, eine nicht. Gemessen wird ueber den
+    // echten Weg — `readSkills()` liest den Vault, `previewSystemPrompt()` baut den Prompt,
+    // `run("load_skill")` liest die Datei. Der Pfad-Guard wird an der Naht geprueft: ein Name mit
+    // Pfad darf keine Notiz ausserhalb von `Skills/` liefern. Eigenen Zustand vorher pruefen.
+    const S51 = ["Koda/Skills/smoke51-pin.md", "Koda/Skills/smoke51-lazy.md", "Koda/smoke51-ausserhalb.md"];
+    let detail51 = "nicht gelaufen";
+    let ok51 = false;
+    let eigen51 = true;
+    try {
+      const r51 = await cdp.evaluate<{
+        vorher: boolean;
+        prompt?: string;
+        status?: string | null;
+        lazy?: { ok: boolean; content?: string; error?: string };
+        pin?: { ok: boolean; content?: string; error?: string };
+        pfad?: { ok: boolean; content?: string; error?: string };
+        fremd?: { ok: boolean; content?: string; error?: string };
+        unbekannt?: { ok: boolean; content?: string; error?: string };
+      }>(`
+        const P = ${JSON.stringify(S51)};
+        for (const f of P) if (app.vault.getAbstractFileByPath(f) !== null) return { vorher: true };
+        await app.vault.create(P[0], "---\\ndescription: smoke pin\\npinned: true\\n---\\nPIN-BODY-51");
+        await app.vault.create(P[1], "---\\ndescription: smoke lazy\\n---\\nLAZY-BODY-51");
+        await app.vault.create(P[2], "---\\ndescription: d\\n---\\nAUSSERHALB-51");
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const t = p.buildTools();
+        const { selection, failed } = await p.readSkills();
+        return {
+          vorher: false,
+          prompt: await p.previewSystemPrompt(),
+          status: p.skillStatusText(selection, failed),
+          lazy: await t.run("load_skill", { name: "smoke51-lazy" }),
+          pin: await t.run("load_skill", { name: "smoke51-pin.md" }),
+          pfad: await t.run("load_skill", { name: "../smoke51-ausserhalb" }),
+          fremd: await t.run("load_skill", { name: "Koda/smoke51-ausserhalb" }),
+          unbekannt: await t.run("load_skill", { name: "gibt-es-nicht" }),
+        };
+      `);
+      eigen51 = !r51.vorher;
+      if (r51.vorher) {
+        detail51 = "smoke51-Dateien existieren schon (Rest eines abgebrochenen Laufs?) — nicht gemessen, bitte von Hand entfernen";
+      } else {
+        const pr = r51.prompt ?? "";
+        const pinVoll = pr.includes("PIN-BODY-51");
+        const lazyNurKopf = pr.includes("smoke lazy") && !pr.includes("LAZY-BODY-51") && pr.includes("call load_skill");
+        const geholt = r51.lazy?.ok === true && (r51.lazy.content ?? "").includes("LAZY-BODY-51");
+        const idem = r51.pin?.ok === true && (r51.pin.content ?? "").includes("PIN-BODY-51");
+        const guard = r51.pfad?.ok === false && r51.fremd?.ok === false
+          && !(r51.pfad?.error ?? "").includes("AUSSERHALB") && !(r51.fremd?.error ?? "").includes("AUSSERHALB");
+        const liste = r51.unbekannt?.ok === false && /smoke51-lazy/.test(r51.unbekannt.error ?? "") && /smoke51-pin/.test(r51.unbekannt.error ?? "");
+        const meldung = /on demand|auf Abruf/.test(r51.status ?? "");
+        ok51 = pinVoll && lazyNurKopf && geholt && idem && guard && liste && meldung;
+        detail51 = `gepinnt: Body im Prompt ${pinVoll} · ungepinnt: nur Beschreibung + Hinweis ${lazyNurKopf} · load_skill holt den Body ${geholt} · gepinnter Skill idempotent ${idem} · `
+          + `Pfad-Guard (../ und Ordner/Name) ${guard ? "lehnt ab" : "LIEFERT FREMDE NOTIZ"} · unbekannter Name nennt die Liste ${liste} · Ladezustand „${(r51.status ?? "").split("\n").find((z) => /on demand|auf Abruf/.test(z)) ?? "FEHLT"}“`;
+      }
+    } catch (error) {
+      detail51 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      if (eigen51) await cdp.evaluate(`
+        for (const f of ${JSON.stringify(S51)}) { const x = app.vault.getAbstractFileByPath(f); if (x) await app.vault.delete(x, true); }
+        return true;
+      `).catch(() => undefined);
+    }
+    record("52. Skills laden zweistufig: pinned voll, der Rest nur als Beschreibung, load_skill holt den Body und hält den Pfad-Guard", ok51, detail51);
+
+    // --- 53. Byte-Token-Guard (Welle 14): literale <0x..>-Folgen werden VOR dem Schreiben dekodiert ---
+    // Belege aus dem Vault Arbeit (koda-start.md, koda-dashboard.md). Gemessen wird der echte
+    // Schreibweg ueber `run("write_note")` in den Koda-Ordner (frei, ohne Dialog): was in der Datei
+    // landet, nicht was das Werkzeug meldet. Die unvollstaendige Folge darf KEINE Datei erzeugen.
+    const W52 = "Koda/smoke52.md";
+    const W52b = "Koda/smoke52-kaputt.md";
+    let detail52 = "nicht gelaufen";
+    let ok52 = false;
+    let eigen52 = true;
+    try {
+      const r52 = await cdp.evaluate<{
+        vorher: boolean;
+        gut?: { ok: boolean; error?: string };
+        text?: string | null;
+        kaputt?: { ok: boolean; error?: string };
+        kaputtDa?: boolean;
+        ascii?: string | null;
+      }>(`
+        const a = ${JSON.stringify(W52)}, b = ${JSON.stringify(W52b)};
+        if (app.vault.getAbstractFileByPath(a) !== null || app.vault.getAbstractFileByPath(b) !== null) return { vorher: true };
+        const t = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools();
+        const gut = await t.run("write_note", { path: a, content: "Ordner <0xF0><0x9F><0x97><0x82> und Koda<0xE2><0x80><0xAF>Dashboard, Hex <0x0A> bleibt", mode: "create" });
+        const f = app.vault.getAbstractFileByPath(a);
+        const text = f ? await app.vault.read(f) : null;
+        const kaputt = await t.run("write_note", { path: b, content: "abgeschnitten <0xF0><0x9F> hier", mode: "create" });
+        return { vorher: false, gut, text, kaputt, kaputtDa: app.vault.getAbstractFileByPath(b) !== null };
+      `);
+      eigen52 = !r52.vorher;
+      if (r52.vorher) {
+        detail52 = "smoke52-Dateien existieren schon (Rest eines abgebrochenen Laufs?) — nicht gemessen, bitte von Hand entfernen";
+      } else {
+        const soll = "Ordner \u{1F5C2} und Koda Dashboard, Hex <0x0A> bleibt";
+        const dekodiert = r52.text === soll;
+        const abgelehnt = r52.kaputt?.ok === false && r52.kaputtDa === false && /<0xF0><0x9F>/.test(r52.kaputt.error ?? "");
+        ok52 = r52.gut?.ok === true && dekodiert && abgelehnt;
+        detail52 = `Datei enthält ${dekodiert ? "🗂, U+202F und das literale <0x0A>" : `FALSCH: ${JSON.stringify(r52.text)}`} · `
+          + `unvollständige Folge ${abgelehnt ? "abgelehnt, keine Datei" : `NICHT abgelehnt (ok=${r52.kaputt?.ok}, Datei da=${r52.kaputtDa})`}`;
+      }
+    } catch (error) {
+      detail52 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      if (eigen52) await cdp.evaluate(`
+        for (const f of ${JSON.stringify([W52, W52b])}) { const x = app.vault.getAbstractFileByPath(f); if (x) await app.vault.delete(x, true); }
+        return true;
+      `).catch(() => undefined);
+    }
+    record("53. Byte-Token-Guard: <0xF0><0x9F><0x97><0x82> landet als 🗂 in der Datei, eine abgeschnittene Folge wird abgelehnt", ok52, detail52);
+
+    // --- 54. Kontextfenster-Hinweis (Welle 14): Notice mit „Uebernehmen", Koda ueberschreibt nichts ---
+    // Der Teil, den kein Unit-Test sieht: `createFragment` im echten Renderer, die Notice im DOM und
+    // der Klick, der die Einstellung schreibt. Ein eindeutiger Modellname (Schluessel der
+    // Einmal-Pruefung) und ein ersetztes `probeContext` halten das Netz heraus. Die Einstellung
+    // wird vorher gemerkt und im `finally` zurueckgesetzt.
+    let detail53 = "nicht gelaufen";
+    let ok53 = false;
+    const vorher53 = await cdp.evaluate<number>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.contextWindowTokens;`);
+    try {
+      const r53 = await cdp.evaluate<{
+        vorBesitz: number;
+        nachWarnung: number;
+        text: string;
+        knopf: string;
+        nachKlick: number;
+        bestaetigung: boolean;
+        nochmal: number;
+      }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.probeContext = async () => null;
+        p.settings.contextWindowTokens = 260000;
+        const sichtbar = () => [...document.querySelectorAll(".notice")];
+        const ep = { url: "http://127.0.0.1:1/smoke53", apiKey: "" };
+        await p.checkContextWindow(ep, "smoke53", "smoke53-ctx64k");
+        const warn = sichtbar().find((n) => n.textContent.includes("65536"));
+        const text = warn ? warn.textContent : "";
+        const btn = warn ? warn.querySelector("button") : null;
+        const knopf = btn ? btn.textContent : "";
+        const nachWarnung = p.settings.contextWindowTokens;
+        if (btn) btn.click();
+        await new Promise((r) => setTimeout(r, 200));
+        const nachKlick = p.settings.contextWindowTokens;
+        const bestaetigung = sichtbar().some((n) => n.textContent.includes("65536") && !n.querySelector("button"));
+        const vorAnzahl = sichtbar().length;
+        await p.checkContextWindow(ep, "smoke53", "smoke53-ctx64k");
+        return { vorBesitz: 260000, nachWarnung, text, knopf, nachKlick, bestaetigung, nochmal: sichtbar().length - vorAnzahl };
+      `);
+      ok53 = r53.text.includes("65536") && r53.text.includes("260000") && r53.nachWarnung === 260000
+        && r53.knopf.includes("65536") && r53.nachKlick === 65536 && r53.bestaetigung && r53.nochmal === 0;
+      detail53 = `Notice „${r53.text.slice(0, 80)}…“ · Knopf „${r53.knopf}“ · Einstellung vor Klick ${r53.nachWarnung} (unverändert: ${r53.nachWarnung === 260000}), nach Klick ${r53.nachKlick} · `
+        + `Bestätigung ${r53.bestaetigung} · zweiter Aufruf ${r53.nochmal === 0 ? "schweigt" : `MELDET ERNEUT (${r53.nochmal})`}`;
+    } catch (error) {
+      detail53 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        delete p.probeContext;
+        p.settings.contextWindowTokens = ${JSON.stringify(vorher53)};
+        await p.saveSettings();
+        for (const n of document.querySelectorAll(".notice")) { if (n.textContent.includes("65536")) n.remove(); }
+        return true;
+      `).catch(() => undefined);
+    }
+    record("54. Kontextfenster-Hinweis: Notice mit Übernehmen-Knopf, Einstellung bleibt bis zum Klick, zweiter Aufruf schweigt", ok53, detail53);
   } finally {
     // Aufräumen darf nie am Ergebnis hängen: auch ein abgebrochener Lauf gibt die
     // EINSTELLUNGEN so zurück, wie er sie vorgefunden hat — sonst bleiben tote Endpunkte
