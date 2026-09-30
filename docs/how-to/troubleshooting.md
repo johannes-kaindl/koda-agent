@@ -159,11 +159,15 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 
 **Fix:** Add one; see [Write a skill](skills.md).
 
-### "⚙ Description only (budget exhausted): …"
+### "⚠ Pinned skills are over budget: … characters"
 
-**Cause:** The active skills together are longer than **Skill budget**. The named skills are only announced, not followed.
+**Cause:** The skills with `pinned: true` are together longer than **Skill budget**. They load in full anyway; the number is by how many characters they exceed it.
 
-**Fix:** Raise the budget, shorten skills, or turn some off with `enabled: false`.
+**Fix:** Raise the budget, pin fewer skills, or shorten them.
+
+### "⚙ … skill(s) on demand"
+
+Not an error. These skills are not pinned: Koda sees their name and description and reads the full text with `load_skill` when a task matches. Add `pinned: true` to a skill that must always apply; see [Write a skill](skills.md).
 
 ### "⚠ Could not be read: …"
 

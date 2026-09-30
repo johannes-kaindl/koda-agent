@@ -965,8 +965,10 @@ export default class KodaPlugin extends Plugin {
     const lines: string[] = [];
     if (sel.loaded.length > 0) lines.push(t("skills.active", sel.loaded.map((s) => s.name).join(", ")));
     if (sel.descriptionOnly.length > 0) {
-      lines.push(t("skills.budget", sel.descriptionOnly.map((s) => s.name).join(", ")));
+      lines.push(t("skills.onDemand", String(sel.descriptionOnly.length)));
     }
+    // Pin gewinnt ueber Budget: geladen wird trotzdem, aber der Ueberhang wird genannt.
+    if (sel.overBudget > 0) lines.push(t("skills.overBudget", String(sel.overBudget)));
     // Zwei verschiedene Ursachen, zwei verschiedene Meldungen: ein Lesefehler ist
     // kein fehlendes Frontmatter-Feld, und "keine description" waere hier schlicht falsch.
     const readErrors = failed.filter((f) => f.reason === "read-error").map((f) => f.name);

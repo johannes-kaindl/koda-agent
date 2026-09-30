@@ -12,7 +12,7 @@ All settings are under **Settings → Koda**, in this order. Numbers outside the
 | Koda folder | `Koda` | | The folder Koda writes to without asking (memory, drafts). Skills in its `Skills/` subfolder still ask. |
 | Max tool calls per answer | 8 | 1–50 | How many tool calls Koda may chain for one question before it has to answer. |
 | Response timeout (seconds) | 300 | 30–900 | How long Koda waits for the endpoint to say anything. The clock restarts with every piece received, so only silence runs into it, not a long answer. Raise it for models that load on demand. |
-| Skill budget | 6000 characters | 1000–100000 | How much skill text goes into the system prompt. Skills beyond it are named with their description only. |
+| Skill budget | 6000 characters | 1000–100000 | Upper limit for pinned skills (`pinned: true`). They always load in full; if together they exceed the budget they still load and the chat names the overshoot. Other skills are listed with their description only. |
 | Maximum listed notes | 150 | 20–1000 | How many notes (and folders) `list_notes` returns at most. A capped result says so in its first line. |
 
 ## Shorten history

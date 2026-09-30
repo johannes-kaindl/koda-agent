@@ -42,9 +42,23 @@ describe("readSkills / skillStatusText — Lesefehler vs. fehlende description",
   });
 
   it("nutzt weiterhin SKILLS_SUBFOLDER als Quelle des Ordnernamens", async () => {
-    const plugin = makePlugin({ "Koda/Skills/A.md": "---\ndescription: x\n---\nbody" });
+    const plugin = makePlugin({ "Koda/Skills/A.md": "---\ndescription: x\npinned: true\n---\nbody" });
     const { selection, failed } = await (plugin as any).readSkills();
     expect(failed).toEqual([]);
     expect(selection.loaded.map((s: { name: string }) => s.name)).toEqual(["A"]);
+  });
+
+  it("meldet ungepinnte Skills als auf Abruf und Gepinnte ueber Budget mit dem Ueberhang", async () => {
+    const plugin = makePlugin({
+      "Koda/Skills/A.md": "---\ndescription: x\npinned: true\n---\n" + "a".repeat(50),
+      "Koda/Skills/B.md": "---\ndescription: y\n---\nbody",
+    });
+    plugin.settings = { ...plugin.settings, skillBudgetChars: 20 };
+    const { selection, failed } = await (plugin as any).readSkills();
+    expect(selection.loaded.map((s: { name: string }) => s.name)).toEqual(["A"]);
+    expect(selection.descriptionOnly.map((s: { name: string }) => s.name)).toEqual(["B"]);
+    const text = (plugin as any).skillStatusText(selection, failed) as string;
+    expect(text).toContain("1 skill(s) on demand");
+    expect(text).toContain("over budget: 30 characters");
   });
 });

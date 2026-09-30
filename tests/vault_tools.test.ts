@@ -349,3 +349,59 @@ describe("get_datetime", () => {
     expect(d.parameters.required).toEqual([]);
   });
 });
+
+describe("load_skill", () => {
+  const skills = {
+    "Koda/Skills/Alpha.md": "---\ndescription: macht A\n---\nBody von Alpha",
+    "Koda/Skills/Gepinnt.md": "---\ndescription: immer da\npinned: true\n---\nBody gepinnt",
+    "Koda/Skills/Aus.md": "---\ndescription: aus\nenabled: false\n---\nnicht laden",
+    "Koda/Skills/Leer.md": "kein Frontmatter",
+    "Koda/Skills/Unter/Tief.md": "---\ndescription: tief\n---\nzu tief",
+    "Notes/Geheim.md": "---\ndescription: d\n---\nausserhalb",
+  };
+  const run = (name: string) => new VaultTools(fakeVault({ ...skills }), yes, opts).run("load_skill", { name });
+
+  it("liefert den Body samt Name und Beschreibung", async () => {
+    expect(await run("Alpha")).toEqual({ ok: true, content: "### Alpha\nmacht A\n\nBody von Alpha" });
+  });
+  it(".md-Suffix und Gross-/Kleinschreibung sind egal", async () => {
+    expect(await run("alpha.md")).toEqual(await run("Alpha"));
+  });
+  it("ein gepinnter Skill liefert seinen Body trotzdem (idempotent)", async () => {
+    const r = await run("Gepinnt");
+    expect(r.ok && r.content).toContain("Body gepinnt");
+  });
+  it("unbekannter Name: Fehler mit den verfuegbaren Namen, ohne abgeschaltete und defekte", async () => {
+    const r = await run("Nope");
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain("Verfuegbar: Alpha, Gepinnt");
+      expect(r.error).not.toContain("Aus");
+      expect(r.error).not.toContain("Leer");
+    }
+  });
+  it("enabled: false ist ein Fehler, der Body wird nicht geliefert", async () => {
+    const r = await run("Aus");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).not.toContain("nicht laden");
+  });
+  it("Skill ohne description ist kein aktiver Skill", async () => {
+    expect((await run("Leer")).ok).toBe(false);
+  });
+  it("Pfad-Guard: Trenner, .. und fremde Ordner werden abgelehnt", async () => {
+    for (const bad of ["../Notes/Geheim", "Notes/Geheim", "Unter/Tief", "..", "", "a\\b", "Alpha/../Alpha"]) {
+      const r = await run(bad);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).not.toContain("ausserhalb");
+    }
+  });
+  it("write_skill replace behaelt den Pin", async () => {
+    const vault = fakeVault({ ...skills });
+    const tools = new VaultTools(vault, yes, opts);
+    await tools.run("write_skill", { name: "Gepinnt", description: "neu", body: "neuer Body", mode: "replace" });
+    expect(vault.files["Koda/Skills/Gepinnt.md"]).toContain("pinned: ");
+    expect(vault.files["Koda/Skills/Gepinnt.md"]).toContain("description: neu");
+    await tools.run("write_skill", { name: "Alpha", description: "neu", body: "x", mode: "replace" });
+    expect(vault.files["Koda/Skills/Alpha.md"]).not.toContain("pinned");
+  });
+});

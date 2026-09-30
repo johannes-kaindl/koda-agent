@@ -25,9 +25,10 @@ describe("buildSystemPrompt", () => {
   });
   it("haengt Skills auch an einen Override an", () => {
     const sel: Selection = {
-      loaded: [{ name: "auf", description: "d", body: "b", enabled: true }],
+      loaded: [{ name: "auf", description: "d", body: "b", enabled: true, pinned: true }],
       descriptionOnly: [],
       disabled: [],
+      overBudget: 0,
     };
     const p = buildSystemPrompt({ ...basis, rulesOverride: "Sei knapp.", skills: sel });
     expect(p).toContain("## Skills");
@@ -40,9 +41,10 @@ describe("buildSystemPrompt", () => {
   });
 
   const sel = (loaded: string[], descOnly: string[] = []): Selection => ({
-    loaded: loaded.map((n) => ({ name: n, description: `desc-${n}`, enabled: true, body: `body-${n}` })),
-    descriptionOnly: descOnly.map((n) => ({ name: n, description: `desc-${n}`, enabled: true, body: `body-${n}` })),
+    loaded: loaded.map((n) => ({ name: n, description: `desc-${n}`, enabled: true, pinned: true, body: `body-${n}` })),
+    descriptionOnly: descOnly.map((n) => ({ name: n, description: `desc-${n}`, enabled: true, pinned: false, body: `body-${n}` })),
     disabled: [],
+    overBudget: 0,
   });
 
   it("enthaelt Sprache, Koda-Ordner und die Memory", () => {
@@ -63,9 +65,11 @@ describe("buildSystemPrompt", () => {
     expect(p).toContain("body-Alpha");
   });
 
-  it("Budget-Skills stehen nur mit Beschreibung, ohne Body", () => {
+  it("Skills auf Abruf stehen nur mit Beschreibung und dem load_skill-Hinweis, ohne Body", () => {
     const p = buildSystemPrompt({ lang: "de", memory: "", kodaFolder: "Koda", skills: sel([], ["Beta"]) });
     expect(p).toContain("desc-Beta");
+    expect(p).toContain("call load_skill");
+    expect(p).not.toContain("budget exhausted");
     expect(p).not.toContain("body-Beta");
   });
 

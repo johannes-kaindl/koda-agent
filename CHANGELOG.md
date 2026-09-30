@@ -17,6 +17,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Skills load in two steps.** Only skills with `pinned: true` in their frontmatter go into the system prompt in full; all others appear with their name and description and a hint to call the new tool `load_skill`, which returns the full text from `<Koda folder>/Skills/` (only that folder; a disabled skill or a name with a path is refused with the list of available names). Before, every skill was loaded in full up to the skill budget, so many skills filled the prompt. **To keep the old behaviour for a skill, add `pinned: true`** (for example to a start routine). **Skill budget** is now the upper limit for pinned skills: pinned skills always load, and the chat reports by how much they exceed it (**⚠ Pinned skills are over budget: N characters**). `write_skill` with `replace` keeps an existing pin. The chat line for the rest reads **⚙ N skill(s) on demand** instead of **⚙ Description only (budget exhausted)**.
 - Kit chat client 0.44.0 (no user-visible change).
 
 ## [0.19.0] — 2026-09-26

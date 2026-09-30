@@ -6,7 +6,7 @@ A question starts a loop. Koda sends your message, the working context and a sys
 
 ## What steers Koda is readable
 
-The system prompt is rebuilt for every conversation from three parts: Koda's rule block (replaceable under **Model control**), your memory note `<Koda folder>/Memory.md`, and the active skills in `<Koda folder>/Skills/` that fit the skill budget. All of it is plain text you can open. **Show active instructions** in the settings shows the exact result. There is no hidden state: conversations are stored as JSONL in the plugin folder and restored after a restart.
+The system prompt is rebuilt for every conversation from three parts: Koda's rule block (replaceable under **Model control**), your memory note `<Koda folder>/Memory.md`, and your skills in `<Koda folder>/Skills/` (pinned ones in full, all others as a name and description that Koda expands with `load_skill`). All of it is plain text you can open. **Show active instructions** in the settings shows the exact result. There is no hidden state: conversations are stored as JSONL in the plugin folder and restored after a restart.
 
 ## The write rule
 

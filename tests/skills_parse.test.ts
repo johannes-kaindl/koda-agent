@@ -67,3 +67,18 @@ describe("parseSkill", () => {
     expect(r.skill.body).toBe("");
   });
 });
+
+describe("parseSkill: pinned", () => {
+  it("ohne pinned-Feld ist der Skill nicht gepinnt", () => {
+    const r = parseSkill("X", "---\ndescription: d\n---\n\nBody\n");
+    expect(r.ok && r.skill.pinned).toBe(false);
+  });
+  it("pinned: true pinnt (String, Gross/Kleinschreibung und Leerraum zaehlen nicht)", () => {
+    const r = parseSkill("X", "---\ndescription: d\npinned:  TRUE \n---\n\nBody\n");
+    expect(r.ok && r.skill.pinned).toBe(true);
+  });
+  it("alles andere pinnt nicht — ein Tippfehler laedt nicht den ganzen Ordner voll", () => {
+    const r = parseSkill("X", "---\ndescription: d\npinned: yes\n---\n\nBody\n");
+    expect(r.ok && r.skill.pinned).toBe(false);
+  });
+});

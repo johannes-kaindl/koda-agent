@@ -33,9 +33,9 @@ function renderSkills(sel: Selection | undefined): string {
     blocks.push(s.body === "" ? `### ${s.name}\n${s.description}` : `### ${s.name}\n${s.description}\n\n${s.body}`);
   }
   for (const s of sel.descriptionOnly) {
-    // Ehrlich benennen, dass hier etwas fehlt: Koda kann dem Skill nicht folgen,
-    // soll aber wissen, dass es ihn gibt.
-    blocks.push(`### ${s.name}\n${s.description}\n(not loaded — skill budget exhausted)`);
+    // Ehrlich benennen, dass hier der Body fehlt: Koda soll wissen, dass es den Skill gibt,
+    // und den Weg dorthin kennen.
+    blocks.push(`### ${s.name}\n${s.description}\n(not loaded — call load_skill to read it)`);
   }
   return blocks.length === 0 ? "" : `## Skills\n${blocks.join("\n\n")}`;
 }

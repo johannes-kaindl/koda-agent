@@ -70,6 +70,18 @@ export const TOOL_DEFS: ToolDef[] = [
     parameters: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "load_skill",
+    description:
+      "Read the full instructions of a skill listed under \"## Skills\" as \"not loaded\". Call it when the task matches the skill's description, before you follow it.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "The skill's name exactly as listed under ## Skills" },
+      },
+      required: ["name"],
+    },
+  },
+  {
     name: "edit_active_note",
     description:
       "Edit the note the user is working in: replace the current selection or insert at the cursor. Always shows the change and asks the user first. Pass the path of the active note exactly as given in the working context; the call fails if another note became active or the selection changed since.",

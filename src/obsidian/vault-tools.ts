@@ -7,6 +7,9 @@ import { movePolicy, planMove } from "../core/tools/move";
 import { appendMemoryLine } from "../core/memory/memory";
 import { serializeFrontmatter } from "../vendor/kit/frontmatter";
 import { sanitizeSkillName, skillPath } from "../core/skills/path";
+import { cleanSkillRef } from "../core/skills/load";
+import { parseSkill } from "../core/skills/skill";
+import { SKILLS_SUBFOLDER } from "../core/tools/write-policy";
 import {
   formatSearchResult, formatRelatedResult, hasIndexableText,
   type RetrievalApi, type TextHit,
@@ -207,6 +210,7 @@ export class VaultTools implements ToolRunner {
             : 20;
           return this.getWorkspace(radius);
         }
+        case "load_skill": return await this.loadSkill(str(a.name));
         case "get_datetime": return { ok: true, content: renderNow((this.opts.now ?? Date.now)(), this.opts.timeZone?.()) };
         case "edit_active_note": return await this.editActiveNote(str(a.path), str(a.mode), str(a.text));
         default: return { ok: false, error: `unbekanntes Tool: ${name}` };
@@ -398,7 +402,12 @@ export class VaultTools implements ToolRunner {
     if (mode === "create" && exists) return { ok: false, error: `Skill existiert schon: "${clean}" — nutze replace` };
     if (mode === "replace" && !exists) return { ok: false, error: `Skill nicht gefunden: "${clean}" — nutze create` };
 
-    const content = `${serializeFrontmatter({ description: desc, enabled: "true" }, ["description", "enabled"])}\n${body.trim()}\n`;
+    // `replace` schreibt das Frontmatter neu — ein vom Nutzer gesetzter Pin darf dabei nicht
+    // verloren gehen, sonst verschwaende der Skill beim naechsten Gespraech aus dem Prompt.
+    const old = exists ? parseSkill(clean, await this.vault.read(path)) : null;
+    const pinned = old !== null && old.ok && old.skill.pinned;
+    const fm: Record<string, string> = pinned ? { description: desc, enabled: "true", pinned: "true" } : { description: desc, enabled: "true" };
+    const content = `${serializeFrontmatter(fm, pinned ? ["description", "enabled", "pinned"] : ["description", "enabled"])}\n${body.trim()}\n`;
 
     // Die Policy wird gefragt, obwohl die Antwort hier feststeht: die Grenze gehoert
     // an EINE Stelle, und diese Zeile bricht auffaellig, wenn sie dort je wegfaellt.
@@ -411,6 +420,35 @@ export class VaultTools implements ToolRunner {
     if (mode === "create") await this.vault.create(path, content);
     else await this.vault.overwrite(path, content);
     return { ok: true, content: `Skill geschrieben: ${path}` };
+  }
+
+  /** Der Body eines Skills aus `<Koda-Ordner>/Skills/` — die zweite Stufe des Skill-Ladens.
+   *  Gelesen wird ausschliesslich unter `Skills/` und flach: der Name wird nie zum Pfad, er
+   *  wird gegen die Dateiliste des Ordners aufgeloest (ohne Beachtung der Gross-/Kleinschreibung,
+   *  wie `writePolicy`). Gepinnte Skills liefern ihren Body trotzdem — idempotent, das Modell
+   *  muss nicht wissen, welche schon im Prompt stehen. */
+  private async loadSkill(name: string): Promise<ToolOutcome> {
+    const ref = cleanSkillRef(name);
+    if (ref === null) return { ok: false, error: `Ungueltiger Skill-Name: "${name}" — nur der Name aus der Liste unter ## Skills, ohne Pfad.` };
+    const dir = `${this.opts.kodaFolder().replace(/\/+$/, "")}/${SKILLS_SUBFOLDER}`;
+    const prefix = `${dir.toLowerCase()}/`;
+    const files = this.vault.listMarkdownPaths().filter((p) => p.toLowerCase().startsWith(prefix) && !p.slice(prefix.length).includes("/"));
+    const nameOf = (p: string): string => p.slice(dir.length + 1).replace(/\.md$/i, "");
+    const hit = files.find((p) => nameOf(p).toLowerCase() === ref.toLowerCase());
+    const available = async (): Promise<string> => {
+      const names: string[] = [];
+      for (const p of files) {
+        const r = parseSkill(nameOf(p), await this.vault.read(p).catch(() => ""));
+        if (r.ok && r.skill.enabled) names.push(r.skill.name);
+      }
+      return names.length === 0 ? "keine" : names.sort().join(", ");
+    };
+    if (hit === undefined) return { ok: false, error: `Skill nicht gefunden: "${ref}". Verfuegbar: ${await available()}` };
+    const parsed = parseSkill(nameOf(hit), await this.vault.read(hit));
+    if (!parsed.ok) return { ok: false, error: `Skill "${ref}" hat keine description im Frontmatter und ist damit nicht aktiv.` };
+    if (!parsed.skill.enabled) return { ok: false, error: `Skill "${ref}" ist abgeschaltet (enabled: false). Verfuegbar: ${await available()}` };
+    const { name: skillName, description, body } = parsed.skill;
+    return { ok: true, content: body === "" ? `### ${skillName}\n${description}` : `### ${skillName}\n${description}\n\n${body}` };
   }
 
   private async saveMemory(text: string): Promise<ToolOutcome> {

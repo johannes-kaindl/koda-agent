@@ -7,6 +7,9 @@ export interface Skill {
   name: string;
   description: string;
   enabled: boolean;
+  /** `pinned: true` im Frontmatter: der Body geht immer voll in den Prompt. Ohne Pin steht
+   *  nur die description dort, den Body holt sich das Modell mit `load_skill`. */
+  pinned: boolean;
   body: string;
 }
 
@@ -26,5 +29,9 @@ export function parseSkill(name: string, raw: string): ParseResult {
   }
   const enabledRaw = fm.data["enabled"];
   const enabled = typeof enabledRaw === "string" ? enabledRaw.trim().toLowerCase() !== "false" : true;
-  return { ok: true, skill: { name, description: desc.trim(), enabled, body: fm.body.trim() } };
+  // Wie `enabled` ein String (Kit-Parser, s. oben) — aber mit umgekehrtem Default: nur ein
+  // ausdruecklich gesetztes `true` pinnt. Ein Tippfehler laedt dann nicht alles voll.
+  const pinnedRaw = fm.data["pinned"];
+  const pinned = typeof pinnedRaw === "string" && pinnedRaw.trim().toLowerCase() === "true";
+  return { ok: true, skill: { name, description: desc.trim(), enabled, pinned, body: fm.body.trim() } };
 }

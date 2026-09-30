@@ -19,6 +19,7 @@ The model decides which tool to call while it answers; every call appears as a s
 | `move_note` | Moves or renames a note; Obsidian updates the links pointing to it. Never overwrites. The dialog names both paths and how many notes link there. | outside the Koda folder |
 | `delete_note` | Moves a note to the vault's trash (as configured in Obsidian). The dialog warns how many links will break. | always |
 | `save_memory` | Appends a dated line to `<Koda folder>/Memory.md`, which goes into every conversation. | never (Koda folder) |
+| `load_skill` | Reads the full instructions of a skill that is listed under `## Skills` with its description only. Skills with `pinned: true` are already in the prompt. | never |
 | `write_skill` | Creates or replaces a skill in `<Koda folder>/Skills/`. | always |
 
 Only `.md` notes are written; `.base` and `.canvas` are read-only for Koda.
