@@ -46,4 +46,22 @@ describe("decodeByteTokens", () => {
   it("fasst <0x..> mit Nicht-Hex oder falscher Laenge nicht an", () => {
     expect(decodeByteTokens("<0xZZ> <0x1> <0x123>")).toEqual({ ok: true, text: "<0xZZ> <0x1> <0x123>" });
   });
+
+  // Entscheidung Master: dokumentierte ASCII-Token (Notiz ueber Hex) bleiben stehen.
+  it("laesst eine Folge, die nur zu ASCII dekodieren wuerde, literal", () => {
+    expect(decodeByteTokens("Zeilenumbruch ist <0x0A>, A ist <0x41><0x42>")).toEqual({
+      ok: true,
+      text: "Zeilenumbruch ist <0x0A>, A ist <0x41><0x42>",
+    });
+  });
+
+  it("laesst fuehrende ASCII-Token stehen und dekodiert ab dem ersten Byte >= 0x80", () => {
+    expect(decodeByteTokens("<0x41><0xC3><0xA4>")).toEqual({ ok: true, text: "<0x41>ä" });
+  });
+
+  it("meldet bei einer Folge mit ASCII-Vorspann nur den dekodierten Teil als fehlerhaft", () => {
+    const r = decodeByteTokens("<0x41><0xF0><0x9F>");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("<0xF0><0x9F>");
+  });
 });
