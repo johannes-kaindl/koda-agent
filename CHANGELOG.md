@@ -41,9 +41,9 @@ All notable changes to this project are documented here. The format follows
 ## [0.19.0] — 2026-09-26
 
 ### Changed
-- **Chat-Aufruf läuft über den Kit-Client** (obsidian-kit 0.43.0, `createChatClient` mit XHR-Transport): Kodas eigener Streaming-Client und -Transport entfallen, Kodas bisherige Reparaturen (Tool-Call-Argumente werden ohne Abbruch abgewartet, abgeschnittene Aufrufe, das Reasoning-Echo für Modelle wie `verdigado-pro`) stehen unverändert. Sichtbare Folgen: Antwortet ein Server mit HTTP 200, aber einem JSON-Fehler im Körper (z. B. „model not loaded“), meldet Koda jetzt die Servermeldung statt einer leeren Antwort. Eine Antwort ohne Stream (Server ignoriert `stream: true`) wird gelesen statt verworfen. Ein Abbruch vor dem Start des Streams erreicht den Server gar nicht mehr. Ein Transportfehler heißt weiter „nicht erreichbar“; einen Wechsel auf eine Anfrage ohne Stream bei Origin-Weigerung gibt es bewusst nicht.
-- **llm-lab-Anbindung über das Kit** (`lab-client`): gleiche Aufzeichnung wie bisher (apiVersion 4). Neu: Hat das installierte llm-lab eine andere Vertragsversion, schreibt Koda einmal je Sitzung eine Warnung in die Konsole, statt die Aufzeichnung still auszulassen.
-- Die Endpunkt-Liste und der Antwortbereich in den Einstellungen und im Chat tragen den Stil von Kit 0.43.0 (Endpunkt-Zeile: Kindselektoren; leere Statuszeile im Antwortbereich blendet sich aus).
+- **Chat calls go through the Kit client** (obsidian-kit 0.43.0, `createChatClient` with XHR transport): Koda's own streaming client and transport are gone, and Koda's earlier repairs (tool-call arguments are awaited without aborting, truncated calls, the reasoning echo for models like `verdigado-pro`) stay unchanged. Visible consequences: if a server answers with HTTP 200 but a JSON error in the body (e.g. "model not loaded"), Koda now reports the server's message instead of an empty answer. An answer without a stream (the server ignores `stream: true`) is read instead of discarded. An abort before the stream starts no longer reaches the server at all. A transport error still reads "not reachable"; falling back to a request without a stream when the origin is refused is deliberately not done.
+- **llm-lab connection through the Kit** (`lab-client`): same recording as before (apiVersion 4). New: if the installed llm-lab has a different contract version, Koda writes a warning to the console once per session instead of silently skipping the recording.
+- The endpoint list and the answer area in the settings and in the chat carry the style of Kit 0.43.0 (endpoint row: child selectors; an empty status line in the answer area hides itself).
 
 ## [0.18.0] — 2026-09-26
 
@@ -53,116 +53,114 @@ All notable changes to this project are documented here. The format follows
 ## [0.17.1] — 2026-09-26
 
 ### Changed
-- **README und Nutzer-Doku neu**: Die README ist auf das Wesentliche gekürzt (Features, Installation, Verwendung, Links) und nennt keinen veralteten Versionsstand mehr. Die Details stehen jetzt in einer Nutzer-Doku unter `docs/`: Getting started, Troubleshooting (jede Meldung wörtlich, mit Ursache und Abhilfe), How-tos zu Arbeitskontext, Skills und Modell-Steuerung, eine Referenz aller Einstellungen, Werkzeuge und Befehle, und eine Erklärung, wie Koda arbeitet. Korrigiert gegenüber der alten README: Die Endpunkt-Liste nimmt den ersten erreichbaren Eintrag (kein fester erster), der Antwort-Timeout misst Stille und keine Gesamtdauer, und `search_notes` fragt Vault Retrieval immer mit ab, nicht erst bei wenigen Treffern.
+- **New README and user documentation**: The README is trimmed to the essentials (features, installation, usage, links) and no longer names an outdated version. The details now live in user documentation under `docs/`: Getting started, Troubleshooting (every message verbatim, with cause and remedy), how-tos on working context, skills and model control, a reference of all settings, tools and commands, and an explanation of how Koda works. Corrected against the old README: the endpoint list takes the first reachable entry (not a fixed first one), the answer timeout measures silence rather than total duration, and `search_notes` always queries Vault Retrieval as well, not only when there are few hits.
 
 ## [0.17.0] — 2026-09-26
 
 ### Added
-- **`list_notes` zeigt den Ordnerbaum**: Mit `depth` (z. B. 2 oder 3) liefert `list_notes` den Aufbau eines Ordners über mehrere Ebenen in einem Aufruf — jeden Ordner mit vollem Pfad und der Zahl der Notizen darin, leere Ordner eingeschlossen. So sieht Koda auf einen Blick, ob jeder Projektordner dieselben Unterordner hat, statt jeden einzeln zu öffnen. Der Baum hält sich an die Höchstzahl aufgelisteter Notizen; wird er gekappt, sagt die erste Zeile das und nennt die Tiefe, bis zu der er vollständig ist. Ohne `depth` bleibt alles wie bisher.
-- **Werkzeuge aus anderen Plugins**: Ein Plugin, das seine Fähigkeiten nach dem Werkzeug-Vertrag anbietet (`api.tools()`/`api.execute()`, erstes Exemplar vault-rag), bekommt seine Werkzeuge in Koda montiert, ohne dass Koda sie nachbaut. Sie erscheinen in der gesendeten Liste hinter Kodas eigenen, lassen sich wie diese in den Einstellungen abschalten und umbeschreiben, und ein schreibendes Werkzeug fragt vorher mit der Vorschau des Anbieters nach. Bietet vault-rag `related_notes` selbst an, ersetzt es Kodas eingebaute Fassung. Ein Werkzeug, dessen Name mit einem Koda-Werkzeug kollidiert, wird nicht montiert.
+- **`list_notes` shows the folder tree**: With `depth` (e.g. 2 or 3), `list_notes` returns the structure of a folder across several levels in one call — every folder with its full path and the number of notes in it, empty folders included. That way Koda sees at a glance whether every project folder has the same subfolders, instead of opening each one. The tree respects the maximum number of listed notes; if it is cut off, the first line says so and names the depth up to which it is complete. Without `depth`, everything stays as before.
+- **Tools from other plugins**: A plugin that offers its capabilities under the tool contract (`api.tools()`/`api.execute()`, first instance vault-rag) gets its tools mounted in Koda without Koda rebuilding them. They appear in the list sent to the model after Koda's own, can be switched off and re-described in the settings like those, and a writing tool asks first with the provider's preview. If vault-rag offers `related_notes` itself, it replaces Koda's built-in version. A tool whose name collides with a Koda tool is not mounted.
 
 ## [0.16.0] — 2026-09-25
 
 ### Added
-- **Modus Vault** im Arbeitskontext: Koda fragt vault-rag mit der Frage, die du gerade sendest, und legt die besten Treffer im Volltext in den Kontext. Im Kontext-Tab erscheinen die Treffer schon beim Tippen (400 ms entprellt), als Chips mit dem Hinweis „vault-rag“. Ist die Suche nicht verfügbar (Plugin fehlt, kein Index, Endpunkt nicht erreichbar), steht das als Hinweiszeile im Block und im Kontext-Tab statt still leer zu bleiben. Ohne vault-rag bleibt der Eintrag im Dropdown sichtbar, aber gesperrt („Vault (braucht vault-rag)“).
-- **Semantische Nachbarn im Modus Notiz**: zusätzlich zu Links und Backlinks nimmt Koda die Notizen mit, die vault-rag der aktiven Notiz ähnlich findet (im Kontext-Tab als „ähnlich“ markiert). Fehlen sie, fehlt nur dieser Abschnitt, ohne Meldung.
-- Die Kontextzeile unter deiner Nachricht nennt im Modus Vault die Quelle: „vault-rag · 3 Treffer“ bzw. „Vault-Suche nicht verfügbar“.
-- Neue Einstellung **„Notizen aus vault-rag“** (0–20, Standard 5, 0 schaltet Vault-Treffer und Nachbarn ab) und ein Stepper dafür im Kontext-Tab.
+- **Vault mode** in the working context: Koda queries vault-rag with the question you are sending and puts the best hits into the context in full text. In the Context tab the hits appear while you type (debounced by 400 ms), as chips marked "vault-rag". If the search is unavailable (plugin missing, no index, endpoint not reachable), that shows as a notice line in the block and in the Context tab instead of staying silently empty. Without vault-rag the entry stays visible in the dropdown but locked ("Vault (needs vault-rag)").
+- **Semantic neighbours in Note mode**: in addition to links and backlinks, Koda takes along the notes that vault-rag finds similar to the active note (marked "similar" in the Context tab). If they are missing, only that section is missing, without a message.
+- In Vault mode, the context line under your message names the source: "vault-rag · 3 hits" or "Vault search unavailable".
+- New setting **"Notes from vault-rag"** (0–20, default 5, 0 switches off vault hits and neighbours) and a stepper for it in the Context tab.
 
 ### Fixed
-- Der Kontext-Tab war in Obsidian nicht zu sehen (seit 0.13.0): der Chat blieb unter dem Tab stehen und schob den Kontext-Tab aus dem Bild. Der Chat wird dort jetzt ausgeblendet.
+- The Context tab was not visible in Obsidian (since 0.13.0): the chat stayed below the tab and pushed the Context tab out of view. The chat is now hidden there.
 
 ## [0.15.2] — 2026-09-25
 
 ### Fixed
-- `list_notes` verschweigt keine Unterordner mehr. Ohne `recursive` nennt das Ergebnis schon in der Kopfzeile, wie viele Unterordner es gibt und wie viele Notizen darunter liegen, und in der zweiten Zeile jeden einzeln — auch Ordner ohne eine einzige Notiz. Rekursiv werden die Ordner ohne Notiz genannt, die in den Pfaden nicht auftauchen können. Anlass: Koda hielt bewohnte Unterordner von `_Koda` für nicht existent, weil die flache Liste sie mit keinem Wort erwähnte.
-- Ein Ordner, den es nicht gibt, wird jetzt so gemeldet; ein existierender Ordner ohne Notiz ist ein Befund statt eines Fehlers.
+- `list_notes` no longer hides subfolders. Without `recursive`, the result already says in the header line how many subfolders there are and how many notes lie beneath them, and names each one in the second line — including folders without a single note. Recursively, the folders without a note that cannot show up in the paths are named. Reason: Koda took inhabited subfolders of `_Koda` for non-existent, because the flat list did not mention them at all.
+- A folder that does not exist is now reported as such; an existing folder without a note is a finding rather than an error.
 
 ## [0.15.1] — 2026-09-24
 
 ### Changed
-- `authorUrl` im Manifest zeigt wieder auf das GitHub-Profil (Rückkehr in den Community Store); keine Funktionsänderung.
+- `authorUrl` in the manifest points to the GitHub profile again (return to the Community Store); no functional change.
 
 ## [0.15.0] — 2026-09-23
 
 ### Added
 
-- Tool-Use gegen LM Studio/MLX gehaertet (Sonderauftrag „Koda-Fix Tool-Use", Befunde
+- Tool use hardened against LM Studio/MLX (special assignment "Koda fix tool use", findings
   llm-setup `6f75737` + `~/Projects/verdigado/llm-configs`):
-  - Ein Tool-Call gilt nur bei `finish_reason: "tool_calls"` als vollstaendig. Kommt der
-    Kopf-Chunk (Name da) mit einem anderen `finish_reason` (z. B. `"length"`, 9x gemessen bei
-    LM Studio), wird er NICHT ausgefuehrt, sondern als abgeschnitten gemeldet — der
-    Text-Fallback (`parseTextToolCall`) ist ausgenommen, er hat nie `finish_reason:
-    "tool_calls"`.
-  - Neue lange Idle-Frist (`TOOL_CALL_IDLE_TIMEOUT_MS`, 900 s) ab dem Tool-Call-Kopf-Chunk:
-    LM Studio puffert die Argumente bis zum Ende ihrer Generierung, ohne ein Byte dazwischen
-    zu senden — das normale 120-s-Timeout riss dabei gesunde Schreib-Calls ab. Die Statuszeile
-    zeigt in dieser Phase „Schreibt Werkzeug-Aufruf …" statt weiter „denkt nach".
-  - `reasoning`-Echo fuer mehrrundige Tool-Laeufe: das Denken einer Tool-Call-Runde geht in
-    der Folgerunde DESSELBEN Laufs als `reasoning`+`reasoning_content` mit zurueck (Vorbild
-    llm-benchmark-harness `fade3f6`). Ohne dieses Echo brechen mehrrundige Laeufe gegen
-    Open WebUI/gpt-oss nach genau zwei Runden stumm ab (gemessen 2026-09-21, `verdigado-pro`).
-    Nicht persistiert — nur innerhalb eines `runAgent`-Laufs relevant.
-  - `max_tokens` von 2048 auf 8192 angehoben (vorlaeufig, die Sampling-Spec legt Budgets
-    spaeter je Modus fest) — 2048 reichte nicht fuer ein `write_note` mit ~9 KB Text.
-  - Die `mode`-Felder von `edit_active_note`, `write_note` und `write_skill` tragen kein
-    `enum` mehr im Tool-Schema (google/gemma-4-31b mit Original-Template scheitert daran mit
-    HTTP 400 „Unknown test: sequence"); die erlaubten Werte stehen weiterhin in der
-    description, die bestehende Validierung in `vault-tools.ts` bleibt die Instanz, die
-    einen falschen Wert als Tool-Ergebnis ans Modell zurueckmeldet.
-- Abgeschnittene Antwort (`finish_reason: "length"`) wird jetzt ausgewertet statt getragen und
-  verworfen: mit verwertbarem Text ein Hinweis unter der Antwort (kein Fehler), ohne Text ein
-  Fehler, der das Token-Limit nennt — der Reasoning-Normalfall, bei dem das Denken das Budget
-  vor der Antwort verbraucht. REGISTRY-Muster „Abgeschnittene LLM-Antwort als eigene
-  Fehlerklasse" (n=4 mit diesem Repo).
-- Koda meldet jede LLM-Antwort jetzt an `llm-lab`, sofern installiert (Konsumenten-Seite,
-  `apiVersion` 4 — `turnId`, `promptTemplate`, `contextPaths`): Modell, Endpunkt, Nachrichten,
-  Latenz/TTFT, ein `turnId` je Nutzer-Handlung (klammert die mehreren LLM-Aufrufe eines
-  Agent-Loop-Durchlaufs), der stabile Regelblock als `promptTemplate` sowie die Pfade der per
-  `read_note` gelesenen Notizen als `contextPaths`. Fire-and-forget, wirft nie — ist llm-lab
-  nicht installiert, passiert nichts. `src/obsidian/lab.ts` uebernommen aus
-  `vault-rag/src/lab_client.ts`.
+  - A tool call counts as complete only with `finish_reason: "tool_calls"`. If the head chunk
+    (name present) arrives with a different `finish_reason` (e.g. `"length"`, measured 9 times
+    with LM Studio), it is NOT executed but reported as truncated — the text fallback
+    (`parseTextToolCall`) is exempt, since it never has `finish_reason: "tool_calls"`.
+  - New long idle deadline (`TOOL_CALL_IDLE_TIMEOUT_MS`, 900 s) from the tool-call head chunk
+    on: LM Studio buffers the arguments until the end of their generation without sending a
+    byte in between — the normal 120 s timeout tore down healthy write calls. In this phase
+    the status line shows "Writing tool call …" instead of continuing with "thinking".
+  - `reasoning` echo for multi-round tool runs: the thinking of a tool-call round goes back in
+    the next round of the SAME run as `reasoning`+`reasoning_content` (model: llm-benchmark-harness
+    `fade3f6`). Without this echo, multi-round runs against Open WebUI/gpt-oss silently abort
+    after exactly two rounds (measured 2026-09-21, `verdigado-pro`). Not persisted — only
+    relevant within one `runAgent` run.
+  - `max_tokens` raised from 2048 to 8192 (provisional, the sampling spec sets budgets per mode
+    later) — 2048 was not enough for a `write_note` with ~9 KB of text.
+  - The `mode` fields of `edit_active_note`, `write_note` and `write_skill` no longer carry an
+    `enum` in the tool schema (google/gemma-4-31b with the original template fails on it with
+    HTTP 400 "Unknown test: sequence"); the allowed values are still in the description, and
+    the existing validation in `vault-tools.ts` remains the instance that reports a wrong value
+    back to the model as a tool result.
+- A truncated answer (`finish_reason: "length"`) is now evaluated instead of carried along and
+  discarded: with usable text a notice under the answer (not an error), without text an error
+  that names the token limit — the normal reasoning case, where the thinking uses up the budget
+  before the answer. REGISTRY pattern "Truncated LLM answer as its own error class" (n=4 with
+  this repo).
+- Koda now reports every LLM answer to `llm-lab` if installed (consumer side, `apiVersion` 4 —
+  `turnId`, `promptTemplate`, `contextPaths`): model, endpoint, messages, latency/TTFT, one
+  `turnId` per user action (brackets the several LLM calls of one agent-loop pass), the stable
+  rules block as `promptTemplate`, and the paths of the notes read via `read_note` as
+  `contextPaths`. Fire-and-forget, never throws — if llm-lab is not installed, nothing
+  happens. `src/obsidian/lab.ts` taken over from `vault-rag/src/lab_client.ts`.
 
 ### Changed
 
-- Sieben Erklärtexte kommen jetzt aus `obsidian-kit`s `explain-texts.ts` (v0.38.0, einzeln
-  vendoriert — Koda ist der erste Konsument dieser Kit-Bauart) statt aus einer eigenen
-  Fassung; drei davon werden dadurch sichtbar ausführlicher (EN/DE):
-  - Modell-Hinweis „kein Modell-Liste": „Endpoint does not publish a model list — type the
-    name yourself." → „The endpoint returns no model list — type the name."
-  - API-Schlüssel-Warnung: „This endpoint has an API key — requests leave your machine." →
-    „Carries an API key — the request with your messages goes to this provider, not to a
+- Seven explanatory texts now come from `obsidian-kit`'s `explain-texts.ts` (v0.38.0,
+  vendored individually — Koda is the first consumer of this Kit design) instead of its own
+  wording; three of them become visibly more detailed as a result (EN/DE):
+  - Model hint "no model list": "Endpoint does not publish a model list — type the
+    name yourself." → "The endpoint returns no model list — type the name."
+  - API key warning: "This endpoint has an API key — requests leave your machine." →
+    "Carries an API key — the request with your messages goes to this provider, not to a
     local server."
-  - Endpunkt-nicht-erreichbar-Hinweis: „Endpoint not reachable — the stored name is kept.
-    Fetch again once it is running." → „Endpoint unreachable — the saved value is kept. Use
+  - Endpoint-unreachable hint: "Endpoint not reachable — the stored name is kept.
+    Fetch again once it is running." → "Endpoint unreachable — the saved value is kept. Use
     "Fetch models" once it is running."
-  - „Nur gedacht"-Platzhalter wechselt von einer parenthetischen Notiz zu einem vollen Satz
-    mit zwei Auswegen: „The model only thought and gave no answer. Turn thinking off in the
+  - The "only thought" placeholder changes from a parenthetical note to a full sentence
+    with two ways out: "The model only thought and gave no answer. Turn thinking off in the
     settings, or pick another model."
-  - „Denken unterdrücken"-Beschreibung nennt jetzt den Mechanismus (geteiltes Token-Budget)
-    statt nur das Ergebnis: „Sends suppress hints for the Chat call. On by default: thinking
+  - The "suppress thinking" description now names the mechanism (shared token budget)
+    instead of only the result: "Sends suppress hints for the Chat call. On by default: thinking
     and answer share the same token budget, and a long thinking phase can use it up before
     the answer even starts. Turn it off only if your model produces better structured output
     after thinking."
-  Zwei Texte (CORS-Blockade, Token-Limit-vor-Text) sind wörtlich unverändert — sie waren die
-  Kit-Vorlage selbst (Herkunft Koda, laut Kit-Kopfkommentar). Kein achter Text: Koda hat für
-  „Modell denkt trotz Suppress weiter" (`reasoningIgnoresSuppress`) keine Entsprechung — das
-  ist kein Verhaltenswechsel, sondern eine bestehende Lücke, außerhalb dieses Auftrags.
-- Thinking-Schalter im Kopf zeigt seinen Zustand jetzt über mindestens zwei Kanäle statt nur
-  über Farbe (UI-STANDARD §8 „Zustands-Knopf", verbindlich seit 2026-09-16, Anlass: für
-  Johannes' Rot-Grün-Schwäche unlesbar): Icon-Wechsel `brain` (an/gesperrt) ↔ `brain-cog` (aus)
-  — Lucide kennt kein `brain-off`, das UI-STANDARD-Beispiel dafür ist erfunden (Meldung ans
-  Dach); `aria-pressed="true|false"`; Tooltip nennt zusätzlich zum Zustand die Aktion („Thinking:
-  an — Klick schaltet aus"); der gesperrte Zustand (Modell immer an) trägt jetzt das echte
-  HTML-`disabled`-Attribut, nicht nur `aria-disabled`.
-- Wortlaut der vier Koda-eigenen Settings-/Verlaufs-Begriffe angeglichen (UI-STANDARD §10, kein
-  Fachbegriff ohne Auflösung): „Kontext & Verdichtung" → „Verlauf kürzen"/„Shorten history"
-  (Settings-Gruppe + Verdichtungs-Marke), „Listen-Grenze" → „Höchstzahl aufgelisteter
-  Notizen"/„Maximum listed notes" (Vorbild vault-rag), „Max. Tool-Runden" →
-  „Maximale Tool-Aufrufe pro Antwort"/„Max tool calls per answer", und der unverständliche
-  Stufe-2-Hilfetext (`settings.summarize.desc`) komplett neu formuliert — ohne „Stufe 2",
-  „Stubs" oder „abgeschlossene Runden". README und `docs/SMOKE.md` (evergreen-Abschnitt)
-  nachgezogen.
+  Two texts (CORS block, token limit before text) are unchanged verbatim — they were the Kit
+  template itself (origin Koda, according to the Kit header comment). No eighth text: Koda has
+  no counterpart for "model keeps thinking despite suppress" (`reasoningIgnoresSuppress`) —
+  that is not a behaviour change but an existing gap, outside this assignment.
+- The thinking switch in the header now shows its state through at least two channels instead
+  of colour alone (UI-STANDARD §8 "state button", binding since 2026-09-16, reason: unreadable
+  for the maintainer's red-green colour weakness): icon change `brain` (on/locked) ↔ `brain-cog`
+  (off) — Lucide has no `brain-off`, the UI-STANDARD example for it is invented (reported to
+  the umbrella repo); `aria-pressed="true|false"`; the tooltip names the action in addition to
+  the state ("Thinking: on — click switches off"); the locked state (model always on) now carries
+  the real HTML `disabled` attribute, not only `aria-disabled`.
+- Wording of Koda's four own settings/history terms aligned (UI-STANDARD §10, no technical term
+  without explanation): "Kontext & Verdichtung" → "Verlauf kürzen"/"Shorten history"
+  (settings group + compaction mark), "Listen-Grenze" → "Höchstzahl aufgelisteter
+  Notizen"/"Maximum listed notes" (model: vault-rag), "Max. Tool-Runden" →
+  "Maximale Tool-Aufrufe pro Antwort"/"Max tool calls per answer", and the incomprehensible
+  stage-2 help text (`settings.summarize.desc`) completely reworded — without "stage 2",
+  "stubs" or "completed rounds". README and `docs/SMOKE.md` (evergreen section)
+  updated.
 - Streaming answer area now uses `obsidian-kit`'s `buildStreamArea`/`createStableWriter`
   (§8 building block) instead of the hand-rolled version. Two behaviour changes: the
   reasoning block stays open for the duration of a stream (was collapsed by default), and
