@@ -12,7 +12,7 @@ Fünf Punkte, Gate 856 → 902, GUI-Smoke 50 → 54 (Punkte 51–54, `docs/SMOKE
 
 ### Vorgeschichte: 0.16.0 released (Arbeitskontext Etappe 3a), Stand 2026-09-25
 
-**0.16.0 ist am 2026-09-25 released** (Release-Commit `210537b`, Tag auf Forgejo und GitHub, GitHub-Release vom Skript abgewartet). Inhalt ist **Arbeitskontext Etappe 3a** (Modus Vault über vault-rags `search`, semantische Nachbarn über `related()`, `contextAutoK`, Kontext-Tab mit Vault-Abschnitt) plus der Fix, dass der Chat im Kontext-Tab ausgeblendet wird (seit 0.13.0 schob er das Panel aus dem Bild). Gebaut von der Minion-Session `koda3a-w8` nach `docs/superpowers/plans/2026-09-18-koda-arbeitskontext-etappe-3.md`, Gate 796/796, Smoke 46/46. Store-Rescan im Developer Dashboard ist Johannes' Handgriff. **Koda ist seit 0.15.2 wieder im Store** (Rescan passed, zero warnings); die Rescan-Blockade der Absätze darunter ist Chronik.
+**0.16.0 ist am 2026-09-25 released** (Release-Commit `210537b`, Tag auf Forgejo und GitHub, GitHub-Release vom Skript abgewartet). Inhalt ist **Arbeitskontext Etappe 3a** (Modus Vault über vault-rags `search`, semantische Nachbarn über `related()`, `contextAutoK`, Kontext-Tab mit Vault-Abschnitt) plus der Fix, dass der Chat im Kontext-Tab ausgeblendet wird (seit 0.13.0 schob er das Panel aus dem Bild). Gebaut von der Minion-Session `koda3a-w8` nach Vault-Cockpit `_SDD/2026-09-18-koda-arbeitskontext-etappe-3.md`, Gate 796/796, Smoke 46/46. Store-Rescan im Developer Dashboard ist Johannes' Handgriff. **Koda ist seit 0.15.2 wieder im Store** (Rescan passed, zero warnings); die Rescan-Blockade der Absätze darunter ist Chronik.
 
 **Nach 0.16.0 auf `main`, released mit 0.17.0: die Wirtsseite des Werkzeug-Anbieter-Vertrags** — Koda montiert Werkzeuge fremder Plugins statt sie nachzubauen (`src/core/tools/provider.ts`, `src/obsidian/providers.ts`, `toolSet()`; Struktur-Kurzüberblick unten). Gate 832/832, Smoke 47/47, Praxistest 4/4. Erster echter Anbieter ist vault-rag `feat/tool-provider` (Vertragsstand 92c6c4d, Merge dort über das Dach); calendar-notes braucht dafür erst eine kleinere Werkzeugmenge mit `writes` und Ziel in den Parametern (Task in dessen Cockpit). Festlegungen und Befunde: Cockpit-Task „Werkzeug-Anbieter-Vertrag" und `docs/SMOKE.md`. **Etappe 3b (Bases-Ansicht, Plan-Tasks 9–13) ist noch offen** und wird als Minion-Auftrag gebaut.
 
@@ -121,8 +121,8 @@ Teil dieser Etappe.
 Fast-Forward nach `main`, Johannes' Entscheidung 18:06; Release-Commit `2dc5d2c`, Tag auf beiden
 Remotes). ⚠️ Beim Release-Lauf erschien das **GitHub-Release nicht binnen drei Minuten** — das
 Konto ist weiter geflaggt, die Action läuft nicht. **Nicht rescannen, bis
-`releases/tags/0.11.0` existiert.** Spec `docs/superpowers/specs/2026-09-02-koda-arbeitskontext-design.md` (drei
-Etappen), Plan `docs/superpowers/plans/2026-09-02-koda-arbeitskontext-etappe-1.md` (16 Tasks,
+`releases/tags/0.11.0` existiert.** Spec Vault-Cockpit `_SDD/2026-09-02-koda-arbeitskontext-design.md` (drei
+Etappen), Plan Vault-Cockpit `_SDD/2026-09-02-koda-arbeitskontext-etappe-1.md` (16 Tasks,
 subagent-getrieben, je Task ein Review). Inhalt: Modi **Aus/Arbeitsplatz** je Nachricht (Dropdown
 neben Senden, drei Befehle, Rechtsklick „Koda fragen"), der Block hängt als Feld `context` an der
 Nutzer-Nachricht (persistiert, nur in der Projektion eingewoben, Stufe 1 stubbt ihn wie
@@ -211,7 +211,7 @@ durchgefallen und nimmt das Plugin binnen 24 h aus der Suche. Details zu Nutzung
 LLM-Server braucht CORS** (LM Studio „Enable CORS"/`lms server start --cors`): der Chat
 streamt als XHR aus dem Renderer, die Testen-Probe läuft über `requestUrl` — Koda benennt
 den Widerspruch „Probe grün, Chat rot" seit `3232660` selbst.
-Spezifiziert in `docs/superpowers/specs/2026-08-05-koda-agent-mvp-design.md` — dort
+Spezifiziert in Vault-Cockpit `_SDD/2026-08-05-koda-agent-mvp-design.md` — dort
 stehen die Entscheidungen (Community-Store ab Commit 1, Schreibmodell „Koda-Ordner
 frei, Rest bestätigt", Agent-Kern im Plugin, Roadmap-Stufen). Ideen-Quelle:
 `10_Pallas/00_Inbox/Koda Agent Plugin Recherche.md` (Pallas-Vault).
@@ -229,11 +229,11 @@ Modell-Zusammenfassung abgeschlossener Runden), Settings-Gruppe „Kontext &
 Verdichtung", Fenster-Vorbefüllung über die Endpunkt-Probe, GUI-Smoke-Punkte 7/8.
 Der Praxistest gegen ein echtes Modell ist **bestanden** (2026-08-19, `docs/SMOKE.md`);
 der „CORS-Verdacht" bei `gui:ask` war LM Studio ohne CORS, kein Plugin-Defekt. Spec:
-`docs/superpowers/specs/2026-08-18-koda-compaction-design.md`.
+Vault-Cockpit `_SDD/2026-08-18-koda-compaction-design.md`.
 **Baustein C** (Aufräum-Assistent) ist **seit 2026-08-21 geparkt** (Entscheidung
 Johannes) — der Seed bleibt unverändert gültig und beginnt bei Wiederaufnahme mit
 `superpowers:brainstorming`, nicht mit Code: das ist ein Schnitt, kein Feature.
-Voller Seed mit offenen Design-Punkten und Kit-Ankern: `docs/NEXT-SESSION.md`.
+Voller Seed mit offenen Design-Punkten und Kit-Ankern: Vault-Cockpit `_Intern/NEXT-SESSION.md`.
 Erledigt und nicht mehr offen: QoL-Ausbau, GUI-Smoke-Automatisierung, Release-Infra,
 Store-Einreichung (0.1.0 ist gelistet). Geparkt: Freeze-Gegenprobe, Baustein C.
 
@@ -273,8 +273,8 @@ Rücknahme im Kommentar in `src/core/tools/retrieval.ts` und im Nachtrag zu E4 d
 Spec.) Die Kopplung ist weich: fehlt vault-rag, verhält sich Koda
 wie vorher und `related_notes` erscheint nicht im Prompt.
 
-Spec: `docs/superpowers/specs/2026-08-13-koda-retrieval-andockung-design.md`,
-Plan: `docs/superpowers/plans/2026-08-13-koda-retrieval-andockung.md`.
+Spec: Vault-Cockpit `_SDD/2026-08-13-koda-retrieval-andockung-design.md`,
+Plan: Vault-Cockpit `_SDD/2026-08-13-koda-retrieval-andockung.md`.
 Verbindlich vorgelagert ist der **Zuständigkeits-Zuschnitt** im Dach
 (`../AGENTS.md` § „Zuständigkeits-Zuschnitt"): Fähigkeiten wandern zur Quelle —
 Koda baut kein eigenes Retrieval, keine Aufgabenverwaltung und kein Persona-/
@@ -314,7 +314,7 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `npm run dev` — esbuild-Watch-Build für lokale Plugin-Entwicklung.
 - `npm test` — `check-no-abs-paths` + vitest (848/848, Stand 2026-09-26).
 - `npm run lab:tools` — koda-lab, das skriptgesteuerte Tool-Calling-Sondieren gegen
-  einen laufenden Endpoint (Befunde in `docs/LAB.md`).
+  einen laufenden Endpoint (Befunde in Vault-Cockpit `_Intern/LAB.md`).
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian (CDP).
   Prüft die Naht zum Host, bewusst **ohne** echte Modell-Antwort. 48 Punkte (48 seit 2026-09-26: `list_notes` mit `depth: "2"` liefert über `run()` den Ordnerbaum samt leerem Ordner der zweiten Ebene aus `getAllFolders()`, ohne `depth` bleibt die Liste flach — Gegenprobe gegen den alten Build in `docs/SMOKE.md`; 47 seit 2026-09-25, Spike Werkzeug-Anbieter: ein Stub-Anbieter unter eigener Plugin-Id wird montiert, `run()` erreicht dessen `execute()` mit `lang` und `confirm`, das montierte `related_notes` geht an den Anbieter, eine Kollision mit `read_note` bleibt beim Wirt, Nutzer-Schalter und Entfernen des Anbieters melden Klartext; Gegenprobe und Praxistest in `docs/SMOKE.md`; 43–46 seit 2026-09-25, Etappe 3a, alle gegen einen Stub der vault-rag-API unter `vault-retrieval` — übersprungen, wenn dort schon ein Eintrag steht: 43 Modus Vault sucht mit der gesendeten Frage und meldet einen Fehlschlag im Block, 44 Vault ist ohne vault-rag gesperrt (Dropdown und Befehl), 45 Modus Notiz holt related()-Nachbarn und K = 0 schaltet ab, 46 die Kontext-Tab-Vorschau folgt dem Eingabefeld (entprellt) und der Chat ist im Kontext-Tab `display:none`; vier Gegenproben je Mutation in `docs/SMOKE.md`, Belege gegen Spezifitätsfehler in `styles.css` inklusive; 42 seit 2026-09-25: `list_notes` nennt die Unterordner eines flachen Ergebnisses, auch einen ohne Notiz, und meldet einen fehlenden Ordner als nicht existent — Naht `vault.getAllFolders()`, Gegenprobe gegen den alten Build in `docs/SMOKE.md`; 41 seit
   2026-09-17: llm-lab-Meldestrecke — ein `llm-lab`-Stub (Marker-Check gegen ein echtes
