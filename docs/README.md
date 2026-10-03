@@ -29,4 +29,4 @@ The pages below follow [Diátaxis](https://diataxis.fr/): learning something, do
 
 ---
 
-`LAB.md`, `SMOKE.md`, `NEXT-SESSION.md` and `superpowers/` in this folder are maintainer material (tool-calling probes, the release smoke checklist, design specs), not user documentation.
+`SMOKE.md` in this folder is the maintainer's release smoke checklist, not user documentation.

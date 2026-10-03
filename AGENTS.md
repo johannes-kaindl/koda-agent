@@ -34,7 +34,7 @@ Struktur im Einzelnen: `CLAUDE.md` § Struktur-Kurzüberblick.
 - `npm run gate` — alles davon; vor jedem Commit erwartet, Ziel 0 Fehler / 0 Warnungen
 - `npm run smoke:gui -- --vault <name>` — GUI-Smoke gegen ein laufendes Obsidian per CDP; `--setup` stellt den Staging-Vault `$STAGING_VAULTS_DIR/koda-agent` aus dem Fixture `docs/images/fixture/` her. Gefahren wird gegen diesen Vault, nicht gegen den Arbeits-Vault.
 - `npm run gui:ask -- --vault <name> --ask "<Frage>" --full` — Praxistest gegen ein echtes Modell (langsam, nicht deterministisch)
-- `npm run lab:tools` — Sondieren des Tool-Callings gegen einen laufenden Endpoint (Befunde in `docs/LAB.md`)
+- `npm run lab:tools` — Sondieren des Tool-Callings gegen einen laufenden Endpoint (Befunde im Vault-Cockpit unter `_Intern/LAB.md`)
 - `npm run shots -- --port <p> --vault koda-agent` und `npm run shots:check` — README-Bilder (Vertrag `docs/images/README.md`)
 - `npm run release` — Minor/Patch-Release über das zentrale Tooling `../tools/release/`; das Repo muss im Dach `obsidian-plugins/` liegen.
 - `python3 ~/Projects/jkaindl/workspace/_docs/readme/readme_lint.py . --strict` — README- und Doku-Standard
@@ -46,7 +46,7 @@ Struktur im Einzelnen: `CLAUDE.md` § Struktur-Kurzüberblick.
 - Push nur nach `origin`. GitHub bekommt Branch und Tag ausschließlich über `release.mjs`.
 - TDD; ein Test, der nicht nachweislich fehlschlagen kann, ist keine Absicherung (CORE-TEST-01), also die Gegenprobe mitfahren.
 - Nutzer-Doku liegt unter `docs/` (Index `docs/README.md`), Standard CORE-META-04. Wer eine Meldung in `src/i18n/strings.ts` ändert, zieht `docs/how-to/troubleshooting.md` mit, weil dort jeder Text wörtlich steht.
-- Specs und Pläne liegen unter `docs/superpowers/`; Messprotokolle des GUI-Smokes in `docs/SMOKE.md`.
+- Specs und Pläne liegen im Vault-Cockpit unter `_SDD/` (CORE-META-14), interne Befunde unter `_Intern/`; Messprotokolle des GUI-Smokes in `docs/SMOKE.md`.
 
 ## Gotchas
 
