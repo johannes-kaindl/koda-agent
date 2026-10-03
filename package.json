@@ -5,8 +5,8 @@
   "description": "Agentic vault companion: chat, search, and note-writing with approval.",
   "license": "AGPL-3.0-or-later",
   "author": {
-    "name": "Jay",
-    "url": "https://github.com/v6t2b9"
+    "name": "Johannes Kaindl",
+    "url": "https://github.com/johannes-kaindl"
   },
   "main": "main.js",
   "scripts": {

@@ -4,7 +4,7 @@
   "version": "0.21.0",
   "minAppVersion": "1.8.7",
   "description": "Agentic vault companion: chat with an assistant that searches and reads your notes, writes only with your approval, and learns through a transparent memory note.",
-  "author": "Jay",
+  "author": "Johannes Kaindl",
   "authorUrl": "https://github.com/johannes-kaindl",
   "isDesktopOnly": false
 }

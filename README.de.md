@@ -83,4 +83,4 @@ Das kanonische Repository ist [git.jkaindl.de/jkaindl/koda-agent](https://git.jk
 
 ## Lizenz
 
-[AGPL-3.0-or-later](https://github.com/johannes-kaindl/koda-agent/blob/main/LICENSE) — © 2026 Jay.
+[AGPL-3.0-or-later](https://github.com/johannes-kaindl/koda-agent/blob/main/LICENSE) — © 2026 Johannes Kaindl.

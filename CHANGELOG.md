@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The author in the manifest now reads "Johannes Kaindl" (shown in Obsidian's plugin list).
+
 ## [0.21.0] — 2026-09-30
 
 ### Added
