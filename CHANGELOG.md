@@ -9,6 +9,8 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - The author in the manifest now reads "Johannes Kaindl" (shown in Obsidian's plugin list).
+- The changelog is now written entirely in English.
+- Internal design notes moved out of the repository; the user documentation is unchanged.
 
 ## [0.21.0] — 2026-09-30
 
