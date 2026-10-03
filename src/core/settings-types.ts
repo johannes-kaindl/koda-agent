@@ -166,7 +166,7 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   skillBudgetChars: 6000,
   listNotesMaxRows: 150,
   imageMaxKb: 4096,
-  textFallback: false, // Default laut koda-lab-Befund setzen (docs/LAB.md)
+  textFallback: false, // Default laut koda-lab-Befund setzen (Vault-Cockpit `_Intern/LAB.md`)
   language: "auto",
   openOnStartup: false,
   contextWindowTokens: 8192,

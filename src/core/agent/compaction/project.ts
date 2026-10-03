@@ -8,7 +8,7 @@
  * Nutzer-Nachricht nie mitten in einer Runde auftauchen kann — `view.ts` verweigert Eingaben,
  * solange `plugin.busy` steht. Unveraenderte Nachrichten liefert die Projektion per Referenz
  * zurueck — Aufrufer duerfen sie nie beschreiben. Spec:
- * docs/superpowers/specs/2026-08-18-koda-compaction-design.md */
+ * Vault-Cockpit `_SDD/2026-08-18-koda-compaction-design.md` */
 import { isCompactionRecord, type ChatMessage, type CompactionRecord, type LogEntry } from "../types";
 import { modeLabel } from "../../context/labels";
 import { IMAGE_EST_CHARS } from "../../tools/images";
@@ -81,7 +81,7 @@ interface Slot {
 
 /** Fasst mehrere `user`-Nachrichten zu einer zusammen — vorsorglich gegen Chat-Templates
  *  (Gemma), die zwei `user`-Rollen hintereinander ablehnen sollen ("roles must alternate").
- *  Gegen LM Studio (2026-08-18, docs/LAB.md) hat keines von 8 Modellen (4x Gemma, 4x Qwen)
+ *  Gegen LM Studio (2026-08-18, Vault-Cockpit `_Intern/LAB.md`) hat keines von 8 Modellen (4x Gemma, 4x Qwen)
  *  das quittiert — die Begründung bleibt also vorsorglich, nicht gemessen bestätigt; das
  *  Zusammenfassen schadet aber nicht und bleibt deshalb bestehen. */
 function renderMerged(parts: string[]): ChatMessage {

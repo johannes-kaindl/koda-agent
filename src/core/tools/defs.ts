@@ -196,7 +196,7 @@ export function toWireTools(defs: ToolDef[]): unknown[] {
 /** Nur verfuegbar, wenn vault-rag einen Index bereitstellt — deshalb kein Teil von
  *  TOOL_DEFS. Ein Werkzeug im Prompt, das nicht laufen kann, kostet Kontext und
  *  provoziert Fehlversuche; bei lokalen Modellen ist die Werkzeugzahl ein
- *  Zuverlaessigkeitsfaktor (Messgrundlage: docs/LAB.md). */
+ *  Zuverlaessigkeitsfaktor (Messgrundlage: Vault-Cockpit `_Intern/LAB.md`). */
 const RELATED_DEF: ToolDef = {
   name: "related_notes",
   description:

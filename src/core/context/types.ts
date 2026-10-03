@@ -1,5 +1,5 @@
 /* Arbeitskontext — was der Nutzer gerade vor sich hat, als Anhang an einer Nutzer-Nachricht.
- * Spec: docs/superpowers/specs/2026-09-02-koda-arbeitskontext-design.md (E2). Pure. */
+ * Spec: Vault-Cockpit `_SDD/2026-09-02-koda-arbeitskontext-design.md` (E2). Pure. */
 
 export const CONTEXT_MODES = ["off", "workspace", "note", "tabs", "vault"] as const;
 export type ContextMode = (typeof CONTEXT_MODES)[number];

@@ -4,7 +4,7 @@
 // Projektordner die Standard-Struktur traegt, liess sich mit der flachen Liste nur mit einem
 // Aufruf je Projekt beantworten. Bewusst KEIN eigenes Werkzeug, sondern ein Parameter an
 // `list_notes`: jedes weitere Werkzeug macht lokale Modelle bei der Auswahl unsicherer
-// (docs/LAB.md), und `list_notes` waehlt Koda schon zuverlaessig. Aus demselben Grund steht
+// (Vault-Cockpit `_Intern/LAB.md`), und `list_notes` waehlt Koda schon zuverlaessig. Aus demselben Grund steht
 // seit 0.15.2 die Unterordner-Zeile im Ergebnis des Werkzeugs, das Koda ohnehin ruft.
 //
 // Was der Baum NICHT sagt: ob ein Ordner fehlt, der da sein sollte. Das ist eine Konvention

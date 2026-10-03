@@ -69,7 +69,7 @@ export interface AgentDeps {
   tools: ToolRunner;
   maxRounds: number;
   /** true: JSON-Tool-Objekte im Antworttext werden als Tool-Call behandelt
-   *  (Default laut koda-lab-Befund, docs/LAB.md). */
+   *  (Default laut koda-lab-Befund, Vault-Cockpit `_Intern/LAB.md`). */
   textFallback: boolean;
   /** Fehlt: keine Verdichtung (Bestandsverhalten, alte Tests). */
   compaction?: CompactionDeps;
