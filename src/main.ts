@@ -6,6 +6,8 @@ import { resolveLang, type Lang } from "./core/lang";
 import type { EndpointConfig } from "./vendor/kit/endpoint_config";
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
+import { hydrateLocalEndpoints, prepareLocalEndpoints } from "./vendor/kit-obsidian/endpoint-secrets";
+import { redactMessages } from "./vendor/kit-obsidian/chat-client";
 import { KodaChatClient, type LlmResult } from "./llm/KodaChatClient";
 import { probeEndpoint, probeModels } from "./core/llm/probe";
 import { probeModelContext } from "./core/llm/context-probe";
@@ -57,16 +59,6 @@ import { pickNote } from "./obsidian/note-picker";
 import { pickFolder } from "./obsidian/folder-picker";
 import { resolveFolderPath } from "./core/tools/path-guard";
 import type { CollapsibleStorage } from "./vendor/kit-obsidian/collapsible";
-
-/** Modell-Override der Zeile, sonst das globale Modell. Inline statt Kit-Import: das Kit
- *  hat `effectiveModel` in `endpoint_config.ts` (code-kit 0.6.0) als `@deprecated`
- *  markiert — koda hat weiterhin ein globales Modellfeld (`settings.model`), die Migration
- *  weg davon ist eine eigene Design-Entscheidung, kein Nebenprodukt des Pin-Bumps auf
- *  0.35.0. Verhalten unveraendert; nur der Aufrufer der deprecated-Warnung entfaellt. */
-function effectiveModel(cfg: EndpointConfig, globalModel: string): string {
-  const m = cfg.model?.trim();
-  return m ? m : globalModel;
-}
 
 /** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
  *  "read-error" (Datei liess sich nicht lesen) und "no-description" (Frontmatter ohne
@@ -326,19 +318,37 @@ export default class KodaPlugin extends Plugin {
    *  Liest `this.settings` bei jedem Durchlauf frisch — eine im Editor geaenderte Liste
    *  wirkt dadurch ohne Neustart, sobald `saveSettings()` den Zwischenstand verwirft. */
   private readonly resolver = new EndpointResolver(
-    () => this.settings.endpoints,
+    // Die Liste liegt mit Schlüssel-IDs in den Settings; `apiKey` steht nur im Speicher
+    // (Schlüsselbund). Ein noch vorhandener Klartext-Schlüssel wandert hier beim ersten
+    // Auflösen in den Schlüsselbund, auch wenn der Settings-Tab nie geöffnet wird.
+    () => prepareLocalEndpoints({
+      app: this.app,
+      pluginId: this.manifest.id,
+      list: this.settings.endpoints,
+      persist: (list) => {
+        this.settings.endpoints = list;
+        return this.saveSettings();
+      },
+    }),
     async (ep) => (await this.probe(ep)).reachable,
+    () => this.settings.model,
   );
+
+  /** Die Zeile mit `apiKey` aus dem Schlüsselbund. Die Listen-Zeilen der Settings tragen nur
+   *  die Schlüssel-ID; ohne diesen Schritt ginge die Probe ohne Authorization-Header raus. */
+  private hydrated(ep: EndpointConfig): EndpointConfig {
+    return hydrateLocalEndpoints(this.app, this.manifest.id, [ep])[0] ?? ep;
+  }
 
   /** Erreichbarkeits-Probe einer Endpunkt-Zeile (Settings-Testknopf). Liegt am Plugin,
    *  weil der Failover sie spaeter ebenfalls braucht. */
   probe(ep: EndpointConfig): Promise<EndpointStatus> {
-    return probeEndpoint(ep, requestUrlProbe, realClock);
+    return probeEndpoint(this.hydrated(ep), requestUrlProbe, realClock);
   }
 
   /** Erreichbarkeit UND Modell-Liste aus einem Aufruf (Settings-Modellauswahl). */
   probeModels(ep: EndpointConfig): Promise<{ status: EndpointStatus; models: string[] }> {
-    return probeModels(ep, requestUrlProbe, realClock);
+    return probeModels(this.hydrated(ep), requestUrlProbe, realClock);
   }
 
   /** Endpunkt|Modell, fuer die in dieser Laufzeit schon geprueft wurde — „einmal je Sitzung"
@@ -357,7 +367,7 @@ export default class KodaPlugin extends Plugin {
     if (this.contextChecked.has(key)) return;
     this.contextChecked.add(key);
     try {
-      const probed = await this.probeContext(ep).catch(() => null);
+      const probed = await this.probeContext(ep, sentModel).catch(() => null);
       const hint = lowerContextHint(this.settings.contextWindowTokens, [
         contextHintFromModelName(reportedModel),
         contextHintFromModelName(sentModel),
@@ -385,8 +395,8 @@ export default class KodaPlugin extends Plugin {
 
   /** Kontextfenster laut Endpunkt (LM Studio/Ollama), sonst null. Nutzt das Modell, das fuer
    *  diese Zeile effektiv gilt. */
-  probeContext(ep: EndpointConfig): Promise<number | null> {
-    return probeModelContext(ep, effectiveModel(ep, this.settings.model), requestUrlProbe, realClock);
+  probeContext(ep: EndpointConfig, model: string = ep.model?.trim() || this.settings.model): Promise<number | null> {
+    return probeModelContext(this.hydrated(ep), model, requestUrlProbe, realClock);
   }
   private store!: SessionStore;
 
@@ -764,14 +774,25 @@ export default class KodaPlugin extends Plugin {
     try {
       // `logToLab` wirft nie und faengt eine Promise ab, die ein fremdes Plugin entgegen dem
       // Vertrag zurueckgibt (Kit lab-client). Telemetrie darf einen Chat nie mitreissen.
+      // Das Log entspricht dem Draht (Master-Entscheidung Welle 15): das Modell sah Platzhalter
+      // statt Geheimnissen, das Lab bekommt dieselben. Der Client gibt dem Loop die Originale
+      // zurueck, also werden Verlauf, Antwort und Denkspur hier in EINER Sitzung geschwaerzt —
+      // derselbe Wert traegt ueberall denselben Platzhalter.
+      const labMessages = toLabMessages(input.messages);
+      const answer = input.result.ok ? input.result.content : input.result.partial;
+      const wire = redactMessages([
+        ...labMessages,
+        { role: "assistant", content: answer },
+        { role: "assistant", content: input.reasoning },
+      ]).messages;
       const out = logToLab(this.app, {
         plugin: "koda-agent",
         feature: input.feature,
         model: input.model,
         endpointUrl: input.endpointUrl,
-        messages: toLabMessages(input.messages),
-        content: input.result.ok ? input.result.content : input.result.partial,
-        ...(input.reasoning !== "" ? { reasoning: input.reasoning } : {}),
+        messages: wire.slice(0, labMessages.length) as typeof labMessages,
+        content: String(wire[labMessages.length]?.content ?? ""),
+        ...(input.reasoning !== "" ? { reasoning: String(wire[labMessages.length + 1]?.content ?? "") } : {}),
         ...(input.result.ok && input.result.finishReason !== undefined ? { finishReason: input.result.finishReason } : {}),
         latencyMs: input.latencyMs,
         ...(input.ttftMs !== undefined ? { ttftMs: input.ttftMs } : {}),
@@ -861,7 +882,8 @@ export default class KodaPlugin extends Plugin {
           const urls = await imageUrls(messages);
           return withFailover(
             this.resolver,
-            (ep) => {
+            (resolved) => {
+              const ep = resolved.config;
               const started = Date.now();
               let firstToken: number | undefined;
               let seenReasoning = "";
@@ -870,7 +892,7 @@ export default class KodaPlugin extends Plugin {
               const cfg = {
                 endpoint: ep.url,
                 apiKey: ep.apiKey ?? "",
-                model: effectiveModel(ep, s.model),
+                model: resolved.model,
                 suppressThinking: s.suppressThinking,
               };
               return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal, onToolCallHead, urls).then((r) => {
@@ -913,9 +935,9 @@ export default class KodaPlugin extends Plugin {
         // `onNoEndpoint` statt `LlmResult` — `r.content` wuerde dann nicht existieren.
         const r = await withFailover<LlmResult>(
           this.resolver,
-          (ep) =>
+          (resolved) =>
             client.complete(
-              { endpoint: ep.url, apiKey: ep.apiKey ?? "", model: effectiveModel(ep, s.model), suppressThinking: true },
+              { endpoint: resolved.config.url, apiKey: resolved.config.apiKey ?? "", model: resolved.model, suppressThinking: true },
               messages, [], () => {}, () => {}, this.abort?.signal ?? new AbortController().signal,
             ),
           (r) => !r.ok && r.kind === "network" && r.partial === "",

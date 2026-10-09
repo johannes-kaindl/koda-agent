@@ -406,6 +406,10 @@ export class KodaSettingsTab extends PluginSettingTab {
       reconnect: () => Promise.resolve(),
       rerender: () => { this.refreshUi(); },
       presets: ENDPOINT_PRESETS,
+      // Schluessel liegen im Schluesselbund (`app.secretStorage`), nicht in data.json; ein noch
+      // vorhandener Klartext-Schluessel wandert beim Zeichnen der Liste dorthin.
+      app: this.app,
+      pluginId: this.plugin.manifest.id,
     });
   }
 
@@ -480,6 +484,10 @@ export class KodaSettingsTab extends PluginSettingTab {
       presetLabel: (preset) => t("settings.endpoints.presetAdd", preset.label),
       checkConnection: t("settings.probe"),
       saveFailed: t("settings.endpoints.saveFailed"),
+      secretSaved: t("settings.endpoints.secretSaved"),
+      secretChange: t("settings.endpoints.secretChange"),
+      secretClear: t("settings.endpoints.secretClear"),
+      secretUnavailable: t("settings.endpoints.secretUnavailable"),
     };
   }
 

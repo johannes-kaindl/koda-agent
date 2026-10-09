@@ -6,6 +6,7 @@ import { isCompactionRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
 import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obsidian/stable-writer";
+import { neutralizeModelMarkdown } from "../vendor/kit/safe-markdown";
 import { thinkToggleView } from "../core/chat/reasoning-toggle";
 import { isContextMode, type ContextAttachment } from "../core/context/types";
 import { contextSummary, sourceChips } from "../core/context/labels";
@@ -297,7 +298,11 @@ export class KodaView extends ItemView {
   private renderMarkdownInto(el: HTMLElement, markdown: string): Promise<void> {
     const comp = this.mdComp;
     if (comp === null) return Promise.resolve();
-    return MarkdownRenderer.render(this.app, markdown, el, "", comp);
+    // Antworten des Modells tragen Originale (die Schwaerzung ist rueckgaengig gemacht) und
+    // sind nicht vertrauenswuerdig: ein Platzhalter in einer Bild-URL oder ein ```dataviewjs
+    // -Block wuerde sonst beim Rendern wirken. Idempotent, der Schreiber-Weg neutralisiert
+    // ohnehin selbst — der Verlauf-Neurender (`renderLog`) laeuft aber an ihm vorbei.
+    return MarkdownRenderer.render(this.app, neutralizeModelMarkdown(markdown), el, "", comp);
   }
 
   private send(): void {

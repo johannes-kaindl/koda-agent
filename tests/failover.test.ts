@@ -6,7 +6,7 @@ const eps = (...urls: string[]): EndpointConfig[] => urls.map((url) => ({ url })
 describe("EndpointResolver", () => {
   it("nimmt den ersten erreichbaren Eintrag — die Liste IST die Prioritaet", async () => {
     const r = new EndpointResolver(() => eps("http://a", "http://b"), async (c) => c.url.includes("b"));
-    expect((await r.resolve())?.url).toBe("http://b");
+    expect((await r.resolve())?.config.url).toBe("http://b");
   });
 
   it("merkt sich das Ergebnis, statt vor jeder Frage neu zu pingen", async () => {
@@ -26,7 +26,7 @@ describe("EndpointResolver", () => {
     });
     const [x, y] = await Promise.all([r.resolve(), r.resolve()]);
     expect(pings).toBe(1);
-    expect(x?.url).toBe(y?.url);
+    expect(x?.config.url).toBe(y?.config.url);
   });
 
   it("merkt sich einen Fehlschlag NICHT — das Netz kann zurueck sein", async () => {
@@ -35,7 +35,7 @@ describe("EndpointResolver", () => {
     const r = new EndpointResolver(() => eps("http://a"), async () => { pings += 1; return reachable; });
     expect(await r.resolve()).toBeNull();
     reachable = true;
-    expect((await r.resolve())?.url).toBe("http://a");
+    expect((await r.resolve())?.config.url).toBe("http://a");
     expect(pings).toBe(2);
   });
 
@@ -46,6 +46,27 @@ describe("EndpointResolver", () => {
     r.invalidate();
     await r.resolve();
     expect(pings).toBe(2);
+  });
+});
+
+describe("EndpointResolver — Modell", () => {
+  it("liefert das Modell der Zeile vor dem globalen Modell", async () => {
+    const r = new EndpointResolver(() => [{ url: "http://a", model: "zeile" }], async () => true, () => "global");
+    expect((await r.resolve())?.model).toBe("zeile");
+  });
+
+  it("faellt ohne Zeilen-Modell auf das globale zurueck", async () => {
+    const r = new EndpointResolver(() => [{ url: "http://a", model: "  " }], async () => true, () => "global");
+    expect((await r.resolve())?.model).toBe("global");
+  });
+
+  it("liest das globale Modell bei jedem Durchlauf frisch (nach invalidate)", async () => {
+    let global = "alt";
+    const r = new EndpointResolver(() => eps("http://a"), async () => true, () => global);
+    expect((await r.resolve())?.model).toBe("alt");
+    global = "neu";
+    r.invalidate();
+    expect((await r.resolve())?.model).toBe("neu");
   });
 });
 
@@ -71,7 +92,7 @@ describe("withFailover", () => {
     const used: string[] = [];
     const out = await withFailover(
       r,
-      async (ep) => { used.push(ep.url); return ep.url === "http://a" ? "netzfehler" : "ok"; },
+      async (ep) => { used.push(ep.config.url); return ep.config.url === "http://a" ? "netzfehler" : "ok"; },
       (res) => res === "netzfehler",
       () => "leer",
     );

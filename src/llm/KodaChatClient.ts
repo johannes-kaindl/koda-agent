@@ -5,7 +5,7 @@
    Puffer, Idle-Frist, Abbruch und Fehlerkoerper-Lesen liegen im Kit — Kodas alter Client war die
    Vorlage dieser Extraktion (Welle 11: rueckgetauscht).
    Kein Obsidian-Import: der Transport wird injiziert (`chat-transport` liefert XHR). */
-import { createChatClient, type ChatResult, type ChatWireMessage, type SseTransport } from "../vendor/kit-obsidian/chat-client";
+import { createChatClient, JIT_FIRST_CHUNK_TIMEOUT_MS, type ChatResult, type ChatWireMessage, type SseTransport } from "../vendor/kit-obsidian/chat-client";
 import { suppressParams } from "../vendor/kit/reasoning";
 // Anzeige- und Request-Seite treffen dieselbe Entscheidung — deshalb EINE Definition,
 // im uebernommenen Toggle-Modul (REGISTRY: „wer nur die Anzeige uebernimmt, hat die Haelfte").
@@ -94,6 +94,9 @@ export class KodaChatClient {
       transport,
       clock,
       idleTimeoutMs: timeoutMs,
+      // Ein JIT-ladendes Modell schweigt Minuten, bevor der erste Chunk kommt; die Idle-Frist
+      // (Default 300 s) gilt sonst auch dafuer. Die Idle-Einstellung bleibt die Untergrenze.
+      firstChunkTimeoutMs: Math.max(timeoutMs, JIT_FIRST_CHUNK_TIMEOUT_MS),
       toolCallIdleTimeoutMs: TOOL_CALL_IDLE_TIMEOUT_MS,
     });
   }

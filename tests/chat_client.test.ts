@@ -1,4 +1,5 @@
 import { KodaChatClient, TOOL_CALL_IDLE_TIMEOUT_MS, type SseTransport } from "../src/llm/KodaChatClient";
+import { JIT_FIRST_CHUNK_TIMEOUT_MS } from "../src/vendor/kit-obsidian/chat-client";
 import type { ChatMessage } from "../src/core/agent/types";
 
 const cfg = { endpoint: "http://127.0.0.1:1234", apiKey: "", model: "m", suppressThinking: true };
@@ -198,8 +199,9 @@ describe("KodaChatClient.complete", () => {
         + line({ choices: [{ delta: {}, finish_reason: "tool_calls" }] }) + "data: [DONE]\n",
     ]), 1000, capturingClock);
     await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
-    // Initialer Timer vor dem ersten Byte laeuft noch mit der normalen Frist.
-    expect(ms[0]).toBe(1000);
+    // Der Timer vor dem ersten Byte ist die Erst-Chunk-Frist (JIT-ladende Modelle schweigen
+    // Minuten) — auch bei einer kleineren Idle-Einstellung.
+    expect(ms[0]).toBe(JIT_FIRST_CHUNK_TIMEOUT_MS);
     // Ab dem Kopf-Chunk (und danach) gilt die lange Frist.
     expect(ms[ms.length - 1]).toBe(TOOL_CALL_IDLE_TIMEOUT_MS);
   });
@@ -301,6 +303,15 @@ describe("KodaChatClient.complete", () => {
       },
     };
     const to = await new KodaChatClient(hang, 30_000, clock).complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
-    expect(to).toMatchObject({ ok: false, kind: "timeout", detail: "keine Antwort seit 30s" });
+    // Vor dem ersten Byte gilt die Erst-Chunk-Frist, nicht die 30-s-Idle-Einstellung.
+    expect(to).toMatchObject({ ok: false, kind: "timeout", detail: `keine Antwort seit ${JIT_FIRST_CHUNK_TIMEOUT_MS / 1000}s` });
+  });
+
+  it("die Erst-Chunk-Frist ist nie kuerzer als die Idle-Einstellung (max statt fest)", async () => {
+    const ms: number[] = [];
+    const clock = { now: () => 0, setTimeout: (_fn: () => void, m: number): number => { ms.push(m); return ms.length; }, clearTimeout: (): void => {} };
+    const idle = JIT_FIRST_CHUNK_TIMEOUT_MS + 300_000;
+    await new KodaChatClient(transportOf([]), idle, clock).complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
+    expect(ms[0]).toBe(idle);
   });
 });

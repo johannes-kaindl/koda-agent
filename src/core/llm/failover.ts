@@ -9,25 +9,42 @@
    `localhost`, unterwegs die LAN-Adresse. Vor jeder Frage die ganze Liste anzupingen ließe
    jede Frage diesen Preis zahlen. Also einmal je Sitzung, und erneut erst, wenn eine
    Anfrage wirklich scheitert. */
-import { resolveActiveEndpointConfig, type EndpointConfig } from "../../vendor/kit/endpoint_config";
+import type { EndpointConfig } from "../../vendor/kit/endpoint_config";
+import { resolveEndpointSource } from "../../vendor/kit/endpoint-source";
+
+/** Der aufgelöste Endpunkt samt dem Modell, das an ihn geht (Zeilen-Override vor globalem Modell,
+ *  in der gesendeten Schreibweise der Kit-Auflösung). */
+export interface ResolvedEndpoint {
+  config: EndpointConfig;
+  model: string;
+}
 
 export class EndpointResolver {
-  private cached: EndpointConfig | null = null;
+  private cached: ResolvedEndpoint | null = null;
   /** Laufender Durchlauf, geteilt — sonst pingt jede gleichzeitige Frage die Liste selbst. */
-  private pending: Promise<EndpointConfig | null> | null = null;
+  private pending: Promise<ResolvedEndpoint | null> | null = null;
 
   constructor(
     private readonly getEndpoints: () => EndpointConfig[],
     private readonly ping: (ep: EndpointConfig) => Promise<boolean>,
+    private readonly getModel: () => string = () => "",
   ) {}
 
   /** Erster erreichbarer Eintrag, sonst `null`. Ein Fehlschlag wird NICHT gemerkt:
-   *  beim nächsten Versuch kann das Netz zurück sein. */
-  async resolve(): Promise<EndpointConfig | null> {
+   *  beim nächsten Versuch kann das Netz zurück sein.
+   *
+   *  Die Auflösung ist die des Kits (`resolveEndpointSource`) mit `manager: null`: Koda hat kein
+   *  `choice`-Feld, ein Manager-Abschnitt wäre ein neues Feature (Entscheidung Master Welle 15).
+   *  Das Zwischenspeichern und genau EINEN Neuversuch (`withFailover`) behält Koda selbst. */
+  async resolve(): Promise<ResolvedEndpoint | null> {
     if (this.cached !== null) return this.cached;
     if (this.pending !== null) return this.pending;
-    this.pending = resolveActiveEndpointConfig(this.getEndpoints(), this.ping)
-      .then((ep) => {
+    this.pending = resolveEndpointSource(
+      { manager: null, local: this.getEndpoints(), capability: "chat", caller: "koda-agent", localModel: this.getModel() },
+      this.ping,
+    )
+      .then((r) => {
+        const ep = r.config === null ? null : { config: r.config, model: r.sentModel || r.model };
         this.cached = ep;
         return ep;
       })
@@ -65,7 +82,7 @@ export class EndpointResolver {
  */
 export async function withFailover<R>(
   resolver: Pick<EndpointResolver, "resolve" | "invalidate">,
-  run: (ep: EndpointConfig) => Promise<R>,
+  run: (ep: ResolvedEndpoint) => Promise<R>,
   isRetryable: (result: R) => boolean,
   onNoEndpoint: () => R,
   onRefusedDespiteProbe?: (result: R) => R,
