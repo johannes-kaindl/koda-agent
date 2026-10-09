@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-10-09
+
 ### Changed
 
 - **API keys move into Obsidian's secret storage.** Keys are no longer kept in `data.json`: an existing key moves there the first time Koda uses the endpoint, and a saved key shows as "saved" with **Change key** and **Remove key** in the endpoint list. Requires Obsidian 1.11.4 (was 1.8.7).
