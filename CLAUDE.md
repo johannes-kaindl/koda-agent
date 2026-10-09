@@ -444,8 +444,8 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
 - `src/vendor/kit` + `src/vendor/kit-obsidian/` — verbatim vendorter `../obsidian-kit` +
   `../../libs/code-kit` (maßgeblich ist immer `src/vendor/kit/VENDOR.json` bzw.
   `src/vendor/kit-obsidian/VENDOR.json`, nicht diese Zeile). **Seit Welle 12 (2026-09-27)
-  liegen die Pins in `tools/kit-sync.json`** (Sammelpin je Quelle, Einzelpins am Modul —
-  `explain-texts`, `sse`, `help-setting` und die Chat-Client-Module auf eigenem Stand),
+  liegen die Pins in `tools/kit-sync.json`** (eine Ref je Quelle für alle Module, seit Welle 15
+  obsidian-kit 0.51.3 / code-kit 0.15.4),
   Re-Sync über `tools/sync-kit.sh` (Wrapper, ruft `../tools/kit-sync/kit-sync.mjs`) — nie
   von Hand editieren. Das zentrale Werkzeug prüft Abhängigkeiten und schreibt
   `VENDOR.json` selbst; ein Testdouble (`tests/vendor/kit/obsidian-mock.ts`) läuft über
