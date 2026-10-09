@@ -6,7 +6,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://github.com/johannes-kaindl/koda-agent/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/johannes-kaindl/koda-agent)](https://github.com/johannes-kaindl/koda-agent/releases/latest)
-![Obsidian](https://img.shields.io/badge/obsidian-1.8.7%2B%20%C2%B7%20desktop%20%26%20mobile-7c3aed)
+![Obsidian](https://img.shields.io/badge/obsidian-1.11.4%2B%20%C2%B7%20desktop%20%26%20mobile-7c3aed)
 
 Koda runs against an OpenAI-compatible model you choose, typically one on your own machine ([LM Studio](https://lmstudio.ai), Ollama), so your notes do not have to leave it. Everything that steers Koda — its instructions, its memory, its skills — is a Markdown note you can read and edit.
 
@@ -27,7 +27,7 @@ Koda runs against an OpenAI-compatible model you choose, typically one on your o
 
 ## Requirements
 
-- **Obsidian 1.8.7** or newer, desktop or mobile.
+- **Obsidian 1.11.4** or newer, desktop or mobile.
 - **An OpenAI-compatible chat endpoint with a tool-calling model**: a local server (LM Studio, Ollama, …) or a hosted provider with an API key. Models without native tool calling work through a text fallback, less reliably.
 - **A local server needs CORS switched on** (LM Studio: *Enable CORS*, or `lms server start --cors`; Ollama: `OLLAMA_ORIGINS`). The connection test passes without it, the chat does not; Koda names this case when it happens.
 - *Optional:* [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) with an indexed vault, for search by meaning, the **Vault** context mode and the `related_notes` tool.

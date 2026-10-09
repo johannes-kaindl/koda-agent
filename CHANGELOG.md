@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **API keys move into Obsidian's secret storage.** Keys are no longer kept in `data.json`: an existing key moves there the first time Koda uses the endpoint, and a saved key shows as "saved" with **Change key** and **Remove key** in the endpoint list. Requires Obsidian 1.11.4 (was 1.8.7).
+- **Secrets are masked before they leave Obsidian.** Private-key blocks, `Bearer …` tokens and common API-key shapes are replaced by placeholders in everything sent to the model, including the arguments of earlier tool calls. Notes Koda writes and the replies you read get the originals back. The llm-lab log records what was sent, so it shows the placeholders too.
+- **Replies are rendered defensively.** Images in a reply appear as text and code is shown as plain text, so a placeholder in an image address or a `dataviewjs` block cannot do anything on its own. Inline code and code fences in Koda's replies lose their code formatting.
+- **A model that loads on demand has time to start.** Before the first piece of an answer arrives Koda now waits at least 10 minutes (before: the "Response timeout" setting, default 5 minutes). The setting still limits silence once the answer is flowing.
+- Endpoint choice uses the shared kit resolution (row model before global model); the failover behaviour (look again once) is unchanged. Kit pins moved to obsidian-kit 0.51.2 and code-kit 0.15.0.
+
 ## [0.21.1] — 2026-10-03
 
 ### Changed

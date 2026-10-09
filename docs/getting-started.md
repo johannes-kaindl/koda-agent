@@ -2,7 +2,7 @@
 
 This walks you from nothing to a first conversation in which Koda looks something up in your vault and writes a note, with your approval. It takes about ten minutes, most of it downloading a model.
 
-You need Obsidian 1.8.7 or newer (desktop or mobile) and a machine that can run a local language model. A hosted OpenAI-compatible provider works too; then skip step 2 and use its URL and API key in step 3.
+You need Obsidian 1.11.4 or newer (desktop or mobile) and a machine that can run a local language model. A hosted OpenAI-compatible provider works too; then skip step 2 and use its URL and API key in step 3.
 
 ## 1. Install Koda
 

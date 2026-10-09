@@ -33,3 +33,5 @@ The same idea runs the other way: plugins can lend Koda their own tools. Koda ke
 ## Why a local model
 
 Koda talks to any OpenAI-compatible endpoint, and it is built for one running on your own machine: your notes then never leave it. Nothing in Koda needs a hosted provider. If you want one, add its URL and API key as an endpoint; then your notes go to that provider, and the settings say so next to the key field.
+
+Before a message leaves Obsidian, Koda replaces secrets in it (private-key blocks, `Bearer …` tokens, common API-key shapes) with placeholders such as `[redacted-token-1]`; the model never sees the original. What Koda writes into your notes and what you read in the chat has the originals put back. Because a reply can repeat such a placeholder, Koda also renders replies defensively: images in a reply appear as text, and code is shown as plain text instead of being run by other plugins (Dataview and the like), so inline code and code fences in a reply lose their code formatting.

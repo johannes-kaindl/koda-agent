@@ -1287,3 +1287,16 @@ Die Warnung in den Einstellungen deckt nur den Totalfall ab („kein lesendes We
 nicht das Abschalten eines von vieren. Wer hier nachbessern will, hat zwei Wege: die Warnung
 verfeinern, oder dem Modell das Fehlen im Prompt mitteilen — Letzteres widerspricht E3 und wäre
 eine Design-Änderung, keine Reparatur.
+
+## Belegter Lauf: 2026-10-09, Welle 15 — Teil-Tausch auf obsidian-kit 0.51.2 (62/62)
+
+Baseline davor (frischer Prozess, Obsidian 1.14.4 Zweitinstanz): 58/58, Gate 957/957. Danach: Gate 963/963, Smoke 62/62 (ein Lauf hatte Punkt 20 rot, „aktiv ist Koda: false" — Fenster nicht vorn; der Neustart-Lauf war grün, kein Befund).
+
+Neue Punkte, die die Naht zum Host messen, nicht das Kit:
+
+- **59** Schwärzung über `edit_active_note`: Notiz mit `Bearer abc123def456ghi789` markiert, das Skript schickt den Platzhalter aus Body 1 als Ersatztext zurück. Erwartet: Body 1 ohne Original, Notiz nach Bestätigung mit Original, Body 2 ohne Original auch in `messages[].tool_calls[].function.arguments`.
+- **60** Schlüsselbund: ein Klartext-Schlüssel in `data.json` (alter Bestand) verlässt die Datei beim Auflösen, die aufgelöste Config und der Authorization-Header tragen ihn weiter.
+- **61** Neutralisierung: Antwort mit Bild-URL und ```` ```dataviewjs ````-Block → kein `img`, kein `pre`, Text sichtbar; nach `renderLog()` dasselbe.
+- **62** Lab-Telemetrie trägt den gesendeten Text (Platzhalter), nicht das Original.
+
+Gegenprobe, vier Mutationen gleichzeitig (`redact: false`, Lab mit Rohnachrichten, `renderMarkdownInto` ohne `neutralizeModelMarkdown`, Auflösung über die rohe Endpunktliste): genau 59, 60, 61 und 62 wurden rot (58/62), alle anderen blieben grün. Mutationen zurückgenommen, Kopien vorher im Scratchpad.
