@@ -7,7 +7,7 @@ import type { EndpointConfig } from "./vendor/kit/endpoint_config";
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
 import { hydrateLocalEndpoints, prepareLocalEndpoints } from "./vendor/kit-obsidian/endpoint-secrets";
-import { redactMessages } from "./vendor/kit-obsidian/chat-client";
+import { redactExchange } from "./vendor/kit-obsidian/chat-client";
 import { KodaChatClient, type LlmResult } from "./llm/KodaChatClient";
 import { probeEndpoint, probeModels } from "./core/llm/probe";
 import { probeModelContext } from "./core/llm/context-probe";
@@ -778,21 +778,16 @@ export default class KodaPlugin extends Plugin {
       // statt Geheimnissen, das Lab bekommt dieselben. Der Client gibt dem Loop die Originale
       // zurueck, also werden Verlauf, Antwort und Denkspur hier in EINER Sitzung geschwaerzt —
       // derselbe Wert traegt ueberall denselben Platzhalter.
-      const labMessages = toLabMessages(input.messages);
       const answer = input.result.ok ? input.result.content : input.result.partial;
-      const wire = redactMessages([
-        ...labMessages,
-        { role: "assistant", content: answer },
-        { role: "assistant", content: input.reasoning },
-      ]).messages;
+      const wire = redactExchange({ messages: toLabMessages(input.messages), answer, reasoning: input.reasoning });
       const out = logToLab(this.app, {
         plugin: "koda-agent",
         feature: input.feature,
         model: input.model,
         endpointUrl: input.endpointUrl,
-        messages: wire.slice(0, labMessages.length) as typeof labMessages,
-        content: String(wire[labMessages.length]?.content ?? ""),
-        ...(input.reasoning !== "" ? { reasoning: String(wire[labMessages.length + 1]?.content ?? "") } : {}),
+        messages: wire.messages,
+        content: wire.answer,
+        ...(input.reasoning !== "" && wire.reasoning !== null ? { reasoning: wire.reasoning } : {}),
         ...(input.result.ok && input.result.finishReason !== undefined ? { finishReason: input.result.finishReason } : {}),
         latencyMs: input.latencyMs,
         ...(input.ttftMs !== undefined ? { ttftMs: input.ttftMs } : {}),
