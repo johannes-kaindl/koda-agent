@@ -290,7 +290,8 @@ async function main(): Promise<void> {
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       if (!p) return { ok: false };
       // Das Modell am Endpunkt ist ein OVERRIDE, kein Pflichtfeld — greift keiner, gilt das
-      // globale settings.model (Kit: effectiveModel). Ohne den Fallback meldete der Kopf
+      // globale settings.model (frueher Kit-effectiveModel, in code-kit 0.16.0 entfernt;
+      // hier selbst nachgebildet). Ohne den Fallback meldete der Kopf
       // „(keins gesetzt)", waehrend der Lauf laengst gegen ein Modell sprach.
       const ep = p.settings?.endpoints?.[0];
       const model = (ep?.model ?? "").trim() || (p.settings?.model ?? "").trim();
