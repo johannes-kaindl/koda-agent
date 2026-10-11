@@ -423,9 +423,12 @@ export class KodaView extends ItemView {
   private endStream(): void {
     this.streamArea = null;
     // Seit obsidian-kit 0.52.0 haengt der Schreiber einen Wächter an die Ansicht; wer ihn
-    // fallen lässt, ohne `destroy()`, lässt ihn weiterlaufen.
-    this.streamWriter?.destroy();
+    // fallen lässt, ohne `destroy()`, lässt ihn weiterlaufen. Erst NACH `settled()`: ein noch
+    // laufendes Rendering macht seinen letzten Wächter-Durchgang danach, und ein sofortiges
+    // `destroy()` nähme ihm den (Fernquellen im letzten Block blieben ungeprüft).
+    const writer = this.streamWriter;
     this.streamWriter = null;
+    if (writer !== null) void writer.settled().then(() => writer.destroy());
   }
 
   /** Legt Bereich + Schreiber einmalig je Antwort an — Gedanken koennen vor dem ersten

@@ -15,6 +15,7 @@ All notable changes to this project are documented here. The format follows
 - The global *Model* setting is gone; each endpoint row carries its own model. An existing value moves once into the rows that had none, and a row you clear stays empty. A row without a model now sends none (before: the global model).
 - With the row, what hung on it is gone: the separate model field with its "Fetch models" button in the main settings list. Per row, the model picker and **Fetch models** stay.
 - The thinking switch, the image mode (vision or text recognition) and the context-window check now follow the model that is actually sent, not a separate setting.
+- Kit pins moved to obsidian-kit 0.53.0 and code-kit 0.21.1. The mask for `Bearer …` tokens now catches more (prose such as "Bearer authentication" is masked too), and a Mermaid diagram in a reply that could load a remote source is shown as text instead of being drawn.
 
 ## [0.22.1] — 2026-10-10
 

@@ -1303,7 +1303,7 @@ Gegenprobe, vier Mutationen gleichzeitig (`redact: false`, Lab mit Rohnachrichte
 
 ## Belegter Lauf: 2026-10-11, Welle 17 — globales Modell-Feld abgeschafft (63/63)
 
-Baseline davor (frischer Prozess, Obsidian 1.14.4 Zweitinstanz, Port 9386): Gate 963/963, Smoke 62/62. Danach: Gate 970/970 (vor dem Pin-Ziel), Smoke 63/63. Die Treiber setzen das Modell jetzt in der Zeile (`endpoints[0].model`, danach `resolver.invalidate()`), nicht mehr in `settings.model`.
+Baseline davor (frischer Prozess, Obsidian 1.14.4 Zweitinstanz, Port 9386): Gate 963/963, Smoke 62/62. Danach: Gate 972/972, Smoke 63/63 (auch nach dem Hub auf obsidian-kit 0.53.0 / code-kit 0.21.1; ein Lauf hatte Punkt 16 rot, wie in Welle 15 fokusabhängig, der Neustart-Lauf war grün). Die Treiber setzen das Modell jetzt in der Zeile (`endpoints[0].model`, danach `resolver.invalidate()`), nicht mehr in `settings.model`.
 
 - **63** Altbestand `{ model: "legacy-63" }` in `data.json`, Plugin per `disablePlugin`/`enablePlugin` neu geladen (der Weg durch `onload`): der Schlüssel `model` ist aus `data.json` und aus `settings` verschwunden, die Zeile trägt `legacy-63`, in den Einstellungen gibt es weder eine Zeile „Model“ noch „global model“.
 
