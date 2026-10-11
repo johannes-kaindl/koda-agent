@@ -9,11 +9,11 @@
    `localhost`, unterwegs die LAN-Adresse. Vor jeder Frage die ganze Liste anzupingen ließe
    jede Frage diesen Preis zahlen. Also einmal je Sitzung, und erneut erst, wenn eine
    Anfrage wirklich scheitert. */
-import type { EndpointConfig } from "../../vendor/kit/endpoint_config";
+import { rowModel, type EndpointConfig } from "../../vendor/kit/endpoint_config";
 import { resolveEndpointSource } from "../../vendor/kit/endpoint-source";
 
-/** Der aufgelöste Endpunkt samt dem Modell, das an ihn geht (Zeilen-Override vor globalem Modell,
- *  in der gesendeten Schreibweise der Kit-Auflösung). */
+/** Der aufgelöste Endpunkt samt dem Modell, das an ihn geht (das Modell der Zeile, in der
+ *  gesendeten Schreibweise der Kit-Auflösung). */
 export interface ResolvedEndpoint {
   config: EndpointConfig;
   model: string;
@@ -27,8 +27,19 @@ export class EndpointResolver {
   constructor(
     private readonly getEndpoints: () => EndpointConfig[],
     private readonly ping: (ep: EndpointConfig) => Promise<boolean>,
-    private readonly getModel: () => string = () => "",
+    /** Nach jeder neuen Auflösung (nicht beim Treffer aus dem Zwischenspeicher): wer das
+     *  gesendete Modell liest (Thinking-Schalter), zieht damit nach. */
+    private readonly onResolved: () => void = () => {},
   ) {}
+
+  /** Das Modell, über das der Chat tatsächlich sendet — synchron. Nach einer Auflösung das des
+   *  aufgelösten Endpunkts, davor das der ersten Zeile (die Liste ist die Priorität). Es gibt
+   *  kein globales Modell mehr; eine Zeile ohne Modell sendet `""`. */
+  peek(rows: readonly EndpointConfig[]): string {
+    if (this.cached !== null) return this.cached.model;
+    const first = rows[0];
+    return first === undefined ? "" : rowModel(first);
+  }
 
   /** Erster erreichbarer Eintrag, sonst `null`. Ein Fehlschlag wird NICHT gemerkt:
    *  beim nächsten Versuch kann das Netz zurück sein.
@@ -40,12 +51,13 @@ export class EndpointResolver {
     if (this.cached !== null) return this.cached;
     if (this.pending !== null) return this.pending;
     this.pending = resolveEndpointSource(
-      { manager: null, local: this.getEndpoints(), capability: "chat", caller: "koda-agent", localModel: this.getModel() },
+      { manager: null, local: this.getEndpoints(), capability: "chat", caller: "koda-agent" },
       this.ping,
     )
       .then((r) => {
         const ep = r.config === null ? null : { config: r.config, model: r.sentModel || r.model };
         this.cached = ep;
+        this.onResolved();
         return ep;
       })
       .finally(() => {

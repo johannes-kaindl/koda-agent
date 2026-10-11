@@ -39,7 +39,6 @@ import { createModelListCache, type ModelListCache, type ModelListClient } from 
 import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
-import { resolveModelChoice, type ModelOption } from "../vendor/kit/model-choice";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "./model-control";
 import { PromptPreviewModal } from "./prompt-modal";
 import { readImageGenApi } from "./image-gen";
@@ -118,13 +117,6 @@ export class KodaSettingsTab extends PluginSettingTab {
         name: t("settings.endpoints"),
         desc: t("settings.endpoints.desc"),
         render: (setting) => this.renderEndpointList(setting),
-      },
-      {
-        // Hatch statt `control: text`: die Auswahl haengt davon ab, was der Endpunkt
-        // gerade hergibt — das kann eine synchrone Definition nicht wissen.
-        name: t("settings.model"),
-        desc: t("settings.model.desc"),
-        render: (setting) => this.renderModelPicker(setting),
       },
       {
         name: t("settings.suppress"),
@@ -344,7 +336,6 @@ export class KodaSettingsTab extends PluginSettingTab {
    *  NICHT aus `refreshUi()` heraus aufrufen — das ist ein Neuaufbau, kein Schliessen. */
   hide(): void {
     this.modelCache.clear();
-    this.globalModelCache = null;
     super.hide();
   }
 
@@ -398,7 +389,6 @@ export class KodaSettingsTab extends PluginSettingTab {
       },
       active: () => this.plugin.settings.endpoints[0]?.url ?? null,
       clientFor: (cfg) => this.endpointClient(cfg),
-      globalModel: () => this.plugin.settings.model,
       save: () => this.plugin.saveSettings(),
       // Koda haelt keine stehende Verbindung — es gibt nichts wiederherzustellen. Der
       // Kit-Vertrag verlangt den Callback trotzdem, weil andere Consumer (vault-rag) beim
@@ -456,8 +446,6 @@ export class KodaSettingsTab extends PluginSettingTab {
       ariaAdd: t("settings.endpoints.aria.add"),
       ariaApiKey: (url) => t("settings.endpoints.aria.apiKey", url),
       ariaModel: (url) => t("settings.endpoints.aria.model", url),
-      emptyModelLabel: (globalModel) =>
-        globalModel === "" ? t("settings.model.useGlobalUnset") : t("settings.model.useGlobal", globalModel),
       modelHint: (key) => (key === "" ? "" : t(`settings.model.hint.${key}`)),
       savedSuffix: t("settings.model.savedSuffix"),
       refreshModels: t("settings.model.fetch"),
@@ -491,103 +479,15 @@ export class KodaSettingsTab extends PluginSettingTab {
     };
   }
 
-  // ── Modellauswahl ─────────────────────────────────────────────────────────
+  // ── Modellauswahl ──────────────────────────────────────────────────────────
   //
-  // Drei Zustaende, weil der Endpunkt drei Antworten geben kann: eine Liste (Auswahl),
-  // keine Liste trotz Erreichbarkeit (Freitext — manche gehosteten Anbieter sperren
-  // /v1/models) und Schweigen (gesperrt, gespeicherter Name bleibt stehen). Ein vierter
-  // Zustand liegt davor: noch nie abgerufen. Der zeigt bewusst ein Textfeld statt einer
-  // leeren Auswahl — sonst waere das Feld nach frischer Installation unbedienbar, bis
-  // jemand einen Knopf findet.
+  // Das Modell steht je Endpunkt-Zeile (Kit `buildEndpointList`); ein globales Feld gibt es
+  // nicht mehr (Welle 17).
 
   /** Modell-Listen je Endpunkt-Zeile. Gehoert der Lebensdauer des Tabs, nicht dem Render —
    *  deshalb Feld und nicht lokal. Wird in `hide()` verworfen (Kit-Vertrag: sonst bleibt ein
    *  einmal als nicht erreichbar gemessener Endpunkt die ganze Sitzung so stehen). */
   private modelCache: ModelListCache = createModelListCache();
-  /** Zustand der GLOBALEN Modell-Zeile (Default fuer Zeilen ohne Override). */
-  private globalModelCache: { url: string; models: string[]; reachable: boolean } | null = null;
-  /** Gegen verspaetete Antworten: ein zweiter Abruf entwertet den ersten. */
-  private modelGeneration = 0;
-
-  private renderModelPicker(setting: Setting): void {
-    const host = settingBodyHost(setting);
-    const row = new Setting(host).setName(t("settings.model")).setDesc(t("settings.model.desc"));
-    const hintEl = row.descEl.createDiv({ cls: "koda-model-hint" });
-
-    const ep = this.plugin.settings.endpoints[0];
-    const url = ep?.url ?? "";
-    const cache = this.globalModelCache !== null && this.globalModelCache.url === url ? this.globalModelCache : null;
-
-    const save = (value: string): void => {
-      this.plugin.settings = validateKodaSettings({ ...this.plugin.settings, model: value });
-      void this.plugin.saveSettings();
-    };
-
-    if (cache === null) {
-      row.addText((tx) => {
-        // Kein Platzhalter mit Beispiel-Modellnamen: der Store-Linter liest ihn als
-        // UI-Text und verlangt Satzform. Die Beschreibung der Zeile sagt es ohnehin.
-        tx.setValue(this.plugin.settings.model);
-        tx.inputEl.addEventListener("blur", () => save(tx.getValue()));
-      });
-      hintEl.setText(t("settings.model.notLoaded"));
-    } else {
-      const choice = resolveModelChoice({
-        reachable: cache.reachable,
-        models: cache.models,
-        current: this.plugin.settings.model,
-      });
-      const label = (o: ModelOption): string =>
-        o.suffix === "saved" ? t("settings.model.saved", o.label) : o.label;
-
-      if (choice.mode === "freetext") {
-        row.addText((tx) => {
-          tx.setValue(choice.value);
-          tx.inputEl.addEventListener("blur", () => save(tx.getValue()));
-        });
-      } else {
-        row.addDropdown((dd) => {
-          for (const o of choice.options) dd.addOption(o.value, label(o));
-          dd.setValue(choice.value);
-          dd.onChange((v) => save(v));
-          // "locked" heisst: der gespeicherte Name bleibt sichtbar, aber es gibt nichts
-          // zu waehlen, solange der Endpunkt schweigt.
-          if (choice.mode === "locked") dd.selectEl.disabled = true;
-        });
-      }
-      if (choice.hintKey !== "") hintEl.setText(t(`settings.model.hint.${choice.hintKey}`));
-    }
-
-    row.addButton((b) =>
-      b
-        .setButtonText(t("settings.model.fetch"))
-        .onClick(() => {
-          if (ep === undefined) return;
-          const gen = ++this.modelGeneration;
-          // `buttonEl.disabled` statt `setDisabled()` — als EINE Form im Repo, nicht als Bugfix.
-          // Der Renderer-Freeze vom 2026-08-06 war echt, aber die daraus abgeleitete Regel
-          // („setDisabled() aus dem Settings-Fenster friert ein") ist am 2026-08-08 widerlegt
-          // worden: derselbe Aufruf lief hier und in vault-rag folgenlos. Gemessen ist nur ein
-          // engeres Muster — die Kombination mit `setIcon`/`setTooltip` auf einem Span
-          // derselben Zeile. Diese Stelle hatte die Kombination nie. Der Wechsel ist also
-          // Vereinheitlichung auf die konservativere Form, kein behobener Defekt.
-          b.buttonEl.disabled = true;
-          b.setButtonText(t("settings.model.fetching"));
-          void this.plugin
-            .probeModels(ep)
-            .then(({ status, models }) => {
-              if (gen !== this.modelGeneration) return; // ein neuerer Abruf gilt
-              this.globalModelCache = { url, models, reachable: status.reachable };
-              this.refreshUi();
-            })
-            .catch(() => {
-              if (gen !== this.modelGeneration) return;
-              this.globalModelCache = { url, models: [], reachable: false };
-              this.refreshUi();
-            });
-        }),
-    );
-  }
 }
 
 /** Kit-Status → Oberflaechentext. Bewusst ueber `kind` statt ueber das mitgelieferte

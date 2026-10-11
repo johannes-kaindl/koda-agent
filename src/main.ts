@@ -3,7 +3,8 @@ import "./i18n/strings";
 import { getLanguage } from "obsidian";
 import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
 import { resolveLang, type Lang } from "./core/lang";
-import type { EndpointConfig } from "./vendor/kit/endpoint_config";
+import { rowModel, type EndpointConfig } from "./vendor/kit/endpoint_config";
+import { loadKodaSettings } from "./core/settings-migration";
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
 import { hydrateLocalEndpoints, prepareLocalEndpoints } from "./vendor/kit-obsidian/endpoint-secrets";
@@ -29,7 +30,7 @@ import { logToLab } from "./vendor/kit-obsidian/lab-client";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
 import { selectSkills, type Selection } from "./core/skills/select";
-import { CONTEXT_AUTO_K_MAX, CONTEXT_AUTO_K_MIN, CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN, DEFAULT_SETTINGS, validateKodaSettings, type KodaSettings } from "./core/settings-types";
+import { CONTEXT_AUTO_K_MAX, CONTEXT_AUTO_K_MIN, CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN, DEFAULT_SETTINGS, type KodaSettings } from "./core/settings-types";
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { readRetrievalApi } from "./obsidian/retrieval";
 import { readOcrApi } from "./obsidian/ocr";
@@ -331,7 +332,8 @@ export default class KodaPlugin extends Plugin {
       },
     }),
     async (ep) => (await this.probe(ep)).reachable,
-    () => this.settings.model,
+    // Der gemerkte Endpunkt hat sich geändert: der Thinking-Schalter liest sein Modell.
+    () => { for (const v of this.views()) v.syncThinkAction(); },
   );
 
   /** Die Zeile mit `apiKey` aus dem Schlüsselbund. Die Listen-Zeilen der Settings tragen nur
@@ -395,13 +397,17 @@ export default class KodaPlugin extends Plugin {
 
   /** Kontextfenster laut Endpunkt (LM Studio/Ollama), sonst null. Nutzt das Modell, das fuer
    *  diese Zeile effektiv gilt. */
-  probeContext(ep: EndpointConfig, model: string = ep.model?.trim() || this.settings.model): Promise<number | null> {
+  probeContext(ep: EndpointConfig, model: string = rowModel(ep)): Promise<number | null> {
     return probeModelContext(this.hydrated(ep), model, requestUrlProbe, realClock);
   }
   private store!: SessionStore;
 
   async onload(): Promise<void> {
-    this.settings = validateKodaSettings(await this.loadData());
+    const loaded = loadKodaSettings(await this.loadData());
+    this.settings = loaded.settings;
+    // Das globale Modell-Feld ist weg: sein Wert ist einmal in die Zeilen gewandert, der
+    // Schlüssel fliegt beim Speichern aus data.json (sonst liefe die Migration bei jedem Start).
+    if (loaded.changed) await this.saveData(this.settings);
     this.contextMode = this.settings.contextModeDefault;
     // Ein gespeicherter Default aus einer spaeteren Etappe (z. B. "note") ist hier noch
     // nicht angeboten — dann faellt der Start auf Arbeitsplatz zurueck, statt den Chat in
@@ -574,11 +580,17 @@ export default class KodaPlugin extends Plugin {
     });
   }
 
+  /** Das Modell, über das der Chat tatsächlich sendet (aufgelöster Endpunkt, davor die erste
+   *  Zeile). Es gibt kein globales Modell-Feld mehr. */
+  sentModel(): string {
+    return this.resolver.peek(this.settings.endpoints);
+  }
+
   /** Wie Koda ein Bild liest: Vision (Namens-Heuristik des Kits, `likely` genuegt), sonst OCR,
-   *  wenn image-to-markdown aktiv ist. Das Modell ist das globale (`settings.model`) — dasselbe
-   *  wie beim Thinking-Schalter; ein Modell-Override je Endpunkt geht erst beim Senden ein. */
+   *  wenn image-to-markdown aktiv ist. Das Modell ist das gesendete (`sentModel()`) — dasselbe
+   *  wie beim Thinking-Schalter. */
   imageMode(): ImageMode {
-    return chooseImageMode(guessFromName(this.settings.model).vision, readOcrApi(this.app) !== null);
+    return chooseImageMode(guessFromName(this.sentModel()).vision, readOcrApi(this.app) !== null);
   }
 
   /** Nur die Namen — was der GUI-Smoke braucht (Pruefpunkt 17). */

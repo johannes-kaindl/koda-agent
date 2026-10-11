@@ -147,8 +147,6 @@ defineStrings({
     // 2026-08-14, E1), die Leer-Option heisst deshalb „kein Modell gewaehlt". Koda hat
     // eines, also sagt die Leer-Option, WAS dann gilt — und faengt den Fall ab, dass
     // global nichts gesetzt ist (sonst stuende dort „global model ()").
-    "settings.model.useGlobal": "global model ({0})",
-    "settings.model.useGlobalUnset": "global model (none set)",
     "error.noEndpoint": "No endpoint reachable. Check the endpoint list in the settings — the test button says which one answers.",
     "error.chatBlocked": EXPLAIN_TEXTS.corsBlocked.en,
     "settings.probe": "Test",
@@ -163,12 +161,7 @@ defineStrings({
     "settings.probe.unknown": "Not reachable — {0}",
     "settings.probe.context": "Context window per endpoint: {0}",
     "settings.probe.contextApplied": "Context window taken from the endpoint: {0} tokens",
-    "settings.model": "Model",
-    "settings.model.desc": "Model id as reported by the server (e.g. from LM Studio).",
     "settings.model.fetch": "Fetch models",
-    "settings.model.fetching": "Fetching…",
-    "settings.model.notLoaded": "Fetch the models to pick from a list instead of typing.",
-    "settings.model.saved": "{0} (saved)",
     "settings.model.savedSuffix": "(saved)",
     "settings.model.hint.unreachable": EXPLAIN_TEXTS.endpointUnreachableKeepsModel.en,
     "settings.model.hint.no-list": EXPLAIN_TEXTS.noModelList.en,
@@ -388,8 +381,6 @@ defineStrings({
     // 2026-08-14, E1), die Leer-Option heisst deshalb „kein Modell gewaehlt". Koda hat
     // eines, also sagt die Leer-Option, WAS dann gilt — und faengt den Fall ab, dass
     // global nichts gesetzt ist (sonst stuende dort „globales Modell ()").
-    "settings.model.useGlobal": "globales Modell ({0})",
-    "settings.model.useGlobalUnset": "globales Modell (keins gesetzt)",
     "error.noEndpoint": "Kein Endpunkt erreichbar. Prüf die Endpunkt-Liste in den Einstellungen — der Testknopf sagt, welcher antwortet.",
     "error.chatBlocked": EXPLAIN_TEXTS.corsBlocked.de,
     "settings.probe": "Testen",
@@ -404,12 +395,7 @@ defineStrings({
     "settings.probe.unknown": "Nicht erreichbar — {0}",
     "settings.probe.context": "Kontextfenster laut Endpunkt: {0}",
     "settings.probe.contextApplied": "Kontextfenster vom Endpunkt übernommen: {0} Token",
-    "settings.model": "Modell",
-    "settings.model.desc": "Modell-ID, wie der Server sie meldet (z. B. aus LM Studio).",
     "settings.model.fetch": "Modelle abrufen",
-    "settings.model.fetching": "Rufe ab …",
-    "settings.model.notLoaded": "Modelle abrufen, um statt zu tippen aus einer Liste zu wählen.",
-    "settings.model.saved": "{0} (gespeichert)",
     "settings.model.savedSuffix": "(gespeichert)",
     "settings.model.hint.unreachable": EXPLAIN_TEXTS.endpointUnreachableKeepsModel.de,
     "settings.model.hint.no-list": EXPLAIN_TEXTS.noModelList.de,

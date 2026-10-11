@@ -111,7 +111,6 @@ export const IMAGE_MAX_KB_STEP = 256;
 
 export interface KodaSettings {
   endpoints: EndpointConfig[];
-  model: string;
   suppressThinking: boolean;
   kodaFolder: string;
   maxRounds: number;
@@ -158,7 +157,6 @@ export interface KodaSettings {
 
 export const DEFAULT_SETTINGS: KodaSettings = {
   endpoints: [{ url: "http://127.0.0.1:1234" }],
-  model: "",
   suppressThinking: true,
   kodaFolder: "Koda",
   maxRounds: 8,
@@ -215,8 +213,8 @@ const boolRecord: FieldCheck<Record<string, boolean>> = (raw, fallback) => {
 
 /** Feldpruefer fuer die Felder, bei denen die generische Bauform-Pruefung des Kits nicht
  *  reicht. Ein Schema-Eintrag ERSETZT sie fuer sein Feld und bekommt den ROHEN Wert —
- *  genau deshalb kommt `"25"` ueberhaupt bei `clampInt` an. Die uebrigen sechs Felder
- *  (model, suppressThinking, kodaFolder, textFallback, openOnStartup, summarizeEnabled)
+ *  genau deshalb kommt `"25"` ueberhaupt bei `clampInt` an. Die uebrigen fuenf Felder
+ *  (suppressThinking, kodaFolder, textFallback, openOnStartup, summarizeEnabled)
  *  brauchen keinen Eintrag: ihre Defaults tragen die Typinformation, die die generische
  *  Pruefung braucht. */
 const SCHEMA: SettingsSchema<KodaSettings> = {

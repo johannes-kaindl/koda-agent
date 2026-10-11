@@ -50,23 +50,40 @@ describe("EndpointResolver", () => {
 });
 
 describe("EndpointResolver — Modell", () => {
-  it("liefert das Modell der Zeile vor dem globalen Modell", async () => {
-    const r = new EndpointResolver(() => [{ url: "http://a", model: "zeile" }], async () => true, () => "global");
+  it("liefert das Modell der Zeile", async () => {
+    const r = new EndpointResolver(() => [{ url: "http://a", model: "zeile" }], async () => true);
     expect((await r.resolve())?.model).toBe("zeile");
   });
 
-  it("faellt ohne Zeilen-Modell auf das globale zurueck", async () => {
-    const r = new EndpointResolver(() => [{ url: "http://a", model: "  " }], async () => true, () => "global");
-    expect((await r.resolve())?.model).toBe("global");
+  it("eine Zeile ohne Modell sendet kein Modell — es gibt keinen globalen Rueckfall mehr", async () => {
+    const r = new EndpointResolver(() => [{ url: "http://a", model: "  " }], async () => true);
+    expect((await r.resolve())?.model).toBe("");
   });
 
-  it("liest das globale Modell bei jedem Durchlauf frisch (nach invalidate)", async () => {
-    let global = "alt";
-    const r = new EndpointResolver(() => eps("http://a"), async () => true, () => global);
-    expect((await r.resolve())?.model).toBe("alt");
-    global = "neu";
+  it("peek: vor dem Aufloesen das Modell der ersten Zeile, danach das der aufgeloesten", async () => {
+    const rows: EndpointConfig[] = [{ url: "http://a", model: "erste" }, { url: "http://b", model: "zweite" }];
+    const r = new EndpointResolver(() => rows, async (c) => c.url.includes("b"));
+    expect(r.peek(rows)).toBe("erste");
+    await r.resolve();
+    expect(r.peek(rows)).toBe("zweite");
     r.invalidate();
-    expect((await r.resolve())?.model).toBe("neu");
+    expect(r.peek(rows)).toBe("erste");
+  });
+
+  it("peek: ohne Zeilen ein leerer Name", () => {
+    const r = new EndpointResolver(() => [], async () => true);
+    expect(r.peek([])).toBe("");
+  });
+
+  it("meldet jede neue Aufloesung, nicht den Treffer aus dem Zwischenspeicher", async () => {
+    let n = 0;
+    const r = new EndpointResolver(() => [{ url: "http://a", model: "m" }], async () => true, () => { n += 1; });
+    await r.resolve();
+    await r.resolve();
+    expect(n).toBe(1);
+    r.invalidate();
+    await r.resolve();
+    expect(n).toBe(2);
   });
 });
 
