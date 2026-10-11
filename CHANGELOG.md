@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-10-11
+
 ### Fixed
 
 - The text tool-call fallback no longer slows down on a reply with many unclosed `<think>` tags: 50 000 of them took 7.6 s to read, now 0.3 ms. With two or more stray `</think>` in a reply, everything up to the last one is now dropped (before: up to the first).
