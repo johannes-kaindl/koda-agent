@@ -289,12 +289,8 @@ async function main(): Promise<void> {
     const plugin = await cdp.evaluate<{ ok: boolean; version?: string; model?: string }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       if (!p) return { ok: false };
-      // Das Modell am Endpunkt ist ein OVERRIDE, kein Pflichtfeld — greift keiner, gilt das
-      // globale settings.model (frueher Kit-effectiveModel, in code-kit 0.16.0 entfernt;
-      // hier selbst nachgebildet). Ohne den Fallback meldete der Kopf
-      // „(keins gesetzt)", waehrend der Lauf laengst gegen ein Modell sprach.
-      const ep = p.settings?.endpoints?.[0];
-      const model = (ep?.model ?? "").trim() || (p.settings?.model ?? "").trim();
+      // Das Modell steht in der Zeile; ein globales Feld gibt es nicht mehr (Welle 17).
+      const model = p.sentModel ? p.sentModel() : "";
       return { ok: true, version: p.manifest.version, model: model || "(keins gesetzt)" };
     `);
     if (!plugin.ok) throw new Error(`Plugin ${PLUGIN_ID} ist nicht aktiv. Erst deployen.`);

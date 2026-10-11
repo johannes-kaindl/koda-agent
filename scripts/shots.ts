@@ -173,8 +173,7 @@ async function grundzustand(cdp: Cdp, stubUrl: string, modus: string, notiz: str
   await idle(cdp, 10_000);
   await cdp.evaluate(`
     const p = ${P};
-    p.settings.endpoints = [{ url: ${JSON.stringify(stubUrl)} }];
-    p.settings.model = ${JSON.stringify(STUB_MODEL)};
+    p.settings.endpoints = [{ url: ${JSON.stringify(stubUrl)}, model: ${JSON.stringify(STUB_MODEL)} }];
     p.settings.language = "en";
     await p.saveSettings();
     await p.newChat();

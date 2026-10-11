@@ -565,7 +565,7 @@ async function main(): Promise<void> {
     // Vorwerte sichern, bevor irgendetwas veraendert wird.
     previous = await cdp.evaluate<Settings>(`
       const s = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings;
-      return { endpoints: JSON.parse(JSON.stringify(s.endpoints)), timeoutSec: s.timeoutSec, model: s.model, suppressThinking: s.suppressThinking };
+      return { endpoints: JSON.parse(JSON.stringify(s.endpoints)), timeoutSec: s.timeoutSec, suppressThinking: s.suppressThinking };
     `);
 
     // --- 2. Die Sidebar oeffnet und ist bedienbar ---------------------------
@@ -1123,11 +1123,14 @@ async function main(): Promise<void> {
           klassen: el ? [...el.classList].filter((c) => c.startsWith("is-")) : [],
         };
       };
-      p.settings.model = "qwen3:8b";
+      // Das Modell steht in der Zeile; der Schalter liest das gesendete (resolver.peek).
+      const url0 = p.settings.endpoints[0].url;
+      const sende = (m) => { p.settings.endpoints = [{ url: url0, model: m }]; p.resolver.invalidate(); };
+      sende("qwen3:8b");
       p.settings.suppressThinking = true;  v.syncThinkAction(); const normalAus = lies();
       p.settings.suppressThinking = false; v.syncThinkAction(); const normalAn = lies();
       // Ein Name, den isAlwaysOnThinker erkennt — das Modell muss nicht existieren.
-      p.settings.model = "gpt-oss:20b";    v.syncThinkAction(); const gesperrt = lies();
+      sende("gpt-oss:20b");                v.syncThinkAction(); const gesperrt = lies();
       const vorKlick = p.settings.suppressThinking;
       await v.toggleThinking();
       const nachKlick = p.settings.suppressThinking;
@@ -3183,11 +3186,9 @@ async function main(): Promise<void> {
     // dort liest; existiert dort schon ein Eintrag, uebersprungen wie bei Punkt 43.
     const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     const BILD = "Koda/smoke55.png";
-    const modellVorher = await cdp.evaluate<string>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.model;`);
     const setzeModell = (model: string, url: string): Promise<unknown> => cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-      p.settings.endpoints = [{ url: ${JSON.stringify(url)} }];
-      p.settings.model = ${JSON.stringify(model)};
+      p.settings.endpoints = [{ url: ${JSON.stringify(url)}, model: ${JSON.stringify(model)} }];
       await p.saveSettings();
       await p.newChat();
       return true;
@@ -3379,12 +3380,6 @@ async function main(): Promise<void> {
     } finally {
       await raeumeBildAuf();
       await removeOcrStub();
-      await cdp.evaluate(`
-        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-        p.settings.model = ${JSON.stringify(modellVorher)};
-        await p.saveSettings();
-        return true;
-      `).catch(() => undefined);
     }
 
     // --- 59–62. Verbindungs-Bausteine des Kits (Welle 15, obsidian-kit 0.51.2) ----------------
@@ -3476,8 +3471,7 @@ async function main(): Promise<void> {
         // Alter Bestand: Klartext in data.json (so lag es bis 0.21.x).
         await cdp.evaluate(`
           const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-          p.settings.endpoints = [{ url: ${JSON.stringify(fake60.url)}, apiKey: ${JSON.stringify(KEY60)} }];
-          p.settings.model = "smoke-model";
+          p.settings.endpoints = [{ url: ${JSON.stringify(fake60.url)}, apiKey: ${JSON.stringify(KEY60)}, model: "smoke-model" }];
           await p.saveData(p.settings);
           p.resolver.invalidate();
           await p.newChat();
@@ -3530,11 +3524,70 @@ async function main(): Promise<void> {
         await fake61.close();
       }
       record("61. Neutralisierung: eine Antwort mit Bild-URL und dataviewjs-Block rendert als Text, auch im neu gezeichneten Verlauf", ok61, detail61);
+
+      // --- 63. Globales Modell-Feld abgeschafft (Welle 17) --------------------------------------
+      // Ein Altbestand mit `model` in data.json: nach dem Laden steht der Wert in der Zeile, der
+      // Schluessel ist aus data.json verschwunden, und die Einstellungen zeigen weder eine Zeile
+      // „Model“ noch die Option „global model“. Der Neustart des Plugins ist der Weg durch `onload`.
+      let ok63 = false;
+      let detail63 = "";
+      let settings63: Cdp | null = null;
+      try {
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          await p.saveData({ endpoints: [{ url: "http://127.0.0.1:1234" }], model: "legacy-63" });
+          await app.plugins.disablePlugin(${JSON.stringify(PLUGIN_ID)});
+          await app.plugins.enablePlugin(${JSON.stringify(PLUGIN_ID)});
+          return true;
+        `);
+        const nach = await pollUntil<{ roh: Record<string, unknown>; zeile: string | null; feld: boolean } | null>(
+          cdp,
+          `
+            const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+            if (!p || !p.settings) return null;
+            const roh = JSON.parse(await app.vault.adapter.read(p.manifest.dir + "/data.json"));
+            return { roh, zeile: p.settings.endpoints[0]?.model ?? null, feld: "model" in p.settings };
+          `,
+          10000,
+        );
+        const gespeichert = nach !== null && !("model" in nach.roh) && (nach.roh.endpoints as Array<{ model?: string }>)[0]?.model === "legacy-63";
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          if (p.views().length === 0) await p.activateView();
+          app.setting.open();
+          app.setting.openTabById(${JSON.stringify(PLUGIN_ID)});
+          return true;
+        `);
+        await new Promise((r) => setTimeout(r, 1200));
+        settings63 = await attachTo("settings", port, vault);
+        const dom = settings63 === null
+          ? null
+          : await pollUntil<{ namen: string[]; global: boolean; zeilenModell: string } | null>(
+              settings63,
+              `
+                const zeilen = [...document.querySelectorAll(".setting-item")].filter((r) => r.querySelector(".okit-ep-status"));
+                if (zeilen.length === 0) return null;
+                const namen = [...document.querySelectorAll(".setting-item-name")].map((e) => e.textContent.trim());
+                const text = document.body.textContent.toLowerCase();
+                const feld = zeilen[0].querySelector("input[type=text], select");
+                return { namen, global: text.includes("global model"), zeilenModell: feld ? (feld.value ?? "") : "" };
+              `,
+              8000,
+            );
+        const keineZeile = dom !== null && !dom.namen.some((n) => n === "Model" || n === "Modell");
+        ok63 = gespeichert && nach?.zeile === "legacy-63" && nach.feld === false && keineZeile && dom !== null && !dom.global;
+        detail63 = `data.json ohne „model“, Zeile traegt legacy-63: ${gespeichert} · Feld im Speicher: ${nach?.feld} · Zeile „Model“ in den Einstellungen: ${dom === null ? "?" : !keineZeile} · „global model“ im Tab: ${dom?.global}`;
+      } catch (error) {
+        detail63 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        settings63?.close();
+        await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+      }
+      record("63. Globales Modell-Feld abgeschafft: Altwert wandert in die Zeile, keine Zeile „Model“, keine Option „global model“", ok63, detail63);
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
         p.setContextMode(${JSON.stringify(modusVorher59)});
-        p.settings.model = ${JSON.stringify(modellVorher)};
         await p.saveSettings();
         return true;
       `).catch(() => undefined);
@@ -3560,7 +3613,6 @@ async function main(): Promise<void> {
           const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
           p.settings.endpoints = ${JSON.stringify(previous.endpoints)};
           p.settings.timeoutSec = ${JSON.stringify(previous.timeoutSec)};
-          p.settings.model = ${JSON.stringify(previous.model)};
           p.settings.suppressThinking = ${JSON.stringify(previous.suppressThinking)};
           await p.saveSettings();
           await p.newChat();
