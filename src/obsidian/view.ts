@@ -345,7 +345,6 @@ export class KodaView extends ItemView {
     this.logEl.empty();
     this.endStream();
     this.streamArea = null;
-    this.streamWriter = null;
     if (this.mdComp !== null) this.removeChild(this.mdComp);
     this.mdComp = this.addChild(new Component());
     if (this.plugin.skillNotice !== null) {
@@ -423,6 +422,9 @@ export class KodaView extends ItemView {
   /** Der naechste Token-Block ist eine neue Blase. */
   private endStream(): void {
     this.streamArea = null;
+    // Seit obsidian-kit 0.52.0 haengt der Schreiber einen Wächter an die Ansicht; wer ihn
+    // fallen lässt, ohne `destroy()`, lässt ihn weiterlaufen.
+    this.streamWriter?.destroy();
     this.streamWriter = null;
   }
 
