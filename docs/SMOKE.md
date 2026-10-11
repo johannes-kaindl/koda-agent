@@ -1300,3 +1300,11 @@ Neue Punkte, die die Naht zum Host messen, nicht das Kit:
 - **62** Lab-Telemetrie trägt den gesendeten Text (Platzhalter), nicht das Original.
 
 Gegenprobe, vier Mutationen gleichzeitig (`redact: false`, Lab mit Rohnachrichten, `renderMarkdownInto` ohne `neutralizeModelMarkdown`, Auflösung über die rohe Endpunktliste): genau 59, 60, 61 und 62 wurden rot (58/62), alle anderen blieben grün. Mutationen zurückgenommen, Kopien vorher im Scratchpad.
+
+## Belegter Lauf: 2026-10-11, Welle 17 — globales Modell-Feld abgeschafft (63/63)
+
+Baseline davor (frischer Prozess, Obsidian 1.14.4 Zweitinstanz, Port 9386): Gate 963/963, Smoke 62/62. Danach: Gate 970/970 (vor dem Pin-Ziel), Smoke 63/63. Die Treiber setzen das Modell jetzt in der Zeile (`endpoints[0].model`, danach `resolver.invalidate()`), nicht mehr in `settings.model`.
+
+- **63** Altbestand `{ model: "legacy-63" }` in `data.json`, Plugin per `disablePlugin`/`enablePlugin` neu geladen (der Weg durch `onload`): der Schlüssel `model` ist aus `data.json` und aus `settings` verschwunden, die Zeile trägt `legacy-63`, in den Einstellungen gibt es weder eine Zeile „Model“ noch „global model“.
+
+Gegenprobe mit dem Build vor dem Umbau (derselbe Treiber): 59/63, genau 13 (Thinking-Schalter liest das Zeilen-Modell, der alte Build das globale Feld, deshalb nie gesperrt) und 63 rot. Der Treiber ist ohnehin auf das Zeilen-Modell umgestellt, 13 zeigt damit die Lesequelle.

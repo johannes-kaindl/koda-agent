@@ -50,7 +50,7 @@ Mit [AnySource Sideloader](https://github.com/johannes-kaindl/anysource-sideload
 
 ## Verwendung
 
-1. Modell-Server starten, **Einstellungen → Koda** öffnen, prüfen, dass die Endpunkt-Zeile (Standard `http://127.0.0.1:1234`) ein grünes Häkchen zeigt, und unter **Modell → Modelle abrufen** das Modell wählen.
+1. Modell-Server starten, **Einstellungen → Koda** öffnen, prüfen, dass die Endpunkt-Zeile (Standard `http://127.0.0.1:1234`) ein grünes Häkchen zeigt, und in der Endpunkt-Zeile (**Modelle abrufen**) das Modell wählen.
 2. Die Seitenleiste über das **Hunde-Symbol** in der Menüleiste oder den Befehl **Koda öffnen** öffnen.
 3. Eine Frage zu deinem Vault stellen. Die Statuszeile sagt, was Koda gerade tut; jeder Werkzeugaufruf erscheint im Chat.
 4. Im Tab **Kontext** oder über das Dropdown neben **Senden** prüfen und ändern, was mitgeht.
@@ -60,9 +60,9 @@ Die Anleitung [Getting started](https://github.com/johannes-kaindl/koda-agent/bl
 
 ## Konfiguration
 
-Alles liegt unter **Einstellungen → Koda**: Endpunkte und Modell, der Koda-Ordner (Standard `Koda`), wie viele Werkzeugaufrufe eine Antwort nehmen darf, die Verdichtung, der Arbeitskontext und die Modell-Steuerung. Die [Einstellungs-Referenz](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/reference/settings.md) führt jede Einstellung mit Standard und Wertebereich (auf Englisch).
+Alles liegt unter **Einstellungen → Koda**: Endpunkte (jeder mit seinem Modell), der Koda-Ordner (Standard `Koda`), wie viele Werkzeugaufrufe eine Antwort nehmen darf, die Verdichtung, der Arbeitskontext und die Modell-Steuerung. Die [Einstellungs-Referenz](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/reference/settings.md) führt jede Einstellung mit Standard und Wertebereich (auf Englisch).
 
-<a href="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/thumbs/settings.png" width="380" alt="Einstellungen → Koda: eine geprüfte Endpunkt-Zeile mit Active, die Knöpfe + LM Studio, + Ollama und Test, das Modellfeld und die ersten allgemeinen Einstellungen"></a><br><sub>Ein Klick auf die Vorschau zeigt die Einstellungsseite in voller Größe.</sub>
+<a href="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/thumbs/settings.png" width="380" alt="Einstellungen → Koda: eine geprüfte Endpunkt-Zeile mit ihrem Modell und Active, die Knöpfe + LM Studio, + Ollama und Test und die ersten allgemeinen Einstellungen"></a><br><sub>Ein Klick auf die Vorschau zeigt die Einstellungsseite in voller Größe.</sub>
 
 ## Funktionsweise
 

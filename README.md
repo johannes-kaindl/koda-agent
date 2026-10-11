@@ -50,7 +50,7 @@ Download `main.js`, `manifest.json` and `styles.css` from the [latest release](h
 
 ## Usage
 
-1. Start your model server, open **Settings → Koda**, check that the endpoint row (default `http://127.0.0.1:1234`) shows a green check mark, and pick the model under **Model → Fetch models**.
+1. Start your model server, open **Settings → Koda**, check that the endpoint row (default `http://127.0.0.1:1234`) shows a green check mark, and pick the model in the endpoint row (**Fetch models**).
 2. Open the sidebar with the **dog icon** in the ribbon or the command **Open Koda**.
 3. Ask a question about your vault. The status line says what Koda is doing; each tool call appears in the chat.
 4. Check or change what goes along in the **Context** tab, or with the dropdown next to **Send**.
@@ -60,9 +60,9 @@ The [Getting started](https://github.com/johannes-kaindl/koda-agent/blob/main/do
 
 ## Configuration
 
-Everything is under **Settings → Koda**: endpoints and model, the Koda folder (default `Koda`), how many tool calls one answer may take, compaction, the working context and model control. The [settings reference](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/reference/settings.md) lists every setting with its default and range.
+Everything is under **Settings → Koda**: endpoints (each with its model), the Koda folder (default `Koda`), how many tool calls one answer may take, compaction, the working context and model control. The [settings reference](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/reference/settings.md) lists every setting with its default and range.
 
-<a href="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/thumbs/settings.png" width="380" alt="Settings → Koda: an endpoint row checked and marked Active, the buttons + LM Studio, + Ollama and Test, the model field and the first general settings"></a><br><sub>Click the preview for the full-size settings page.</sub>
+<a href="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/koda-agent/main/docs/images/thumbs/settings.png" width="380" alt="Settings → Koda: an endpoint row with its model, checked and marked Active, the buttons + LM Studio, + Ollama and Test, and the first general settings"></a><br><sub>Click the preview for the full-size settings page.</sub>
 
 ## How it works
 

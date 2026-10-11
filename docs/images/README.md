@@ -9,7 +9,7 @@ This folder holds the images that `README.md` and `README.de.md` embed. This fil
 | `hero.png` | hero | README.md, README.de.md | A note open on the left, Koda's sidebar on the right: a question, the context line, three tool steps (`search_notes`, `read_note` twice) and a streamed answer with wikilinks |
 | `confirm-write.png` | feature | README.md, README.de.md | The confirmation dialog for a write outside the Koda folder: action and path in the title, the full text, **Cancel** / **Write** |
 | `context-tab.png` | feature | README.md, README.de.md | The Context tab in mode Note: mode dropdown, usage summary, link depth, the active note plus its linked notes as chips, the Manual section with its three add buttons |
-| `settings.png` | detail | README.md, README.de.md | Settings → Koda, top: the Help row (**Open documentation**, bug button), an endpoint row checked (green mark, **Active**), **+ LM Studio** / **+ Ollama** / **Test**, the model field, the first general settings |
+| `settings.png` | detail | README.md, README.de.md | Settings → Koda, top: the Help row (**Open documentation**, bug button), an endpoint row with its model, checked (green mark, **Active**), **+ LM Studio** / **+ Ollama** / **Test**, the first general settings |
 
 Captured at 1200 px, device pixel ratio 2, English interface. The sidebar images are embedded at their real on-screen width (not stretched to the class width).
 

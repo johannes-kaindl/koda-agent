@@ -112,7 +112,7 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 
 **Cause:** Any other error from the server, quoted as the server sent it.
 
-**Fix:** If the text mentions a model, check that **Model** (or the row's model override) matches a model the server has loaded.
+**Fix:** If the text mentions a model, check that the endpoint row's model matches a model the server has loaded.
 
 ## In the Context tab and the context modes
 
