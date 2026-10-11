@@ -1,10 +1,8 @@
+import { stripThinkBlocks } from "../../vendor/kit/think-splitter";
+
 /** Fallback fuer Modelle ohne natives Tool-Calling (Dicke laut koda-lab-Messung):
  *  findet ein {"tool": …, "arguments": …}-Objekt im Antworttext.
  *  firstJsonObject-Scanner nach dem transmute-Muster (balancierte Klammern, Strings uebersprungen). */
-function stripThink(raw: string): string {
-  return raw.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/^[\s\S]*?<\/think>/, "");
-}
-
 function stripFence(raw: string): string {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(raw);
   return fenced ? fenced[1] : raw;
@@ -33,7 +31,7 @@ function firstJsonObject(raw: string): string | null {
 }
 
 export function parseTextToolCall(content: string): { name: string; arguments: string } | null {
-  const candidate = firstJsonObject(stripFence(stripThink(content)));
+  const candidate = firstJsonObject(stripFence(stripThinkBlocks(content, { dropStrayClose: true })));
   if (candidate === null) return null;
   let parsed: unknown;
   try {

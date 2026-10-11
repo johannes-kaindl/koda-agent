@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The text tool-call fallback no longer slows down on a reply with many unclosed `<think>` tags: 50 000 of them took 7.6 s to read, now 0.3 ms. With two or more stray `</think>` in a reply, everything up to the last one is now dropped (before: up to the first).
+
 ### Changed
 
 - The global *Model* setting is gone; each endpoint row carries its own model. An existing value moves once into the rows that had none, and a row you clear stays empty. A row without a model now sends none (before: the global model).
