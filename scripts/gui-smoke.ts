@@ -137,7 +137,7 @@ import { cwd } from "node:process";
 import { Cdp, attachTo, bereiteInstanzVor, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { boxOf, capture } from "../../tools/obsidian-cdp/shot.js";
-import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
+import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
 const PLUGIN_ID = "koda-agent";
 /** Repo- und Vault-Name sind hier dasselbe Wort — der Staging-Vault heisst wie das Repo. */
@@ -516,6 +516,7 @@ async function main(): Promise<void> {
 
   // Ausserhalb des try, damit das `finally` sie auch nach einem Abbruch mitten im Lauf
   // zurueckschreiben kann — sonst bliebe der Vault mit toten Endpunkten stehen.
+  const herkunftsWarnungen: string[] = [];
   let previous: Settings | null = null;
   let fake: { url: string; port: number; close: () => Promise<void> } | null = null;
 
@@ -530,6 +531,17 @@ async function main(): Promise<void> {
     const vaultName = await cdp.evaluate<string>(`return window.app?.appId ? app.vault.getName() : "";`);
     if (!vaultName) throw new Error("Obsidians `app` ist im Renderer nicht erreichbar.");
     console.log(`Vault: ${vaultName}\n`);
+
+    // Build-Herkunft VOR jeder Messung (CORE-TEST-02 g): ein gruener Lauf gegen einen Store-Build oder
+    // einen veralteten Deploy ist schlimmer als keiner, weil er nicht untersucht wird — `manifest.version`
+    // ist fuer Store- und Repo-Build identisch. Bricht bei „fehlt“/„store-installiert“/„fremd“ ab; bei
+    // „ungeklaert“ landet die Warnung in der Abschlusszeile.
+    const vaultInfo = await cdp.evaluate<{ basePath: string; configDir: string }>(`return { basePath: app.vault.adapter.basePath, configDir: app.vault.configDir };`);
+    requireEigenerBuild(
+      join(vaultInfo.basePath, vaultInfo.configDir, "plugins", PLUGIN_ID, "main.js"),
+      join(REPO_ROOT, "main.js"),
+      (meldung) => { herkunftsWarnungen.push(meldung); console.warn(meldung); },
+    );
 
     // --- 1. Plugin ist aktiv ------------------------------------------------
     const plugin = await cdp.evaluate<{ ok: boolean; version?: string }>(`
@@ -3726,6 +3738,7 @@ async function main(): Promise<void> {
     cdp.close();
     // Auch nach einem Abbruch: nie aufgezeichnete Punkte zaehlen als „nichts gemessen“.
     abschluss();
+    for (const w of herkunftsWarnungen) console.log(`\n${w}`);
   }
 }
 
