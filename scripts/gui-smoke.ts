@@ -130,12 +130,11 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { cwd } from "node:process";
 import { Cdp, attachTo, bereiteInstanzVor, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
+import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
@@ -284,6 +283,9 @@ const PUNKTE = [
   "61. Neutralisierung: eine Antwort mit Bild-URL und dataviewjs-Block rendert als Text, auch im neu gezeichneten Verlauf",
   "63. Globales Modell-Feld abgeschafft: Altwert wandert in die Zeile, keine Zeile „Model“, keine Option „global model“",
   "64. Kontextlaenge je Endpunkt-Zeile: geladen und hoechstens unter der Zeile, Leer-Option „Server waehlt“, eine Anfrage je Zeile und Modell",
+  "65. Strom: der Verlauf folgt dem Ende, solange niemand eingreift (Kontrolle zu 66)",
+  "66. Folge-Regel: Hochscrollen mitten im Strom wird respektiert, der Verlauf springt nicht zurueck",
+  "67. Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -329,51 +331,23 @@ async function startFakeEndpoint(
   // (LM Studio meldet z. B. „model not loaded“ so) — der Kit-Client liest ihn als Fehler.
   chatStub?: { content: string; finishReason: string; errorBody?: string },
 ): Promise<{ url: string; port: number; close: () => Promise<void> }> {
-  const server: Server = createServer((req, res) => {
-    // CORS-Preflight nur relevant, seit Pruefpunkt 40 echte POSTs aus dem Renderer schickt
-    // (Verbindungsprobe/-`/v1/models` sind GETs, die kein Preflight ausloesen). Ohne Antwort
-    // hier bricht die Chat-Anfrage mit genau der CORS-Meldung ab, die Koda selbst kennt
-    // (`error.chatBlocked` — „Probe gruen, Chat rot"), lange bevor `chatStub` greift.
-    if (chatStub !== undefined && req.method === "OPTIONS") {
-      res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-        "Access-Control-Allow-Headers": "*",
-      });
-      res.end();
-      return;
-    }
-    if (chatStub?.errorBody !== undefined && req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
-      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
-      res.end(chatStub.errorBody);
-      return;
-    }
-    if (chatStub !== undefined && req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
-      res.writeHead(200, { "Content-Type": "text/event-stream", "Access-Control-Allow-Origin": "*" });
-      res.end(
-        `data: ${JSON.stringify({ choices: [{ delta: { content: chatStub.content }, finish_reason: null }] })}\n\n`
-        + `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: chatStub.finishReason }] })}\n\n`
-        + `data: [DONE]\n\n`,
-      );
-      return;
-    }
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(
-      req.url?.includes("/v1/models") === true
-        ? JSON.stringify({ data: [{ id: "smoke-model", object: "model" }] })
-        : JSON.stringify({ ok: true }),
-    );
+  // Seit Welle 20 der zentrale Stub (`tools/obsidian-cdp/llm-stub.ts`); CORS ist an (Preflight 204), die
+  // Pfade sind streng (alles ausser GET /v1/models und POST /v1/chat/completions antwortet 404).
+  const fehler = chatStub?.errorBody === undefined
+    ? undefined
+    : (JSON.parse(chatStub.errorBody) as { error?: { message?: string } }).error?.message;
+  const stub = await startLlmStub({
+    port: wunschPort,
+    models: ["smoke-model"],
+    standard: fehler !== undefined
+      ? { fehler, fehlerAls200: true, fehlerForm: "objekt" }
+      : chatStub !== undefined
+        ? { text: chatStub.content, finishReason: chatStub.finishReason }
+        : "Stub-Antwort",
   });
-  await new Promise<void>((resolve) => server.listen(wunschPort, "127.0.0.1", resolve));
-  const port = (server.address() as AddressInfo).port;
   // `close()` gibt ein Promise: Punkt 19 startet denselben Port wieder und braucht die
-  // Zusage, dass er wirklich frei ist — ein `server.close()` ohne Warten laesst das
-  // erneute `listen` mit EADDRINUSE scheitern, und der Punkt waere rot am Falschen.
-  return {
-    url: `http://127.0.0.1:${port}`,
-    port,
-    close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }),
-  };
+  // Zusage, dass er wirklich frei ist.
+  return { url: stub.url, port: stub.port, close: () => stub.stop() };
 }
 
 /** Eine SSE-Antwort je Anfrage, vom Test geschrieben: `respond(body, n)` sieht die Anfrage (als
@@ -381,44 +355,26 @@ async function startFakeEndpoint(
  *  landet in `bodies` — Punkte 55-58 messen damit, WAS Koda auf den Draht schickt (Bild-Parts im
  *  Tool-Ergebnis, Werkzeugliste), nicht nur, was ankommt. Kein Modell noetig. */
 interface ScriptedReply { status?: number; content?: string; toolCall?: { name: string; args: string }; errorMessage?: string }
+type ScriptedBody = { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] };
 async function startScriptedEndpoint(
-  respond: (body: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }, n: number) => ScriptedReply,
-): Promise<{ url: string; bodies: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }[]; authHeaders: string[]; close: () => Promise<void> }> {
-  const authHeaders: string[] = [];
-  const bodies: { messages: { role: string; content: unknown }[]; tools?: { function: { name: string } }[] }[] = [];
-  const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "*" };
-  const server: Server = createServer((req, res) => {
-    if (req.method === "OPTIONS") { res.writeHead(204, cors); res.end(); return; }
-    if (req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
-      const chunks: Buffer[] = [];
-      req.on("data", (c: Buffer) => chunks.push(c));
-      req.on("end", () => {
-        const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as (typeof bodies)[number];
-        bodies.push(body);
-        authHeaders.push(String(req.headers.authorization ?? ""));
-        const r = respond(body, bodies.length);
-        if (r.status !== undefined && r.status >= 400) {
-          res.writeHead(r.status, { "Content-Type": "application/json", ...cors });
-          res.end(JSON.stringify({ error: { message: r.errorMessage ?? "Fehler" } }));
-          return;
-        }
-        res.writeHead(200, { "Content-Type": "text/event-stream", ...cors });
-        const chunk = (delta: object, finish: string | null): string => `data: ${JSON.stringify({ choices: [{ delta, finish_reason: finish }] })}\n\n`;
-        res.end(
-          r.toolCall !== undefined
-            ? chunk({ tool_calls: [{ index: 0, id: "call_smoke", type: "function", function: { name: r.toolCall.name, arguments: r.toolCall.args } }] }, null)
-              + chunk({}, "tool_calls") + "data: [DONE]\n\n"
-            : chunk({ content: r.content ?? "" }, null) + chunk({}, "stop") + "data: [DONE]\n\n",
-        );
-      });
-      return;
-    }
-    res.writeHead(200, { "Content-Type": "application/json", ...cors });
-    res.end(req.url?.includes("/v1/models") === true ? JSON.stringify({ data: [{ id: "smoke-model", object: "model" }] }) : JSON.stringify({ ok: true }));
+  respond: (body: ScriptedBody, n: number) => ScriptedReply,
+): Promise<{ url: string; bodies: ScriptedBody[]; authHeaders: string[]; close: () => Promise<void> }> {
+  const stub = await startLlmStub({
+    models: ["smoke-model"],
+    antwort: (anfrage, n) => {
+      const r = respond(anfrage.json as ScriptedBody, n);
+      if (r.status !== undefined && r.status >= 400) return { status: r.status, fehler: r.errorMessage ?? "Fehler" };
+      if (r.toolCall !== undefined) return { toolCalls: [{ name: r.toolCall.name, arguments: r.toolCall.args }] };
+      return { text: r.content ?? "" };
+    },
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const port = (server.address() as AddressInfo).port;
-  return { url: `http://127.0.0.1:${port}`, bodies, authHeaders, close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }) };
+  const chat = () => stub.anfragen().filter((a) => a.route === "chat");
+  return {
+    url: stub.url,
+    get bodies() { return chat().map((a) => a.json as ScriptedBody); },
+    get authHeaders() { return chat().map((a) => String(a.header.authorization ?? "")); },
+    close: () => stub.stop(),
+  };
 }
 
 /**
@@ -3648,19 +3604,10 @@ async function main(): Promise<void> {
       let ok64 = false;
       let detail64 = "";
       let settings64: Cdp | null = null;
-      let ctxHits64 = 0;
-      const ctxServer64 = createServer((req, res) => {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        if (req.url?.includes("/api/v0/models") === true) {
-          ctxHits64++;
-          res.end(JSON.stringify({ data: [{ id: "ctx-64", max_context_length: 32768, loaded_context_length: 8192 }] }));
-        } else if (req.url?.includes("/v1/models") === true) {
-          res.end(JSON.stringify({ data: [{ id: "ctx-64", object: "model" }] }));
-        } else res.end(JSON.stringify({ ok: true }));
-      });
+      const ctxServer64 = await startLlmStub({ models: ["ctx-64"], kontext: { geladen: 8192, max: 32768 } });
+      const ctxHits64 = (): number => ctxServer64.anfragen().filter((a) => a.route === "api-v0-models").length;
       try {
-        await new Promise<void>((resolve) => ctxServer64.listen(0, "127.0.0.1", resolve));
-        const url64 = `http://127.0.0.1:${(ctxServer64.address() as AddressInfo).port}`;
+        const url64 = ctxServer64.url;
         await cdp.evaluate(`
           const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
           p.settings.endpoints = [{ url: ${JSON.stringify(url64)}, model: "ctx-64" }];
@@ -3686,16 +3633,158 @@ async function main(): Promise<void> {
             );
         const zahlenOk = dom64 !== null && /8[.,\u202f]?192/.test(dom64.text) && /32[.,\u202f]?768/.test(dom64.text);
         const leerOk = dom64 !== null && dom64.leer.some((o) => /server (picks|w.hlt)/i.test(o));
-        ok64 = zahlenOk && leerOk && ctxHits64 === 1;
-        detail64 = `Kontextzeile „${dom64?.text ?? "—"}“ (beide Zahlen: ${zahlenOk}) · Leer-Option: ${leerOk} · Anfragen an /api/v0/models: ${ctxHits64} (soll 1)`;
+        ok64 = zahlenOk && leerOk && ctxHits64() === 1;
+        detail64 = `Kontextzeile „${dom64?.text ?? "—"}“ (beide Zahlen: ${zahlenOk}) · Leer-Option: ${leerOk} · Anfragen an /api/v0/models: ${ctxHits64()} (soll 1)`;
       } catch (error) {
         detail64 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
       } finally {
         settings64?.close();
         await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
-        await new Promise<void>((resolve) => { ctxServer64.close(() => { resolve(); }); });
+        await ctxServer64.stop();
       }
       record("64. Kontextlaenge je Endpunkt-Zeile: geladen und hoechstens unter der Zeile, Leer-Option „Server waehlt“, eine Anfrage je Zeile und Modell", ok64, detail64);
+
+      // --- 65–67. Strom im Chat (Welle 20, zentraler Stub) ------------------------------------
+      // Bisher ohne Modell nicht messbar: der Stub liefert den Strom in einstellbarem Takt. Der
+      // scrollende Container ist `.koda-log` (`scrollEl` von `buildStreamArea`, `view.ts`), seine
+      // Hoehe ist begrenzt (Spalten-Flex im Chat-Tab, `styles.css`) — sonst gaebe es nichts zu folgen.
+      // Gueltigkeit (CORE-TEST-22): Ueberlauf >= 80 px zum Stoerungszeitpunkt (Folge-Schwelle 40 px + 40 px
+      // Spielraum) und mindestens zwei Stuecke nach der Stoerung, abgetastet nur bis zum vorletzten Stueck
+      // (der Schluss-Draw zaehlt nicht); der Stub haelt danach drei Takte offen. Sonst „nichts gemessen“.
+      {
+        // Tokengrosse Stuecke (10 Zeichen, hoechstens eine Zeile Zuwachs): `followTail` prueft den Abstand NACH dem
+        // Wachsen, ein Stueck von mehr als 40 px (Folge-Schwelle) reisst die Verfolgung ab — mit ganzen Absaetzen
+        // je Stueck ging Punkt 65 rot (Abstand 878 px). Echte Token sind klein; der Stub bildet sie nach.
+        const TAKT = 40;
+        const LAENGE = 10;
+        const antwortText = Array.from({ length: 26 }, (_, i) => `Absatz ${i + 1}: Der Strom laeuft weiter, Wort fuer Wort, damit der Verlauf waechst und das Ende wandert.\n\n`).join("");
+        const STUECKE = Math.ceil(antwortText.length / LAENGE);
+        const LOG = `app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0].view.containerEl.querySelector(".koda-log")`;
+        const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+        const chatOffen = (): Promise<unknown> => cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          if (p.views().length === 0) await p.activateView();
+          app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
+          return true;
+        `);
+        const abwarten = async (): Promise<void> => {
+          await pollUntil<boolean>(cdp, `return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].busy ? null : true;`, 25_000).catch(() => undefined);
+        };
+        interface Strom { grund?: string; ueberlauf: number; hoehe: number; stuecke: number; proben: { top: number; abstand: number }[] }
+        const strommessung = async (stoere: boolean): Promise<Strom> => {
+          const stub = await startLlmStub({ models: ["smoke-model"], takt: TAKT, nachlaufMs: 3 * TAKT, standard: { text: antwortText, laenge: LAENGE } });
+          try {
+            await setzeModell("smoke-model", stub.url);
+            await chatOffen();
+            await pause(400);
+            const hoehe = await cdp.evaluate<number>(`const el = ${LOG}; return el ? el.clientHeight : -1;`);
+            if (hoehe <= 0) return { grund: "Verlauf nicht sichtbar (Hoehe 0)", ueberlauf: 0, hoehe, stuecke: 0, proben: [] };
+            await cdp.evaluate(`void app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].ask("Smoke: lange Antwort."); return true;`);
+            // Warten, bis der Ueberlauf die Bedingung erfuellt; Stoerung (oder Messbeginn) im selben evaluate.
+            let start: { ue: number; top: number } | null = null;
+            const frist = Date.now() + 15_000;
+            while (Date.now() < frist && start === null) {
+              start = await cdp.evaluate<{ ue: number; top: number } | null>(`
+                const el = ${LOG};
+                const ue = el.scrollHeight - el.clientHeight;
+                if (ue < 100) return null;
+                ${stoere ? "el.scrollTop = 0;" : ""}
+                return { ue, top: el.scrollTop };
+              `);
+              if (start === null) await pause(40);
+            }
+            const t = Date.now();
+            if (start === null) return { ueberlauf: 0, hoehe, grund: "Ueberlauf blieb unter 100 px (Strom zu kurz oder Verlauf zu hoch)", stuecke: 0, proben: [] };
+            const chat0 = stub.letzte("chat")?.zeit ?? t;
+            const ende = chat0 + STUECKE * TAKT; // Zeitpunkt des letzten Stuecks (Untergrenze)
+            const bis = ende - TAKT; // nur bis zum vorletzten Stueck abtasten
+            const proben: { top: number; abstand: number }[] = [];
+            while (Date.now() < bis) {
+              proben.push(await cdp.evaluate<{ top: number; abstand: number }>(`
+                const el = ${LOG};
+                return { top: el.scrollTop, abstand: el.scrollHeight - el.scrollTop - el.clientHeight };
+              `));
+              await pause(60);
+            }
+            const stuecke = Math.max(0, Math.floor((bis - t) / TAKT));
+            await abwarten();
+            return { ueberlauf: start.ue, hoehe, stuecke, proben, grund: stuecke < 2 ? `nur ${stuecke} Stueck(e) nach dem Messbeginn` : undefined };
+          } finally {
+            await stub.stop();
+          }
+        };
+        const zeige = (m: Strom): string => `Hoehe ${m.hoehe} px · Ueberlauf bei Messbeginn ${m.ueberlauf} px · ${m.stuecke} Stuecke danach · ${m.proben.length} Proben`;
+
+        // 65. Kontrolle: ohne Stoerung folgt der Verlauf dem Ende.
+        let ok65 = false; let detail65 = "";
+        try {
+          const m = await strommessung(false);
+          if (m.grund !== undefined) detail65 = `Abbruch: ${m.grund} (${zeige(m)})`;
+          else {
+            const maxAbstand = Math.max(...m.proben.map((x) => x.abstand));
+            ok65 = maxAbstand < 40;
+            detail65 = `${zeige(m)} · groesster Abstand zum Ende ${maxAbstand} px (soll < 40) · Abstand-Verlauf ${m.proben.filter((_, i) => i % 6 === 0).map((x) => x.abstand).join(",")}`;
+          }
+        } catch (error) {
+          detail65 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        }
+        record("65. Strom: der Verlauf folgt dem Ende, solange niemand eingreift (Kontrolle zu 66)", ok65, detail65);
+
+        // 66. Stoerung: scrollTop = 0 mitten im Strom; der Verlauf darf nicht zum Ende springen.
+        let ok66 = false; let detail66 = "";
+        try {
+          const m = await strommessung(true);
+          if (m.grund !== undefined) detail66 = `Abbruch: ${m.grund} (${zeige(m)})`;
+          else {
+            const maxTop = Math.max(...m.proben.map((x) => x.top));
+            ok66 = maxTop < 4;
+            detail66 = `${zeige(m)} · scrollTop nach der Stoerung 0, danach hoechstens ${maxTop} px (soll < 4) · Abstand zum Ende zuletzt ${m.proben[m.proben.length - 1]?.abstand} px`;
+          }
+        } catch (error) {
+          detail66 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        }
+        record("66. Folge-Regel: Hochscrollen mitten im Strom wird respektiert, der Verlauf springt nicht zurueck", ok66, detail66);
+
+        // 67. Denkblock live: Reasoning waechst sichtbar, waehrend der Antworttext noch fehlt.
+        let ok67 = false; let detail67 = "";
+        const stub67 = await startLlmStub({
+          models: ["smoke-model"], takt: 250, nachlaufMs: 750,
+          standard: { reasoning: "Ich ueberlege Schritt fuer Schritt, was zu tun ist. ".repeat(12), laenge: 40, text: "Fertig." },
+        });
+        try {
+          await setzeModell("smoke-model", stub67.url);
+          await chatOffen();
+          await pause(400);
+          await cdp.evaluate(`void app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].ask("Smoke: denke nach."); return true;`);
+          const proben: { len: number; offen: boolean; sichtbar: boolean; body: number }[] = [];
+          const frist67 = Date.now() + 8_000;
+          while (Date.now() < frist67 && proben.length < 12) {
+            const pr = await cdp.evaluate<{ len: number; offen: boolean; sichtbar: boolean; body: number } | null>(`
+              const pre = document.querySelector(".okit-stream-reasoning pre");
+              if (!pre) return null;
+              const det = pre.closest("details");
+              return { len: pre.textContent.length, offen: det.open, sichtbar: pre.getBoundingClientRect().height > 0, body: (document.querySelector(".okit-stream-body")?.textContent ?? "").trim().length };
+            `);
+            if (pr !== null) proben.push(pr);
+            await pause(250);
+          }
+          const langen = proben.map((x) => x.len);
+          const waechst = langen.length >= 3 && langen.every((l, i) => i === 0 || l >= langen[i - 1]!) && langen[langen.length - 1]! > langen[0]!;
+          const sichtbar = proben.length > 0 && proben.every((x) => x.offen && x.sichtbar);
+          const vorAntwort = proben.length > 0 && proben[0]!.body === 0;
+          if (proben.length < 3) detail67 = `Abbruch: nur ${proben.length} Probe(n) mit Denkblock im Strom`;
+          else {
+            ok67 = waechst && sichtbar && vorAntwort;
+            detail67 = `${proben.length} Proben, Laenge ${langen.join(" → ")} · offen und sichtbar: ${sichtbar} · beim ersten Probepunkt noch keine Antwort: ${vorAntwort}`;
+          }
+          await abwarten();
+        } catch (error) {
+          detail67 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        } finally {
+          await stub67.stop();
+        }
+        record("67. Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst", ok67, detail67);
+      }
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];

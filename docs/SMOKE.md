@@ -1316,3 +1316,13 @@ Baseline davor (frischer Prozess, Obsidian 1.14.4 Zweitinstanz, Port 9386, 01:36
 - **64** Ein Stub meldet für das Zeilen-Modell geladen 8192 / höchstens 32768 (LM-Studio-Form): die Zeile zeigt „Context: loaded 8,192 · max 32,768 tokens“, das Modell-Dropdown bietet „— (server picks)“, und an `/api/v0/models` geht genau EINE Anfrage, obwohl Anzeige und Fenster-Übernahme sie beide brauchen.
 
 Gegenprobe (die Fenster-Übernahme in `endpointClient().probe()` an den gemeinsamen Cache vorbei, gebaut, deployt, frischer Prozess, zurückgenommen): Punkt 64 rot mit 3 Anfragen statt 1, die Zahlen und die Leer-Option bleiben grün — der Punkt misst also die Anfragezahl, nicht nur die Anzeige. Einstellungsbild `docs/images/settings.png` neu aufgenommen (der Stub des Rezepts meldet jetzt die Kontextlänge) und angesehen.
+
+## Belegter Lauf: 2026-10-12, Welle 20 B1 — zentraler LLM-Stub, Strom-Punkte (67 Punkte)
+
+Die beiden eigenen Stubs und der Kontext-Server des Treibers sind der zentrale Stub aus `tools/obsidian-cdp/llm-stub.ts` (Brücke `fc71211`); `startFakeEndpoint` und `startScriptedEndpoint` bleiben als dünne Hüllen mit der alten Schnittstelle. Die Pfade sind jetzt streng (alles außer `GET /v1/models` und `POST /v1/chat/completions` ist 404), und die Bilanz blieb gleich: 63 grün, 0 rot, 1 übersprungen (1b), 0 nichts gemessen von 64 — vorher und nachher. Punkt 20 ist fokusabhängig (Fenster nicht vorn) und wechselte zwischen den Läufen, unabhängig vom Stub.
+
+- **65** Kontrolle: der Strom (tokengroße Stücke, 10 Zeichen, Takt 40 ms) läuft, der Verlauf (`.koda-log`, begrenzte Höhe) folgt dem Ende, der Abstand bleibt unter 40 px. Gültig ab 100 px Überlauf.
+- **66** Folge-Regel: `scrollTop = 0` mitten im Strom bei ≥ 100 px Überlauf (Bedingung ≥ 80 px); danach bleibt `scrollTop` bei 0, abgetastet bis zum vorletzten Stück, mindestens zwei Stücke danach.
+- **67** Denkblock live: das `<pre>` im Reasoning-Block wächst über mindestens drei Proben, ist offen und sichtbar, solange noch keine Antwort steht.
+
+Mutationsproben (`stream-area.ts` verändert, gebaut, frischer Prozess, zurückgenommen, `kit-sync --check` Exit 0): ohne `atBottom()`-Prüfung ist 66 rot (scrollTop 957), 65 grün; `followTail` als No-op macht 65 rot (Abstand 957 px), 66 bleibt grün — deshalb gehört die Kontrolle dazu; `appendReasoning` ohne `setText` macht 67 rot (Länge 0). Mit absatzgroßen Stücken (ein Absatz je Stück) ging 65 rot (Abstand 878 px): `followTail` misst den Abstand nach dem Wachsen, ein Sprung über 40 px beendet das Folgen — Kit-Befund, behoben in obsidian-kit 0.59.0 (Rundschreiben 3).

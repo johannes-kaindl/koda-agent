@@ -33,12 +33,11 @@
  * Vor jedem Lauf den CDP-Lock fuer den Port nehmen (Dach-`AGENTS.md`).
  */
 
-import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { argv, cwd, exit } from "node:process";
 
 import { attachTo, Cdp, closeExtraLeaves, openExisting, pollUntil, setAppConfig } from "../../tools/obsidian-cdp/cdp.js";
+import { startLlmStub, type Antwort, type StubAnfrage } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture, setWindowSize, writeShot, type Rect } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
@@ -104,60 +103,30 @@ const SZENEN: { erkennung: string; schritte: Schritt[] }[] = [
   },
 ];
 
-function sse(obj: unknown): string {
-  return `data: ${JSON.stringify(obj)}\n\n`;
-}
-
-function antwort(messages: WireMessage[]): string {
+/** Die Antwort auf eine Anfrage als Spezifikation fuer den zentralen Stub (`tools/obsidian-cdp/llm-stub.ts`). */
+function antwort(messages: WireMessage[]): Antwort {
   let letzteNutzer = -1;
   messages.forEach((m, i) => { if (m.role === "user") letzteNutzer = i; });
   const frage = letzteNutzer >= 0 ? String(messages[letzteNutzer]?.content ?? "") : "";
   const szene = SZENEN.find((s) => frage.includes(s.erkennung));
   const schritt = messages.slice(letzteNutzer + 1).filter((m) => m.role === "tool").length;
   const s: Schritt = szene?.schritte[Math.min(schritt, szene.schritte.length - 1)] ?? { text: "(no scripted answer)" };
-  if ("text" in s) {
-    // In Stuecken, damit Koda wie bei einem echten Modell streamt.
-    const teile = s.text.match(/[^\n]+\n*|\n+/g) ?? [s.text];
-    return teile.map((t) => sse({ choices: [{ delta: { content: t }, finish_reason: null }] })).join("")
-      + sse({ choices: [{ delta: {}, finish_reason: "stop" }] }) + "data: [DONE]\n\n";
-  }
-  const id = `call_${schritt}`;
-  return sse({ choices: [{ delta: { tool_calls: [{ index: 0, id, type: "function", function: { name: s.tool, arguments: "" } }] }, finish_reason: null }] })
-    + sse({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: JSON.stringify(s.args) } }] }, finish_reason: null }] })
-    + sse({ choices: [{ delta: {}, finish_reason: "tool_calls" }] }) + "data: [DONE]\n\n";
+  // In Stuecken (je Zeile), damit Koda wie bei einem echten Modell streamt.
+  if ("text" in s) return { stuecke: s.text.match(/[^\n]+\n*|\n+/g) ?? [s.text] };
+  return { toolCalls: [{ name: s.tool, arguments: s.args, id: `call_${schritt}` }] };
 }
 
 async function startStub(): Promise<{ url: string; close: () => Promise<void> }> {
-  const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, GET, OPTIONS", "Access-Control-Allow-Headers": "*" };
-  const server: Server = createServer((req, res) => {
-    if (req.method === "OPTIONS") { res.writeHead(204, cors); res.end(); return; }
-    if (req.method === "POST" && req.url?.includes("/chat/completions") === true) {
-      let body = "";
-      req.on("data", (c: Buffer) => { body += c.toString("utf8"); });
-      req.on("end", () => {
-        const parsed = JSON.parse(body) as { messages?: WireMessage[] };
-        res.writeHead(200, { ...cors, "Content-Type": "text/event-stream" });
-        res.end(antwort(parsed.messages ?? []));
-      });
-      return;
-    }
-    res.writeHead(200, { ...cors, "Content-Type": "application/json" });
-    res.end(req.url?.includes("/api/v0/models") === true
-      // LM-Studio-Form: das Einstellungsbild zeigt die Kontextlaenge unter der Zeile (obsidian-kit 0.56.0).
-      ? JSON.stringify({ data: [{ id: STUB_MODEL, max_context_length: 32768, loaded_context_length: 8192 }] })
-      : req.url?.includes("/models") === true
-      ? JSON.stringify({ data: [{ id: STUB_MODEL, object: "model" }] })
-      : JSON.stringify({ ok: true }));
-  });
   // Fester Port fuer eine ruhige Adresse im Einstellungsbild; ist er belegt (andere Sessions
   // starten eigene Stubs), ein freier — das Bild zeigt dann eine andere Zahl, sonst nichts.
-  const lauschen = (port: number): Promise<void> => new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, "127.0.0.1", () => { server.off("error", reject); resolve(); });
-  });
-  await lauschen(STUB_PORT).catch(() => lauschen(0));
-  const port = (server.address() as AddressInfo).port;
-  return { url: `http://127.0.0.1:${port}`, close: () => new Promise<void>((r) => { server.close(() => { r(); }); }) };
+  const optionen = {
+    models: [STUB_MODEL],
+    // LM-Studio-Form: das Einstellungsbild zeigt die Kontextlaenge unter der Zeile (obsidian-kit 0.56.0).
+    kontext: { geladen: 8192, max: 32768 },
+    antwort: (anfrage: StubAnfrage) => antwort((anfrage.json as { messages?: WireMessage[] } | null)?.messages ?? []),
+  };
+  const stub = await startLlmStub({ ...optionen, port: STUB_PORT }).catch(() => startLlmStub({ ...optionen, port: 0 }));
+  return { url: stub.url, close: () => stub.stop() };
 }
 
 // --- Bausteine ---------------------------------------------------------------------
