@@ -33,4 +33,30 @@ describe("parseTextToolCall", () => {
     expect(gross).toBeLessThan(500);
     expect(gross / klein).toBeLessThan(15);
   });
+  it("JSON hinter Prosa mit eckigen Klammern wird gefunden (frueher: Klammerpaar ohne JSON verdeckte es)", () => {
+    const c = 'Siehe [1] und {kein json}: {"tool":"read_note","arguments":{"path":"A.md"}}';
+    expect(parseTextToolCall(c)).toEqual({ name: "read_note", arguments: '{"path":"A.md"}' });
+  });
+  it("ein offenes <think> verwirft den Rest (Entscheidung 2026-10-12): kein Tool-Aufruf dahinter", () => {
+    expect(parseTextToolCall('<think>ich ueberlege {"tool":"read_note"} {"tool":"read_note","arguments":{"path":"A.md"}}')).toBeNull();
+  });
+  it("entartete Antworten: Laufzeit waechst linear (1 000 / 10 000 / 50 000)", () => {
+    const formen: Array<(n: number) => string> = [
+      (n) => '\\"['.repeat(n),
+      (n) => "[".repeat(n) + "x" + "]".repeat(n),
+      (n) => "{".repeat(n),
+    ];
+    for (const form of formen) {
+      parseTextToolCall(form(1000));
+      const t = (n: number): number => { const t0 = performance.now(); parseTextToolCall(form(n)); return performance.now() - t0; };
+      const klein = Math.max(t(10_000), 1);
+      const gross = t(50_000);
+      expect(gross).toBeLessThan(1000);
+      expect(gross / klein).toBeLessThan(15);
+    }
+  });
+  it("bei zwei Fences gilt der erste (fence: first, wie bisher)", () => {
+    const c = '```json\n{"tool":"read_note","arguments":{"path":"A.md"}}\n```\nund dann\n```json\n{"tool":"write_note","arguments":{}}\n```';
+    expect(parseTextToolCall(c)?.name).toBe("read_note");
+  });
 });
