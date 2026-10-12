@@ -1,4 +1,5 @@
 import { parseTextToolCall } from "../src/core/agent/text-fallback";
+import { pruefeLinear } from "./vendor/kit/linear-probe";
 
 describe("parseTextToolCall", () => {
   it("erkennt ein JSON-Tool-Objekt im Fliesstext (auch in ```json-Fences)", () => {
@@ -20,18 +21,9 @@ describe("parseTextToolCall", () => {
     expect(parseTextToolCall(c)).toEqual({ name: "read_note", arguments: '{"path":"A.md"}' });
   });
   it("viele <think> ohne Schluss: Laufzeit waechst linear, nicht quadratisch", () => {
-    const zeit = (n: number): number => {
-      const t0 = performance.now();
-      parseTextToolCall("<think>".repeat(n));
-      return performance.now() - t0;
-    };
-    zeit(1000); // Aufwaermen
-    const klein = Math.max(zeit(10_000), 1);
-    const gross = zeit(50_000);
-    // Linear: Faktor 5 in der Eingabe, hoechstens ein grosszuegiges Vielfaches davon in der Zeit.
-    // Quadratisch waeren 25 (gemessen: 50 000 Opens brauchten 2,6 s).
-    expect(gross).toBeLessThan(500);
-    expect(gross / klein).toBeLessThan(15);
+    // Quadratisch waeren 25 bei Faktor 5 in der Eingabe (gemessen: 50 000 Opens brauchten 2,6 s).
+    const r = pruefeLinear(parseTextToolCall, "<think>");
+    expect(r.linear, r.message).toBe(true);
   });
   it("JSON hinter Prosa mit eckigen Klammern wird gefunden (frueher: Klammerpaar ohne JSON verdeckte es)", () => {
     const c = 'Siehe [1] und {kein json}: {"tool":"read_note","arguments":{"path":"A.md"}}';
@@ -47,12 +39,8 @@ describe("parseTextToolCall", () => {
       (n) => "{".repeat(n),
     ];
     for (const form of formen) {
-      parseTextToolCall(form(1000));
-      const t = (n: number): number => { const t0 = performance.now(); parseTextToolCall(form(n)); return performance.now() - t0; };
-      const klein = Math.max(t(10_000), 1);
-      const gross = t(50_000);
-      expect(gross).toBeLessThan(1000);
-      expect(gross / klein).toBeLessThan(15);
+      const r = pruefeLinear(parseTextToolCall, form);
+      expect(r.linear, r.message).toBe(true);
     }
   });
   it("bei zwei Fences gilt der erste (fence: first, wie bisher)", () => {

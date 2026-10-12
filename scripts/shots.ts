@@ -25,8 +25,8 @@
  *
  * ```bash
  * npm run build && npm run shots -- --setup          # Vault aus dem Fixture bauen (deployt main.js)
- * npm run shots -- --port 9329 --vault koda-agent    # alles aufnehmen
- * npm run shots -- --port 9329 --vault koda-agent --only hero.png
+ * npm run shots -- --port <PORT> --vault koda-agent  # alles aufnehmen
+ * npm run shots -- --port <PORT> --vault koda-agent --only hero.png
  * npm run shots -- --list
  * ```
  *
@@ -346,7 +346,10 @@ async function main(): Promise<void> {
     for (const s of SHOTS) console.log(`${s.name.padEnd(20)} ${s.klasse.padEnd(8)} ${s.muss}`);
     return;
   }
-  const port = Number(flag("port") ?? 9222);
+  const port = Number(flag("port"));
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error("--port <1024-65535> ist Pflicht (kein Standardport: 9222 gehoert der regulaeren Instanz). Beispiel: npm run shots -- --port <PORT> --vault koda-agent");
+  }
   const vault = flag("vault");
   const only = flag("only");
 

@@ -24,6 +24,6 @@
       ],
       "rewrite": [["../pure/", "../kit/"], ["../vendor/code-kit/pure/", "../kit/"], ["../vendor/code-kit/web/", "../kit/"]]
     },
-    { "dir": "tests/vendor/kit", "source": "obsidian-kit", "from": "src/testing", "modules": ["kit-css", "obsidian-mock"] }
+    { "dir": "tests/vendor/kit", "source": "obsidian-kit", "from": "src/testing", "modules": ["kit-css", "obsidian-mock", "linear-probe"] }
   ]
 }

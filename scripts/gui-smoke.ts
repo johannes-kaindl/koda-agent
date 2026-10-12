@@ -84,13 +84,13 @@
  *
  * ```bash
  * UD=/tmp/obs-test-koda-agent; mkdir -p "$UD"
- * lsof -nP -iTCP:9394 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
- * pgrep -f "user-data-dir=$UD" && echo "Profil belegt — $UD-w19 nehmen, nie beenden"
+ * lsof -nP -iTCP:<PORT> -sTCP:LISTEN && echo "Port belegt — anderen waehlen (Port laut Auftrag bzw. frei, nie aus diesem Kommentar)"
+ * pgrep -f "user-data-dir=$UD" && echo "Profil belegt — $UD-wNN nehmen, nie beenden"
  * cp ~/Library/Application\ Support/obsidian/obsidian-*.asar "$UD"/   # aktuelle Version statt gebuendelter
  * node -e 'const p=process.env.STAGING_VAULTS_DIR+"/koda-agent";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{"koda-agent":{path:p,ts:Date.now(),open:true}},language:"en"}))' "$UD"
- * /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9394 &   # je Messlauf frischer Prozess, PID merken
- * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label koda-agent --intent "Smoke :9394" --exclusive focus --port 9394 --ttl 900
- * npm run smoke:gui -- --port 9394 --vault koda-agent
+ * /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=<PORT> &   # je Messlauf frischer Prozess, PID merken
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label koda-agent --intent "Smoke :<PORT>" --exclusive focus --port <PORT> --ttl 900
+ * npm run smoke:gui -- --port <PORT> --vault koda-agent
  * python3 ~/.claude/hooks/obsidian-cdp-lock.py release           # danach nur die eigene PID beenden
  * ```
  *
@@ -471,7 +471,7 @@ function setup(): void {
   console.log(
     "\nZweitinstanz starten (eigenes Profil, eigener Port, Vault in obsidian.json eintragen: Rezept im\n" +
       "Dateikopf), dann:\n" +
-      `  npm run smoke:gui -- --port 9394 --vault ${REPO_NAME}`,
+      `  npm run smoke:gui -- --port <PORT> --vault ${REPO_NAME}`,
   );
 }
 
@@ -483,7 +483,7 @@ async function main(): Promise<void> {
   }
   const port = Number(args.value("port"));
   if (!Number.isInteger(port) || port < 1024 || port > 65535) {
-    throw new Error("--port <1024-65535> ist Pflicht (kein Standardport: 9222 gehoert der regulaeren Instanz). Beispiel: npm run smoke:gui -- --port 9394 --vault koda-agent");
+    throw new Error("--port <1024-65535> ist Pflicht (kein Standardport: 9222 gehoert der regulaeren Instanz). Beispiel: npm run smoke:gui -- --port <PORT> --vault koda-agent");
   }
   const vault = args.value("vault") ?? REPO_NAME;
 
