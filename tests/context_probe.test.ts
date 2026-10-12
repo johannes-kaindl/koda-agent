@@ -33,4 +33,31 @@ describe("probeModelContext", () => {
     expect(await probeModelContext(ep, "", h, clock)).toBeNull();
     expect(h.calls).toEqual([]);
   });
+  it("Auth-Kopfzeile geht an beide Anfragen, Ollama bekommt { model } als Body", async () => {
+    const seen: Array<{ url: string; headers: Record<string, string>; body?: unknown }> = [];
+    const h: HttpProbe = {
+      async getJson(url, headers) { seen.push({ url, headers }); return { status: 404, json: null }; },
+      async postJson(url, body, headers) { seen.push({ url, headers, body }); return { status: 200, json: { model_info: { "llama.context_length": 4096 } } }; },
+    };
+    expect(await probeModelContext({ url: "http://h:1", apiKey: "k" }, "llama3", h, clock)).toBe(4096);
+    expect(seen[0].headers.Authorization).toBe("Bearer k");
+    expect(seen[1].headers.Authorization).toBe("Bearer k");
+    expect(seen[1].body).toEqual({ model: "llama3" });
+  });
+  it("ein Status ausserhalb 2xx zaehlt nicht, auch wenn der Koerper ein Fenster nennt", async () => {
+    const body = { data: [{ id: "qwen", loaded_context_length: 8192 }] };
+    expect(await probeModelContext(ep, "qwen", http({ status: 500, json: body }, { status: 401, json: {} }), clock)).toBeNull();
+  });
+  it("haengt der erste Versuch, wird nach dem Timeout der zweite gefragt", async () => {
+    const timers: Array<() => void> = [];
+    const firing = { now: () => 0, setTimeout: (fn: () => void) => { timers.push(fn); return timers.length; }, clearTimeout: () => {} };
+    const h: HttpProbe = {
+      getJson: () => new Promise(() => {}),
+      async postJson() { return { status: 200, json: { model_info: { "llama.context_length": 2048 } } }; },
+    };
+    const p = probeModelContext(ep, "llama3", h, firing, 5000);
+    await Promise.resolve();
+    timers.shift()?.();
+    expect(await p).toBe(2048);
+  });
 });
