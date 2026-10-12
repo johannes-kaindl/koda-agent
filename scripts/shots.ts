@@ -142,7 +142,10 @@ async function startStub(): Promise<{ url: string; close: () => Promise<void> }>
       return;
     }
     res.writeHead(200, { ...cors, "Content-Type": "application/json" });
-    res.end(req.url?.includes("/models") === true
+    res.end(req.url?.includes("/api/v0/models") === true
+      // LM-Studio-Form: das Einstellungsbild zeigt die Kontextlaenge unter der Zeile (obsidian-kit 0.56.0).
+      ? JSON.stringify({ data: [{ id: STUB_MODEL, max_context_length: 32768, loaded_context_length: 8192 }] })
+      : req.url?.includes("/models") === true
       ? JSON.stringify({ data: [{ id: STUB_MODEL, object: "model" }] })
       : JSON.stringify({ ok: true }));
   });

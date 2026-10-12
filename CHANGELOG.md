@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Context length per endpoint row.** Under a reachable row with a model, the settings now show what the server reports for that model, e.g. `Context: loaded 8,192 · max 32,768 tokens` (LM Studio gives both, Ollama only the maximum). The check that fills **Context window** and this line share one request per row and model; **Fetch models** asks again.
+- The model picker of every row offers **— (server picks)** again to clear the choice (the row then sends no model).
+
+### Changed
+
+- Kit pins moved to obsidian-kit 0.56.0 and code-kit 0.23.0 (skipping obsidian-kit 0.54.0–0.55.0 and code-kit 0.22.0–0.22.1): long streamed replies are checked for remote sources noticeably faster and leak less; the `<think>` clean-up in the kit is linear for degenerate replies; the Bearer mask and the Mermaid rule from the previous pin stay.
+- The text tool-call fallback now reads the JSON through the kit. **A tool call behind prose that contains brackets is found** (e.g. `see [1]: {"tool": …}`; before, the first bracket pair hid it). **An unclosed `<think>` now drops the rest of the reply**, so no tool call is read from behind it. Of the existing cases nothing else changes.
+- Reading the context window goes through the kit: LM Studio first, then Ollama, as before. Each attempt stops waiting after 5 seconds (as before); the status check still accepts only 2xx answers.
+
 ## [0.23.0] — 2026-10-11
 
 ### Fixed

@@ -422,13 +422,12 @@ export class KodaView extends ItemView {
   /** Der naechste Token-Block ist eine neue Blase. */
   private endStream(): void {
     this.streamArea = null;
-    // Seit obsidian-kit 0.52.0 haengt der Schreiber einen Wächter an die Ansicht; wer ihn
-    // fallen lässt, ohne `destroy()`, lässt ihn weiterlaufen. Erst NACH `settled()`: ein noch
-    // laufendes Rendering macht seinen letzten Wächter-Durchgang danach, und ein sofortiges
-    // `destroy()` nähme ihm den (Fernquellen im letzten Block blieben ungeprüft).
+    // Seit obsidian-kit 0.52.0 haengt der Schreiber einen Waechter an die Ansicht; wer ihn
+    // fallen laesst, ohne `destroy()`, laesst ihn weiterlaufen. Seit 0.55.0 sichert `destroy()`
+    // sich selbst ab: laeuft noch ein Block, trennt es den Observer erst nach `settled()`.
     const writer = this.streamWriter;
     this.streamWriter = null;
-    if (writer !== null) void writer.settled().then(() => writer.destroy());
+    writer?.destroy();
   }
 
   /** Legt Bereich + Schreiber einmalig je Antwort an — Gedanken koennen vor dem ersten
