@@ -1,7 +1,7 @@
 {
   "sources": {
-    "obsidian-kit": { "ref": "0.53.0" },
-    "code-kit": { "ref": "0.21.1" }
+    "obsidian-kit": { "ref": "0.56.0" },
+    "code-kit": { "ref": "0.23.0" }
   },
   "targets": [
     { "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["frontmatter", "explain-texts", "ocr-provider", "image-gen-provider", "endpoint-source", "endpoint-secret-hook"], "rewrite": [["../vendor/code-kit/pure/", "./"]] },
@@ -11,7 +11,7 @@
         "think-splitter", "reasoning", "capabilities", "endpoint", "endpoint_config",
         "endpoint_diagnostics", "settings", "i18n", "num", "timeout",
         "model-context", "error_body", "diff", "settings_schema", "model-choice",
-        "model-list-cache", "stream-blocks", "sse", "redact", "secrets", "safe-markdown", "sampling-profiles"
+        "model-list-cache", "stream-blocks", "sse", "redact", "secrets", "safe-markdown", "sampling-profiles", "llm-json"
       ]
     },
     { "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/web", "modules": ["remote-resources"], "rewrite": [["../pure/", "./"]] },
