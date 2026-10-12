@@ -70,7 +70,6 @@
  * dann in seine Zeitueberschreitung, ohne dass etwas kaputt waere.
  */
 
-import { execFileSync } from "node:child_process";
 // Die CDP-Bruecke liegt seit 2026-08-16 zentral im Dach (tools/obsidian-cdp/) und wird
 // importiert, nicht vendored — sie ist plugin-neutral. Fehlt das Dach (fremder
 // Checkout), bricht esbuild beim Aufloesen ab: das ist die gewollte Meldung.
@@ -259,14 +258,6 @@ async function main(): Promise<void> {
     // Ohne Fokus drosselt Chromium den Renderer — dieselbe Falle wie im GUI-Smoke.
     // `requireVisible` holt das Fenster selbst nach vorn und bricht mit
     // Handlungsanweisung ab, wenn das nicht reicht.
-    if (process.platform === "darwin") {
-      try {
-        execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      } catch {
-        console.log("  (Hinweis: `osascript activate` schlug fehl — Fenster ggf. von Hand nach vorn holen)");
-      }
-    }
     await requireVisible(cdp);
 
     const plugin = await cdp.evaluate<{ ok: boolean; version?: string; model?: string }>(`
