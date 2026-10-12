@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Endpoint rows:** the "move up" and "remove endpoint" buttons now sit together and stay in one place; the address field keeps its full width while the API key and model fields are a little narrower (obsidian-kit 0.59.0).
+- **Chat:** the streamed reply keeps following the end — also when a large block arrives at once, such as a table or a code block — as long as you are at the bottom. Before, one big block could stop the scrolling for the rest of the reply. If you scroll up while it streams, the view stays where you put it (obsidian-kit 0.59.0).
+- Kit pins moved to obsidian-kit 0.59.0 and code-kit 0.24.0 (skipping obsidian-kit 0.56.1–0.58.0, whose changes nothing in Koda shows).
+
 ## [0.24.0] — 2026-10-12
 
 ### Added
