@@ -1308,3 +1308,11 @@ Baseline davor (frischer Prozess, Obsidian 1.14.4 Zweitinstanz, Port 9386): Gate
 - **63** Altbestand `{ model: "legacy-63" }` in `data.json`, Plugin per `disablePlugin`/`enablePlugin` neu geladen (der Weg durch `onload`): der Schlüssel `model` ist aus `data.json` und aus `settings` verschwunden, die Zeile trägt `legacy-63`, in den Einstellungen gibt es weder eine Zeile „Model“ noch „global model“.
 
 Gegenprobe mit dem Build vor dem Umbau (derselbe Treiber): 59/63, genau 13 (Thinking-Schalter liest das Zeilen-Modell, der alte Build das globale Feld, deshalb nie gesperrt) und 63 rot. Der Treiber ist ohnehin auf das Zeilen-Modell umgestellt, 13 zeigt damit die Lesequelle.
+
+## Belegter Lauf: 2026-10-12, Welle 18 — llm-json, Kontext-Abruf aus dem Kit, Kontextlänge je Zeile (64/64)
+
+Baseline davor (frischer Prozess, Obsidian 1.14.4 Zweitinstanz, Port 9386, 01:36): Gate 972/972, Smoke 62 grün, 1 rot (Punkt 20, Fenster nicht vorn — in Aufwärm- und Folgelauf gleich), 0 übersprungen, 0 nichts gemessen. Danach (Pins obsidian-kit 0.56.0 / code-kit 0.23.0): Gate 980/980, Smoke 64/64 im zweiten Lauf nach frischem Prozess; der erste Schlusslauf hatte erneut nur Punkt 20 rot (bekanntes Fokus-Muster, kein Befund).
+
+- **64** Ein Stub meldet für das Zeilen-Modell geladen 8192 / höchstens 32768 (LM-Studio-Form): die Zeile zeigt „Context: loaded 8,192 · max 32,768 tokens“, das Modell-Dropdown bietet „— (server picks)“, und an `/api/v0/models` geht genau EINE Anfrage, obwohl Anzeige und Fenster-Übernahme sie beide brauchen.
+
+Gegenprobe (die Fenster-Übernahme in `endpointClient().probe()` an den gemeinsamen Cache vorbei, gebaut, deployt, frischer Prozess, zurückgenommen): Punkt 64 rot mit 3 Anfragen statt 1, die Zahlen und die Leer-Option bleiben grün — der Punkt misst also die Anfragezahl, nicht nur die Anzeige. Einstellungsbild `docs/images/settings.png` neu aufgenommen (der Stub des Rezepts meldet jetzt die Kontextlänge) und angesehen.
