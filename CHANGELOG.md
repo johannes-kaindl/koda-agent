@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.24.0] — 2026-10-12
+
 ### Added
 
 - **Context length per endpoint row.** Under a reachable row with a model, the settings now show what the server reports for that model, e.g. `Context: loaded 8,192 · max 32,768 tokens` (LM Studio gives both, Ollama only the maximum). The check that fills **Context window** and this line share one request per row and model; **Fetch models** asks again.
