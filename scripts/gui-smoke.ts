@@ -3584,6 +3584,63 @@ async function main(): Promise<void> {
         await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
       }
       record("63. Globales Modell-Feld abgeschafft: Altwert wandert in die Zeile, keine Zeile „Model“, keine Option „global model“", ok63, detail63);
+
+      // --- 64. Kontextlaenge je Endpunkt-Zeile (obsidian-kit 0.56.0, Welle 18) ------------------
+      // Ein Stub meldet fuer das Zeilen-Modell geladen 8192 / hoechstens 32768 (LM-Studio-Form). Die
+      // Zeile zeigt beide Zahlen unter dem Status, bietet die Leer-Option „Server waehlt“ an, und die
+      // Abfrage laeuft je Zeile und Modell genau EINMAL, obwohl Anzeige und Fenster-Uebernahme sie
+      // beide brauchen (gemeinsamer Cache in `contextInfo`).
+      let ok64 = false;
+      let detail64 = "";
+      let settings64: Cdp | null = null;
+      let ctxHits64 = 0;
+      const ctxServer64 = createServer((req, res) => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        if (req.url?.includes("/api/v0/models") === true) {
+          ctxHits64++;
+          res.end(JSON.stringify({ data: [{ id: "ctx-64", max_context_length: 32768, loaded_context_length: 8192 }] }));
+        } else if (req.url?.includes("/v1/models") === true) {
+          res.end(JSON.stringify({ data: [{ id: "ctx-64", object: "model" }] }));
+        } else res.end(JSON.stringify({ ok: true }));
+      });
+      try {
+        await new Promise<void>((resolve) => ctxServer64.listen(0, "127.0.0.1", resolve));
+        const url64 = `http://127.0.0.1:${(ctxServer64.address() as AddressInfo).port}`;
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.settings.endpoints = [{ url: ${JSON.stringify(url64)}, model: "ctx-64" }];
+          await p.saveSettings();
+          if (p.views().length === 0) await p.activateView();
+          app.setting.open();
+          app.setting.openTabById(${JSON.stringify(PLUGIN_ID)});
+          return true;
+        `);
+        await new Promise((r) => setTimeout(r, 1200));
+        settings64 = await attachTo("settings", port, vault);
+        const dom64 = settings64 === null
+          ? null
+          : await pollUntil<{ text: string; leer: string[] } | null>(
+              settings64,
+              `
+                const c = document.querySelector(".okit-ep-context");
+                if (!c) return null;
+                const opts = [...document.querySelectorAll(".okit-ep-row select option, .setting-item select option")].map((o) => o.textContent.trim());
+                return { text: c.textContent.trim(), leer: opts };
+              `,
+              10000,
+            );
+        const zahlenOk = dom64 !== null && /8[.,\u202f]?192/.test(dom64.text) && /32[.,\u202f]?768/.test(dom64.text);
+        const leerOk = dom64 !== null && dom64.leer.some((o) => /server (picks|w.hlt)/i.test(o));
+        ok64 = zahlenOk && leerOk && ctxHits64 === 1;
+        detail64 = `Kontextzeile „${dom64?.text ?? "—"}“ (beide Zahlen: ${zahlenOk}) · Leer-Option: ${leerOk} · Anfragen an /api/v0/models: ${ctxHits64} (soll 1)`;
+      } catch (error) {
+        detail64 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      } finally {
+        settings64?.close();
+        await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+        await new Promise<void>((resolve) => { ctxServer64.close(() => { resolve(); }); });
+      }
+      record("64. Kontextlaenge je Endpunkt-Zeile: geladen und hoechstens unter der Zeile, Leer-Option „Server waehlt“, eine Anfrage je Zeile und Modell", ok64, detail64);
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];

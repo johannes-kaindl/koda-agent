@@ -6,17 +6,18 @@
 import { normalizeEndpoint } from "../../vendor/kit/endpoint";
 import { authHeaders, type EndpointConfig } from "../../vendor/kit/endpoint_config";
 import type { CapabilityFetch } from "../../vendor/kit/capabilities";
-import { effectiveContext, fetchModelContext } from "../../vendor/kit/model-context";
+import { effectiveContext, fetchModelContext, type ModelContext } from "../../vendor/kit/model-context";
 import type { ClockPort } from "../../vendor/kit-obsidian/clock";
 import { PROBE_TIMEOUT_MS, type HttpProbe } from "./probe";
 
-export async function probeModelContext(
+/** Beide Laengen, die der Server nennt (geladen, hoechstens) — die Zeile der Endpunkt-Liste zeigt beide. */
+export async function probeModelContextInfo(
   ep: EndpointConfig,
   model: string,
   http: HttpProbe,
   clock: ClockPort,
   timeoutMs: number = PROBE_TIMEOUT_MS,
-): Promise<number | null> {
+): Promise<ModelContext | null> {
   const headers = authHeaders(ep.apiKey === "" || ep.apiKey === undefined ? undefined : ep.apiKey);
   const fetchJson: CapabilityFetch = async (req) => {
     const r = req.method === "POST"
@@ -24,6 +25,16 @@ export async function probeModelContext(
       : await http.getJson(req.url, headers);
     return r.status >= 200 && r.status < 300 ? { json: r.json } : null;
   };
-  const ctx = await fetchModelContext(fetchJson, normalizeEndpoint(ep.url), model, { timers: clock, timeoutMs });
-  return effectiveContext(ctx);
+  return fetchModelContext(fetchJson, normalizeEndpoint(ep.url), model, { timers: clock, timeoutMs });
+}
+
+/** Die eine Zahl (geladen vor hoechstens), die Koda fuer Kontextfenster-Uebernahme und -Warnung braucht. */
+export async function probeModelContext(
+  ep: EndpointConfig,
+  model: string,
+  http: HttpProbe,
+  clock: ClockPort,
+  timeoutMs: number = PROBE_TIMEOUT_MS,
+): Promise<number | null> {
+  return effectiveContext(await probeModelContextInfo(ep, model, http, clock, timeoutMs));
 }

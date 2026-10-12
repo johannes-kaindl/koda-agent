@@ -11,7 +11,8 @@ import { hydrateLocalEndpoints, prepareLocalEndpoints } from "./vendor/kit-obsid
 import { redactExchange } from "./vendor/kit-obsidian/chat-client";
 import { KodaChatClient, type LlmResult } from "./llm/KodaChatClient";
 import { probeEndpoint, probeModels } from "./core/llm/probe";
-import { probeModelContext } from "./core/llm/context-probe";
+import { probeModelContextInfo } from "./core/llm/context-probe";
+import { effectiveContext, type ModelContext } from "./vendor/kit/model-context";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { xhrSseTransport } from "./vendor/kit-obsidian/chat-transport";
@@ -398,7 +399,11 @@ export default class KodaPlugin extends Plugin {
   /** Kontextfenster laut Endpunkt (LM Studio/Ollama), sonst null. Nutzt das Modell, das fuer
    *  diese Zeile effektiv gilt. */
   probeContext(ep: EndpointConfig, model: string = rowModel(ep)): Promise<number | null> {
-    return probeModelContext(this.hydrated(ep), model, requestUrlProbe, realClock);
+    return this.probeContextInfo(ep, model).then(effectiveContext);
+  }
+  /** Beide Laengen (geladen, hoechstens) — die Endpunkt-Liste zeigt beide unter der Zeile. */
+  probeContextInfo(ep: EndpointConfig, model: string = rowModel(ep)): Promise<ModelContext | null> {
+    return probeModelContextInfo(this.hydrated(ep), model, requestUrlProbe, realClock);
   }
   private store!: SessionStore;
 

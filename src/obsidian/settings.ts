@@ -33,7 +33,8 @@ import { githubHelpUrls, helpSettingDefinition } from "../vendor/kit-obsidian/he
 import { modeLabel } from "../core/context/labels";
 import { AVAILABLE_MODES } from "../core/context/types";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
-import type { EndpointConfig } from "../vendor/kit/endpoint_config";
+import { rowModel, type EndpointConfig } from "../vendor/kit/endpoint_config";
+import { effectiveContext, type ModelContext } from "../vendor/kit/model-context";
 import { buildEndpointList, type EndpointListStrings } from "../vendor/kit-obsidian/endpoint-list";
 import { createModelListCache, type ModelListCache, type ModelListClient } from "../vendor/kit/model-list-cache";
 import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
@@ -336,6 +337,7 @@ export class KodaSettingsTab extends PluginSettingTab {
    *  NICHT aus `refreshUi()` heraus aufrufen — das ist ein Neuaufbau, kein Schliessen. */
   hide(): void {
     this.modelCache.clear();
+    this.contextCache.clear();
     super.hide();
   }
 
@@ -396,6 +398,13 @@ export class KodaSettingsTab extends PluginSettingTab {
       reconnect: () => Promise.resolve(),
       rerender: () => { this.refreshUi(); },
       presets: ENDPOINT_PRESETS,
+      // Kontextlaenge unter der Zeile (obsidian-kit 0.56.0). Dieselbe Abfrage wie die Fenster-
+      // Uebernahme in `endpointClient().probe()`: beide gehen durch `contextInfo`, sodass je Zeile
+      // und Modell nur EINE Anfrage laeuft. „Modelle neu laden“ verwirft den Eintrag.
+      modelContext: {
+        load: (cfg) => this.contextInfo(cfg),
+        invalidate: (cfg) => { this.contextCache.delete(this.contextKey(cfg)); },
+      },
       // Schluessel liegen im Schluesselbund (`app.secretStorage`), nicht in data.json; ein noch
       // vorhandener Klartext-Schluessel wandert beim Zeichnen der Liste dorthin.
       app: this.app,
@@ -413,7 +422,7 @@ export class KodaSettingsTab extends PluginSettingTab {
       probe: async (): Promise<EndpointStatus> => {
         const status = await this.plugin.probe(cfg);
         if (!status.reachable) return status;
-        const ctx = await this.plugin.probeContext(cfg);
+        const ctx = effectiveContext(await this.contextInfo(cfg));
         if (ctx !== null && this.plugin.settings.contextWindowTokens === DEFAULT_SETTINGS.contextWindowTokens) {
           await this.setControlValue("contextWindowTokens", ctx);
           // Die Notice ueberlebt einen Redraw, das eben gesetzte Status-Icon nicht — sie ist
@@ -448,6 +457,12 @@ export class KodaSettingsTab extends PluginSettingTab {
       ariaModel: (url) => t("settings.endpoints.aria.model", url),
       modelHint: (key) => (key === "" ? "" : t(`settings.model.hint.${key}`)),
       savedSuffix: t("settings.model.savedSuffix"),
+      emptyModel: t("settings.endpoints.emptyModel"),
+      contextText: (c) => c.loadedContextLength !== undefined && c.maxContextLength !== undefined
+        ? t("settings.endpoints.context.both", c.loadedContextLength.toLocaleString(getLang()), c.maxContextLength.toLocaleString(getLang()))
+        : c.loadedContextLength !== undefined
+          ? t("settings.endpoints.context.loaded", c.loadedContextLength.toLocaleString(getLang()))
+          : t("settings.endpoints.context.max", (c.maxContextLength ?? 0).toLocaleString(getLang())),
       refreshModels: t("settings.model.fetch"),
       moveToFront: t("settings.endpoints.moveToFront"),
       remove: t("settings.remove"),
@@ -488,6 +503,21 @@ export class KodaSettingsTab extends PluginSettingTab {
    *  deshalb Feld und nicht lokal. Wird in `hide()` verworfen (Kit-Vertrag: sonst bleibt ein
    *  einmal als nicht erreichbar gemessener Endpunkt die ganze Sitzung so stehen). */
   private modelCache: ModelListCache = createModelListCache();
+
+  /** Kontextlaenge je Zeile und Modell, geteilt zwischen Anzeige und Fenster-Uebernahme. Wie
+   *  `modelCache` in `hide()` verworfen. Misslungene Abfragen (null) bleiben stehen, bis neu
+   *  geladen wird: ein Server, der nichts meldet, wird nicht bei jedem Redraw neu gefragt. */
+  private contextCache = new Map<string, Promise<ModelContext | null>>();
+  private contextKey(cfg: EndpointConfig): string { return `${cfg.url}|${rowModel(cfg)}`; }
+  private contextInfo(cfg: EndpointConfig): Promise<ModelContext | null> {
+    const key = this.contextKey(cfg);
+    let hit = this.contextCache.get(key);
+    if (!hit) {
+      hit = this.plugin.probeContextInfo(cfg).catch(() => null);
+      this.contextCache.set(key, hit);
+    }
+    return hit;
+  }
 }
 
 /** Kit-Status → Oberflaechentext. Bewusst ueber `kind` statt ueber das mitgelieferte

@@ -1,4 +1,4 @@
-import { probeModelContext } from "../src/core/llm/context-probe";
+import { probeModelContext, probeModelContextInfo } from "../src/core/llm/context-probe";
 import type { HttpProbe } from "../src/core/llm/probe";
 
 const clock = { now: () => 0, setTimeout: () => 1, clearTimeout: () => {} };
@@ -59,5 +59,9 @@ describe("probeModelContext", () => {
     await Promise.resolve();
     timers.shift()?.();
     expect(await p).toBe(2048);
+  });
+  it("Info-Variante liefert beide Laengen (geladen und hoechstens), nicht nur die eine Zahl", async () => {
+    const h = http({ status: 200, json: { data: [{ id: "qwen", max_context_length: 32768, loaded_context_length: 8192 }] } }, new Error("nicht gefragt"));
+    expect(await probeModelContextInfo(ep, "qwen", h, clock)).toEqual({ loadedContextLength: 8192, maxContextLength: 32768 });
   });
 });
