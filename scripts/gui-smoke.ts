@@ -286,6 +286,7 @@ const PUNKTE = [
   "65. Strom: der Verlauf folgt dem Ende, solange niemand eingreift (Kontrolle zu 66)",
   "66. Folge-Regel: Hochscrollen mitten im Strom wird respektiert, der Verlauf springt nicht zurueck",
   "67. Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst",
+  "68. Strom mit absatzgrossen Stuecken: der Verlauf folgt dem Ende auch bei Spruengen ueber die Folge-Schwelle (Kit 0.59.0, withFollow)",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -3659,6 +3660,7 @@ async function main(): Promise<void> {
         const LAENGE = 10;
         const antwortText = Array.from({ length: 26 }, (_, i) => `Absatz ${i + 1}: Der Strom laeuft weiter, Wort fuer Wort, damit der Verlauf waechst und das Ende wandert.\n\n`).join("");
         const STUECKE = Math.ceil(antwortText.length / LAENGE);
+        const absaetze = antwortText.split(/(?<=\n\n)/);
         const LOG = `app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0].view.containerEl.querySelector(".koda-log")`;
         const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
         const chatOffen = (): Promise<unknown> => cdp.evaluate(`
@@ -3671,8 +3673,11 @@ async function main(): Promise<void> {
           await pollUntil<boolean>(cdp, `return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].busy ? null : true;`, 25_000).catch(() => undefined);
         };
         interface Strom { grund?: string; ueberlauf: number; hoehe: number; stuecke: number; proben: { top: number; abstand: number }[] }
-        const strommessung = async (stoere: boolean): Promise<Strom> => {
-          const stub = await startLlmStub({ models: ["smoke-model"], takt: TAKT, nachlaufMs: 3 * TAKT, standard: { text: antwortText, laenge: LAENGE } });
+        const strommessung = async (stoere: boolean, grob = false): Promise<Strom> => {
+          // `grob`: ein ganzer Absatz je Stueck (Zuwachs > 40 px) — vor Kit 0.59.0 riss das die Verfolgung ab.
+          const takt = grob ? 150 : TAKT;
+          const stueckeAnzahl = grob ? absaetze.length : STUECKE;
+          const stub = await startLlmStub({ models: ["smoke-model"], takt, nachlaufMs: 3 * takt, standard: grob ? { stuecke: absaetze } : { text: antwortText, laenge: LAENGE } });
           try {
             await setzeModell("smoke-model", stub.url);
             await chatOffen();
@@ -3696,8 +3701,8 @@ async function main(): Promise<void> {
             const t = Date.now();
             if (start === null) return { ueberlauf: 0, hoehe, grund: "Ueberlauf blieb unter 100 px (Strom zu kurz oder Verlauf zu hoch)", stuecke: 0, proben: [] };
             const chat0 = stub.letzte("chat")?.zeit ?? t;
-            const ende = chat0 + STUECKE * TAKT; // Zeitpunkt des letzten Stuecks (Untergrenze)
-            const bis = ende - TAKT; // nur bis zum vorletzten Stueck abtasten
+            const ende = chat0 + stueckeAnzahl * takt; // Zeitpunkt des letzten Stuecks (Untergrenze)
+            const bis = ende - takt; // nur bis zum vorletzten Stueck abtasten
             const proben: { top: number; abstand: number }[] = [];
             while (Date.now() < bis) {
               proben.push(await cdp.evaluate<{ top: number; abstand: number }>(`
@@ -3706,7 +3711,7 @@ async function main(): Promise<void> {
               `));
               await pause(60);
             }
-            const stuecke = Math.max(0, Math.floor((bis - t) / TAKT));
+            const stuecke = Math.max(0, Math.floor((bis - t) / takt));
             await abwarten();
             return { ueberlauf: start.ue, hoehe, stuecke, proben, grund: stuecke < 2 ? `nur ${stuecke} Stueck(e) nach dem Messbeginn` : undefined };
           } finally {
@@ -3729,6 +3734,21 @@ async function main(): Promise<void> {
           detail65 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
         }
         record("65. Strom: der Verlauf folgt dem Ende, solange niemand eingreift (Kontrolle zu 66)", ok65, detail65);
+
+        // 68. Absatzgrosse Stuecke: dieselbe Kontrolle wie 65, aber jedes Stueck waechst um mehr als die Folge-Schwelle.
+        let ok68 = false; let detail68 = "";
+        try {
+          const m = await strommessung(false, true);
+          if (m.grund !== undefined) detail68 = `Abbruch: ${m.grund} (${zeige(m)})`;
+          else {
+            const maxAbstand = Math.max(...m.proben.map((x) => x.abstand));
+            ok68 = maxAbstand < 40;
+            detail68 = `${zeige(m)} · groesster Abstand zum Ende ${maxAbstand} px (soll < 40) · Abstand-Verlauf ${m.proben.filter((_, i) => i % 6 === 0).map((x) => x.abstand).join(",")}`;
+          }
+        } catch (error) {
+          detail68 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        }
+        record("68. Strom mit absatzgrossen Stuecken: der Verlauf folgt dem Ende auch bei Spruengen ueber die Folge-Schwelle (Kit 0.59.0, withFollow)", ok68, detail68);
 
         // 66. Stoerung: scrollTop = 0 mitten im Strom; der Verlauf darf nicht zum Ende springen.
         let ok66 = false; let detail66 = "";

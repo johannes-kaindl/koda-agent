@@ -1326,3 +1326,10 @@ Die beiden eigenen Stubs und der Kontext-Server des Treibers sind der zentrale S
 - **67** Denkblock live: das `<pre>` im Reasoning-Block wächst über mindestens drei Proben, ist offen und sichtbar, solange noch keine Antwort steht.
 
 Mutationsproben (`stream-area.ts` verändert, gebaut, frischer Prozess, zurückgenommen, `kit-sync --check` Exit 0): ohne `atBottom()`-Prüfung ist 66 rot (scrollTop 957), 65 grün; `followTail` als No-op macht 65 rot (Abstand 957 px), 66 bleibt grün — deshalb gehört die Kontrolle dazu; `appendReasoning` ohne `setText` macht 67 rot (Länge 0). Mit absatzgroßen Stücken (ein Absatz je Stück) ging 65 rot (Abstand 878 px): `followTail` misst den Abstand nach dem Wachsen, ein Sprung über 40 px beendet das Folgen — Kit-Befund, behoben in obsidian-kit 0.59.0 (Rundschreiben 3).
+
+## Belegter Lauf: 2026-10-12, Welle 20 B2 — obsidian-kit 0.59.0 / code-kit 0.24.0 (68 Punkte)
+
+Pin-Hebung von 0.56.0/0.23.0; `ENDPOINT_LIST_CSS` neu kopiert (der CSS-Test misst die Kopie). Smoke nach der Hebung: 67 grün, 0 rot, 1 übersprungen (1b), 0 nichts gemessen von 68, Load ~4. Die Bilanz hat sich nicht verschoben (vorher 66/0/1/0 von 67); neu ist nur Punkt 68.
+
+- **68** Kontrolle mit absatzgroßen Stücken (ein Absatz je Stück, Zuwachs über der 40-px-Folge-Schwelle, Takt 150 ms): der Verlauf folgt dem Ende, größter Abstand unter 40 px. Gegenprobe: mit `stream-area.ts` und `stable-writer.ts` aus 0.56.0 (Stand vor der Hebung, gebaut, frischer Prozess) ist 68 rot (Abstand 936 px), 65 mit tokengroßen Stücken grün; mit dem Pin 0.59.0 grün. Danach zurückgenommen, `kit-sync --check` Exit 0.
+- Das Einstellungsbild (`settings.png`) mit 0.59.0 zeigt den Platzhalter des Schlüsselfelds abgeschnitten („API key (empty = loc“) — das kleinere Schlüsselfeld der Kit-Konstante. Dem Master gemeldet; das Bild wird mit dem Pin 0.59.1 neu aufgenommen, nicht vorher.
