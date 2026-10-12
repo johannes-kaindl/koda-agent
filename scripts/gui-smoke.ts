@@ -45,23 +45,17 @@
  * exponiert — der Pruefpunkt braeuchte eine Produktionscode-Aenderung allein zur
  * Testbarkeit. Bleibt Handarbeit (`docs/SMOKE.md` Punkt 5).
  *
- * ## Voraussetzung
+ * ## Lauf (Zweitinstanz, eigenes Profil, eigener Port — die regulaere Instanz wird nie angefasst)
  *
- * ⚠️ **Zuerst pruefen, wer sonst an Obsidian haengt.** Obsidian ist Single-Instance — ein
- * `quit` trifft die Instanz, an der moeglicherweise eine andere Session arbeitet, und zerstoert
- * deren Zustand. Der eigene Lauf ist danach sauber gruen; der Schaden entsteht woanders und
- * faellt nicht auf.
+ * `--port` ist Pflicht (kein Standardport; 9222 gehoert der regulaeren Instanz). Vertrauensdialog und
+ * Restricted Mode eines frischen Profils erledigt `bereiteInstanzVor` (zentrale Bruecke) vor dem ersten
+ * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
- * ```bash
- * lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null && echo "laeuft bereits — NICHT beenden"
- * ```
- *
- * Hoert der Port schon, dann **mitnutzen statt neu starten**: ein eigenes Fenster per
- * `vault-open` ueber IPC oeffnen, dann `attachTo("workspace", port, vault)` — der Vault-Name
- * waehlt, nicht die Reihenfolge. ⚠️ Die Port-Pruefung ersetzt die Frage nicht: sie zeigt aktive
- * CDP-Treiber, aber nicht, wer ein Fenster offen haelt oder auf den Port wartet.
- *
- * Erst wenn nichts laeuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
+ * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
+ * Nenner ist `PUNKTE` (64 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
+ * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
+ * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.
  *
  * ## Der Vault, gegen den geprueft wird
  *
@@ -81,24 +75,26 @@
  * `manifest.version` verraet es nicht, weil beide Staende dieselbe Nummer tragen
  * (Dach-`AGENTS.md` § Staging-Vaults).
  *
- * ⚠️ **Ein frisch gebauter Vault ist Obsidian unbekannt** — `obsidian://open?vault=koda-agent`
- * tut dann schlicht nichts, was leicht als „ich muss Obsidian neu starten" gelesen wird. Der
- * Weg ohne Neustart geht ueber den Pfad statt den Namen; `--setup` gibt die Zeile fertig aus.
+ * Ein frisch gebauter Vault wird der Zweitinstanz ueber `obsidian.json` bekannt gemacht (Rezept unten);
+ * ein `obsidian://`-Aufruf an die regulaere Instanz ist unter Obsidian 1.14 wirkungslos.
  *
  * ⚠️ Der Lauf leert das laufende Koda-Gespraech im Zielvault (Punkt 5 braucht ein frisches).
  * Der bisherige Verlauf wandert nach `.obsidian/plugins/koda-agent/sessions/archive.jsonl` und ist nicht verloren, aber
  * aus der Sidebar weg. Wer gerade an einem Verlauf misst, faehrt den Smoke davor oder danach.
  *
  * ```bash
- * osascript -e 'quit app "Obsidian"'
- * open -a Obsidian --args --remote-debugging-port=9222
+ * UD=/tmp/obs-test-koda-agent; mkdir -p "$UD"
+ * lsof -nP -iTCP:9394 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
+ * pgrep -f "user-data-dir=$UD" && echo "Profil belegt — $UD-w19 nehmen, nie beenden"
+ * cp ~/Library/Application\ Support/obsidian/obsidian-*.asar "$UD"/   # aktuelle Version statt gebuendelter
+ * node -e 'const p=process.env.STAGING_VAULTS_DIR+"/koda-agent";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{"koda-agent":{path:p,ts:Date.now(),open:true}},language:"en"}))' "$UD"
+ * /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9394 &   # je Messlauf frischer Prozess, PID merken
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label koda-agent --intent "Smoke :9394" --exclusive focus --port 9394 --ttl 900
+ * npm run smoke:gui -- --port 9394 --vault koda-agent
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py release           # danach nur die eigene PID beenden
  * ```
  *
- * Dann mit deployter Plugin-Version:
- *
- * ```bash
- * npm run smoke:gui -- --vault koda-agent
- * ```
+ * Der erste Lauf nach der Profilanlage ist ein Aufwaermlauf und zaehlt nicht.
  *
  * ## Pruefpunkte 43-46 (Etappe 3a, seit 2026-09-25)
  *
@@ -133,13 +129,13 @@
  * verschobenen Leerzeile, nicht als Abbruch.
  */
 
-import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { cwd } from "node:process";
-import { Cdp, attachTo, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, bereiteInstanzVor, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { boxOf, capture } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
@@ -222,17 +218,87 @@ const SCENE_JS = `
 
 // --- Prüfpunkte -------------------------------------------------------------
 
-interface Check {
-  name: string;
-  passed: boolean;
-  detail: string;
-}
+/** Soll-Liste aller Pruefpunkte (der Nenner der Bilanz); ein Punkt, der nie aufgezeichnet wird, zaehlt als „nichts gemessen“. */
+const PUNKTE = [
+  "1. Plugin ist aktiv",
+  "1b. Retrieval-Andockung",
+  "1c. Frontmatter-Naht",
+  "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen und zwei SICHTBAREN Kopfzeilen-Aktionen",
+  "3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein",
+  "4. Toter Endpunkt wird als nicht erreichbar angezeigt",
+  "8. Settings-Gruppe „Verlauf kürzen“ mit Fenster-Feld",
+  "49. Die Hilfe-Zeile steht als erste Zeile im Tab, mit Text-Knopf und Icon-Knopf",
+  "5. Zwei tote Endpunkte ergeben Klartext, keinen Stacktrace",
+  "6. Wikilink in der Antwort ist klickbar und oeffnet die Notiz",
+  "7. Verdichtungs-Marken (Stufe 1 + Stufe 2, erzwungen) werden gerendert",
+  "9. Statuszeile nennt die Taetigkeit und dreht sich dabei",
+  "10. Statuszeile zeigt die Belegung des Kontextfensters",
+  "11. Thinking-Schalter im Kopf schaltet und ueberlebt den Neuaufbau",
+  "12. „Neues Gespraech“ fragt nach, Abbruch laesst den Verlauf stehen",
+  "13. Thinking-Schalter sperrt bei einem Modell, das sich nicht abschalten laesst",
+  "16. Zuruecksetzen stellt den Auslieferungsstand her",
+  "17. Abgeschaltetes Werkzeug wird nicht gesendet",
+  "18. „Aktive Anweisung ansehen“ zeigt Memory und Skills",
+  "19. `hide()` verwirft den Modell-Cache (toter Endpunkt bleibt nicht tot)",
+  "20. Arbeitsplatz-Block nennt aktive Notiz, Kopfdaten und Markierung — aus der Sidebar heraus",
+  "21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand",
+  "22. get_workspace und edit_active_note stehen in der gesendeten Liste und sind abschaltbar",
+  "23. edit_active_note: veraltete Markierung schreibt nicht, gueltige schreibt (Invariante Vorschau == Inhalt)",
+  "24. move_note verschiebt, die Verlinkung bleibt intakt und Obsidian passt den Text an, wo noetig",
+  "25. Das Move-Modal nennt beide Pfade und die Zahl der verweisenden Notizen",
+  "26. delete_note fragt auch im Koda-Ordner nach und legt die Notiz in den Papierkorb",
+  "27. Restaurierte, nicht besuchte Tabs (DeferredViews) stehen im Arbeitskontext",
+  "28. Dieselbe Notiz in zwei Tabs steht einmal im Block, nicht zweimal",
+  "29. Hub-Tabs Chat und Kontext sind sichtbar (Hoehe > 0, nicht nur im DOM)",
+  "30. Ein abgewaehlter Chip verschwindet aus dem gesendeten Block, Zuruecksetzen holt ihn wieder",
+  "31. Auf/Zu-Zustand der Abschnitte landet in data.json",
+  "32. Chat-Panel ist Spalten-Flex, Eingabezeile sitzt am unteren Rand (nicht im Verlauf)",
+  "33. Modus Notiz schickt die aktive Notiz UND einen verlinkten Nachbarn im Volltext",
+  "34. Die Budget-Kappung meldet sich im Block, statt still zu kuerzen",
+  "35. Eine von Hand hinzugefuegte Notiz geht mit und laesst sich wieder entfernen",
+  "36. read_note liest eine .base aus dem Fixture (und weiterhin .md)",
+  "37. Quellen-Chips stehen unter der Antwort — nur Volltext-Quellen, Hoehe > 0",
+  "38. Kontext-Tab zeigt einen sichtbaren Fehlerzustand, wenn das ViewModel ablehnt",
+  "39. Knopf '+ Aktive Notiz' und Befehl context-add-active landen auf demselben Zustand",
+  "40. Abgeschnittene Antwort (finish_reason length, mit Text) meldet einen Hinweis statt zu schweigen",
+  "41. llm-lab-Meldestrecke (Konsumenten-Seite): turnId/promptTemplate/Nachrichten korrekt gemeldet",
+  "42. list_notes nennt Unterordner, auch einen ohne Notiz; fehlender Ordner als nicht existent",
+  "43. Modus Vault: Treffer zur gesendeten Frage im Volltext, Fehlschlag meldet sich",
+  "44. Modus Vault ist ohne vault-rag gesperrt (Dropdown und Befehl)",
+  "45. Modus Notiz: semantische Nachbarn aus related(), K = 0 schaltet ab",
+  "46. Kontext-Tab: Vault-Vorschau folgt dem Entwurf im Eingabefeld (entprellt)",
+  "47. Werkzeug-Anbieter: montiert, geroutet, abschaltbar, entfernt",
+  "48. list_notes mit depth zeigt den Ordnerbaum, leere Ordner der zweiten Ebene inklusive",
+  "50. HTTP 200 mit JSON-Fehlerkörper meldet die Servermeldung statt einer leeren Antwort (Kit-Chat-Client)",
+  "51. Datum und Uhrzeit: ## Now im Prompt und get_datetime nennen den Kalendertag der Renderer-Uhr",
+  "52. Skills laden zweistufig: pinned voll, der Rest nur als Beschreibung, load_skill holt den Body und hält den Pfad-Guard",
+  "53. Byte-Token-Guard: <0xF0><0x9F><0x97><0x82> landet als 🗂 in der Datei, eine abgeschnittene Folge wird abgelehnt",
+  "54. Kontextfenster-Hinweis: Notice mit Übernehmen-Knopf, Einstellung bleibt bis zum Klick, zweiter Aufruf schweigt",
+  "55. Vision: read_image bringt das Bild als image_url-Part im Tool-Ergebnis, der Verlauf traegt nur den Pfad",
+  "56. OCR: read_image liefert dem Text-Modell den erkannten Text, ohne Anbieter fehlt das Werkzeug",
+  "57. generate_image: im Koda-Ordner frei, sonst Rueckfrage VOR der Erzeugung, Ablehnung erzeugt nichts",
+  "58. Vision-Fehler: HTTP 400 nach einem Bild faellt auf Texterkennung zurueck, die Runde wiederholt sich",
+  "59. Schwaerzung: edit_active_note mit Bearer-Token — der Draht sieht nur den Platzhalter (auch in den Tool-Argumenten der 2. Runde), die Notiz bekommt das Original",
+  "62. Lab-Telemetrie traegt den gesendeten Text (Platzhalter), nicht das Original",
+  "60. Schluesselbund: Klartext-Schluessel verlaesst data.json beim Aufloesen, der Authorization-Header traegt ihn weiter",
+  "61. Neutralisierung: eine Antwort mit Bild-URL und dataviewjs-Block rendert als Text, auch im neu gezeichneten Verlauf",
+  "63. Globales Modell-Feld abgeschafft: Altwert wandert in die Zeile, keine Zeile „Model“, keine Option „global model“",
+  "64. Kontextlaenge je Endpunkt-Zeile: geladen und hoechstens unter der Zeile, Leer-Option „Server waehlt“, eine Anfrage je Zeile und Modell",
+] as const;
+const bilanz = createBilanz({ punkte: PUNKTE });
+const { skipped, unmeasured, abschluss } = bilanz;
 
-const results: Check[] = [];
-
-function record(name: string, passed: boolean, detail: string): void {
-  results.push({ name, passed, detail });
-  console.log(`${passed ? "  ✓" : "  ✗"} ${name}${detail ? ` — ${detail}` : ""}`);
+/**
+ * Aufzeichnung eines gemessenen Punkts. Zwei Konventionen des alten Treibers werden hier auf die
+ * vier Zustaende (CORE-TEST-19) abgebildet, damit sie nirgends als gruen oder rot durchgehen:
+ *   - „uebersprungen — …“ mit passed = true (ein echtes Plugin oder ein Rest eines abgebrochenen Laufs
+ *     steht dem Stub im Weg): der Gegenstand wurde NICHT erreicht → nichts gemessen.
+ *   - „Abbruch: …“ mit passed = false (eine Ausnahme im Messpfad): ebenfalls nichts gemessen, nicht rot.
+ */
+function record(name: (typeof PUNKTE)[number], passed: boolean, detail = ""): void {
+  if (passed && detail.startsWith("uebersprungen")) unmeasured(name, detail);
+  else if (!passed && detail.startsWith("Abbruch:")) unmeasured(name, detail);
+  else bilanz.record(name, passed, detail);
 }
 
 interface Settings {
@@ -403,31 +469,25 @@ function setup(): void {
   console.log(`Staging-Vault: ${vaultDir}`);
   for (const zeile of log) console.log(`  ${zeile}`);
   console.log(
-    "\nJetzt den Vault oeffnen — NICHT Obsidian beenden, falls es laeuft (Single-Instance,\n" +
-      "siehe Dateikopf). Ein frisch gebauter Vault ist Obsidian unbekannt, `?vault=` tut dann\n" +
-      "nichts; der URI mit dem PFAD einer Datei registriert ihn und oeffnet ein zweites Fenster\n" +
-      "derselben Instanz:\n" +
-      `  open "obsidian://open?path=${encodeURIComponent(join(vaultDir, "Notes", "Project plan.md"))}"\n` +
-      "Ein frisch geoeffnetes Fenster fragt einmalig nach Vertrauen und beantwortet bis zum\n" +
-      "Wegklicken KEINEN Aufruf — das sieht wie ein haengender Renderer aus.\n" +
-      `Danach: npm run smoke:gui -- --vault ${REPO_NAME}`,
+    "\nZweitinstanz starten (eigenes Profil, eigener Port, Vault in obsidian.json eintragen: Rezept im\n" +
+      "Dateikopf), dann:\n" +
+      `  npm run smoke:gui -- --port 9394 --vault ${REPO_NAME}`,
   );
 }
 
 async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
-  if (argv.includes("--setup")) {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.has("setup")) {
     setup();
     return;
   }
-  const flag = (name: string): string | undefined => {
-    const index = argv.indexOf(`--${name}`);
-    return index === -1 ? undefined : argv[index + 1];
-  };
-  const port = Number(flag("port") ?? 9222);
-  const vault = flag("vault");
+  const port = Number(args.value("port"));
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error("--port <1024-65535> ist Pflicht (kein Standardport: 9222 gehoert der regulaeren Instanz). Beispiel: npm run smoke:gui -- --port 9394 --vault koda-agent");
+  }
+  const vault = args.value("vault") ?? REPO_NAME;
 
-  console.log(`GUI-Smoke — Obsidian auf Port ${port}`);
+  console.log(`Smoke koda-agent — Obsidian auf Port ${port}`);
   // `attachTo` unterscheidet Haupt- und Einstellungen-Fenster an der Sache (nur das
   // Hauptfenster traegt einen Workspace), nicht am lokalisierten Fenstertitel.
   const cdp = await attachTo("workspace", port, vault);
@@ -446,6 +506,8 @@ async function main(): Promise<void> {
   // sieht ein wirkungsloser Fix aus wie ein falscher Fix, und man sucht am falschen Ende.
   // (LESSONS 2026-09-03/calendar-notes; koda-agent stand dort namentlich als eines von
   // fuenf Repos ohne Reload.)
+  // Vertrauensdialog, Restricted Mode, Plugin laden (frisches Profil): zentrale Bruecke.
+  const instanz = await bereiteInstanzVor(cdp, { pluginIds: [PLUGIN_ID], nurVault: REPO_NAME, sprache: "en" });
   await cdp.evaluate(`
     await app.plugins.disablePlugin(${JSON.stringify(PLUGIN_ID)});
     await app.plugins.enablePlugin(${JSON.stringify(PLUGIN_ID)});
@@ -463,14 +525,6 @@ async function main(): Promise<void> {
     // vorn. Im Hintergrund bleibt das DOM leer, obwohl die App-API den Zustand korrekt
     // meldet — man debuggt dann ein Phantom. `requireVisible` holt das Fenster selbst
     // nach vorn und bricht mit Handlungsanweisung ab, wenn das nicht reicht.
-    if (process.platform === "darwin") {
-      try {
-        execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      } catch {
-        console.log("  (Hinweis: `osascript activate` schlug fehl — Fenster ggf. von Hand nach vorn holen)");
-      }
-    }
     await requireVisible(cdp);
 
     const vaultName = await cdp.evaluate<string>(`return window.app?.appId ? app.vault.getName() : "";`);
@@ -482,7 +536,7 @@ async function main(): Promise<void> {
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       return p ? { ok: true, version: p.manifest.version } : { ok: false };
     `);
-    if (!plugin.ok) throw new Error(`Plugin ${PLUGIN_ID} ist nicht aktiv. Erst deployen.`);
+    if (!plugin.ok) throw new Error(`Plugin ${PLUGIN_ID} ist nicht aktiv — ${instanz.hinweis}. Ggf. erst deployen.`);
     record("1. Plugin ist aktiv", true, `Version ${plugin.version}`);
 
     // --- 1b. Retrieval-Andockung an vault-rag -------------------------------
@@ -519,7 +573,8 @@ async function main(): Promise<void> {
       };
     `);
     if (!retrieval.installed) {
-      record("1b. Retrieval-Andockung", true, "vault-retrieval nicht installiert — Koda laeuft ohne (weiche Kopplung)");
+      // Nicht anwendbar in dieser Lage (weiche Kopplung: Koda laeuft ohne vault-rag), kein Gegenstand verfehlt.
+      skipped("1b. Retrieval-Andockung", "vault-retrieval nicht installiert — Koda laeuft ohne (weiche Kopplung)");
     } else {
       record(
         "1b. Retrieval-Andockung",
@@ -669,8 +724,8 @@ async function main(): Promise<void> {
     try {
       settings = await attachTo("settings", port, vault);
       if (!settings) {
-        record("3. Klick auf „Testen“ friert den Renderer nicht ein", false, "Einstellungsfenster nicht gefunden");
-        record("4. Toter Endpunkt wird als nicht erreichbar angezeigt", false, "ohne Einstellungsfenster nicht entscheidbar");
+        unmeasured("3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein", "Einstellungsfenster nicht gefunden");
+        unmeasured("4. Toter Endpunkt wird als nicht erreichbar angezeigt", "ohne Einstellungsfenster nicht entscheidbar");
       } else {
         // Auch dieses Fenster wird im Hintergrund gedrosselt.
         await settings.send("Page.bringToFront");
@@ -686,8 +741,8 @@ async function main(): Promise<void> {
         const hatZeile = zeilen !== null && zeilen >= 2;
 
         if (!hatZeile) {
-          record("3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein", false, "Endpunkt-Zeile im Einstellungsfenster nicht gefunden");
-          record("4. Toter Endpunkt wird als nicht erreichbar angezeigt", false, "ohne Endpunkt-Zeile nicht entscheidbar");
+          unmeasured("3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein", "Endpunkt-Zeile im Einstellungsfenster nicht gefunden");
+          unmeasured("4. Toter Endpunkt wird als nicht erreichbar angezeigt", "ohne Endpunkt-Zeile nicht entscheidbar");
         } else {
           const t0 = Date.now();
           let survived = true;
@@ -1172,7 +1227,7 @@ async function main(): Promise<void> {
       try {
         settings16 = await attachTo("settings", port, vault);
         if (!settings16) {
-          record("16. Zuruecksetzen stellt den Auslieferungsstand her", false, "Einstellungsfenster nicht gefunden");
+          unmeasured("16. Zuruecksetzen stellt den Auslieferungsstand her", "Einstellungsfenster nicht gefunden");
         } else {
           await settings16.send("Page.bringToFront");
           const vorKlick = await pollUntil<{ value: string }>(
@@ -1184,7 +1239,7 @@ async function main(): Promise<void> {
             8000,
           );
           if (vorKlick === null) {
-            record("16. Zuruecksetzen stellt den Auslieferungsstand her", false, "Anweisungs-Textarea nicht gefunden");
+            unmeasured("16. Zuruecksetzen stellt den Auslieferungsstand her", "Anweisungs-Textarea nicht gefunden");
           } else {
             const geklickt = await clickReal(
               settings16,
@@ -1288,7 +1343,7 @@ async function main(): Promise<void> {
     try {
       settings18 = await attachTo("settings", port, vault);
       if (!settings18) {
-        record("18. „Aktive Anweisung ansehen“ zeigt Memory und Skills", false, "Einstellungsfenster nicht gefunden");
+        unmeasured("18. „Aktive Anweisung ansehen“ zeigt Memory und Skills", "Einstellungsfenster nicht gefunden");
       } else {
         await settings18.send("Page.bringToFront");
         const knopfDa = await pollUntil<boolean>(
@@ -1300,7 +1355,7 @@ async function main(): Promise<void> {
           8000,
         );
         if (!knopfDa) {
-          record("18. „Aktive Anweisung ansehen“ zeigt Memory und Skills", false, "Knopf nicht gefunden");
+          unmeasured("18. „Aktive Anweisung ansehen“ zeigt Memory und Skills", "Knopf nicht gefunden");
         } else {
           const geklickt = await clickReal(
             settings18,
@@ -1492,11 +1547,7 @@ async function main(): Promise<void> {
             : `aktiv ist Koda: ${String(punkt20.aktivIstKoda)} · Markierung: ${sel20 ? `${sel20.chars} Zeichen` : "fehlt"} · ${punkt20.text.split("\n")[1] ?? ""}`,
       );
     } catch (error) {
-      record(
-        "20. Arbeitsplatz-Block nennt aktive Notiz, Kopfdaten und Markierung — aus der Sidebar heraus",
-        false,
-        `Abbruch: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      unmeasured("20. Arbeitsplatz-Block nennt aktive Notiz, Kopfdaten und Markierung — aus der Sidebar heraus", `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       await cdp.evaluate(`
         app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].setContextMode(${JSON.stringify(vorherMode)});
@@ -1525,11 +1576,7 @@ async function main(): Promise<void> {
         `aus → null: ${String(punkt21.ausNull)} · Dropdown nach Befehl: ${punkt21.dropdownNachBefehl} · Modus nach Dropdown: ${punkt21.modeNachDropdown}`,
       );
     } catch (error) {
-      record(
-        "21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand",
-        false,
-        `Abbruch: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      unmeasured("21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand", `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       await cdp.evaluate(`
         app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].setContextMode(${JSON.stringify(vorherMode)});
@@ -1553,11 +1600,7 @@ async function main(): Promise<void> {
         `an: ${an.join(", ")} · aus: ${aus.join(", ")}`,
       );
     } catch (error) {
-      record(
-        "22. get_workspace und edit_active_note stehen in der gesendeten Liste und sind abschaltbar",
-        false,
-        `Abbruch: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      unmeasured("22. get_workspace und edit_active_note stehen in der gesendeten Liste und sind abschaltbar", `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -2474,7 +2517,7 @@ async function main(): Promise<void> {
     let ok41 = false;
     if (labVorher) {
       detail41 = "uebersprungen — ein llm-lab-Eintrag existiert bereits (echtes Plugin oder Rest eines abgebrochenen Laufs); Stub wuerde ihn ueberschreiben";
-      record("41. llm-lab-Meldestrecke (Konsumenten-Seite)", true, detail41);
+      record("41. llm-lab-Meldestrecke (Konsumenten-Seite): turnId/promptTemplate/Nachrichten korrekt gemeldet", true, detail41);
     } else {
       fake = await startFakeEndpoint(0, { content: "Ok.", finishReason: "stop" });
       try {
@@ -3681,18 +3724,9 @@ async function main(): Promise<void> {
     }
     await fake?.close();
     cdp.close();
-  }
-
-  const failed = results.filter((check) => !check.passed);
-  console.log(`\n${results.length - failed.length}/${results.length} grün`);
-  if (failed.length > 0) {
-    console.log("Rot:");
-    for (const check of failed) console.log(`  - ${check.name}: ${check.detail}`);
-    process.exitCode = 1;
+    // Auch nach einem Abbruch: nie aufgezeichnete Punkte zaehlen als „nichts gemessen“.
+    abschluss();
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(`\nAbbruch: ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-});
+runDriver(main);

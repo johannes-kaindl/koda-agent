@@ -49,32 +49,15 @@
  *
  * ## Voraussetzung
  *
- * ⚠️ **Zuerst pruefen, wer sonst an Obsidian haengt.** Obsidian ist Single-Instance — ein
- * `quit` trifft die Instanz, an der moeglicherweise eine andere Session arbeitet, und zerstoert
- * deren Zustand. Der eigene Lauf ist danach sauber gruen; der Schaden entsteht woanders und
- * faellt nicht auf.
+ * Gefragt wird in einer **Zweitinstanz** mit eigenem Profil und eigenem Port (Rezept im Kopf von
+ * `gui-smoke.ts`: Profil, `.asar`, `obsidian.json`, Lock je Port); die regulaere Instanz wird nie
+ * angefasst und nie beendet. Den Port der Zweitinstanz immer mit `--port` angeben (dort 9394).
+ * Das Modell (Endpunkt der Zeile im Staging-Vault) muss erreichbar sein; LM Studio auf :1234 ist
+ * geteilt, vorher beim Master anmelden.
  *
  * ```bash
- * lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null && echo "laeuft bereits — NICHT beenden"
- * ```
- *
- * Hoert der Port schon, dann **mitnutzen statt neu starten**: ein eigenes Fenster per
- * `vault-open` ueber IPC oeffnen, dann `attachTo("workspace", port, vault)` — der Vault-Name
- * waehlt, nicht die Reihenfolge. ⚠️ Die Port-Pruefung ersetzt die Frage nicht: sie zeigt aktive
- * CDP-Treiber, aber nicht, wer ein Fenster offen haelt oder auf den Port wartet.
- *
- * Erst wenn nichts laeuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
- *
- * ```bash
- * osascript -e 'quit app "Obsidian"'
- * open -a Obsidian --args --remote-debugging-port=9222
- * ```
- *
- * Dann mit deployter Plugin-Version und erreichbarem Modell-Endpunkt:
- *
- * ```bash
- * npm run gui:ask -- --vault 80_Arbeit --ask "Welche Notizen behandeln lokale KI-Modelle?"
- * npm run gui:ask -- --vault 80_Arbeit --ask "…" --expect "Lokale KI/" --expect "search_notes" --full
+ * npm run gui:ask -- --port 9394 --vault koda-agent --ask "Welche Notizen behandeln lokale KI-Modelle?"
+ * npm run gui:ask -- --port 9394 --vault koda-agent --ask "…" --expect "Lokale KI/" --expect "search_notes" --full
  * ```
  *
  * `--expect` prueft gegen den ganzen Verlauf — Tool-Ergebnis UND Antworttext. Es belegt
