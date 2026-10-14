@@ -426,3 +426,11 @@ describe("write_note create: gleichnamige Notiz in anderem Ordner", () => {
     expect((await tools.run("write_note", { path: "Archiv/Projekt X.md", content: "mehr", mode: "append" })).ok).toBe(true);
   });
 });
+
+describe("write_note create: Unicode-Normalisierung des Namens", () => {
+  it("NFD auf der Platte und NFC im Aufruf sind derselbe Name (macOS)", async () => {
+    const vault = fakeVault({ "Archiv/Bücher.md": "alt" });
+    const r = await new VaultTools(vault, yes, opts).run("write_note", { path: "Koda/Bücher.md", content: "neu", mode: "create" });
+    expect(r.ok).toBe(false);
+  });
+});

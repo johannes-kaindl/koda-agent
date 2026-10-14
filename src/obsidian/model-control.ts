@@ -34,6 +34,9 @@ function warnText(w: RuleWarning, toolsOff: string[]): string {
 export function renderPromptRow(setting: Setting, ctx: ModelControlCtx): void {
   const model = promptRow(ctx.settings, ctx.relatedAvailable);
   setting.setName(t("settings.prompt")).setDesc(t("settings.prompt.desc"));
+  // Eigene Klasse fuer das Layout: die Textarea steht sonst neben dem Namen und bekommt vom
+  // Flex-Container der Zeile nur ~18 px (gemessen auf dem nativen 1.13-Pfad, Smoke-Punkt 71).
+  setting.setClass("koda-prompt-setting");
 
   /** Zeichnet NUR die Warnzeilen neu, nicht den ganzen Tab. Zwei Gruende:
    *  - Ein `ctx.refresh()` baut den Tab neu auf (`display()`), und dieses Neuzeichnen

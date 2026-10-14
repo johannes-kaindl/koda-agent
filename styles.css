@@ -259,6 +259,8 @@
   min-width: 0;
   text-overflow: ellipsis;
 }
+.koda-prompt-setting { flex-wrap: wrap; }
+.koda-prompt-setting > .setting-item-control { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; }
 .koda-prompt-textarea { width: 100%; min-height: 8em; font-family: var(--font-monospace); }
 .koda-warn {
   display: flex; align-items: center; gap: var(--size-4-1);

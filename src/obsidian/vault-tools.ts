@@ -413,7 +413,7 @@ export class VaultTools implements ToolRunner {
       // Dieselbe Namensgleichheit, an der Obsidian einen Kurzlink [[Name]] aufloest (Basisname,
       // Gross-/Kleinschreibung egal): eine zweite Notiz gleichen Namens in einem anderen Ordner
       // macht jeden Kurzlink mehrdeutig und die aeltere Fassung unsichtbar.
-      const base = (p: string): string => (p.split("/").pop() ?? p).toLowerCase();
+      const base = (p: string): string => (p.split("/").pop() ?? p).normalize("NFC").toLowerCase();
       const wanted = base(norm);
       const twin = this.vault.listMarkdownPaths().find((p) => p !== norm && base(p) === wanted);
       if (twin !== undefined) {
