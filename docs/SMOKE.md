@@ -152,14 +152,12 @@ geht mit und lässt sich wieder entfernen, `read_note` liest eine `.base`, Quell
 der Antwort zeigen nur Volltext-Eintraege, der Kontext-Tab zeigt einen sichtbaren
 Fehlerzustand bei einer abgelehnten ViewModel-Promise, und Knopf/Befehl „+ Aktive Notiz"
 landen auf demselben Zustand).
-Voraussetzung ist der eine Handgriff, der Handarbeit bleibt:
+Gefahren wird in einer **Zweitinstanz** mit eigenem Profil und eigenem Port; die reguläre Instanz wird nie beendet. Das Startrezept (Profil, `.asar`, `obsidian.json`, Lock je Port) steht im Kopfkommentar von `scripts/gui-smoke.ts` und im Dach-`AGENTS.md` § Staging-Vaults:
 
 ```bash
-osascript -e 'quit app "Obsidian"'
-open -a Obsidian --args --remote-debugging-port=9222
 npm run build
 npm run smoke:gui -- --setup            # Staging-Vault aus docs/images/fixture/ herstellen
-npm run smoke:gui -- --vault koda-agent
+npm run smoke:gui -- --port <PORT> --vault koda-agent
 ```
 
 ⚠️ **Gefahren wird gegen den Staging-Vault `koda-agent`, nicht gegen den Arbeits-Vault** —

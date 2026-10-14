@@ -36,7 +36,7 @@
 import { join } from "node:path";
 import { argv, cwd, exit } from "node:process";
 
-import { attachTo, Cdp, closeExtraLeaves, openExisting, pollUntil, setAppConfig } from "../../tools/obsidian-cdp/cdp.js";
+import { attachTo, Cdp, clearNotices, closeExtraLeaves, openExisting, pollUntil, requireUntil, setAppConfig } from "../../tools/obsidian-cdp/cdp.js";
 import { startLlmStub, type Antwort, type StubAnfrage } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture, setWindowSize, writeShot, type Rect } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -172,7 +172,7 @@ async function grundzustand(cdp: Cdp, stubUrl: string, modus: string, notiz: str
   `);
   // Die Breite greift erst nach dem naechsten Layout-Durchlauf; ohne dieses Warten nahm das
   // erste Motiv die alte, schmale Seitenleiste auf.
-  await pollUntil<boolean>(cdp, `return app.workspace.rightSplit.containerEl.getBoundingClientRect().width >= ${SIDEBAR_BREITE - 5};`, 5000, 200);
+  await requireUntil(cdp, `app.workspace.rightSplit.containerEl.getBoundingClientRect().width >= ${SIDEBAR_BREITE - 5}`, "Seitenleiste erreicht die Zielbreite nicht", 5000, 200);
   return (await pollUntil<boolean>(cdp, `return !!document.querySelector(".koda-input");`, 8000, 200)) === true;
 }
 
@@ -185,7 +185,7 @@ async function dialogeSchliessen(cdp: Cdp): Promise<void> {
     }
     return true;
   `);
-  await pollUntil<boolean>(cdp, `return document.querySelectorAll(".modal-container").length === 0;`, 5000, 200);
+  await requireUntil(cdp, `document.querySelectorAll(".modal-container").length === 0`, "Dialog schliesst nicht", 5000, 200);
 }
 
 /** Frage ueber die echte Eingabe senden (Enter), nicht ueber `p.ask()` — so entsteht die
@@ -284,7 +284,11 @@ const SHOTS: Shot[] = [
       const knopf = `[...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Test" && b.getBoundingClientRect().width > 1)`;
       if (!(await pollUntil<boolean>(win, `return !!(${knopf});`, 8000, 250))) return { rect: null, aus: win };
       await win.evaluate(`(${knopf}).click(); return true;`);
-      await pollUntil<boolean>(win, `return document.body.textContent.includes("Connected");`, 8000, 250);
+      // Das Bild zeigt das gruene Status-Icon der Zeile; „Connected“ ist nur die Notice im Hauptfenster und stand nie im
+      // Einstellungen-Fenster (die alte Wartebedingung lief 8 s in den Timeout und schoss dann einfach weiter).
+      await requireUntil(win, `document.querySelector(".okit-ep-status.is-ok")`, "Status-Icon der Endpunkt-Zeile wird nie gruen (Stub nicht erreicht?)", 8000, 250);
+      // Die Kontextfenster-Notice („taken from the endpoint“) liegt sonst ueber dem Bild; vorher liess die 8-s-Wartezeit sie ablaufen.
+      await clearNotices(win);
       await new Promise((r) => setTimeout(r, 600));
       const rect = await win.evaluate<string | null>(`
         const c = [...document.querySelectorAll(".vertical-tab-content")].find((e) => e.getBoundingClientRect().width > 1);

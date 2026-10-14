@@ -52,7 +52,7 @@
  * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
  * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
- * Nenner ist `PUNKTE` (64 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * Nenner ist `PUNKTE` (69 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
  * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
  * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
  * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.
@@ -132,7 +132,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "node:process";
-import { Cdp, attachTo, bereiteInstanzVor, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, clearNotices, clickReal, istAbgebrochen, pollUntil, requireVisible, schliesseDialog } from "../../tools/obsidian-cdp/cdp.js";
+import { messeFolge, zeichneFolge } from "../../tools/obsidian-cdp/folge.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture } from "../../tools/obsidian-cdp/shot.js";
@@ -287,6 +288,7 @@ const PUNKTE = [
   "66. Folge-Regel: Hochscrollen mitten im Strom wird respektiert, der Verlauf springt nicht zurueck",
   "67. Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst",
   "68. Strom mit absatzgrossen Stuecken: der Verlauf folgt dem Ende auch bei Spruengen ueber die Folge-Schwelle (Kit 0.59.0, withFollow)",
+  "69. Folge-Regel, zweite Haelfte: steht der Nutzer wieder unten, folgt der Verlauf dem Strom wieder",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -476,6 +478,26 @@ async function main(): Promise<void> {
   const herkunftsWarnungen: string[] = [];
   let previous: Settings | null = null;
   let fake: { url: string; port: number; close: () => Promise<void> } | null = null;
+  let zustand: { schliesse(): Promise<void> } | null = null;
+  // Gibt die Einstellungen zurueck, wie der Lauf sie vorgefunden hat. Idempotent und ohne Warten: sie laeuft im
+  // Normalweg (`finally`) und nach Ctrl-C (Abbruch-Modul, hoechstens eine Sekunde).
+  const stelleZurueck = async (): Promise<void> => {
+    if (previous === null) return;
+    await cdp
+      .evaluate(
+        `
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.endpoints = ${JSON.stringify(previous.endpoints)};
+        p.settings.timeoutSec = ${JSON.stringify(previous.timeoutSec)};
+        p.settings.suppressThinking = ${JSON.stringify(previous.suppressThinking)};
+        await p.saveSettings();
+        await p.newChat();
+        app.setting.close();
+        return true;
+      `,
+      )
+      .catch(() => undefined);
+  };
 
   try {
     // Ohne Fokus drosselt Chromium den Renderer. `Page.bringToFront` allein genuegt auf
@@ -591,6 +613,8 @@ async function main(): Promise<void> {
       const s = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings;
       return { endpoints: JSON.parse(JSON.stringify(s.endpoints)), timeoutSec: s.timeoutSec, suppressThinking: s.suppressThinking };
     `);
+    // Vor der ersten Mutation anmelden: ab hier raeumt Ctrl-C die Einstellungen zurueck.
+    zustand = beimAbbruch(stelleZurueck, "Einstellungen zurueckschreiben");
 
     // --- 2. Die Sidebar oeffnet und ist bedienbar ---------------------------
     // Mutation (Command feuern) und Wartephase (auf gerenderte View pollen) sind
@@ -1351,8 +1375,9 @@ async function main(): Promise<void> {
           );
           // In welchem Fenster auch immer es entstand — auf beiden schliessen ist billiger
           // als vorher zu klaeren, in welchem es sicher steht.
-          await cdp.evaluate(`document.querySelector(".modal-container .modal-close-button")?.click(); return true;`).catch(() => undefined);
-          await settings18.evaluate(`document.querySelector(".modal-container .modal-close-button")?.click(); return true;`).catch(() => undefined);
+          // `schliesseDialog` kennt beide Knopf-Formen (`.modal-close-button` bis 1.12, `.modal-header-button` ab 1.14.4).
+          await schliesseDialog(cdp).catch(() => undefined);
+          await schliesseDialog(settings18, { escapeRueckfall: false }).catch(() => undefined);
         }
       }
     } finally {
@@ -1641,9 +1666,9 @@ async function main(): Promise<void> {
       `).catch(() => undefined);
       await cdp.evaluate(`
         app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].setContextMode(${JSON.stringify(vorherMode)});
-        document.querySelector(".modal-container .modal-close-button")?.click();
         return true;
       `).catch(() => undefined);
+      await schliesseDialog(cdp).catch(() => undefined);
     }
     record("23. edit_active_note: veraltete Markierung schreibt nicht, gueltige schreibt (Invariante Vorschau == Inhalt)", ok23, detail23);
 
@@ -1719,9 +1744,9 @@ async function main(): Promise<void> {
         if (f) await app.fileManager.renameFile(f, ${JSON.stringify(QUELLE24)});
         const probe = app.vault.getFileByPath(${JSON.stringify(PROBE24)});
         if (probe) await app.fileManager.trashFile(probe);
-        document.querySelector(".modal-container .modal-close-button")?.click();
         return true;
       `).catch(() => undefined);
+      await schliesseDialog(cdp).catch(() => undefined);
     }
     record("24. move_note verschiebt, die Verlinkung bleibt intakt und Obsidian passt den Text an, wo noetig", ok24, detail24);
 
@@ -1759,7 +1784,7 @@ async function main(): Promise<void> {
     } catch (error) {
       detail25 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
     } finally {
-      await cdp.evaluate(`document.querySelector(".modal-container .modal-close-button")?.click(); return true;`).catch(() => undefined);
+      await schliesseDialog(cdp).catch(() => undefined);
     }
     record("25. Das Move-Modal nennt beide Pfade und die Zahl der verweisenden Notizen", ok25, detail25);
 
@@ -1796,9 +1821,9 @@ async function main(): Promise<void> {
       await cdp.evaluate(`
         const rest = app.vault.getFileByPath(${JSON.stringify(OPFER)});
         if (rest) await app.fileManager.trashFile(rest);
-        document.querySelector(".modal-container .modal-close-button")?.click();
         return true;
       `).catch(() => undefined);
+      await schliesseDialog(cdp).catch(() => undefined);
     }
     record("26. delete_note fragt auch im Koda-Ordner nach und legt die Notiz in den Papierkorb", ok26, detail26);
 
@@ -3185,9 +3210,9 @@ async function main(): Promise<void> {
         delete p.probeContext;
         p.settings.contextWindowTokens = ${JSON.stringify(vorher53)};
         await p.saveSettings();
-        for (const n of document.querySelectorAll(".notice")) { if (n.textContent.includes("65536")) n.remove(); }
         return true;
       `).catch(() => undefined);
+      await clearNotices(cdp).catch(() => undefined);
     }
     record("54. Kontextfenster-Hinweis: Notice mit Übernehmen-Knopf, Einstellung bleibt bis zum Klick, zweiter Aufruf schweigt", ok53, detail53);
 
@@ -3346,11 +3371,11 @@ async function main(): Promise<void> {
           detail57 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
         } finally {
           await cdp.evaluate(`
-            document.querySelector(".modal-container .modal-close-button")?.click();
             if (app.plugins.plugins["local-image-generator"]?.__kodaSmokeStub) delete app.plugins.plugins["local-image-generator"];
             delete window.__kodaGenSeen; delete window.__kodaGen57;
             return true;
           `).catch(() => undefined);
+          await schliesseDialog(cdp).catch(() => undefined);
         }
         record("57. generate_image: im Koda-Ordner frei, sonst Rueckfrage VOR der Erzeugung, Ablehnung erzeugt nichts", ok57, detail57);
       }
@@ -3464,9 +3489,9 @@ async function main(): Promise<void> {
           if (leaf && leaf.view?.file?.path === path) leaf.view.editor.setValue(${JSON.stringify(FIXTURE_NOTE)});
           if (app.plugins.plugins["llm-lab"]?.__kodaSmokeStub) delete app.plugins.plugins["llm-lab"];
           delete window.__kodaLab59;
-          document.querySelector(".modal-container .modal-close-button")?.click();
           return true;
         `).catch(() => undefined);
+        await schliesseDialog(cdp).catch(() => undefined);
       }
       record("59. Schwaerzung: edit_active_note mit Bearer-Token — der Draht sieht nur den Platzhalter (auch in den Tool-Argumenten der 2. Runde), die Notiz bekommt das Original", ok59, detail59);
       record("62. Lab-Telemetrie traegt den gesendeten Text (Platzhalter), nicht das Original", ok62, detail62);
@@ -3672,98 +3697,50 @@ async function main(): Promise<void> {
         const abwarten = async (): Promise<void> => {
           await pollUntil<boolean>(cdp, `return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].busy ? null : true;`, 25_000).catch(() => undefined);
         };
-        interface Strom { grund?: string; ueberlauf: number; hoehe: number; stuecke: number; proben: { top: number; abstand: number }[] }
-        const strommessung = async (stoere: boolean, grob = false): Promise<Strom> => {
-          // `grob`: ein ganzer Absatz je Stueck (Zuwachs > 40 px) — vor Kit 0.59.0 riss das die Verfolgung ab.
+        // Folge-Messung: zentral (`messeFolge`, tools/obsidian-cdp/README § Folge-Messung). Hier bleibt nur, was Wissen
+        // ueber Koda ist: Stub, Modell, Chat oeffnen, Senden, der Scroll-Container und „laeuft der Strom noch“.
+        // `grob`: ein ganzer Absatz je Stueck (Zuwachs > 40 px) — vor Kit 0.59.0 riss das die Verfolgung ab.
+        const strom = async (opt: { kontrolle: boolean; stoerung: boolean; wiederaufnahme?: boolean }, grob = false): Promise<Awaited<ReturnType<typeof messeFolge>>> => {
           const takt = grob ? 150 : TAKT;
-          const stueckeAnzahl = grob ? absaetze.length : STUECKE;
           const stub = await startLlmStub({ models: ["smoke-model"], takt, nachlaufMs: 3 * takt, standard: grob ? { stuecke: absaetze } : { text: antwortText, laenge: LAENGE } });
           try {
             await setzeModell("smoke-model", stub.url);
             await chatOffen();
             await pause(400);
-            const hoehe = await cdp.evaluate<number>(`const el = ${LOG}; return el ? el.clientHeight : -1;`);
-            if (hoehe <= 0) return { grund: "Verlauf nicht sichtbar (Hoehe 0)", ueberlauf: 0, hoehe, stuecke: 0, proben: [] };
-            await cdp.evaluate(`void app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].ask("Smoke: lange Antwort."); return true;`);
-            // Warten, bis der Ueberlauf die Bedingung erfuellt; Stoerung (oder Messbeginn) im selben evaluate.
-            let start: { ue: number; top: number } | null = null;
-            const frist = Date.now() + 15_000;
-            while (Date.now() < frist && start === null) {
-              start = await cdp.evaluate<{ ue: number; top: number } | null>(`
-                const el = ${LOG};
-                const ue = el.scrollHeight - el.clientHeight;
-                if (ue < 100) return null;
-                ${stoere ? "el.scrollTop = 0;" : ""}
-                return { ue, top: el.scrollTop };
-              `);
-              if (start === null) await pause(40);
-            }
-            const t = Date.now();
-            if (start === null) return { ueberlauf: 0, hoehe, grund: "Ueberlauf blieb unter 100 px (Strom zu kurz oder Verlauf zu hoch)", stuecke: 0, proben: [] };
-            const chat0 = stub.letzte("chat")?.zeit ?? t;
-            const ende = chat0 + stueckeAnzahl * takt; // Zeitpunkt des letzten Stuecks (Untergrenze)
-            const bis = ende - takt; // nur bis zum vorletzten Stueck abtasten
-            const proben: { top: number; abstand: number }[] = [];
-            while (Date.now() < bis) {
-              proben.push(await cdp.evaluate<{ top: number; abstand: number }>(`
-                const el = ${LOG};
-                return { top: el.scrollTop, abstand: el.scrollHeight - el.scrollTop - el.clientHeight };
-              `));
-              await pause(60);
-            }
-            const stuecke = Math.max(0, Math.floor((bis - t) / takt));
+            const ergebnis = await messeFolge(cdp, {
+              ausdruck: LOG,
+              laeuft: () => stub.zaehler().unterwegs > 0,
+              starte: () => cdp.evaluate(`void app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].ask("Smoke: lange Antwort."); return true;`),
+              ...opt,
+            });
             await abwarten();
-            return { ueberlauf: start.ue, hoehe, stuecke, proben, grund: stuecke < 2 ? `nur ${stuecke} Stueck(e) nach dem Messbeginn` : undefined };
+            return ergebnis;
           } finally {
             await stub.stop();
           }
         };
-        const zeige = (m: Strom): string => `Hoehe ${m.hoehe} px · Ueberlauf bei Messbeginn ${m.ueberlauf} px · ${m.stuecke} Stuecke danach · ${m.proben.length} Proben`;
+
+        const P65 = "65. Strom: der Verlauf folgt dem Ende, solange niemand eingreift (Kontrolle zu 66)";
+        const P66 = "66. Folge-Regel: Hochscrollen mitten im Strom wird respektiert, der Verlauf springt nicht zurueck";
+        const P68 = "68. Strom mit absatzgrossen Stuecken: der Verlauf folgt dem Ende auch bei Spruengen ueber die Folge-Schwelle (Kit 0.59.0, withFollow)";
+        const P69 = "69. Folge-Regel, zweite Haelfte: steht der Nutzer wieder unten, folgt der Verlauf dem Strom wieder";
+        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
 
         // 65. Kontrolle: ohne Stoerung folgt der Verlauf dem Ende.
-        let ok65 = false; let detail65 = "";
         try {
-          const m = await strommessung(false);
-          if (m.grund !== undefined) detail65 = `Abbruch: ${m.grund} (${zeige(m)})`;
-          else {
-            const maxAbstand = Math.max(...m.proben.map((x) => x.abstand));
-            ok65 = maxAbstand < 40;
-            detail65 = `${zeige(m)} · groesster Abstand zum Ende ${maxAbstand} px (soll < 40) · Abstand-Verlauf ${m.proben.filter((_, i) => i % 6 === 0).map((x) => x.abstand).join(",")}`;
-          }
-        } catch (error) {
-          detail65 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
-        }
-        record("65. Strom: der Verlauf folgt dem Ende, solange niemand eingreift (Kontrolle zu 66)", ok65, detail65);
+          zeichneFolge({ record, unmeasured }, { kontrolle: P65 }, await strom({ kontrolle: true, stoerung: false }));
+        } catch (error) { abbruch(P65, error); }
 
         // 68. Absatzgrosse Stuecke: dieselbe Kontrolle wie 65, aber jedes Stueck waechst um mehr als die Folge-Schwelle.
-        let ok68 = false; let detail68 = "";
         try {
-          const m = await strommessung(false, true);
-          if (m.grund !== undefined) detail68 = `Abbruch: ${m.grund} (${zeige(m)})`;
-          else {
-            const maxAbstand = Math.max(...m.proben.map((x) => x.abstand));
-            ok68 = maxAbstand < 40;
-            detail68 = `${zeige(m)} · groesster Abstand zum Ende ${maxAbstand} px (soll < 40) · Abstand-Verlauf ${m.proben.filter((_, i) => i % 6 === 0).map((x) => x.abstand).join(",")}`;
-          }
-        } catch (error) {
-          detail68 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
-        }
-        record("68. Strom mit absatzgrossen Stuecken: der Verlauf folgt dem Ende auch bei Spruengen ueber die Folge-Schwelle (Kit 0.59.0, withFollow)", ok68, detail68);
+          zeichneFolge({ record, unmeasured }, { kontrolle: P68 }, await strom({ kontrolle: true, stoerung: false }, true));
+        } catch (error) { abbruch(P68, error); }
 
-        // 66. Stoerung: scrollTop = 0 mitten im Strom; der Verlauf darf nicht zum Ende springen.
-        let ok66 = false; let detail66 = "";
+        // 66 + 69. Stoerung: scrollTop = 0 mitten im Strom; der Verlauf darf nicht zum Ende springen (66). Danach
+        // stellt die Messung den Nutzer wieder unten her; der Verlauf muss dem Strom wieder folgen (69).
         try {
-          const m = await strommessung(true);
-          if (m.grund !== undefined) detail66 = `Abbruch: ${m.grund} (${zeige(m)})`;
-          else {
-            const maxTop = Math.max(...m.proben.map((x) => x.top));
-            ok66 = maxTop < 4;
-            detail66 = `${zeige(m)} · scrollTop nach der Stoerung 0, danach hoechstens ${maxTop} px (soll < 4) · Abstand zum Ende zuletzt ${m.proben[m.proben.length - 1]?.abstand} px`;
-          }
-        } catch (error) {
-          detail66 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
-        }
-        record("66. Folge-Regel: Hochscrollen mitten im Strom wird respektiert, der Verlauf springt nicht zurueck", ok66, detail66);
+          zeichneFolge({ record, unmeasured }, { folge: P66, wiederaufnahme: P69 }, await strom({ kontrolle: false, stoerung: true, wiederaufnahme: true }));
+        } catch (error) { abbruch(P66, error); abbruch(P69, error); }
 
         // 67. Denkblock live: Reasoning waechst sichtbar, waehrend der Antworttext noch fehlt.
         let ok67 = false; let detail67 = "";
@@ -3827,23 +3804,10 @@ async function main(): Promise<void> {
     // zwei Messungen kostete den Verlauf, an dem gerade gemessen wurde.
     // Ein echtes Zurückschreiben wäre mehr Mechanik, als der Fall wert ist — die Warnung
     // im Kopfkommentar ist der billigere Weg.
-    if (previous !== null) {
-      await cdp
-        .evaluate(
-          `
-          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-          p.settings.endpoints = ${JSON.stringify(previous.endpoints)};
-          p.settings.timeoutSec = ${JSON.stringify(previous.timeoutSec)};
-          p.settings.suppressThinking = ${JSON.stringify(previous.suppressThinking)};
-          await p.saveSettings();
-          await p.newChat();
-          app.setting.close();
-          return true;
-        `,
-        )
-        .catch(() => undefined);
-    }
+    await zustand?.schliesse();
     await fake?.close();
+    // Nach Ctrl-C druckt das Modul die Bilanz und beendet den Prozess selbst.
+    if (istAbgebrochen()) return;
     cdp.close();
     // Auch nach einem Abbruch: nie aufgezeichnete Punkte zaehlen als „nichts gemessen“.
     abschluss();
