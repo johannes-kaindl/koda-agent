@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-10-14
+
 ### Added
 
 - **A failed request now stays visible in the history.** When the endpoint is unreachable, the model is still loading or the request times out, an error bubble is saved right under your question, also across a restart. Before, only the question stayed and a retry piled up identical questions with no explanation.
