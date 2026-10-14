@@ -19,7 +19,7 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - `write_note` with mode `create` refuses a note whose file name already exists in another folder and names the existing path, so short links `[[Name]]` stay unambiguous. Appending or replacing is unaffected.
-- Kit pins moved to obsidian-kit 0.60.0 and code-kit 0.27.0 (skipping code-kit 0.25.0–0.26.0, which change nothing visible here). Byte-token decoding, the thinking-switch state, the model-name context hint and the tool contract now come from the kit; a byte-order mark written as `<0xEF><0xBB><0xBF>` is kept as a character instead of being swallowed. New in the kit and visible in Koda: error messages for a missing API key or a switched-off endpoint name the actual reason instead of "no endpoint" (obsidian-kit 0.60.0).
+- Kit pins moved to obsidian-kit 0.60.1 and code-kit 0.27.1 (skipping code-kit 0.25.0–0.26.0, which change nothing visible here). Byte-token decoding, the thinking-switch state, the model-name context hint and the tool contract now come from the kit; a byte-order mark written as `<0xEF><0xBB><0xBF>` is kept as a character instead of being swallowed. New in the kit and visible in Koda: error messages for a missing API key or a switched-off endpoint name the actual reason instead of "no endpoint" (obsidian-kit 0.60.0).
 
 ### Fixed
 

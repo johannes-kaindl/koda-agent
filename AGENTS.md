@@ -70,3 +70,8 @@ Session-Handoff unter `.remember/`.
 ## Abweichungen von der Leitkonvention
 
 Keine dokumentiert.
+
+## UI-Abweichungen
+
+- **thinking-control** — Grund: Koda schaltet das Denken nur an oder aus (`suppressThinking`, Zustands-Knopf nur mit Icon im Kopf der Sidebar), der Kit-Baustein führt Denkstufen über `family()`/`current()`/`setLevel()` und trägt keine An/Aus-Variante; ein Umbau wäre eine neue Einstellung und eine Verhaltensänderung, kein Tausch (Entscheidung Master Welle 22)
+  — gilt-solange: `src/obsidian/view.ts` enthaelt-nicht `buildThinkingControl`
