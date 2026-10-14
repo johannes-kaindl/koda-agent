@@ -1,4 +1,4 @@
-import { mountProviderTools, type MountedTools, type ProviderOffer } from "./provider";
+import { mountProviderTools, type MountedTools, type ProviderOffer } from "../../vendor/kit/tool-provider";
 
 export interface ToolDef {
   name: string;
@@ -61,6 +61,19 @@ export const TOOL_DEFS: ToolDef[] = [
         around_cursor: { type: "integer", description: "Lines of context above and below the cursor, default 20" },
       },
       required: [],
+    },
+  },
+  {
+    name: "open_note",
+    description:
+      "Open a note in the user's workspace so they see it. Only call this when the user explicitly asks you to open or show a note — never to browse, and not after every search. It changes nothing in the vault and asks nothing. Path ends in .md, .base or .canvas.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Vault-relative path, e.g. Projekte/Plan.md" },
+        heading: { type: "string", description: "Optional heading in that note to jump to, without the leading #" },
+      },
+      required: ["path"],
     },
   },
   {

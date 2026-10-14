@@ -190,3 +190,38 @@ describe("edit_active_note: Byte-Token-Guard", () => {
     expect(state.doc).toBe("alt");
   });
 });
+
+describe("open_note", () => {
+  const mk = (files: Record<string, string>, opened: string[]): VaultTools => {
+    const vault: VaultPort = {
+      listMarkdownPaths: () => Object.keys(files), listFolderPaths: () => [], read: async () => "",
+      exists: async (p) => p in files, create: async () => undefined, append: async () => undefined,
+      overwrite: async () => undefined, frontmatterOf: () => null,
+      move: async () => undefined, trash: async () => undefined, backlinkCount: () => 0,
+    };
+    return new VaultTools(vault, async () => true, {
+      kodaFolder: () => "Koda", today: () => "2026-10-14", listMaxRows: () => 150,
+      openNote: async (l) => void opened.push(l),
+    });
+  };
+  it("oeffnet eine vorhandene Notiz, mit Ueberschrift als #-Anker", async () => {
+    const opened: string[] = [];
+    const t = mk({ "P/Plan.md": "" }, opened);
+    expect((await t.run("open_note", { path: "P/Plan.md" })).ok).toBe(true);
+    expect((await t.run("open_note", { path: "P/Plan.md", heading: "## Ziele" })).ok).toBe(true);
+    expect(opened).toEqual(["P/Plan.md", "P/Plan.md#Ziele"]);
+  });
+  it("legt nie etwas an: unbekannter Pfad oeffnet nichts", async () => {
+    const opened: string[] = [];
+    const r = await mk({}, opened).run("open_note", { path: "P/Nichts.md" });
+    expect(r.ok).toBe(false);
+    expect(opened).toEqual([]);
+  });
+  it("ohne Anschluss meldet es das statt zu schweigen", async () => {
+    const t = new VaultTools({ listMarkdownPaths: () => [], listFolderPaths: () => [], read: async () => "", exists: async () => true,
+      create: async () => undefined, append: async () => undefined, overwrite: async () => undefined, frontmatterOf: () => null,
+      move: async () => undefined, trash: async () => undefined, backlinkCount: () => 0 }, async () => true,
+      { kodaFolder: () => "Koda", today: () => "x", listMaxRows: () => 1 });
+    expect((await t.run("open_note", { path: "a.md" })).ok).toBe(false);
+  });
+});

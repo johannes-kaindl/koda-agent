@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   isToolProviderApi,
+  toolProviderRejection,
   mountProviderTools,
   outcomeFromProvider,
   type ProviderToolDef,
   type ToolProviderApi,
-} from "../src/core/tools/provider";
+} from "../src/vendor/kit/tool-provider";
 import type { ToolDef } from "../src/core/tools/defs";
 
 const def = (name: string, writes = false): ProviderToolDef => ({
@@ -16,28 +17,34 @@ const def = (name: string, writes = false): ProviderToolDef => ({
 });
 
 const provider = (tools: ProviderToolDef[]): ToolProviderApi => ({
+  version: 1,
   tools: () => tools,
-  execute: async () => ({ ok: true, content: "" }),
+  executeTool: async () => ({ ok: true, content: "" }),
 });
 
 describe("isToolProviderApi — Form-Pruefung statt Vorhandensein", () => {
-  it("nimmt ein Objekt mit tools() und execute() an, dessen Definitionen vollstaendig sind", () => {
+  it("nimmt ein Objekt mit version 1, tools() und executeTool() an, dessen Definitionen vollstaendig sind", () => {
     expect(isToolProviderApi(provider([def("a")]))).toBe(true);
   });
   it("nimmt einen Anbieter ohne Werkzeuge an (leer ohne Index ist ein gueltiger Zustand)", () => {
     expect(isToolProviderApi(provider([]))).toBe(true);
   });
-  it("lehnt ab, wenn tools oder execute fehlt", () => {
-    expect(isToolProviderApi({ tools: () => [] })).toBe(false);
-    expect(isToolProviderApi({ execute: async () => ({ ok: true, content: "" }) })).toBe(false);
+  it("lehnt einen Anbieter ohne version: 1 ab (vault-rag vor Welle 22) und nennt den Grund", () => {
+    const alt = { tools: () => [], executeTool: async () => ({ ok: true as const, content: "" }) };
+    expect(isToolProviderApi(alt)).toBe(false);
+    expect(toolProviderRejection(alt)).toEqual({ reason: "version", found: undefined });
+  });
+  it("lehnt ab, wenn version, tools oder executeTool fehlt", () => {
+    expect(isToolProviderApi({ version: 1, tools: () => [] })).toBe(false);
+    expect(isToolProviderApi({ version: 1, executeTool: async () => ({ ok: true, content: "" }) })).toBe(false);
   });
   it("lehnt Definitionen ohne writes-Kennzeichen ab — calendar-notes 0.2.1 in heutiger Form", () => {
     const ohneWrites = { name: "event_create", description: "x", parameters: { type: "object", properties: {}, required: [] } };
-    expect(isToolProviderApi({ tools: () => [ohneWrites], execute: async () => ({ ok: true, content: "" }) })).toBe(false);
+    expect(isToolProviderApi({ version: 1, tools: () => [ohneWrites], executeTool: async () => ({ ok: true, content: "" }) })).toBe(false);
   });
   it("lehnt ab, wenn tools() kein Array liefert oder wirft", () => {
-    expect(isToolProviderApi({ tools: () => "nein", execute: async () => ({ ok: true, content: "" }) })).toBe(false);
-    expect(isToolProviderApi({ tools: () => { throw new Error("kaputt"); }, execute: async () => ({ ok: true, content: "" }) })).toBe(false);
+    expect(isToolProviderApi({ version: 1, tools: () => "nein", executeTool: async () => ({ ok: true, content: "" }) })).toBe(false);
+    expect(isToolProviderApi({ version: 1, tools: () => { throw new Error("kaputt"); }, executeTool: async () => ({ ok: true, content: "" }) })).toBe(false);
   });
   it("faellt bei Nicht-Objekten auf false statt zu werfen", () => {
     for (const bad of [null, undefined, 3, "api", []]) expect(isToolProviderApi(bad)).toBe(false);

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { VaultTools, type VaultPort } from "../src/obsidian/vault-tools";
-import type { ProviderResult, ToolProviderApi } from "../src/core/tools/provider";
+import type { ProviderResult, ToolProviderApi } from "../src/vendor/kit/tool-provider";
 
 function vault(): VaultPort {
   return {
@@ -20,8 +20,9 @@ function vault(): VaultPort {
 
 function providerApi(result: ProviderResult, spy?: (name: string, args: unknown, opts: unknown) => void): ToolProviderApi {
   return {
+    version: 1,
     tools: () => [],
-    execute: async (name, args, opts) => { spy?.(name, args, opts); return result; },
+    executeTool: async (name, args, opts) => { spy?.(name, args, opts); return result; },
   };
 }
 
@@ -56,8 +57,9 @@ describe("VaultTools.run — Route zu einem Anbieter-Werkzeug", () => {
     const confirm = vi.fn(async () => true);
     let gesehen: unknown;
     const api: ToolProviderApi = {
+      version: 1,
       tools: () => [],
-      execute: async (_n, _a, opts) => {
+      executeTool: async (_n, _a, opts) => {
         gesehen = opts?.confirm;
         const ok = await opts?.confirm?.({ summary: "Termin anlegen", paths: ["Kalender/x.md"] });
         return ok ? { ok: true, content: "angelegt" } : { ok: false, reason: "needs-confirm", message: "abgebrochen" };
@@ -99,8 +101,8 @@ describe("VaultTools.run — Route zu einem Anbieter-Werkzeug", () => {
     expect((r as { error: string }).error).not.toMatch(/nicht mehr verf/);
   });
 
-  it("faengt eine werfende execute() und meldet sie als Fehler", async () => {
-    const api: ToolProviderApi = { tools: () => [], execute: async () => { throw new Error("kaputt"); } };
+  it("faengt eine werfende executeTool() und meldet sie als Fehler", async () => {
+    const api: ToolProviderApi = { version: 1, tools: () => [], executeTool: async () => { throw new Error("kaputt"); } };
     const t = tools({ provider: () => api });
     expect(await t.run("semantic_search", { query: "x" })).toEqual({ ok: false, error: "kaputt" });
   });

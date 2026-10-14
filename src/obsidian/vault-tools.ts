@@ -1,6 +1,6 @@
 import type { ToolOutcome, ToolRunner } from "../core/agent/types";
 import { HOST_TOOL_NAMES } from "../core/tools/defs";
-import { outcomeFromProvider, type ProviderConfirmPreview, type ToolProviderApi } from "../core/tools/provider";
+import { callProviderTool, outcomeFromProvider, type ProviderConfirmPreview, type ToolProviderApi } from "../vendor/kit/tool-provider";
 import { resolveFolderPath, resolveNotePath, READ_EXTENSIONS } from "../core/tools/path-guard";
 import { writePolicy } from "../core/tools/write-policy";
 import { movePolicy, planMove } from "../core/tools/move";
@@ -30,6 +30,9 @@ import type { ImageGenProviderApi, ImageGenProviderError } from "../vendor/kit/i
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
+  /** `.base`- und `.canvas`-Dateien: `read_note` liest sie, `listMarkdownPaths` kennt sie nicht.
+   *  Optional, damit ein Port ohne diese Quelle (Tests, Altbestand) weiter gilt. */
+  listOtherReadablePaths?(): string[];
   /** Alle Ordner des Vaults, auch die ohne eine einzige Notiz. Aus `listMarkdownPaths` sind
    *  genau diese nicht ableitbar — und ein Ordner, den das Werkzeug nicht sieht, wird vom
    *  Modell als „existiert nicht" berichtet (gemessen 2026-09-25, `_Koda/Brain`). */
@@ -135,6 +138,8 @@ export class VaultTools implements ToolRunner {
       allowed?: () => Set<string>;
       /** Arbeitsplatz fuer `get_workspace` — fehlt in Tests, die nur den Vault-Kern messen. */
       workspace?: WorkspacePort;
+      /** Oeffnet eine Notiz im Workspace (`open_note`); fehlt → das Werkzeug meldet es. */
+      openNote?: (linktext: string) => Promise<void>;
       /** Editor fuer `edit_active_note`; jede Methode liest frisch (Invariante, Spec E5). */
       editor?: EditorPort;
       /** Uhr fuer `get_datetime` (`ClockPort.now()`); fehlt → `Date.now`. Tests injizieren sie. */
@@ -184,7 +189,7 @@ export class VaultTools implements ToolRunner {
     if (erlaubt !== undefined && !erlaubt.has(name)) {
       return { ok: false, error: `Werkzeug abgeschaltet: ${name} — der Nutzer hat es in den Einstellungen deaktiviert. Nutze ein anderes.` };
     }
-    const r = await api.execute(name, args, { lang: this.opts.lang?.(), confirm: this.opts.confirmProvider });
+    const r = await callProviderTool(api, name, args, { lang: this.opts.lang?.(), confirm: this.opts.confirmProvider });
     return outcomeFromProvider(r);
   }
 
@@ -241,6 +246,7 @@ export class VaultTools implements ToolRunner {
           return this.getWorkspace(radius);
         }
         case "load_skill": return await this.loadSkill(str(a.name));
+        case "open_note": return await this.openNote(str(a.path), a.heading === undefined ? "" : str(a.heading));
         case "get_datetime": return { ok: true, content: renderNow((this.opts.now ?? Date.now)(), this.opts.timeZone?.()) };
         case "read_image": return await this.readImage(str(a.path));
         case "generate_image": return await this.generateImage(str(a.prompt), a.folder === undefined ? undefined : str(a.folder));
@@ -288,7 +294,7 @@ export class VaultTools implements ToolRunner {
     const tooBig = size > maxKb * 1024;
     if (mode === "ocr" || (tooBig && ocr !== null)) {
       if (ocr === null) return { ok: false, error: "Texterkennung nicht verfügbar: das Plugin image-to-markdown ist nicht (mehr) aktiv." };
-      return await ocrResult(ocr, norm);
+      return await ocrResult(ocr, norm, mode === "ocr" ? "no-vision" : "too-big");
     }
     if (tooBig) {
       return { ok: false, error: `Bild zu groß: "${norm}" hat ${Math.ceil(size / 1024)} KB, die Grenze liegt bei ${maxKb} KB (Einstellung „Größtes Bild, das Koda liest“).` };
@@ -380,6 +386,19 @@ export class VaultTools implements ToolRunner {
     return text === null ? { ok: false, error: `Notiz nicht gefunden: "${path}"` } : { ok: true, content: text };
   }
 
+  /** Oeffnet, ohne zu schreiben und ohne Rueckfrage: der Schutz ist die Werkzeugbeschreibung
+   *  („nur auf ausdruecklichen Wunsch"). Der Pfad muss existieren — `openLinkText` legt sonst
+   *  still eine leere Notiz an, und ein Oeffnen darf nichts erzeugen. */
+  private async openNote(path: string, heading: string): Promise<ToolOutcome> {
+    const open = this.opts.openNote;
+    if (open === undefined) return { ok: false, error: "Notizen öffnen ist hier nicht verfügbar." };
+    const norm = resolveNotePath(path, READ_EXTENSIONS);
+    if (!(await this.vault.exists(norm))) return { ok: false, error: `Notiz nicht gefunden: "${path}"` };
+    const h = heading.trim().replace(/^#+\s*/, "");
+    await open(h === "" ? norm : `${norm}#${h}`);
+    return { ok: true, content: h === "" ? `geöffnet: ${norm}` : `geöffnet: ${norm} (Abschnitt „${h}“)` };
+  }
+
   private async write(path: string, content: string, mode: string): Promise<ToolOutcome> {
     if (mode !== "create" && mode !== "append" && mode !== "replace") {
       return { ok: false, error: `mode muss create|append|replace sein, war: "${mode}"` };
@@ -390,6 +409,17 @@ export class VaultTools implements ToolRunner {
     const norm = resolveNotePath(path);
     const exists = await this.vault.exists(norm);
     if (mode === "create" && exists) return { ok: false, error: `existiert schon: "${norm}" — nutze append oder replace` };
+    if (mode === "create") {
+      // Dieselbe Namensgleichheit, an der Obsidian einen Kurzlink [[Name]] aufloest (Basisname,
+      // Gross-/Kleinschreibung egal): eine zweite Notiz gleichen Namens in einem anderen Ordner
+      // macht jeden Kurzlink mehrdeutig und die aeltere Fassung unsichtbar.
+      const base = (p: string): string => (p.split("/").pop() ?? p).toLowerCase();
+      const wanted = base(norm);
+      const twin = this.vault.listMarkdownPaths().find((p) => p !== norm && base(p) === wanted);
+      if (twin !== undefined) {
+        return { ok: false, error: `gleichnamige Notiz existiert schon: "${twin}" — ergaenze sie mit append/replace oder waehle einen anderen Titel` };
+      }
+    }
     if (mode !== "create" && !exists) return { ok: false, error: `nicht gefunden: "${norm}" — nutze create` };
 
     // Effektiver Inhalt, EINMAL berechnet: append ergaenzt ggf. einen fuehrenden
@@ -568,13 +598,15 @@ export class VaultTools implements ToolRunner {
     const max = Math.max(1, this.opts.listMaxRows());
     const shown = paths.slice(0, max);
     const rows = shown.map((p) => ({ path: p, fields: pickFields(this.vault.frontmatterOf(p), fields) }));
-    const subfolders = collectSubfolders(all, folders, norm, recursive);
+    const otherAll = this.vault.listOtherReadablePaths?.() ?? [];
+    const subfolders = collectSubfolders(all, folders, norm, recursive, otherAll);
+    const others = collectFolderNotes(otherAll, norm, recursive);
     // Tiefe 1 ist die Unterordner-Zeile, die es schon gibt — ein Baum lohnt erst ab 2. Er
     // teilt sich die Zeilengrenze mit der Notizliste: beides landet im selben Kontextfenster.
     const tree = depth >= 2 ? renderTreeBlock(collectFolderTree(all, folders, norm, depth, max), depth) : undefined;
     return {
       ok: true,
-      content: formatListResult({ folder: norm, recursive, total: paths.length, rows, subfolders, subfolderMax: max, tree }),
+      content: formatListResult({ folder: norm, recursive, total: paths.length, rows, subfolders, subfolderMax: max, tree, others }),
     };
   }
 

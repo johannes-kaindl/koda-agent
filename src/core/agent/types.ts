@@ -53,13 +53,27 @@ export interface CompactionRecord {
   stats: { stubbed: number; bytes: number; contexts?: number };
 }
 
-export type LogEntry = ChatMessage | CompactionRecord;
+/** Fehler-Marke im Verlauf: ein gescheiterter Versuch bleibt neben seiner Frage sichtbar,
+ *  auch nach einem Neustart. Wie `CompactionRecord` ein zweiter Shape im JSONL; geht nie ans
+ *  Modell (`projectForModel` ueberspringt sie), die Ansicht zeigt sie als Fehlerblase. */
+export interface ErrorRecord {
+  kind: "error";
+  /** ISO-Zeitstempel, nur fuer Anzeige/Log. */
+  at: string;
+  /** Der Klartext, den der Nutzer im Moment des Scheiterns sah. */
+  text: string;
+}
+
+export type LogEntry = ChatMessage | CompactionRecord | ErrorRecord;
 
 export function isCompactionRecord(e: LogEntry): e is CompactionRecord {
   return (e as CompactionRecord).kind === "compaction";
 }
+export function isErrorRecord(e: LogEntry): e is ErrorRecord {
+  return (e as ErrorRecord).kind === "error";
+}
 export function isChatMessage(e: LogEntry): e is ChatMessage {
-  return !isCompactionRecord(e);
+  return !isCompactionRecord(e) && !isErrorRecord(e);
 }
 
 export type ToolOutcome = { ok: true; content: string; images?: { path: string }[] } | { ok: false; error: string };

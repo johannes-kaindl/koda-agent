@@ -1,10 +1,9 @@
-// binaryToDataUrl + MIME-Tabelle uebernommen aus slide-deck/src/adapter.ts, 2026-09-30
 import type { Confidence } from "../../vendor/kit/capabilities";
 import type { OcrProviderApi, OcrProviderError } from "../../vendor/kit/ocr-provider";
 
 /** Formate, die Vision-Modelle und der OCR-Anbieter lesen. SVG fehlt mit Absicht: es ist Text,
  *  kein Rasterbild, und kein Vision-Endpunkt nimmt es als `image_url`. */
-const MIME: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
+const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
 
 export function imageExtension(path: string): string {
   const at = path.lastIndexOf(".");
@@ -12,16 +11,7 @@ export function imageExtension(path: string): string {
 }
 
 export function isImagePath(path: string): boolean {
-  return imageExtension(path) in MIME;
-}
-
-export function binaryToDataUrl(buf: ArrayBuffer, ext: string): string {
-  const bytes = new Uint8Array(buf);
-  let bin = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  const mime = MIME[ext.toLowerCase()] ?? "application/octet-stream";
-  return `data:${mime};base64,${btoa(bin)}`;
+  return IMAGE_EXTENSIONS.has(imageExtension(path));
 }
 
 /** Zeichen, die ein Bild in der Token-Schaetzung (`estimateTokens`) kostet — grob 1000 Token.
@@ -62,7 +52,17 @@ export function describeOcrError(e: OcrProviderError): string {
 
 /** OCR ueber den Anbieter image-to-markdown. Der Vertrag wirft nie — ein Wurf ist trotzdem
  *  ein Anbieter-Defekt und darf den Lauf nicht mitreissen. */
-export async function ocrResult(api: Pick<OcrProviderApi, "extractText">, path: string): Promise<ImageReadOutcome> {
+/** Warum der Text statt des Bildes kommt — das Ergebnis sagt es dazu, damit Koda (und der
+ *  Nutzer im Werkzeugschritt) einen Textbericht nicht fuer das Bild selbst halten. */
+export type OcrWhy = "no-vision" | "too-big" | "vision-failed";
+
+const OCR_NOTE: Record<OcrWhy, string> = {
+  "no-vision": "Hinweis: Das Bild kommt nur als OCR-Text an, weil das Modell ohne Bildfähigkeit erkannt wurde. Layout, Farben und Details, die nicht im Text stehen, kannst du daraus nicht beantworten — sag das, statt zu raten.",
+  "too-big": "Hinweis: Das Bild ist größer als die Grenze für die Bildübergabe und kommt nur als OCR-Text an. Layout, Farben und Details, die nicht im Text stehen, kannst du daraus nicht beantworten — sag das, statt zu raten.",
+  "vision-failed": "Hinweis: Das Modell konnte das Bild nicht annehmen; es kommt nur als OCR-Text an. Layout, Farben und Details, die nicht im Text stehen, kannst du daraus nicht beantworten — sag das, statt zu raten.",
+};
+
+export async function ocrResult(api: Pick<OcrProviderApi, "extractText">, path: string, why?: OcrWhy): Promise<ImageReadOutcome> {
   let r: Awaited<ReturnType<OcrProviderApi["extractText"]>>;
   try {
     r = await api.extractText(path);
@@ -71,6 +71,7 @@ export async function ocrResult(api: Pick<OcrProviderApi, "extractText">, path: 
   }
   if (typeof r !== "string") return { ok: false, error: describeOcrError(r) };
   const text = r.trim();
-  const content = text === "" ? `Im Bild ${path} wurde kein Text erkannt.` : `Text aus ${path} (Texterkennung):\n\n${text}`;
+  const body = text === "" ? `Im Bild ${path} wurde kein Text erkannt.` : `Text aus ${path} (Texterkennung):\n\n${text}`;
+  const content = why === undefined ? body : `${OCR_NOTE[why]}\n\n${body}`;
   return { ok: true, source: "ocr:image-to-markdown", content };
 }

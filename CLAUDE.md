@@ -254,7 +254,7 @@ Release-Infra über Skill `plugin-release-setup`, Test-Setup über Skill
 2. **Stufe 2:** Markdown-Skill-System (inkl. Selbst-Autorschaft mit
    Bestätigung), Compaction, Aufräum-Assistent.
 3. **Stufe 3:** Synthese-Workflows, Voice
-   (STT/TTS gehört zu Koda, NICHT zu vault-rag), optional OpenClaw-Gateway.
+   (STT/TTS gehört zu Koda, NICHT zu vault-rag).
    *(Die vault-rag-Anbindung ist seit 2026-08-13 erledigt — über dessen Plugin-API
    statt über MCP, siehe unten.)*
 4. **Nie:** Full System Access / Terminal-Ausführung (Store + Sicherheit).
@@ -305,7 +305,7 @@ Die gesamte LLM-Klempnerei existiert im Ökosystem bereits — **nicht neu bauen
   `collapsibleSection` im Kit, i18n via `defineStrings`/`t`/`pickLang`
 
 **Genuin neu zu bauen ist nur der Agent-Kern:** Tool-Calling-Loop,
-Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
+Markdown-Skill-Loader, Compaction.
 
 ## Commands
 
@@ -372,9 +372,9 @@ Markdown-Skill-Loader, Heartbeat-Scheduler (opt-in!), Compaction.
   gerade tut, als Zustandsautomat — die Statuszeile bildet ihn nur ab), `context-usage.ts`
   (Belegung des Kontextfensters, **dieselbe** Schaetzung und Schwelle wie die Verdichtung),
   `stream-blocks.ts` (`splitStable`: fertige Absaetze rendern, laufenden Absatz als Rohtext
-  lassen — ein offener ```-Fence ist keine Grenze), `reasoning-toggle.ts` (**uebernommen**
-  aus `image-to-markdown`, Herkunftsstempel; drei Toggle-Zustaende **und** `effectiveSuppress`
-  fuer die Request-Seite — die REGISTRY warnt, dass wer nur die Anzeige nimmt, die Haelfte hat).
+  lassen — ein offener ```-Fence ist keine Grenze), `reasoning-toggle.ts` (seit Welle 22 nur noch die
+  Abbildung des Kit-Zustands `think-toggle` auf Kodas Beschriftungsschluessel, Icons und Klassen; Zustand **und**
+  `effectiveSuppress` fuer die Request-Seite kommen aus dem Kit — die REGISTRY warnt, dass wer nur die Anzeige nimmt, die Haelfte hat).
 - `src/core/context/` — Arbeitskontext (Spec 2026-09-02): Typen, Ports, Block-Rendern; Adapter `src/obsidian/workspace.ts`.
   Seit Etappe 2a (2026-09-05) dazu `selection.ts` (pure, Abwahl-Zustand): abgewählt wird der
   **Snapshot vor dem Rendern**, nicht der gerenderte Block — sonst müssten Text und `items`

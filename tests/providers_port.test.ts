@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { readToolProviders } from "../src/obsidian/providers";
+import { readToolProviders } from "../src/vendor/kit-obsidian/tool-providers";
 
 const tool = { name: "semantic_search", description: "s", parameters: { type: "object", properties: {}, required: [] }, writes: false };
-const good = { apiVersion: 1, tools: () => [tool], execute: async () => ({ ok: true as const, content: "" }) };
+const good = { version: 1, tools: () => [tool], executeTool: async () => ({ ok: true as const, content: "" }) };
 const appWith = (plugins: Record<string, unknown>) => ({ plugins: { plugins } });
 
 describe("readToolProviders — alle Anbieter aus dem Plugin-Register, in stabiler Reihenfolge", () => {
@@ -22,7 +22,7 @@ describe("readToolProviders — alle Anbieter aus dem Plugin-Register, in stabil
       "ohne-api": {},
       "fremde-api": { api: { apiVersion: 1, status: () => ({}) } },
       "halb": { api: { tools: () => [tool] } },
-      "ohne-writes": { api: { tools: () => [{ ...tool, writes: undefined }], execute: good.execute } },
+      "ohne-writes": { api: { version: 1, tools: () => [{ ...tool, writes: undefined }], executeTool: good.executeTool } },
       "echt": { api: good },
     }));
     expect(r.map((p) => p.id)).toEqual(["echt"]);

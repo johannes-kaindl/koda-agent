@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  binaryToDataUrl, chooseImageMode, describeOcrError, imageExtension, isImagePath,
+  chooseImageMode, describeOcrError, imageExtension, isImagePath,
   IMAGE_EST_CHARS, ocrResult, visionResult,
 } from "../src/core/tools/images";
+import { binaryToDataUrl } from "../src/vendor/kit/data-url";
 
 describe("isImagePath / imageExtension", () => {
   it("erkennt Bildformate, die Vision-Modelle lesen, unabhaengig von der Schreibweise", () => {
@@ -74,5 +75,20 @@ describe("ocrResult", () => {
     const r = await ocrResult({ extractText: async () => { throw new Error("kaputt"); } }, "a.png");
     expect(r.ok).toBe(false);
     expect(!r.ok && r.error).toContain("kaputt");
+  });
+});
+
+describe("ocrResult: Hinweiszeile", () => {
+  const api = { extractText: async () => "Rechnung 42" };
+  it("nennt je Grund, dass nur Text ankommt", async () => {
+    for (const why of ["no-vision", "too-big", "vision-failed"] as const) {
+      const r = await ocrResult(api, "a.png", why);
+      expect(r.ok && r.content).toMatch(/^Hinweis: .*OCR-Text/);
+      expect(r.ok && r.content).toContain("Rechnung 42");
+    }
+  });
+  it("ohne Grund bleibt die Ausgabe wie bisher", async () => {
+    const r = await ocrResult(api, "a.png");
+    expect(r.ok && r.content.startsWith("Text aus a.png")).toBe(true);
   });
 });

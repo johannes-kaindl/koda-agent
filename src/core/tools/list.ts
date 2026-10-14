@@ -123,7 +123,9 @@ export function cell(s: string): string {
   return /[·=]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export interface Subfolder { path: string; notes: number }
+/** `others`: `.base`-/`.canvas`-Dateien darunter — `read_note` liest sie, die Notizliste kennt sie
+ *  nicht. Eigene Zahl, nie in `notes` eingerechnet: Notizen bleiben die Zaehleinheit. */
+export interface Subfolder { path: string; notes: number; others?: number }
 
 /** Alle bekannten Ordner, normalisiert → Originalpfad. Zwei Quellen, weil jede allein
  *  luegt: die Notizpfade kennen keinen Ordner ohne Notiz, und eine fehlende oder
@@ -157,10 +159,11 @@ export function folderExists(allPaths: string[], folderPaths: string[], folder: 
  *  Rekursiv: nur die Ordner ohne eine einzige Notiz; alle anderen stehen schon in den
  *  Pfaden der Liste. */
 export function collectSubfolders(
-  allPaths: string[], folderPaths: string[], folder: string, recursive: boolean,
+  allPaths: string[], folderPaths: string[], folder: string, recursive: boolean, otherPaths: string[] = [],
 ): Subfolder[] {
   const prefix = folder === "" ? "" : `${nf(folder)}/`;
   const notesPaths = allPaths.map(nf);
+  const otherNorm = otherPaths.map(nf);
   const out: Subfolder[] = [];
   for (const [n, original] of knownFolders(allPaths, folderPaths)) {
     if (!n.startsWith(prefix)) continue;
@@ -168,7 +171,8 @@ export function collectSubfolders(
     if (rest === "" || (!recursive && rest.includes("/"))) continue;
     const notes = notesPaths.filter((p) => p.startsWith(`${n}/`)).length;
     if (recursive && notes > 0) continue;
-    out.push({ path: original, notes });
+    const others = otherNorm.filter((p) => p.startsWith(`${n}/`)).length;
+    out.push(others === 0 ? { path: original, notes } : { path: original, notes, others });
   }
   // Standard-Ordnung wie `collectFolderNotes` — deterministisch ueber ICU-Versionen.
   return out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
@@ -178,6 +182,11 @@ export function collectSubfolders(
  *  enthalten. Gemessen wird hier nur, was Notiz ist. */
 export function countLabel(n: number): string {
   return n === 0 ? "keine Notiz" : notesWord(n);
+}
+
+/** „2 weitere lesbare Dateien": `.base`/`.canvas`, die `read_note` oeffnet. */
+function othersWord(n: number): string {
+  return `${n} weitere lesbare Datei${n === 1 ? "" : "en"}`;
 }
 
 function notesWord(n: number): string {
@@ -193,8 +202,10 @@ export function formatListResult(args: {
   subfolders?: Subfolder[]; subfolderMax?: number;
   /** Ordnerbaum (`depth` >= 2): ersetzt die Unterordner-Zeile bzw. „Ordner ohne Notiz". */
   tree?: TreeBlock;
+  /** `.base`/`.canvas` im gelisteten Ordner (sortiert): eigene Zeile, nie Teil der Zaehlung. */
+  others?: string[];
 }): string {
-  const { folder, recursive, total, rows, subfolders = [], subfolderMax = Infinity, tree } = args;
+  const { folder, recursive, total, rows, subfolders = [], subfolderMax = Infinity, tree, others = [] } = args;
   const where = folder === "" ? "in der Vault-Wurzel" : `in "${folder}"`;
   const folderNotes = rows.filter((r) => isFolderNote(r.path)).length;
   // Die Zahl steht im Kopf UND die Zeile traegt die Markierung. Das ist bewusst doppelt:
@@ -208,11 +219,11 @@ export function formatListResult(args: {
     const more = subfolders.length - shown.length;
     const tail = more > 0 ? ` · … und ${more} weitere` : "";
     if (recursive) {
-      folderLine = `Ordner ohne Notiz: ${shown.map((s) => cell(s.path)).join(", ")}${tail}`;
+      folderLine = `Ordner ohne Notiz: ${shown.map((s) => (s.others ? `${cell(s.path)} (${othersWord(s.others)})` : cell(s.path))).join(", ")}${tail}`;
     } else {
       const below = subfolders.reduce((sum, s) => sum + s.notes, 0);
       head += `; dazu ${subfolders.length} Unterordner mit ${notesWord(below)}, NICHT mitgelistet (recursive:true zeigt sie, depth:2 ihren Aufbau)`;
-      folderLine = `Unterordner: ${shown.map((s) => `${cell(s.path)} (${countLabel(s.notes)})`).join(" · ")}${tail}`;
+      folderLine = `Unterordner: ${shown.map((s) => `${cell(s.path)} (${countLabel(s.notes)}${s.others ? `, ${othersWord(s.others)}` : ""})`).join(" · ")}${tail}`;
     }
   } else if (total === 0) {
     head += " — der Ordner existiert, enthält aber keine Notiz";
@@ -225,6 +236,14 @@ export function formatListResult(args: {
   // Der Baum ersetzt die Ordnerzeile, statt neben ihr zu stehen: dieselbe Auskunft zweimal
   // in verschiedener Form laedt ein Modell ein, die beiden gegeneinander abzugleichen.
   if (tree !== undefined) folderLine = tree.text;
+  // `.base`/`.canvas` stehen NICHT in der Notizliste und nicht in „N von M Notizen": sie sind
+  // keine Notizen, `read_note` oeffnet sie aber. Gekappt wie die Unterordner-Zeile.
+  if (others.length > 0) {
+    const shownOthers = others.slice(0, Math.max(1, subfolderMax));
+    const more = others.length - shownOthers.length;
+    const otherLine = `Weitere lesbare Dateien (${others.length}, keine Notizen, read_note öffnet sie): ${shownOthers.map(cell).join(", ")}${more > 0 ? ` · … und ${more} weitere` : ""}`;
+    folderLine = folderLine === "" ? otherLine : `${folderLine}\n${otherLine}`;
+  }
   const top = folderLine === "" ? head : `${head}\n${folderLine}`;
   const body = lines.length === 0 ? top : `${top}\n\n${lines.join("\n")}`;
 

@@ -157,10 +157,17 @@ const zeile = (s: Setting, name: string): any =>
   zeilen(s).find((r) => r.getAttribute("data-tool") === name);
 
 describe("renderToolList", () => {
+  it("ist idempotent: ein zweiter Aufruf auf derselben Zeile haengt keine zweite Liste an (nativer 1.13-Pfad)", () => {
+    const s = new Setting(makeFakeEl());
+    renderToolList(s, ctx());
+    renderToolList(s, ctx());
+    expect(s.settingEl.querySelectorAll(".koda-tool-list")).toHaveLength(1);
+    expect(zeilen(s)).toHaveLength(16);
+  });
   it("fuehrt jedes Werkzeug mit einer eigenen Zeile", () => {
     const s = new Setting(makeFakeEl());
     renderToolList(s, ctx());
-    expect(zeilen(s)).toHaveLength(15); // zwoelf feste plus related_notes plus read_image und generate_image
+    expect(zeilen(s)).toHaveLength(16); // dreizehn feste plus related_notes plus read_image und generate_image
   });
   it("zeigt related_notes ausgegraut statt es zu verschweigen, wenn vault-rag fehlt", () => {
     const s = new Setting(makeFakeEl());

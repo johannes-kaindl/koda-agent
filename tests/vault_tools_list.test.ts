@@ -151,3 +151,31 @@ describe("list_notes", () => {
     if (r.ok) expect(r.content).toContain("P/A.md");
   });
 });
+
+describe("list_notes: .base und .canvas", () => {
+  const withOthers = (files: Record<string, string>, others: string[]): VaultPort => ({
+    ...fakeVault(files),
+    listOtherReadablePaths: () => others,
+  });
+  it("eigene Zeile, nicht in der Notizzahl", async () => {
+    const vault = withOthers({ "P/A.md": "" }, ["P/Board.base", "P/Karte.canvas", "Q/Fremd.base"]);
+    const r = await new VaultTools(vault, async () => true, opts).run("list_notes", { folder: "P" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.content).toContain("1 von 1 Notizen");
+      expect(r.content).toContain("Weitere lesbare Dateien (2, keine Notizen, read_note öffnet sie): P/Board.base, P/Karte.canvas");
+      expect(r.content).not.toContain("Fremd.base");
+    }
+  });
+  it("Unterordner-Zeile zaehlt sie getrennt von den Notizen", async () => {
+    const vault = withOthers({ "P/A.md": "", "P/Sub/B.md": "" }, ["P/Sub/Board.base"]);
+    const r = await new VaultTools(vault, async () => true, opts).run("list_notes", { folder: "P" });
+    if (!r.ok) throw new Error(r.error);
+    expect(r.content).toContain("P/Sub (1 Notiz, 1 weitere lesbare Datei)");
+  });
+  it("ohne die Quelle bleibt die Ausgabe wie bisher", async () => {
+    const r = await new VaultTools(fakeVault({ "P/A.md": "" }), async () => true, opts).run("list_notes", { folder: "P" });
+    if (!r.ok) throw new Error(r.error);
+    expect(r.content).not.toContain("Weitere lesbare");
+  });
+});

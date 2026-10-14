@@ -26,6 +26,11 @@ export function parseLines(text: string): LogEntry[] {
         }
         continue;
       }
+      if (parsed.kind === "error") {
+        // Dritter Shape: ohne Text keine Marke (Idiom wie bei der Verdichtungs-Marke).
+        if (typeof parsed.text === "string" && typeof parsed.at === "string") out.push(parsed as unknown as LogEntry);
+        continue;
+      }
       if (typeof parsed.role === "string" && typeof parsed.content === "string") {
         // Ein kaputtes Kontextfeld kostet das Feld, nicht die Nachricht (Idiom wie bei der Marke).
         if ("context" in parsed && !isContextAttachment(parsed.context)) delete parsed.context;

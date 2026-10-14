@@ -229,3 +229,11 @@ describe("Bilder an Tool-Ergebnissen (Stufe 1)", () => {
     expect(projectForModel(log).find((m) => m.role === "tool")!.images).toEqual([{ path: "a.png" }]);
   });
 });
+
+describe("ErrorRecord in der Projektion", () => {
+  it("geht nie ans Modell und verschiebt nichts", () => {
+    const err = { kind: "error" as const, at: "2026-10-14T19:00:00.000Z", text: "tot" };
+    const out = projectForModel([{ role: "user", content: "a" }, err, { role: "user", content: "a" }]);
+    expect(out).toEqual([{ role: "user", content: "a" }, { role: "user", content: "a" }]);
+  });
+});

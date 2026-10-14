@@ -17,14 +17,14 @@ import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { xhrSseTransport } from "./vendor/kit-obsidian/chat-transport";
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
-import { type ChatMessage, type LogEntry } from "./core/agent/types";
+import { type ChatMessage, type ErrorRecord, type LogEntry } from "./core/agent/types";
 import { toolSet, toWireTools, type ToolDef, type ToolSet } from "./core/tools/defs";
-import { readToolProviders } from "./obsidian/providers";
+import { findToolProvider, readProviderOffers } from "./vendor/kit-obsidian/tool-providers";
 import { confirmAction } from "./vendor/kit-obsidian/confirm";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/prompt/build";
 import { renderLocalDate } from "./core/prompt/now";
-import { contextHintFromModelName, lowerContextHint } from "./core/llm/context-hint";
+import { contextHintFromModelName, lowerContextHint } from "./vendor/kit/model-context";
 import { effectiveRules, renderRules } from "./core/prompt/rules";
 import { toLabMessages, describeLlmFailure, readNotePathOf } from "./core/agent/lab-trace";
 import { logToLab } from "./vendor/kit-obsidian/lab-client";
@@ -581,7 +581,7 @@ export default class KodaPlugin extends Plugin {
       generateImage: readImageGenApi(this.app) !== null,
       disabled: this.settings.toolsDisabled,
       descriptions: this.settings.toolDescriptions,
-      providers: readToolProviders(this.app).map((p) => ({ id: p.id, tools: p.api.tools({ lang }) })),
+      providers: readProviderOffers(this.app, lang),
     });
   }
 
@@ -609,6 +609,7 @@ export default class KodaPlugin extends Plugin {
     const vaultPort: VaultPort = {
       listMarkdownPaths: () => this.app.vault.getMarkdownFiles().map((f) => f.path),
       listFolderPaths: () => this.app.vault.getAllFolders().map((f) => f.path),
+      listOtherReadablePaths: () => this.app.vault.getFiles().filter((f) => f.extension === "base" || f.extension === "canvas").map((f) => f.path),
       read: async (p) => {
         const f = this.app.vault.getFileByPath(p);
         if (f === null) throw new Error(`nicht gefunden: ${p}`);
@@ -696,6 +697,7 @@ export default class KodaPlugin extends Plugin {
         linesAround: (r) => linesAround(this.app, r),
       },
       editor: editorPort(this.app),
+      openNote: (linktext) => this.app.workspace.openLinkText(linktext, "", false),
       lang: () => this.promptLang(),
       contextFrontmatterChars: () => this.settings.contextFrontmatterChars,
       // Anbieter-Werkzeuge: Route aus derselben Menge wie die gesendete Liste, API frisch aus
@@ -704,7 +706,7 @@ export default class KodaPlugin extends Plugin {
       provider: (name) => {
         const id = this.currentToolSet().routes.get(name);
         if (id === undefined) return null;
-        return readToolProviders(this.app).find((p) => p.id === id)?.api ?? null;
+        return findToolProvider(this.app, id);
       },
       imageMode: () => this.imageMode(),
       ocr: () => readOcrApi(this.app),
@@ -719,7 +721,11 @@ export default class KodaPlugin extends Plugin {
       }),
       confirmProvider: (preview) => confirmAction(this.app, {
         title: t("provider.confirm.title"),
-        message: [preview.summary, ...(preview.paths.length > 0 ? [t("provider.confirm.paths", preview.paths.join(", "))] : [])],
+        message: [
+          preview.summary,
+          ...(preview.paths.length > 0 ? [t("provider.confirm.paths", preview.paths.join(", "))] : []),
+          ...((preview.outside ?? []).length > 0 ? [t("provider.confirm.outside", (preview.outside ?? []).join("; "))] : []),
+        ],
         confirmLabel: t("provider.confirm.ok"),
         warning: false,
       }),
@@ -973,6 +979,7 @@ export default class KodaPlugin extends Plugin {
       };
 
       const tools = this.buildTools();
+      let failure: string | null = null;
 
       const appended = await runAgent(
         {
@@ -984,7 +991,7 @@ export default class KodaPlugin extends Plugin {
             ocrFallback: async (path: string) => {
               const api = readOcrApi(this.app);
               if (api === null) return { ok: false as const, error: "Texterkennung nicht verfügbar" };
-              return ocrResult(api, path);
+              return ocrResult(api, path, "vision-failed");
             },
           }),
         },
@@ -1007,13 +1014,15 @@ export default class KodaPlugin extends Plugin {
             e.outcome.ok ? e.outcome.content.slice(0, 400) : e.outcome.error,
           );
           if (e.kind === "error") {
-            this.lastNotice = e.errorKind === "aborted"
-              ? { text: t("view.stopped"), kind: "neutral" }
-              : e.errorKind === "overflow"
-                ? { text: t("view.overflow", e.message, s.contextWindowTokens), kind: "error" }
-                : e.errorKind === "truncated"
-                  ? { text: t("error.truncatedEmpty"), kind: "error" }
-                  : { text: t("err.generic", e.message), kind: "error" };
+            // Ein echter Fehler wandert als Marke in den Verlauf (unten, hinter die Antworten
+            // dieses Laufs), nicht in den flüchtigen lastNotice: sonst bliebe nach dem
+            // nächsten Versuch nur die Frage stehen, ohne Grund.
+            if (e.errorKind === "aborted") this.lastNotice = { text: t("view.stopped"), kind: "neutral" };
+            else failure = e.errorKind === "overflow"
+              ? t("view.overflow", e.message, s.contextWindowTokens)
+              : e.errorKind === "truncated"
+                ? t("error.truncatedEmpty")
+                : t("err.generic", e.message);
           }
           if (e.kind === "final" && e.truncated) this.lastNotice = { text: t("view.truncated"), kind: "neutral" };
           if (e.kind === "round-limit") this.lastNotice = { text: t("view.roundLimit", s.maxRounds), kind: "error" };
@@ -1026,14 +1035,23 @@ export default class KodaPlugin extends Plugin {
 
       this.chatLog.push(...appended);
       await this.store.appendMessages(appended);
+      if (failure !== null) await this.recordFailure(failure);
     } catch (e) {
       const message = e instanceof Error ? e.message : "unknown error";
-      this.lastNotice = { text: t("err.generic", message), kind: "error" };
+      await this.recordFailure(t("err.generic", message));
     } finally {
       this.busy = false;
       this.abort = null;
       for (const v of this.views()) { v.activity({ kind: "done" }); v.renderLog(); }
     }
+  }
+
+  /** Gescheiterter Versuch: Marke in Verlauf und JSONL, damit die Frage nicht ohne Grund
+   *  stehen bleibt (Reload, nächster Versuch). */
+  private async recordFailure(text: string): Promise<void> {
+    const rec: ErrorRecord = { kind: "error", at: new Date().toISOString(), text };
+    this.chatLog.push(rec);
+    await this.store.appendMessages([rec]);
   }
 
   private async ensureParents(path: string): Promise<void> {

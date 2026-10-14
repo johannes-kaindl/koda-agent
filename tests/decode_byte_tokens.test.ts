@@ -65,3 +65,9 @@ describe("decodeByteTokens", () => {
     if (!r.ok) expect(r.error).toContain("<0xF0><0x9F>");
   });
 });
+
+describe("Kit-Verhalten (code-kit 0.27.1)", () => {
+  it("ein BOM bleibt als U+FEFF stehen", () => {
+    expect(decodeByteTokens("<0xEF><0xBB><0xBF>x")).toEqual({ ok: true, text: "﻿x" });
+  });
+});

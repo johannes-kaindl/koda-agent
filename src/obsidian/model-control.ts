@@ -115,6 +115,10 @@ export interface ToolRowHandle {
  *  Fix-Runde 1). Ein Aufrufer, der die Zeilen braucht, adressiert sie ueber `name`. */
 export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowHandle[] {
   setting.setName(t("settings.tools")).setDesc(t("settings.tools.desc"));
+  // Idempotent: der native Settings-Pfad (>= 1.13) ruft `render` bei jedem partiellen `update()`
+  // erneut auf dieselbe Zeile auf, ohne `settingEl` zu leeren — ohne das hier stuende die Liste
+  // nach jedem Schalter ein weiteres Mal daneben (display() leert selbst, dort fiel es nie auf).
+  for (const alt of Array.from(setting.settingEl.querySelectorAll(".koda-tool-list"))) alt.remove();
   const host = setting.settingEl.createDiv({ cls: "koda-tool-list" });
   const handles: ToolRowHandle[] = [];
   for (const row_ of toolRows(ctx.settings, ctx.relatedAvailable, ctx.imagesAvailable)) {

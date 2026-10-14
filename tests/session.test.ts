@@ -114,3 +114,13 @@ describe("Kontextfeld im JSONL", () => {
     expect(parseLines(line)).toEqual([{ role: "user", content: "Frage" }]);
   });
 });
+
+describe("ErrorRecord im JSONL (gescheiterte Anfrage)", () => {
+  const rec = { kind: "error" as const, at: "2026-10-14T19:00:00.000Z", text: "Endpunkt nicht erreichbar" };
+  it("Roundtrip", () => {
+    expect(parseLines(serializeLine(msg) + serializeLine(rec))).toEqual([msg, rec]);
+  });
+  it("eine kaputte Fehler-Marke (ohne Text) kostet die Marke, nicht die Session", () => {
+    expect(parseLines(JSON.stringify({ kind: "error", at: "x" }) + "\n" + serializeLine(msg))).toEqual([msg]);
+  });
+});

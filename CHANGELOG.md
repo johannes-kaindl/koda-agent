@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A failed request now stays visible in the history.** When the endpoint is unreachable, the model is still loading or the request times out, an error bubble is saved right under your question, also across a restart. Before, only the question stayed and a retry piled up identical questions with no explanation.
+- **`open_note` tool:** Koda opens a note in your workspace (optionally at a heading) when you ask it to. It changes nothing, so it never asks.
+- **`list_notes` shows `.base` and `.canvas` files** on a separate line ("Weitere lesbare Dateien") and as a count per subfolder. They are not counted as notes.
+- When an image reaches the model only as text from the text recognition, the result now says so and why (model without image support, image over the size limit, or the model refused the image), so Koda does not answer questions about layout or colours from a text report.
+
+### Changed
+
+- `write_note` with mode `create` refuses a note whose file name already exists in another folder and names the existing path, so short links `[[Name]]` stay unambiguous. Appending or replacing is unaffected.
+- Kit pins moved to obsidian-kit 0.60.0 and code-kit 0.27.0 (skipping code-kit 0.25.0–0.26.0, which change nothing visible here). New in the kit and visible in Koda: error messages for a missing API key or a switched-off endpoint name the actual reason instead of "no endpoint" (obsidian-kit 0.60.0).
+
+### Fixed
+
+- **Settings, native settings path (Obsidian 1.13+):** the tool list no longer appears twice or three times after you flip a switch.
+
 ## [0.24.1] — 2026-10-12
 
 ### Changed

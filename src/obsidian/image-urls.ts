@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import type { ChatMessage } from "../core/agent/types";
-import { binaryToDataUrl, imageExtension } from "../core/tools/images";
+import { imageExtension } from "../core/tools/images";
+import { binaryToDataUrl } from "../vendor/kit/data-url";
 
 /** Loest die Bild-PFADE der Nachrichten in Data-URLs auf — erst hier, am Transport-Rand,
  *  entsteht Base64; die Sitzung (JSONL) traegt nur Pfade. Gestubbte Nachrichten tragen kein

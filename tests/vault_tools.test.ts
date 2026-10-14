@@ -405,3 +405,24 @@ describe("load_skill", () => {
     expect(vault.files["Koda/Skills/Alpha.md"]).not.toContain("pinned");
   });
 });
+
+describe("write_note create: gleichnamige Notiz in anderem Ordner", () => {
+  it("weist ab und nennt den vorhandenen Pfad", async () => {
+    const vault = fakeVault({ "Archiv/Projekt X.md": "alt" });
+    const tools = new VaultTools(vault, yes, opts);
+    const r = await tools.run("write_note", { path: "Koda/Projekt X.md", content: "neu", mode: "create" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("Archiv/Projekt X.md");
+    expect(Object.keys(vault.files)).toEqual(["Archiv/Projekt X.md"]);
+  });
+  it("Gross-/Kleinschreibung zaehlt nicht (wie bei der Link-Aufloesung)", async () => {
+    const tools = new VaultTools(fakeVault({ "Archiv/projekt x.md": "alt" }), yes, opts);
+    expect((await tools.run("write_note", { path: "Koda/Projekt X.md", content: "neu", mode: "create" })).ok).toBe(false);
+  });
+  it("ein anderer Name legt an, append/replace bleiben unberuehrt", async () => {
+    const vault = fakeVault({ "Archiv/Projekt X.md": "alt" });
+    const tools = new VaultTools(vault, yes, opts);
+    expect((await tools.run("write_note", { path: "Koda/Projekt Y.md", content: "neu", mode: "create" })).ok).toBe(true);
+    expect((await tools.run("write_note", { path: "Archiv/Projekt X.md", content: "mehr", mode: "append" })).ok).toBe(true);
+  });
+});

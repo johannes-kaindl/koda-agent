@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { toolSet, toolDefs, TOOL_DEFS } from "../src/core/tools/defs";
-import type { ProviderToolDef } from "../src/core/tools/provider";
+import type { ProviderToolDef } from "../src/vendor/kit/tool-provider";
 
 const pdef = (name: string, writes = false): ProviderToolDef => ({
   name, description: `Anbieter: ${name}`, parameters: { type: "object", properties: {}, required: [] }, writes,

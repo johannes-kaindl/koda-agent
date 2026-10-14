@@ -9,7 +9,7 @@
  * solange `plugin.busy` steht. Unveraenderte Nachrichten liefert die Projektion per Referenz
  * zurueck — Aufrufer duerfen sie nie beschreiben. Spec:
  * Vault-Cockpit `_SDD/2026-08-18-koda-compaction-design.md` */
-import { isCompactionRecord, type ChatMessage, type CompactionRecord, type LogEntry } from "../types";
+import { isCompactionRecord, isErrorRecord, type ChatMessage, type CompactionRecord, type LogEntry } from "../types";
 import { modeLabel } from "../../context/labels";
 import { IMAGE_EST_CHARS } from "../../tools/images";
 import type { ContextAttachment } from "../../context/types";
@@ -158,6 +158,7 @@ export function projectForModel(entries: LogEntry[]): ChatMessage[] {
       else slots = applyStage2(slots, e);
       continue;
     }
+    if (isErrorRecord(e)) continue;
     if (e.role === "assistant" && e.toolCalls) {
       for (const c of e.toolCalls) calls.set(c.id, { name: c.name, args: c.arguments });
     }

@@ -52,7 +52,7 @@
  * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
  * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
- * Nenner ist `PUNKTE` (69 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * Nenner ist `PUNKTE` (75 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
  * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
  * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
  * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.
@@ -289,6 +289,12 @@ const PUNKTE = [
   "67. Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst",
   "68. Strom mit absatzgrossen Stuecken: der Verlauf folgt dem Ende auch bei Spruengen ueber die Folge-Schwelle (Kit 0.59.0, withFollow)",
   "69. Folge-Regel, zweite Haelfte: steht der Nutzer wieder unten, folgt der Verlauf dem Strom wieder",
+  "70. Gescheiterte Anfrage: zwei Sendungen gegen einen Endpunkt mit HTTP 500 ergeben zwei Fragen und zwei Fehlerblasen — im Verlauf, im DOM und im JSONL",
+  "71. Einstellungen (nativer Pfad): nach zwei Werkzeug-Schaltern steht genau eine Werkzeugliste, die Anweisungs-Textarea ist breiter als 200 px",
+  "72. list_notes nennt .base und .canvas auf einer eigenen Zeile und je Unterordner, ohne sie als Notizen zu zaehlen",
+  "73. open_note oeffnet eine vorhandene Notiz im Workspace, ein unbekannter Pfad legt nichts an",
+  "74. write_note create: eine gleichnamige Notiz in einem anderen Ordner wird abgewiesen und der vorhandene Pfad genannt",
+  "75. Netzfehler-Fallback: bricht die erste Verbindung ab, streamt die zweite Anfrage wieder (stream:true) und die Antwort kommt an",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -2817,7 +2823,7 @@ async function main(): Promise<void> {
     // --- 47. Werkzeug-Anbieter: ein fremdes Plugin wird montiert, geroutet, abgeschaltet, entfernt ---
     // Spike 2026-09-25 (Cockpit-Task „Werkzeug-Anbieter-Vertrag"). Die pure Schicht ist
     // unit-getestet; hier zaehlt die NAHT: liest `currentToolNames()` wirklich aus
-    // `app.plugins.plugins[*].api`, geht `buildTools().run()` an `execute()` des Anbieters,
+    // `app.plugins.plugins[*].api`, geht `buildTools().run()` an `executeTool()` des Anbieters,
     // greift der Nutzer-Schalter aus `toolsDisabled` auch fuer ein montiertes Werkzeug, und
     // verschwindet das Werkzeug samt Route, sobald der Anbieter weg ist? Ein Stub unter einer
     // eigenen Plugin-Id — kein echtes Plugin traegt sie, also kann der Punkt nichts
@@ -2836,12 +2842,13 @@ async function main(): Promise<void> {
           window.__kodaProvCalls = [];
           app.plugins.plugins[${JSON.stringify(PROV)}] = {
             api: {
+              version: 1,
               tools: (opts) => [
                 { name: "smoke_echo", description: "Smoke: " + String(opts && opts.lang), parameters: { type: "object", properties: { text: { type: "string", description: "x" } }, required: ["text"] }, writes: false },
                 { name: "read_note", description: "Kollision mit dem Wirt — darf NICHT montiert werden", parameters: { type: "object", properties: {}, required: [] }, writes: false },
                 { name: "related_notes", description: "Anbieter-Fassung — ersetzt Kodas eigene", parameters: { type: "object", properties: { path: { type: "string", description: "p" } }, required: ["path"] }, writes: false },
               ],
-              execute: async (name, args, opts) => {
+              executeTool: async (name, args, opts) => {
                 window.__kodaProvCalls.push({ name, args, lang: opts && opts.lang, hatConfirm: typeof (opts && opts.confirm) === "function" });
                 return { ok: true, content: name === "related_notes" ? "related:" + String(args.path) : "echo:" + String(args.text) };
               },
@@ -2885,7 +2892,7 @@ async function main(): Promise<void> {
           && !aus.names.includes("smoke_echo") && aus.lauf.ok === false && /abgeschaltet/.test(aus.lauf.error ?? "")
           && !weg.names.includes("smoke_echo") && weg.lauf.ok === false && /nicht mehr verf/.test(weg.lauf.error ?? "");
         detail47 = `vorher ${vorher.length} Werkzeuge · mit Anbieter ${mit.length} (smoke_echo ${mit.includes("smoke_echo") ? "montiert" : "FEHLT"}, read_note ${mit.filter((n) => n === "read_note").length}× — ${readNoteDef?.description.startsWith("Kollision") ? "ANBIETER GEWANN" : "Wirt gewann"}) · `
-          + `run → ${lauf.ok ? `„${lauf.content}“` : `Fehler „${lauf.error}“`} · related_notes → ${related.ok ? `„${related.content}“` : `Fehler „${related.error}“`} · execute sah lang=${calls[0]?.lang}, confirm=${calls[0]?.hatConfirm} · `
+          + `run → ${lauf.ok ? `„${lauf.content}“` : `Fehler „${lauf.error}“`} · related_notes → ${related.ok ? `„${related.content}“` : `Fehler „${related.error}“`} · executeTool sah lang=${calls[0]?.lang}, confirm=${calls[0]?.hatConfirm} · `
           + `abgeschaltet: gesendet ${aus.names.includes("smoke_echo")}, run „${aus.lauf.error ?? "ok?!"}“ · `
           + `entfernt: gesendet ${weg.names.includes("smoke_echo")}, run „${weg.lauf.error ?? "ok?!"}“`;
       } catch (error) {
@@ -3781,6 +3788,145 @@ async function main(): Promise<void> {
           await stub67.stop();
         }
         record("67. Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst", ok67, detail67);
+      }
+
+      // --- 70–75. Welle 22: Fehler-Marke, Einstellungen, list_notes, open_note, gleichnamig, Netzfehler ----
+      {
+        const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const pause22 = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+        const abbruch22 = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        const chatZeigen = (): Promise<unknown> => cdp.evaluate(`
+          const p = ${PL};
+          if (p.views().length === 0) await p.activateView();
+          app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
+          return true;
+        `);
+
+        // 70. Zwei gescheiterte Sendungen: Frage + Fehlerblase je Versuch, nicht fuenf gleiche Fragen ohne Grund.
+        const P70 = "70. Gescheiterte Anfrage: zwei Sendungen gegen einen Endpunkt mit HTTP 500 ergeben zwei Fragen und zwei Fehlerblasen — im Verlauf, im DOM und im JSONL";
+        const fake70 = await startScriptedEndpoint(() => ({ status: 500, errorMessage: "Smoke-Fehler 70" }));
+        try {
+          await setzeModell("smoke-model", fake70.url);
+          await chatZeigen();
+          await pause22(400);
+          for (let i = 0; i < 2; i++) await cdp.evaluate(`await ${PL}.ask("Smoke 70: gleiche Frage"); return true;`);
+          const r70 = await cdp.evaluate<{ fragen: number; fehler: number; dom: number; jsonl: number; text: string }>(`
+            const p = ${PL};
+            const log = p.chatLog;
+            const dom = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)})[0].view.containerEl.querySelectorAll(".koda-log .koda-error").length;
+            const raw = await app.vault.adapter.read(p.manifest.dir + "/sessions/current.jsonl");
+            const zeilen = raw.split("\\n").filter((z) => z.trim() !== "").map((z) => JSON.parse(z));
+            return {
+              fragen: log.filter((m) => m.role === "user").length,
+              fehler: log.filter((m) => m.kind === "error").length,
+              dom,
+              jsonl: zeilen.filter((m) => m.kind === "error").length,
+              text: (log.find((m) => m.kind === "error") ?? {}).text ?? "",
+            };
+          `);
+          record(P70, r70.fragen === 2 && r70.fehler === 2 && r70.dom === 2 && r70.jsonl === 2 && r70.text.includes("Smoke-Fehler 70"),
+            `Fragen ${r70.fragen} · Fehler-Marken im Verlauf ${r70.fehler} · Fehlerblasen im DOM ${r70.dom} · Fehler-Zeilen im JSONL ${r70.jsonl} (soll je 2) · Text „${r70.text.slice(0, 60)}“`);
+        } catch (error) { abbruch22(P70, error); } finally { await fake70.close(); }
+
+        // 71. Nativer Einstellungspfad: Liste nicht duplizieren, Textarea nicht auf 30 px.
+        const P71 = "71. Einstellungen (nativer Pfad): nach zwei Werkzeug-Schaltern steht genau eine Werkzeugliste, die Anweisungs-Textarea ist breiter als 200 px";
+        let settings71: Cdp | null = null;
+        try {
+          await cdp.evaluate(`app.setting.open(); app.setting.openTabById(${JSON.stringify(PLUGIN_ID)}); return true;`);
+          await pause22(1200);
+          settings71 = await attachTo("settings", port, vault);
+          if (settings71 === null) { unmeasured(P71, "Einstellungsfenster nicht gefunden"); }
+          else {
+            await pollUntil(settings71, `return document.querySelector(".koda-tool-row") ? true : null;`, 8000);
+            for (let i = 0; i < 2; i++) {
+              await settings71.evaluate(`
+                const rows = [...document.querySelectorAll(".koda-tool-row")];
+                rows[${i}].querySelector(".checkbox-container").click();
+                return true;
+              `);
+              await pause22(900);
+            }
+            const m71 = await settings71.evaluate<{ listen: number; breite: number; zeilen: number }>(`
+              const ta = document.querySelector(".koda-prompt-textarea");
+              return {
+                listen: document.querySelectorAll(".koda-tool-list").length,
+                zeilen: document.querySelectorAll(".koda-tool-row").length,
+                breite: ta ? ta.getBoundingClientRect().width : -1,
+              };
+            `);
+            record(P71, m71.listen === 1 && m71.breite > 200,
+              `Werkzeuglisten ${m71.listen} (soll 1) · Zeilen ${m71.zeilen} · Breite der Anweisungs-Textarea ${Math.round(m71.breite)} px (soll > 200)`);
+          }
+        } catch (error) { abbruch22(P71, error); } finally {
+          settings71?.close();
+          await cdp.evaluate(`
+            const p = ${PL};
+            p.settings.toolsDisabled = [];
+            await p.saveSettings();
+            app.setting.close();
+            return true;
+          `).catch(() => undefined);
+        }
+
+        // 72–74. Werkzeuge ueber DENSELBEN Weg wie ask() (`buildTools().run`).
+        const run = <T>(name: string, args: unknown): Promise<T> => cdp.evaluate<T>(`
+          return await ${PL}.buildTools().run(${JSON.stringify(name)}, ${JSON.stringify(args)});
+        `);
+        const P72 = "72. list_notes nennt .base und .canvas auf einer eigenen Zeile und je Unterordner, ohne sie als Notizen zu zaehlen";
+        const P73 = "73. open_note oeffnet eine vorhandene Notiz im Workspace, ein unbekannter Pfad legt nichts an";
+        const P74 = "74. write_note create: eine gleichnamige Notiz in einem anderen Ordner wird abgewiesen und der vorhandene Pfad genannt";
+        try {
+          await cdp.evaluate(`
+            for (const f of ["Smoke22", "Smoke22/Sub"]) if (!app.vault.getFolderByPath(f)) await app.vault.createFolder(f);
+            for (const [p, c] of [["Smoke22/A.md", "a"], ["Smoke22/Sub/B.md", "b"], ["Smoke22/Board.base", "views: []"], ["Smoke22/Sub/Karte.canvas", "{}"]]) {
+              const alt = app.vault.getFileByPath(p);
+              if (alt) await app.vault.delete(alt);
+              await app.vault.create(p, c);
+            }
+            return true;
+          `);
+          // 72
+          const l72 = await run<{ ok: boolean; content?: string; error?: string }>("list_notes", { folder: "Smoke22" });
+          const t72 = l72.content ?? l72.error ?? "";
+          record(P72, l72.ok && /1 von 1 Notizen/.test(t72) && /Weitere lesbare Dateien \(1, keine Notizen.*Smoke22\/Board\.base/.test(t72) && /Smoke22\/Sub \(1 Notiz, 1 weitere lesbare Datei\)/.test(t72),
+            `Ausgabe: ${t72.replace(/\s+/g, " ").slice(0, 260)}`);
+          // 73
+          const o73 = await run<{ ok: boolean }>("open_note", { path: "Smoke22/A.md" });
+          await pause22(500);
+          const aktiv = await cdp.evaluate<string>(`return app.workspace.getActiveFile()?.path ?? "";`);
+          const o73b = await run<{ ok: boolean }>("open_note", { path: "Smoke22/Nichts.md" });
+          const angelegt = await cdp.evaluate<boolean>(`return app.vault.getFileByPath("Smoke22/Nichts.md") !== null;`);
+          record(P73, o73.ok && aktiv === "Smoke22/A.md" && !o73b.ok && !angelegt,
+            `geoeffnet: ${o73.ok} · aktive Datei „${aktiv}“ · unbekannter Pfad abgelehnt: ${!o73b.ok} · dabei angelegt: ${angelegt}`);
+          // 74
+          const w74 = await run<{ ok: boolean; error?: string }>("write_note", { path: "Koda/A.md", content: "neu", mode: "create" });
+          const da74 = await cdp.evaluate<boolean>(`return app.vault.getFileByPath("Koda/A.md") !== null;`);
+          record(P74, !w74.ok && (w74.error ?? "").includes("Smoke22/A.md") && !da74,
+            `abgewiesen: ${!w74.ok} · Fehler „${(w74.error ?? "").slice(0, 100)}“ · Koda/A.md angelegt: ${da74}`);
+        } catch (error) { abbruch22(P72, error); abbruch22(P73, error); abbruch22(P74, error); } finally {
+          await cdp.evaluate(`
+            const f = app.vault.getFolderByPath("Smoke22");
+            if (f) await app.vault.delete(f, true);
+            const k = app.vault.getFileByPath("Koda/A.md");
+            if (k) await app.vault.delete(k);
+            return true;
+          `).catch(() => undefined);
+        }
+
+        // 75. Netzfehler: die erste Verbindung bricht ab, die zweite Anfrage streamt wieder.
+        const P75 = "75. Netzfehler-Fallback: bricht die erste Verbindung ab, streamt die zweite Anfrage wieder (stream:true) und die Antwort kommt an";
+        const stub75 = await startLlmStub({
+          models: ["smoke-model"],
+          antwort: (_anfrage, n) => (n === 1 ? { text: "halb", abbruchNach: 0 } : { text: "Smoke-Antwort 75" }),
+        });
+        try {
+          await setzeModell("smoke-model", stub75.url);
+          await cdp.evaluate(`await ${PL}.ask("Smoke 75: Netzfehler"); return true;`);
+          const chats = stub75.anfragen().filter((a) => a.route === "chat");
+          const letzte = await cdp.evaluate<string>(`const l = ${PL}.chatLog; return l[l.length - 1]?.content ?? "";`);
+          record(P75, chats.length >= 2 && chats[1]!.stream === true && letzte.includes("Smoke-Antwort 75"),
+            `Chat-Anfragen ${chats.length} (soll >= 2) · 2. mit stream:true: ${chats[1]?.stream === true} · letzte Verlaufszeile „${letzte.slice(0, 40)}“`);
+        } catch (error) { abbruch22(P75, error); } finally { await stub75.stop(); }
       }
     } finally {
       await cdp.evaluate(`
