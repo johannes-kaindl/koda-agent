@@ -1,17 +1,17 @@
 {
   "sources": {
-    "obsidian-kit": { "ref": "0.59.1" },
-    "code-kit": { "ref": "0.24.0" }
+    "obsidian-kit": { "ref": "0.60.1" },
+    "code-kit": { "ref": "0.27.1" }
   },
   "targets": [
-    { "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["frontmatter", "explain-texts", "ocr-provider", "image-gen-provider", "endpoint-source", "endpoint-secret-hook"], "rewrite": [["../vendor/code-kit/pure/", "./"]] },
+    { "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["frontmatter", "explain-texts", "ocr-provider", "image-gen-provider", "endpoint-source", "endpoint-secret-hook", "tool-provider"], "rewrite": [["../vendor/code-kit/pure/", "./"]] },
     {
       "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/pure",
       "modules": [
         "think-splitter", "reasoning", "capabilities", "endpoint", "endpoint_config",
         "endpoint_diagnostics", "settings", "i18n", "num", "timeout",
         "model-context", "error_body", "diff", "settings_schema", "model-choice",
-        "model-list-cache", "stream-blocks", "sse", "redact", "secrets", "safe-markdown", "sampling-profiles", "llm-json"
+        "model-list-cache", "stream-blocks", "sse", "redact", "secrets", "safe-markdown", "sampling-profiles", "llm-json", "data-url", "think-toggle", "byte-tokens"
       ]
     },
     { "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/web", "modules": ["remote-resources"], "rewrite": [["../pure/", "./"]] },
@@ -20,7 +20,7 @@
       "modules": [
         "clock", "confirm", "folder-suggest", "settings_walker", "model-picker", "hub", "collapsible", "stable-writer", "dom-guard",
         "help-setting", "chat-client", "chat-transport", "lab-client", "endpoint-list", "stream-area",
-        "endpoint-secrets", "secrets", "endpoint-source", "shortcuts-bridge"
+        "endpoint-secrets", "secrets", "endpoint-source", "shortcuts-bridge", "tool-providers"
       ],
       "rewrite": [["../pure/", "../kit/"], ["../vendor/code-kit/pure/", "../kit/"], ["../vendor/code-kit/web/", "../kit/"]]
     },
