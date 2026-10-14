@@ -40,6 +40,7 @@ import { createModelListCache, type ModelListCache, type ModelListClient } from 
 import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
+import { readProviderOffers, readToolProviderRejections } from "../vendor/kit-obsidian/tool-providers";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "./model-control";
 import { PromptPreviewModal } from "./prompt-modal";
 import { readImageGenApi } from "./image-gen";
@@ -258,7 +259,7 @@ export class KodaSettingsTab extends PluginSettingTab {
           },
           {
             name: t("settings.contextAutoK"),
-            desc: t("settings.contextAutoK.desc"),
+            desc: readRetrievalApi(this.app) === null ? `${t("settings.contextAutoK.desc")} ${t("settings.contextAutoK.noRag")}` : t("settings.contextAutoK.desc"),
             control: { type: "slider", key: "contextAutoK", min: CONTEXT_AUTO_K_MIN, max: CONTEXT_AUTO_K_MAX, step: 1 },
           },
           {
@@ -357,6 +358,10 @@ export class KodaSettingsTab extends PluginSettingTab {
       refresh: () => this.refreshUi(),
       relatedAvailable: readRetrievalApi(this.app)?.status().indexed === true,
       imagesAvailable: { read: this.plugin.imageMode() !== "none", generate: readImageGenApi(this.app) !== null },
+      providers: {
+        offers: readProviderOffers(this.app, this.plugin.promptLang()),
+        rejections: readToolProviderRejections(this.app),
+      },
       openPreview: () => { new PromptPreviewModal(this.app, this.plugin).open(); },
     };
   }

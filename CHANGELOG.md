@@ -13,14 +13,17 @@ All notable changes to this project are documented here. The format follows
 - **`list_notes` shows `.base` and `.canvas` files** on a separate line ("Weitere lesbare Dateien") and as a count per subfolder. They are not counted as notes.
 - When an image reaches the model only as text from the text recognition, the result now says so and why (model without image support, image over the size limit, or the model refused the image), so Koda does not answer questions about layout or colours from a text report.
 
+- **Tools from other plugins in the settings.** Under Settings → Koda → Model control → Tools, each plugin that lends Koda tools has its own group "From the plugin …" with the same switch and description field as Koda's own tools. A plugin that does not follow the tool contract (version 1) is no longer missing silently: the list says why. Switches for tools of plugins that are not loaded stay visible, greyed out. A write that reaches outside the vault names that in the approval dialog ("Outside the vault").
+- Settings: the Vault mode description no longer says "not built yet"; the slider "Notes from vault-rag" says so when Vault Retrieval is not active.
+
 ### Changed
 
 - `write_note` with mode `create` refuses a note whose file name already exists in another folder and names the existing path, so short links `[[Name]]` stay unambiguous. Appending or replacing is unaffected.
-- Kit pins moved to obsidian-kit 0.60.0 and code-kit 0.27.0 (skipping code-kit 0.25.0–0.26.0, which change nothing visible here). New in the kit and visible in Koda: error messages for a missing API key or a switched-off endpoint name the actual reason instead of "no endpoint" (obsidian-kit 0.60.0).
+- Kit pins moved to obsidian-kit 0.60.0 and code-kit 0.27.0 (skipping code-kit 0.25.0–0.26.0, which change nothing visible here). Byte-token decoding, the thinking-switch state, the model-name context hint and the tool contract now come from the kit; a byte-order mark written as `<0xEF><0xBB><0xBF>` is kept as a character instead of being swallowed. New in the kit and visible in Koda: error messages for a missing API key or a switched-off endpoint name the actual reason instead of "no endpoint" (obsidian-kit 0.60.0).
 
 ### Fixed
 
-- **Settings, native settings path (Obsidian 1.13+):** the tool list no longer appears twice or three times after you flip a switch.
+- **Settings, native settings path (Obsidian 1.13+):** the tool list no longer appears twice or three times after you flip a switch, and the "Instruction for Koda" text box is no longer squeezed to a sliver (about 18 px wide before, now the full row). The tool list uses the full row width.
 
 ## [0.24.1] — 2026-10-12
 

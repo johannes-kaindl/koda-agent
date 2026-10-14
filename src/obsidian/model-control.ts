@@ -1,7 +1,9 @@
 import { Setting, setIcon, type TextAreaComponent, type ToggleComponent } from "obsidian";
 import { t } from "../vendor/kit/i18n";
 import { type RuleWarning } from "../core/prompt/rules";
-import { promptRow, toolRows } from "../core/prompt/view-model";
+import { promptRow, providerToolGroups, toolRows, type ToolRowModel } from "../core/prompt/view-model";
+import { HOST_TOOL_NAMES } from "../core/tools/defs";
+import type { ProviderOffer, ToolProviderRejection } from "../vendor/kit/tool-provider";
 import type { KodaSettings } from "../core/settings-types";
 
 export interface ModelControlCtx {
@@ -13,6 +15,9 @@ export interface ModelControlCtx {
    *  ist moeglich (Bildgenerierungs-Anbieter). Fehlt das Feld, gilt beides als verfuegbar. */
   imagesAvailable?: { read: boolean; generate: boolean };
   openPreview(): void;
+  /** Werkzeuge anderer Plugins und die Gruende abgelehnter Anbieter. Fehlt das Feld, zeigt die
+   *  Liste nur Kodas eigene Werkzeuge (Tests, Altaufrufer). */
+  providers?: { offers: ProviderOffer[]; rejections: { id: string; rejection: ToolProviderRejection }[] };
 }
 
 const WARN_TEXT: Record<RuleWarning, string> = {
@@ -118,14 +123,18 @@ export interface ToolRowHandle {
  *  Fix-Runde 1). Ein Aufrufer, der die Zeilen braucht, adressiert sie ueber `name`. */
 export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowHandle[] {
   setting.setName(t("settings.tools")).setDesc(t("settings.tools.desc"));
+  // Die Liste braucht die ganze Zeilenbreite: als drittes Flex-Kind neben Name und Beschreibung
+  // wurde sie in die rechte Haelfte gequetscht (Screenshot Welle 22).
+  setting.setClass("koda-tools-setting");
   // Idempotent: der native Settings-Pfad (>= 1.13) ruft `render` bei jedem partiellen `update()`
   // erneut auf dieselbe Zeile auf, ohne `settingEl` zu leeren — ohne das hier stuende die Liste
   // nach jedem Schalter ein weiteres Mal daneben (display() leert selbst, dort fiel es nie auf).
   for (const alt of Array.from(setting.settingEl.querySelectorAll(".koda-tool-list"))) alt.remove();
   const host = setting.settingEl.createDiv({ cls: "koda-tool-list" });
   const handles: ToolRowHandle[] = [];
-  for (const row_ of toolRows(ctx.settings, ctx.relatedAvailable, ctx.imagesAvailable)) {
-    const row = host.createDiv({ cls: "koda-tool-row" });
+
+  const zeile = (parent: HTMLElement, row_: ToolRowModel): void => {
+    const row = parent.createDiv({ cls: "koda-tool-row" });
     // `setAttribute` statt `dataset`: der Fake-DOM des Mocks kennt Attribute, kein dataset.
     row.setAttribute("data-tool", row_.name);
     if (row_.unavailable) row.addClass("is-unavailable");
@@ -134,13 +143,18 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
     kopf.createSpan({ cls: "koda-tool-name", text: row_.name });
     if (row_.unavailable) kopf.createSpan({
       cls: "koda-tool-hint",
-      text: t(row_.needs === "image-read" ? "settings.tools.needsImageRead" : row_.needs === "image-gen" ? "settings.tools.needsImageGen" : "settings.tools.needsRag"),
+      text: t(
+        row_.needs === "image-read" ? "settings.tools.needsImageRead"
+          : row_.needs === "image-gen" ? "settings.tools.needsImageGen"
+            : row_.needs === "plugin-missing" ? "settings.tools.pluginMissing"
+              : "settings.tools.needsRag",
+      ),
     });
 
-    const zeile = new Setting(row);
-    zeile.setClass("koda-tool-controls");
+    const controls = new Setting(row);
+    controls.setClass("koda-tool-controls");
     let textarea: TextAreaComponent | undefined;
-    zeile.addTextArea((ta) => {
+    controls.addTextArea((ta) => {
       textarea = ta;
       ta.setPlaceholder(row_.placeholder).setValue(row_.own);
       ta.inputEl.rows = 2;
@@ -154,7 +168,7 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
       });
     });
     let toggle: ToggleComponent | undefined;
-    zeile.addToggle((tg) => {
+    controls.addToggle((tg) => {
       toggle = tg;
       tg.setValue(row_.enabled).onChange((an) => {
         const ohne = ctx.settings.toolsDisabled.filter((n) => n !== row_.name);
@@ -165,6 +179,47 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
     // `addTextArea`/`addToggle` rufen ihr Callback synchron auf (echtes Obsidian wie Mock)
     // — an dieser Stelle sind beide Variablen also immer gesetzt.
     handles.push({ name: row_.name, textarea: textarea!, toggle: toggle! });
+  };
+
+  for (const row_ of toolRows(ctx.settings, ctx.relatedAvailable, ctx.imagesAvailable)) zeile(host, row_);
+
+  // Werkzeuge anderer Plugins: eine Gruppe je Anbieter, dieselbe Zeile. Der Grund, aus dem ein
+  // Anbieter NICHT montiert wird, steht daneben (sonst fehlt er still, Welle 22).
+  const fremd = ctx.providers;
+  if (fremd !== undefined) {
+    const { groups, missing } = providerToolGroups(ctx.settings, fremd.offers, HOST_TOOL_NAMES);
+    const gruppe = (titel: string, cls: string): HTMLElement => {
+      const g = host.createDiv({ cls: `koda-tool-group ${cls}` });
+      g.createDiv({ cls: "koda-tool-group-title", text: titel });
+      return g;
+    };
+    for (const g of groups) {
+      const el = gruppe(t("settings.tools.fromPlugin", g.id), "is-provider");
+      for (const row_ of g.rows) zeile(el, row_);
+    }
+    for (const r of fremd.rejections) {
+      const el = host.createDiv({ cls: "koda-tool-group koda-warn is-warning" });
+      const text = t("settings.tools.rejected", r.id, rejectionText(r.rejection));
+      setIcon(el.createSpan({ cls: "koda-warn-icon" }), "alert-triangle");
+      el.createSpan({ text });
+      el.setAttribute("aria-label", text);
+    }
+    if (missing.length > 0) {
+      const el = gruppe(t("settings.tools.notLoaded"), "is-missing");
+      for (const row_ of missing) zeile(el, row_);
+    }
   }
   return handles;
+}
+
+/** Der Grund einer Ablehnung (`toolProviderRejection`) als Satz fuer die Einstellungen. */
+export function rejectionText(r: ToolProviderRejection): string {
+  switch (r.reason) {
+    case "version": return t("settings.tools.rejectVersion", typeof r.found === "string" || typeof r.found === "number" ? String(r.found) : "—");
+    case "missing-method": return t("settings.tools.rejectMethod", r.method);
+    case "tools-threw": return t("settings.tools.rejectThrew");
+    case "tools-not-array": return t("settings.tools.rejectNotArray");
+    case "bad-definition": return t("settings.tools.rejectDef", r.index + 1, r.field);
+    case "not-an-object": return t("settings.tools.rejectObject");
+  }
 }

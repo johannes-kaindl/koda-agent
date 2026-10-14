@@ -46,7 +46,7 @@ export interface ToolRowModel {
   enabled: boolean;
   unavailable: boolean;
   /** Was fehlt, wenn `unavailable`: benennt den Hinweis neben dem Namen. */
-  needs: "vault-rag" | "image-read" | "image-gen" | null;
+  needs: "vault-rag" | "image-read" | "image-gen" | "plugin-missing" | null;
 }
 
 export function toolRows(
@@ -75,4 +75,38 @@ export function toolRows(
       needs,
     };
   });
+}
+
+/** Zeilen fuer Werkzeuge, die fremde Plugins anbieten — dieselbe Zeile wie ein eigenes Werkzeug
+ *  (Schalter + eigene Beschreibung), gruppiert je Plugin. Namen, die ein Wirts-Werkzeug
+ *  verdeckt (Kollision), bekommen keine Zeile: sie werden nie gesendet.
+ *
+ *  Dazu die Namen, die der Nutzer abgeschaltet oder umbeschrieben hat und die KEIN Anbieter
+ *  mehr liefert (Plugin deaktiviert): sie bleiben als ausgegraute Zeile sichtbar, mit dem
+ *  Schalter — sonst waere eine Einstellung ohne Ort, an dem man sie zuruecknimmt. */
+export interface ProviderToolGroup { id: string; rows: ToolRowModel[] }
+
+export function providerToolGroups(
+  s: { toolsDisabled: string[]; toolDescriptions: Record<string, string> },
+  offers: ReadonlyArray<{ id: string; tools: ReadonlyArray<{ name: string; description: string }> }>,
+  hostNames: ReadonlySet<string>,
+): { groups: ProviderToolGroup[]; missing: ToolRowModel[] } {
+  const aus = new Set(s.toolsDisabled);
+  const gesehen = new Set<string>();
+  const groups: ProviderToolGroup[] = [];
+  for (const o of offers) {
+    const rows: ToolRowModel[] = [];
+    for (const t of o.tools) {
+      if (hostNames.has(t.name) || gesehen.has(t.name)) continue;
+      gesehen.add(t.name);
+      rows.push({ name: t.name, placeholder: t.description, own: s.toolDescriptions[t.name] ?? "", enabled: !aus.has(t.name), unavailable: false, needs: null });
+    }
+    if (rows.length > 0) groups.push({ id: o.id, rows });
+  }
+  const bekannt = new Set<string>([...hostNames, ...gesehen]);
+  const namen = [...new Set([...s.toolsDisabled, ...Object.keys(s.toolDescriptions)])].filter((n) => !bekannt.has(n)).sort();
+  const missing = namen.map((name): ToolRowModel => ({
+    name, placeholder: "", own: s.toolDescriptions[name] ?? "", enabled: !aus.has(name), unavailable: true, needs: "plugin-missing",
+  }));
+  return { groups, missing };
 }

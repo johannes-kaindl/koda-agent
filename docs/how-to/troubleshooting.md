@@ -234,11 +234,11 @@ Not an error. These skills are not pinned: Koda sees their name and description 
 
 **Fix:** Install Vault Retrieval, or ignore it.
 
-### A tool from another plugin has no switch in the tool list
+### The tools of another plugin are missing from the tool list
 
-**Cause:** Other plugins can lend Koda their tools (see [Tools and commands](../reference/tools.md#tools-from-other-plugins)). In this version they do not appear under **Settings → Koda → Model control → Tools**; the list shows Koda's own tools only.
+**Cause:** Other plugins can lend Koda their tools (see [Tools and commands](../reference/tools.md#tools-from-other-plugins)). Under **Settings → Koda → Model control → Tools** they appear in their own group "From the plugin …", each with a switch. A plugin that is installed but does not follow the tool contract (version 1) is not offered to Koda, and the list says why with a warning such as "its tools are not offered to Koda — it does not follow tool contract version 1 (found: —); update the plugin".
 
-**Fix:** Disable the plugin that provides the tool. Or, with Obsidian closed, add the tool's name to the `toolsDisabled` list in `.obsidian/plugins/koda-agent/data.json`; Koda then leaves it out and tells the model it was switched off.
+**Fix:** Update the providing plugin. A switch or description you set for a tool whose plugin is not loaded stays under "Settings for tools of plugins that are not loaded", greyed out with "plugin not loaded", so you can take it back.
 
 ## Getting help
 

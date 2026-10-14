@@ -509,7 +509,7 @@ export default class KodaPlugin extends Plugin {
   /** Sprache fuer den System-Prompt — dieselbe Quelle wie die Oberflaeche. Zwei getrennte
    *  Erkennungen koennten auseinanderlaufen, und dann antwortet Koda in einer anderen
    *  Sprache, als seine Knoepfe tragen. */
-  private promptLang(): Lang {
+  promptLang(): Lang {
     const r = resolveLang(this.settings.language, this.autoLang, () => detectLang(), getLang());
     this.autoLang = r.cache;
     return r.lang;

@@ -31,7 +31,7 @@ Only `.md` notes are written; `.base` and `.canvas` are read-only for Koda.
 
 Other Obsidian plugins can offer Koda their tools. Koda looks for them each time it sends a question and adds them next to its own. A plugin tool with the same name as one of Koda's own never replaces it, with one exception: if Vault Retrieval offers `related_notes` itself, its version takes the place of Koda's built-in one. When a plugin tool wants to write, it asks through Koda's dialog **Koda wants to write through another plugin**, which names the affected paths. Whether and when it asks is up to the providing plugin; Koda only supplies the dialog.
 
-Tools from other plugins do not appear in the tool list of the settings in this version. To turn one off, disable the plugin that provides it, or see [Troubleshooting](../how-to/troubleshooting.md#a-tool-from-another-plugin-has-no-switch-in-the-tool-list).
+Under **Settings → Koda → Model control → Tools** these tools stand in their own group "From the plugin …", with the same switch and description field as Koda's own. If a write would also affect something outside the vault (a calendar server, an invitation by mail), the dialog lists it under "Outside the vault". A plugin that does not follow the tool contract is not offered; the list says why, see [Troubleshooting](../how-to/troubleshooting.md#the-tools-of-another-plugin-are-missing-from-the-tool-list).
 
 ## Commands
 

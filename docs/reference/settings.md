@@ -59,4 +59,4 @@ See [Tune Koda for a smaller model](../how-to/model-control.md).
 | Language | Auto | Interface and prompt language: follows Obsidian, or Deutsch / English. |
 | Open sidebar on startup | off | Koda never opens itself without this. |
 
-Not in the settings tab: which sections of the Context tab are collapsed (remembered automatically), and `toolsDisabled` / `toolDescriptions` for tools from other plugins, which only exist in `data.json` (see [Troubleshooting](../how-to/troubleshooting.md#a-tool-from-another-plugin-has-no-switch-in-the-tool-list)).
+Not in the settings tab: which sections of the Context tab are collapsed (remembered automatically), and the stored lists `toolsDisabled` / `toolDescriptions` in `data.json`, which the tool list in the settings edits.

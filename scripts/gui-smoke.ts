@@ -52,7 +52,7 @@
  * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
  * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
- * Nenner ist `PUNKTE` (75 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * Nenner ist `PUNKTE` (76 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
  * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
  * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
  * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.
@@ -295,6 +295,7 @@ const PUNKTE = [
   "73. open_note oeffnet eine vorhandene Notiz im Workspace, ein unbekannter Pfad legt nichts an",
   "74. write_note create: eine gleichnamige Notiz in einem anderen Ordner wird abgewiesen und der vorhandene Pfad genannt",
   "75. Netzfehler-Fallback: bricht die erste Verbindung ab, streamt die zweite Anfrage wieder (stream:true) und die Antwort kommt an",
+  "76. Einstellungen: Werkzeuge eines Anbieter-Plugins stehen in eigener Gruppe mit Schalter, ein Anbieter ohne version nennt seinen Grund, der Schalter schreibt toolsDisabled",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -3860,6 +3861,58 @@ async function main(): Promise<void> {
         } catch (error) { abbruch22(P71, error); } finally {
           settings71?.close();
           await cdp.evaluate(`
+            const p = ${PL};
+            p.settings.toolsDisabled = [];
+            await p.saveSettings();
+            app.setting.close();
+            return true;
+          `).catch(() => undefined);
+        }
+
+
+        // 76. Anbieter-Gruppe in der Werkzeugliste der Einstellungen (nativer Pfad).
+        const P76 = "76. Einstellungen: Werkzeuge eines Anbieter-Plugins stehen in eigener Gruppe mit Schalter, ein Anbieter ohne version nennt seinen Grund, der Schalter schreibt toolsDisabled";
+        const PROV76 = "koda-smoke-provider-76";
+        const ALT76 = "koda-smoke-altanbieter-76";
+        let settings76: Cdp | null = null;
+        try {
+          if (await cdp.evaluate<boolean>(`return !!app.plugins.plugins[${JSON.stringify(PROV76)}] || !!app.plugins.plugins[${JSON.stringify(ALT76)}];`)) {
+            unmeasured(P76, "uebersprungen — ein Eintrag unter der Stub-Id existiert bereits");
+          } else {
+            await cdp.evaluate(`
+              app.plugins.plugins[${JSON.stringify(PROV76)}] = { api: { version: 1, tools: () => [
+                { name: "smoke76_echo", description: "Smoke 76 Beschreibung", parameters: { type: "object", properties: {}, required: [] }, writes: false },
+              ], executeTool: async () => ({ ok: true, content: "x" }) } };
+              app.plugins.plugins[${JSON.stringify(ALT76)}] = { api: { tools: () => [], executeTool: async () => ({ ok: true, content: "x" }) } };
+              app.setting.open(); app.setting.openTabById(${JSON.stringify(PLUGIN_ID)});
+              return true;
+            `);
+            await pause22(1200);
+            settings76 = await attachTo("settings", port, vault);
+            if (settings76 === null) unmeasured(P76, "Einstellungsfenster nicht gefunden");
+            else {
+              await pollUntil(settings76, `return document.querySelector('.koda-tool-row[data-tool="smoke76_echo"]') ? true : null;`, 8000);
+              const m76 = await settings76.evaluate<{ gruppe: string; zeile: boolean; platzhalter: string; warn: string }>(`
+                const z = document.querySelector('.koda-tool-row[data-tool="smoke76_echo"]');
+                const g = z ? z.closest(".koda-tool-group") : null;
+                return {
+                  gruppe: g ? (g.querySelector(".koda-tool-group-title")?.textContent ?? "") : "",
+                  zeile: !!z,
+                  platzhalter: z ? (z.querySelector("textarea")?.getAttribute("placeholder") ?? "") : "",
+                  warn: [...document.querySelectorAll(".koda-tool-group.koda-warn")].map((e) => e.textContent).join(" | "),
+                };
+              `);
+              await settings76.evaluate(`document.querySelector('.koda-tool-row[data-tool="smoke76_echo"] .checkbox-container').click(); return true;`);
+              await pause22(900);
+              const aus76 = await cdp.evaluate<boolean>(`return ${PL}.settings.toolsDisabled.includes("smoke76_echo");`);
+              record(P76, m76.zeile && m76.gruppe.includes(PROV76) && m76.platzhalter === "Smoke 76 Beschreibung" && m76.warn.includes(ALT76) && aus76,
+                `Gruppe „${m76.gruppe}“ · Zeile da: ${m76.zeile} · Platzhalter „${m76.platzhalter}“ · Ablehnung: „${m76.warn.slice(0, 120)}“ · nach dem Schalter in toolsDisabled: ${aus76}`);
+            }
+          }
+        } catch (error) { abbruch22(P76, error); } finally {
+          settings76?.close();
+          await cdp.evaluate(`
+            delete app.plugins.plugins[${JSON.stringify(PROV76)}]; delete app.plugins.plugins[${JSON.stringify(ALT76)}];
             const p = ${PL};
             p.settings.toolsDisabled = [];
             await p.saveSettings();

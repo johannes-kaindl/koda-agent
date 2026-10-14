@@ -227,3 +227,32 @@ describe("renderToolList", () => {
     expect(DEFAULT_SETTINGS.systemPromptOverride).toBe("");
   });
 });
+
+describe("renderToolList: Werkzeuge anderer Plugins", () => {
+  const pdef = (name: string) => ({ name, description: `von ${name}`, parameters: { type: "object", properties: {}, required: [] }, writes: false });
+  it("eine Gruppe je Anbieter mit Zeile, Beschreibung als Platzhalter; Kollision mit einem Wirts-Werkzeug bekommt keine Zeile", () => {
+    const s = new Setting(makeFakeEl());
+    const c = { ...ctx(), providers: { offers: [{ id: "kalender", tools: [pdef("list_events"), pdef("read_note")] }], rejections: [] } };
+    renderToolList(s, c);
+    expect(zeile(s, "list_events")).toBeDefined();
+    expect(zeilen(s).filter((r) => r.getAttribute("data-tool") === "read_note")).toHaveLength(1);
+    expect(s.settingEl.querySelectorAll(".is-provider")).toHaveLength(1);
+  });
+  it("ein abgelehnter Anbieter nennt seinen Grund", () => {
+    const s = new Setting(makeFakeEl());
+    const c = { ...ctx(), providers: { offers: [], rejections: [{ id: "vault-retrieval", rejection: { reason: "version" as const, found: undefined } }] } };
+    renderToolList(s, c);
+    const w = s.settingEl.querySelectorAll(".koda-warn");
+    expect(w).toHaveLength(1);
+    expect(w[0].textContent).toContain("vault-retrieval");
+    expect(w[0].textContent).toContain("version 1");
+  });
+  it("ein abgeschaltetes Werkzeug eines nicht geladenen Plugins bleibt als ausgegraute Zeile mit Schalter stehen", () => {
+    const s = new Setting(makeFakeEl());
+    const c = { ...ctx({ toolsDisabled: ["list_events"] }), providers: { offers: [], rejections: [] } };
+    renderToolList(s, c);
+    const r = zeile(s, "list_events");
+    expect(r.hasClass("is-unavailable")).toBe(true);
+    expect(r.textContent).toContain("plugin not loaded");
+  });
+});
