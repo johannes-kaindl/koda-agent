@@ -40,6 +40,11 @@ describe("fetchSemanticHits — Modus Vault", () => {
     expect(await fetchSemanticHits(a, { mode: "vault", query: "Frage", activePath: null, k: 5 }))
       .toEqual({ kind: "failed", reason: "offline" });
   });
+  it("reicht die Pause als eigenen Grund durch, nicht als offline", async () => {
+    const a = api({ ok: false, reason: "paused" });
+    expect(await fetchSemanticHits(a, { mode: "vault", query: "Frage", activePath: null, k: 5 }))
+      .toEqual({ kind: "failed", reason: "paused" });
+  });
   it("ein Wurf im fremden Plugin wird zu failed/error, nicht zu einer Ausnahme", async () => {
     const a = api(ok);
     a.search.mockImplementation(() => Promise.reject(new Error("kaputt")));
@@ -80,5 +85,7 @@ describe("semanticNotice", () => {
     expect(semanticNotice("offline", "de")).toContain("Vault-Suche nicht verfügbar");
     expect(semanticNotice("absent", "de")).toContain("vault-rag");
     expect(semanticNotice("offline", "en")).toContain("Vault search unavailable");
+    expect(semanticNotice("paused", "de")).toContain("pausiert");
+    expect(semanticNotice("paused", "en")).toContain("paused");
   });
 });

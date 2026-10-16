@@ -15,7 +15,7 @@ import type { ContextMode } from "./types";
 // uebernommen aus vault-rag/src/context_panel.ts:10 (MIN_QUERY), 2026-09-18
 export const MIN_QUERY_CHARS = 3;
 
-export type SemanticFailure = "absent" | "no-index" | "offline" | "not-indexed" | "error";
+export type SemanticFailure = "absent" | "no-index" | "offline" | "paused" | "not-indexed" | "error";
 export type SemanticHits =
   | { kind: "none" }
   | { kind: "ok"; paths: string[] }
@@ -65,6 +65,7 @@ const NOTICE = {
     absent: "das Plugin vault-rag fehlt oder ist deaktiviert",
     "no-index": "vault-rag hat keinen Index geladen",
     offline: "der Embedding-Endpunkt von vault-rag ist nicht erreichbar",
+    paused: "vault-rag hat die semantische Suche pausiert",
     "not-indexed": "die Notiz steht nicht im Index von vault-rag",
     error: "vault-rag hat einen Fehler gemeldet",
   },
@@ -73,6 +74,7 @@ const NOTICE = {
     absent: "the vault-rag plugin is missing or disabled",
     "no-index": "vault-rag has no index loaded",
     offline: "vault-rag's embedding endpoint is not reachable",
+    paused: "vault-rag has paused semantic search",
     "not-indexed": "the note is not in vault-rag's index",
     error: "vault-rag reported an error",
   },

@@ -35,6 +35,19 @@ describe("formatSearchResult", () => {
       .toContain("semantisch: Embedding-Endpunkt nicht erreichbar");
   });
 
+  it("meldet pausierte semantische Suche ehrlich und bleibt bei Volltext", () => {
+    const out = formatSearchResult(t, { ok: false, reason: "paused" });
+    expect(out).toContain("Die semantische Suche ist pausiert");
+    expect(out).toContain("Volltext");
+    expect(out).not.toContain("nicht erreichbar");
+  });
+
+  it("nennt die Pause auch bei null Volltext-Treffern", () => {
+    const out = formatSearchResult([], { ok: false, reason: "paused" });
+    expect(out).toContain("Keine Treffer");
+    expect(out).toContain("Die semantische Suche ist pausiert");
+  });
+
   it("sagt bei null Treffern beider Wege deutlich, dass nichts gefunden wurde", () => {
     const out = formatSearchResult([], { ok: true, hits: [] });
     expect(out).toContain("Keine Treffer");
@@ -48,6 +61,10 @@ describe("formatSearchResult", () => {
 });
 
 describe("formatRelatedResult", () => {
+  it("meldet die Pause statt Endpunkt-Ausfall", () => {
+    expect(formatRelatedResult({ ok: false, reason: "paused" }, "a.md")).toContain("pausiert");
+  });
+
   it("listet verwandte Notizen mit Score", () => {
     const out = formatRelatedResult({ ok: true, hits: [{ path: "b.md", score: 0.66 }] }, "a.md");
     expect(out).toBe("Verwandt zu a.md:\nb.md (0.66)");

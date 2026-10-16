@@ -19,6 +19,7 @@ export type ApiResult =
   | { ok: true; hits: ApiHit[] }
   | { ok: false; reason: "no-index" }
   | { ok: false; reason: "offline" }
+  | { ok: false; reason: "paused" }
   | { ok: false; reason: "not-indexed"; path: string };
 
 export interface ApiStatus { apiVersion: number; indexed: boolean; noteCount: number }
@@ -70,6 +71,8 @@ function outageNote(r: ApiResult | null): string | null {
       return "(semantisch: kein Index vorhanden — vault-rag hat den Vault noch nicht indexiert)";
     case "offline":
       return "(semantisch: Embedding-Endpunkt nicht erreichbar — nur Volltext-Treffer)";
+    case "paused":
+      return "(Die semantische Suche ist pausiert — Treffer stammen nur aus dem Volltext)";
     case "not-indexed":
       return `(semantisch: "${r.path}" nicht im Index)`;
   }
@@ -131,6 +134,8 @@ export function formatRelatedResult(r: ApiResult, path: string, hasText: boolean
         return "Semantischer Index: kein Index vorhanden — vault-rag hat den Vault noch nicht indexiert.";
       case "offline":
         return "Semantischer Index: Endpunkt nicht erreichbar.";
+      case "paused":
+        return "Die semantische Suche ist pausiert — verwandte Notizen lassen sich solange nicht bestimmen.";
       case "not-indexed":
         if (hasText === false) {
           // Bedingt formuliert, nicht endgueltig: die Notiz ist nicht dauerhaft
