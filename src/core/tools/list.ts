@@ -204,8 +204,10 @@ export function formatListResult(args: {
   tree?: TreeBlock;
   /** `.base`/`.canvas` im gelisteten Ordner (sortiert): eigene Zeile, nie Teil der Zaehlung. */
   others?: string[];
+  /** Lesbare Fassung des `where`-Filters. Gesetzt heißt: `total` zählt die gefilterte Menge. */
+  filter?: string;
 }): string {
-  const { folder, recursive, total, rows, subfolders = [], subfolderMax = Infinity, tree, others = [] } = args;
+  const { folder, recursive, total, rows, subfolders = [], subfolderMax = Infinity, tree, others = [], filter } = args;
   const where = folder === "" ? "in der Vault-Wurzel" : `in "${folder}"`;
   const folderNotes = rows.filter((r) => isFolderNote(r.path)).length;
   // Die Zahl steht im Kopf UND die Zeile traegt die Markierung. Das ist bewusst doppelt:
@@ -226,8 +228,9 @@ export function formatListResult(args: {
       folderLine = `Unterordner: ${shown.map((s) => `${cell(s.path)} (${countLabel(s.notes)}${s.others ? `, ${othersWord(s.others)}` : ""})`).join(" · ")}${tail}`;
     }
   } else if (total === 0) {
-    head += " — der Ordner existiert, enthält aber keine Notiz";
+    head += filter === undefined ? " — der Ordner existiert, enthält aber keine Notiz" : " — keine Notiz erfüllt den Filter";
   }
+  if (filter !== undefined) head += `\nFilter: ${filter}`;
   const lines = rows.map((r) => {
     const cols = Object.entries(r.fields).map(([k, v]) => `${k}=${cell(v)}`);
     const path = `${cell(r.path)}${isFolderNote(r.path) ? " (Ordnernotiz)" : ""}`;

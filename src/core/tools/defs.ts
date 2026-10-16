@@ -47,6 +47,11 @@ export const TOOL_DEFS: ToolDef[] = [
           items: { type: "string" },
           description: "Frontmatter field names to show per note, e.g. [\"status\",\"priority\"]. Omit for paths only.",
         },
+        where: {
+          type: "array",
+          items: { type: "object" },
+          description: "Only list notes whose frontmatter matches ALL conditions, e.g. [{\"field\":\"status\",\"op\":\"=\",\"value\":\"offen\"}]. op is one of \"=\" (whole value; on a list one element), \"!=\", \"contains\" (substring), \"exists\", \"missing\" (the last two take no value). Case-insensitive. The count then covers the filtered notes only, and the subfolder and tree lines are left out.",
+        },
       },
       required: ["folder"],
     },

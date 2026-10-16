@@ -18,6 +18,7 @@ import {
   collectFolderNotes, pickFields, formatListResult, suggestFolders, formatEmptyFolder,
   collectSubfolders, folderExists,
 } from "../core/tools/list";
+import { parseWhere, matchesWhere, describeWhere } from "../core/tools/where";
 import { collectFolderTree, renderTreeBlock } from "../core/tools/tree";
 import { decodeByteTokens } from "../core/tools/decode-byte-tokens";
 import { renderNow } from "../core/prompt/now";
@@ -235,7 +236,7 @@ export class VaultTools implements ToolRunner {
           // SYNCHRON innerhalb der async-Methode, was ohne await eine abgelehnte Promise
           // ausserhalb dieses try/catch ergibt (Traversal wuerde nicht als Fehler-Result
           // gemeldet, sondern als unbehandelte Ablehnung durchschlagen).
-          return await this.listNotes(str(a.folder), bool(a.recursive), strArray(a.fields), depthOf(a.depth));
+          return await this.listNotes(str(a.folder), bool(a.recursive), strArray(a.fields), depthOf(a.depth), a.where);
         case "get_workspace": {
           // Eigene Spanne statt num(): num() kappt bei 25 (fuer max_results gedacht) und
           // behandelt 0 als "fehlt" — around_cursor: 0 ("nur die Cursor-Zeile") ist aber ein
@@ -585,8 +586,10 @@ export class VaultTools implements ToolRunner {
 
   /** Ordnerinhalt in EINEM Aufruf. Die Kappung liegt vor dem Frontmatter-Holen: gezaehlt
    *  wird ueber die Pfadliste (billig), geholt nur fuer die Zeilen, die auch erscheinen. */
-  private async listNotes(folder: string, recursive: boolean, fields: string[], depth: number): Promise<ToolOutcome> {
+  private async listNotes(folder: string, recursive: boolean, fields: string[], depth: number, whereRaw?: unknown): Promise<ToolOutcome> {
     const norm = resolveFolderPath(folder);
+    const where = parseWhere(whereRaw);
+    if (!where.ok) return { ok: false, error: where.error };
     const all = this.vault.listMarkdownPaths();
     const folders = this.vault.listFolderPaths();
     // Ein Ordner ohne Notiz ist ein Befund, kein Fehler — nur ein Ordner, den es nicht gibt,
@@ -594,19 +597,25 @@ export class VaultTools implements ToolRunner {
     if (!folderExists(all, folders, norm)) {
       return { ok: false, error: formatEmptyFolder(norm, suggestFolders(all, norm), true) };
     }
-    const paths = collectFolderNotes(all, norm, recursive);
+    const inFolder = collectFolderNotes(all, norm, recursive);
+    // Der Filter wirkt VOR der Kappung: „N von M“ zählt die gefilterte Menge, sonst meldete die
+    // Warnung eine Vollständigkeit, die der Filter längst durchlöchert hat.
+    const filtered = where.clauses.length > 0;
+    const paths = filtered ? inFolder.filter((p) => matchesWhere(this.vault.frontmatterOf(p), where.clauses)) : inFolder;
     const max = Math.max(1, this.opts.listMaxRows());
     const shown = paths.slice(0, max);
     const rows = shown.map((p) => ({ path: p, fields: pickFields(this.vault.frontmatterOf(p), fields) }));
     const otherAll = this.vault.listOtherReadablePaths?.() ?? [];
-    const subfolders = collectSubfolders(all, folders, norm, recursive, otherAll);
-    const others = collectFolderNotes(otherAll, norm, recursive);
+    // Unterordner-Zählung, Baum und Weitere Dateien kennen den Filter nicht: mit Filter weggelassen,
+    // statt ungefilterte Zahlen neben einer gefilterten Liste zu zeigen.
+    const subfolders = filtered ? [] : collectSubfolders(all, folders, norm, recursive, otherAll);
+    const others = filtered ? [] : collectFolderNotes(otherAll, norm, recursive);
     // Tiefe 1 ist die Unterordner-Zeile, die es schon gibt — ein Baum lohnt erst ab 2. Er
     // teilt sich die Zeilengrenze mit der Notizliste: beides landet im selben Kontextfenster.
-    const tree = depth >= 2 ? renderTreeBlock(collectFolderTree(all, folders, norm, depth, max), depth) : undefined;
+    const tree = depth >= 2 && !filtered ? renderTreeBlock(collectFolderTree(all, folders, norm, depth, max), depth) : undefined;
     return {
       ok: true,
-      content: formatListResult({ folder: norm, recursive, total: paths.length, rows, subfolders, subfolderMax: max, tree, others }),
+      content: formatListResult({ folder: norm, recursive, total: paths.length, rows, subfolders, subfolderMax: max, tree, others, filter: filtered ? describeWhere(where.clauses) : undefined }),
     };
   }
 
