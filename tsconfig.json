@@ -14,7 +14,7 @@
     "noImplicitAny": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
-    "lib": ["ES2018", "DOM"],
+    "lib": ["ES2022", "DOM"],
     "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]
