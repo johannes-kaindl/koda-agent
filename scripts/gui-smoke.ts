@@ -52,7 +52,7 @@
  * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
  * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
- * Nenner ist `PUNKTE` (77 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * Nenner ist `PUNKTE` (78 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
  * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
  * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
  * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.
@@ -296,6 +296,7 @@ const PUNKTE = [
   "74. write_note create: eine gleichnamige Notiz in einem anderen Ordner wird abgewiesen und der vorhandene Pfad genannt",
   "75. Netzfehler-Fallback: bricht die erste Verbindung ab, streamt die zweite Anfrage wieder (stream:true) und die Antwort kommt an",
   "77. Gemma 4 ohne Öffner: der Denktext steht im Denkblock, nicht in der Antwort (Stream und Verlauf)",
+  "78. Anbieter-Werkzeug: ein Aufruf gegen das Schema (Pflichtfeld fehlt, unmögliches Datum) erreicht den Anbieter nicht, ein gültiger schon",
   "76. Einstellungen: Werkzeuge eines Anbieter-Plugins stehen in eigener Gruppe mit Schalter, ein Anbieter ohne version nennt seinen Grund, der Schalter schreibt toolsDisabled",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
@@ -4017,6 +4018,35 @@ async function main(): Promise<void> {
               ? `kein laufender Strom mit „fertige“ gesehen · Verlauf „${letzte.slice(0, 80)}“`
               : `Strom-Anzeige „${live.body.slice(0, 60)}“ · Denkblock da: ${live.hasBlock} (${live.thought.slice(0, 30)}…) · Verlauf „${letzte.slice(0, 60)}“`);
         } catch (error) { abbruch22(P77, error); } finally { await stub77.stop(); }
+
+        // 78. Argumente eines Anbieter-Werkzeugs werden VOR dem Aufruf gegen sein Schema geprueft (Vertrag tool-provider).
+        const P78 = "78. Anbieter-Werkzeug: ein Aufruf gegen das Schema (Pflichtfeld fehlt, unmögliches Datum) erreicht den Anbieter nicht, ein gültiger schon";
+        const PROV78 = "koda-smoke-provider-78";
+        try {
+          if (await cdp.evaluate<boolean>(`return !!app.plugins.plugins[${JSON.stringify(PROV78)}];`)) {
+            unmeasured(P78, "uebersprungen — ein Eintrag unter der Stub-Id existiert bereits");
+          } else {
+            await cdp.evaluate(`
+              window.__kodaSmoke78 = [];
+              app.plugins.plugins[${JSON.stringify(PROV78)}] = { api: { version: 1, tools: () => [
+                { name: "smoke78_plan", description: "Smoke 78", parameters: { type: "object", properties: { title: { type: "string", minLength: 1 }, day: { type: "string", format: "date" } }, required: ["title"] }, writes: false },
+              ], executeTool: async (n, a) => { window.__kodaSmoke78.push(a); return { ok: true, content: "angelegt" }; } } };
+              return true;
+            `);
+            const r78 = await cdp.evaluate<{ schlecht: { ok: boolean; error?: string }; gut: { ok: boolean; content?: string }; erreicht: unknown[] }>(`
+              const t = ${PL}.buildTools();
+              const schlecht = await t.run("smoke78_plan", { day: "2026-02-31" });
+              const gut = await t.run("smoke78_plan", { title: "x", day: "2026-03-01", erfunden: 1 });
+              return { schlecht, gut, erreicht: window.__kodaSmoke78 };
+            `);
+            record(P78,
+              !r78.schlecht.ok && /title/.test(r78.schlecht.error ?? "") && /day/.test(r78.schlecht.error ?? "")
+                && r78.gut.ok && r78.erreicht.length === 1 && JSON.stringify(r78.erreicht[0]) === JSON.stringify({ title: "x", day: "2026-03-01" }),
+              `ungültiger Aufruf: „${(r78.schlecht.error ?? "").slice(0, 140)}“ · Anbieter erreicht ${r78.erreicht.length}× (soll 1) mit ${JSON.stringify(r78.erreicht[0])}`);
+          }
+        } catch (error) { abbruch22(P78, error); } finally {
+          await cdp.evaluate(`delete app.plugins.plugins[${JSON.stringify(PROV78)}]; delete window.__kodaSmoke78; return true;`).catch(() => undefined);
+        }
       }
     } finally {
       await cdp.evaluate(`
