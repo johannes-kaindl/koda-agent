@@ -124,9 +124,9 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 
 ### "[Vault search unavailable: …]" in the context block
 
-**Cause:** Vault Retrieval is installed, but the search failed this time. The reason follows the colon: *the vault-rag plugin is missing or disabled*, *vault-rag has no index loaded*, *vault-rag's embedding endpoint is not reachable*, *the note is not in vault-rag's index*, or *vault-rag reported an error*.
+**Cause:** Vault Retrieval is installed, but the search failed this time. The reason follows the colon: *the vault-rag plugin is missing or disabled*, *vault-rag has no index loaded*, *vault-rag's embedding endpoint is not reachable*, *vault-rag has paused semantic search*, *the note is not in vault-rag's index*, or *vault-rag reported an error*.
 
-**Fix:** Let vault-rag finish indexing, start the server it embeds with, or reindex after adding notes. The question still goes out, with the active note.
+**Fix:** Let vault-rag finish indexing, start the server it embeds with, resume semantic search in vault-rag if you paused it, or reindex after adding notes. In a `search_notes` result the same state reads "Die semantische Suche ist pausiert"; the full-text hits above it are complete. The question still goes out, with the active note.
 
 ### A note I added by hand does not reach Koda
 
