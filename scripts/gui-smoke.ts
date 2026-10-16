@@ -52,7 +52,7 @@
  * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
  * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
- * Nenner ist `PUNKTE` (76 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * Nenner ist `PUNKTE` (77 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
  * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
  * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
  * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.
@@ -295,6 +295,7 @@ const PUNKTE = [
   "73. open_note oeffnet eine vorhandene Notiz im Workspace, ein unbekannter Pfad legt nichts an",
   "74. write_note create: eine gleichnamige Notiz in einem anderen Ordner wird abgewiesen und der vorhandene Pfad genannt",
   "75. Netzfehler-Fallback: bricht die erste Verbindung ab, streamt die zweite Anfrage wieder (stream:true) und die Antwort kommt an",
+  "77. Gemma 4 ohne Öffner: der Denktext steht im Denkblock, nicht in der Antwort (Stream und Verlauf)",
   "76. Einstellungen: Werkzeuge eines Anbieter-Plugins stehen in eigener Gruppe mit Schalter, ein Anbieter ohne version nennt seinen Grund, der Schalter schreibt toolsDisabled",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
@@ -3989,6 +3990,33 @@ async function main(): Promise<void> {
           record(P75, chats.length >= 2 && chats[1]!.stream === true && letzte.includes("Smoke-Antwort 75"),
             `Chat-Anfragen ${chats.length} (soll >= 2) · 2. mit stream:true: ${chats[1]?.stream === true} · letzte Verlaufszeile „${letzte.slice(0, 40)}“`);
         } catch (error) { abbruch22(P75, error); } finally { await stub75.stop(); }
+
+        // 77. Gemma 4 auf LM Studio schreibt das Denken OHNE Öffner in `content` und beendet es mit `<channel|>`
+        // (Welle 23, Gegenprobe zu `onContentReset`). Gemessen wird der Anzeigetext WÄHREND des Stroms (der Denktext darf
+        // dort nach dem Kanalende nicht mehr stehen) und die Antwort im Verlauf.
+        const P77 = "77. Gemma 4 ohne Öffner: der Denktext steht im Denkblock, nicht in der Antwort (Stream und Verlauf)";
+        const GEDANKE77 = "Ich wäge erst die Quellen ab und prüfe dann den Kontext.";
+        const stub77 = await startLlmStub({
+          models: ["google/gemma-4-e4b"],
+          antwort: () => ({ stuecke: [GEDANKE77.slice(0, 20), GEDANKE77.slice(20) + "<channel|>", "Die fertige ", "Antwort."], takt: 500 }),
+        });
+        try {
+          await setzeModell("google/gemma-4-e4b", stub77.url);
+          await cdp.evaluate(`void ${PL}.ask("Smoke 77: Gemma"); return true;`);
+          const live = await pollUntil<{ body: string; thought: string; hasBlock: boolean }>(cdp, `
+            const b = [...document.querySelectorAll(".koda-streaming .okit-stream-body")].pop();
+            if (!b || !(b.textContent || "").includes("fertige")) return null;
+            const r = [...document.querySelectorAll(".koda-streaming .okit-stream-reasoning")].pop();
+            return { body: (b.textContent || "").trim(), thought: r ? (r.textContent || "") : "", hasBlock: !!r };`, 20_000, 60).catch(() => null);
+          await pollUntil<boolean>(cdp, `return ${PL}.busy ? null : true;`, 20_000);
+          const letzte = await cdp.evaluate<string>(`const l = ${PL}.chatLog.filter((m) => m.role === "assistant"); return l[l.length - 1]?.content ?? "";`);
+          record(P77,
+            live !== null && live.hasBlock && live.thought.includes("wäge") && !live.body.includes("wäge") && !live.body.includes("channel")
+              && letzte === "Die fertige Antwort.",
+            live === null
+              ? `kein laufender Strom mit „fertige“ gesehen · Verlauf „${letzte.slice(0, 80)}“`
+              : `Strom-Anzeige „${live.body.slice(0, 60)}“ · Denkblock da: ${live.hasBlock} (${live.thought.slice(0, 30)}…) · Verlauf „${letzte.slice(0, 60)}“`);
+        } catch (error) { abbruch22(P77, error); } finally { await stub77.stop(); }
       }
     } finally {
       await cdp.evaluate(`
