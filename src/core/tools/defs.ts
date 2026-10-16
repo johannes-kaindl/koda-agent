@@ -180,7 +180,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "write_skill",
     description:
-      "Create or replace one of your own skills — a named Markdown instruction that changes how you behave in future conversations. Always requires the user's approval, even though skills live in the Koda folder. Use this when the user teaches you a rule that should keep applying; use save_memory for facts instead.",
+      "Create or replace one of your own skills — a named Markdown instruction that changes how you behave in future conversations. Always requires the user's approval, even though skills live in the Koda folder. Use this when the user teaches you a rule that should keep applying; use save_memory for facts instead. A skill contains only steps you can carry out with your own tools — no bash or python blocks as action steps, you cannot run them.",
     parameters: {
       type: "object",
       properties: {
@@ -189,7 +189,7 @@ export const TOOL_DEFS: ToolDef[] = [
           type: "string",
           description: "One sentence describing what will be different from now on. Shown to the user for approval.",
         },
-        body: { type: "string", description: "The instruction itself, in Markdown" },
+        body: { type: "string", description: "The instruction itself, in Markdown. Steps use only your own tools; no bash or python blocks as action steps." },
         // Kein `enum` (s. edit_active_note.mode oben) — writeSkill() in vault-tools.ts
         // validiert die Werte.
         mode: {

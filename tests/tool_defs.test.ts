@@ -120,6 +120,18 @@ describe("Werkzeug-Schemas ohne String-Enum (Punkt 5: google/gemma-4-31b scheite
   });
 });
 
+describe("write_skill nennt die Grenze der Ausführbarkeit", () => {
+  const skill = TOOL_DEFS.find((d) => d.name === "write_skill")!;
+  const body = (skill.parameters as { properties: { body: { description: string } } }).properties.body.description;
+  it("die Werkzeugbeschreibung verbietet Bash-/Python-Blöcke als Handlungsschritte", () => {
+    expect(skill.description).toMatch(/only steps you can carry out with your own tools/i);
+    expect(skill.description).toMatch(/no bash or python/i);
+  });
+  it("auch das body-Feld sagt es, dort schreibt das Modell den Skill", () => {
+    expect(body).toMatch(/no bash or python/i);
+  });
+});
+
 describe("read_note mit erweiterten Formaten", () => {
   it("read_note nennt die drei lesbaren Formate in seiner Beschreibung", () => {
     const def = TOOL_DEFS.find((d) => d.name === "read_note");
