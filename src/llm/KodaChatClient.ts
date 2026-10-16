@@ -116,6 +116,8 @@ export class KodaChatClient {
     // Aufgeloeste Bild-URLs (Pfad → Data-URL) fuer Tool-Ergebnisse mit Bild; ohne sie geht
     // jede Nachricht als reiner Text (siehe `toWireMessages`).
     imageUrls?: ReadonlyMap<string, string>,
+    // Gemma 4 ohne Öffner: der bisher gezeigte Antworttext war Denken und wird verworfen (obsidian-kit 0.60.3).
+    onContentReset?: () => void,
   ): Promise<LlmResult> {
     const result = await this.chat.complete({
       endpoint: { url: cfg.endpoint, ...(cfg.apiKey === "" ? {} : { apiKey: cfg.apiKey }) },
@@ -135,6 +137,7 @@ export class KodaChatClient {
       onToken,
       onReasoning,
       ...(onToolCallHead !== undefined ? { onToolCallHead } : {}),
+      ...(onContentReset !== undefined ? { onContentReset } : {}),
     });
     return toLlmResult(result);
   }

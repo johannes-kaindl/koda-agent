@@ -11,11 +11,17 @@ All notable changes to this project are documented here. The format follows
 - **`list_notes` can filter by frontmatter** (`where`: field, operator `=`, `!=`, `contains`, `exists` or `missing`, value; all conditions must match). "All open tasks of a project" is now one call. The count and the "N of M" line cover the filtered notes, the first lines name the filter, and an invalid filter is an error instead of a silently unfiltered list.
 - When vault-rag has paused semantic search, Koda says so ("Die semantische Suche ist pausiert") and keeps searching the full text, instead of looking like the search found nothing. The Vault context mode names the pause as well.
 
+### Fixed
+
+- **Gemma 4 in LM Studio: its thinking no longer shows up as the answer.** The model writes its thought into the answer text without an opening tag and ends it with a channel marker; Koda showed all of it as the reply, and a `<channel|>` stood in the middle. Now the thought goes into the collapsible thinking block, the bubble shows only the answer, and the saved history holds only the answer. Turning thinking off does not stop this model from thinking (LM Studio ignores the switch for it), the thought just lands in the block.
+
 ### Changed
 
+- **Arguments of tools from other plugins are checked against the tool's own schema** before the call (required fields, types, dates, whole numbers). A wrong call comes back to the model as a plain error naming the field, instead of reaching the plugin; a field the model made up is dropped. A schema the check cannot read completely is not half-checked: the plugin judges those calls alone, as before.
 - A tool of another plugin that Koda cannot offer because the name is already taken (by one of Koda's own tools or by another plugin that comes first) now gets a notice line in Settings → Model control → Tools, instead of just missing from the list.
 - `write_skill` tells the model that a skill contains only steps it can carry out with its own tools, no bash or python blocks as action steps.
 - Settings → Model control → Tools: the description fields show three lines and use the full row width.
+- Kit pins moved to obsidian-kit 0.61.0 and code-kit 0.28.0 (skipping obsidian-kit 0.60.2–0.60.3 and code-kit 0.27.2). Besides the Gemma fix above, nothing else is visible in Koda: the changes to endpoint resolution, the thinking switch's per-backend note, the index-model lookup and the Claude profile concern parts of the kit Koda does not use. `tsconfig.json` now has `lib` ES2022, as the vendored sampling profiles need `Object.hasOwn`.
 
 ## [0.25.0] — 2026-10-14
 

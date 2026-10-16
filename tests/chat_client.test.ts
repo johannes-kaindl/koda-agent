@@ -61,6 +61,25 @@ describe("KodaChatClient.complete", () => {
     expect(reasoning.join("")).toBe("weil");
   });
 
+  it("Gemma 4 ohne Öffner: das Denken geht in den reasoning-Kanal, onContentReset leert die Anzeige", async () => {
+    const client = new KodaChatClient(transportOf([
+      line({ choices: [{ delta: { content: "Ich wäge " } }] }),
+      line({ choices: [{ delta: { content: "ab.<channel|>Die Antwort." } }] }) + "data: [DONE]\n",
+    ]), 1000, fakeClock);
+    const shown: string[] = [];
+    const reasoning: string[] = [];
+    let resets = 0;
+    const r = await client.complete(
+      { ...cfg, model: "google/gemma-4-e4b" }, msgs, [],
+      (t) => shown.push(t), (t) => reasoning.push(t), new AbortController().signal,
+      undefined, undefined, () => { resets++; shown.length = 0; },
+    );
+    expect(r).toMatchObject({ ok: true, content: "Die Antwort." });
+    expect(resets).toBe(1);
+    expect(shown.join("")).toBe("Die Antwort.");
+    expect(reasoning.join("")).toContain("Ich wäge");
+  });
+
   it("uebersetzt HTTP-Fehlerstatus in kind http mit chatErrorMessage-Detail", async () => {
     const client = new KodaChatClient(transportOf(['{"detail":"Not authenticated"}'], 401), 1000, fakeClock);
     const r = await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);

@@ -107,3 +107,47 @@ describe("VaultTools.run — Route zu einem Anbieter-Werkzeug", () => {
     expect(await t.run("semantic_search", { query: "x" })).toEqual({ ok: false, error: "kaputt" });
   });
 });
+
+describe("VaultTools.run — Argumente eines Anbieter-Werkzeugs werden gegen sein Schema geprueft", () => {
+  const schema = {
+    type: "object",
+    properties: { title: { type: "string", minLength: 1 }, day: { type: "string", format: "date" }, count: { type: "integer", minimum: 1 } },
+    required: ["title"],
+  };
+  const api = (spy: (a: unknown) => void, parameters: object = schema): ToolProviderApi => ({
+    version: 1,
+    tools: () => [{ name: "create_event", description: "d", parameters, writes: true }],
+    executeTool: async (_n, a) => { spy(a); return { ok: true, content: "angelegt" }; },
+  });
+
+  it("ein ungueltiges Argument erreicht den Anbieter nicht und kommt als Klartext-Fehler zurueck", async () => {
+    const spy = vi.fn();
+    const r = await tools({ provider: () => api(spy) }).run("create_event", { title: "x", day: "2026-02-31" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) { expect(r.error).toContain("create_event"); expect(r.error).toContain("day"); }
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("ein fehlendes Pflichtfeld und ein Typfehler werden zusammen genannt", async () => {
+    const spy = vi.fn();
+    const r = await tools({ provider: () => api(spy) }).run("create_event", { count: "3" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) { expect(r.error).toContain("title"); expect(r.error).toContain("count"); }
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("gueltige Argumente gehen durch; ein vom Modell erfundenes Zusatzfeld wird nicht weitergereicht", async () => {
+    const spy = vi.fn();
+    const r = await tools({ provider: () => api(spy) }).run("create_event", { title: "x", erfunden: 1 });
+    expect(r).toEqual({ ok: true, content: "angelegt" });
+    expect(spy).toHaveBeenCalledWith({ title: "x" });
+  });
+
+  it("ein Schema ausserhalb dessen, was die Pruefung versteht, wird nicht halb geprueft, sondern durchgereicht", async () => {
+    const spy = vi.fn();
+    const frei = { type: "object", properties: { x: { type: "string", pattern: "^a" } }, required: ["x"] };
+    const r = await tools({ provider: () => api(spy, frei) }).run("create_event", { x: "b" });
+    expect(r).toEqual({ ok: true, content: "angelegt" });
+    expect(spy).toHaveBeenCalledWith({ x: "b" });
+  });
+});

@@ -24,6 +24,9 @@ export interface LoopLlm {
     // die UI kann daraus "schreibt Tool-Aufruf <name> …" zeigen, statt in der gepufferten
     // Stille (KodaChatClient TOOL_CALL_IDLE_TIMEOUT_MS) ohne Lebenszeichen dazustehen.
     onToolCallHead?: (name: string) => void,
+    // Optional: Gemma 4 auf LM Studio schreibt das Denken ohne Öffner in `content`; erst das Kanalende verrät es.
+    // Der Aufruf heißt: den bisher gezeigten Antworttext verwerfen, das Denken kommt über `onReasoning`.
+    onContentReset?: () => void,
   ): Promise<LlmResult>;
 }
 
@@ -92,8 +95,9 @@ export async function runAgent(
   onReasoning: (t: string) => void,
   onEvent: (e: AgentEvent) => void,
   signal: AbortSignal,
+  onContentReset?: () => void,
 ): Promise<LogEntry[]> {
-  const appended = await runAgentImpl(deps, history, onToken, onReasoning, onEvent, signal);
+  const appended = await runAgentImpl(deps, history, onToken, onReasoning, onEvent, signal, onContentReset);
   return appended.map((e) => {
     if (isChatMessage(e) && e.reasoning !== undefined) {
       const { reasoning: _reasoning, ...rest } = e;
@@ -110,6 +114,7 @@ async function runAgentImpl(
   onReasoning: (t: string) => void,
   onEvent: (e: AgentEvent) => void,
   signal: AbortSignal,
+  onContentReset?: () => void,
 ): Promise<LogEntry[]> {
   const appended: LogEntry[] = [];
   // Geheilte Nachrichten AUS dem uebergebenen Verlauf: der Aufrufer besitzt ihn, der Loop
@@ -199,6 +204,7 @@ async function runAgentImpl(
     const r = await deps.llm.complete(
       projectForModel(entries()), onToken, onReasoning, signal,
       (name) => onEvent({ kind: "tool-call-head", name }),
+      onContentReset,
     );
 
     if (!r.ok) {

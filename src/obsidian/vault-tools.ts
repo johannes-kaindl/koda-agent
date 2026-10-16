@@ -18,6 +18,7 @@ import {
   collectFolderNotes, pickFields, formatListResult, suggestFolders, formatEmptyFolder,
   collectSubfolders, folderExists,
 } from "../core/tools/list";
+import { validateInput, unsupportedSchemaKeywords, type ObjectSchema } from "../vendor/kit/validate-input";
 import { parseWhere, matchesWhere, describeWhere } from "../core/tools/where";
 import { collectFolderTree, renderTreeBlock } from "../core/tools/tree";
 import { decodeByteTokens } from "../core/tools/decode-byte-tokens";
@@ -190,8 +191,28 @@ export class VaultTools implements ToolRunner {
     if (erlaubt !== undefined && !erlaubt.has(name)) {
       return { ok: false, error: `Werkzeug abgeschaltet: ${name} — der Nutzer hat es in den Einstellungen deaktiviert. Nutze ein anderes.` };
     }
-    const r = await callProviderTool(api, name, args, { lang: this.opts.lang?.(), confirm: this.opts.confirmProvider });
+    // Der Vertrag (tool-provider.ts) legt die Pruefung der Argumente gegen `parameters` in die Hand des Wirts.
+    // Ein Schema ausserhalb der Teilmenge, die `validateInput` kennt, wird NICHT halb geprueft (es meldete
+    // gueltige Aufrufe als Fehler): dann entscheidet der Anbieter allein, wie bisher.
+    const lang = this.opts.lang?.();
+    let call = args;
+    const schema = this.schemaOf(api, name, lang);
+    if (schema !== null && unsupportedSchemaKeywords(schema).length === 0) {
+      const v = validateInput(schema as ObjectSchema, args, { unknownFields: "ignore" });
+      if (!v.ok) return { ok: false, error: `Ungueltige Argumente fuer ${name}: ${v.errors.join("; ")}` };
+      call = v.value;
+    }
+    const r = await callProviderTool(api, name, call, { lang, confirm: this.opts.confirmProvider });
     return outcomeFromProvider(r);
+  }
+
+  /** Das Schema des Werkzeugs, frisch beim Anbieter gelesen; `null`, wenn er es nicht (mehr) nennt oder wirft. */
+  private schemaOf(api: ToolProviderApi, name: string, lang: "de" | "en" | undefined): object | null {
+    try {
+      return api.tools(lang === undefined ? undefined : { lang }).find((d) => d.name === name)?.parameters ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async run(name: string, args: unknown): Promise<ToolOutcome> {

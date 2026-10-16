@@ -896,7 +896,7 @@ export default class KodaPlugin extends Plugin {
 
       const imageUrls = createImageUrlResolver(this.app, () => s.imageMaxKb);
       const llm: LoopLlm = {
-        complete: async (messages, onToken, onReasoning, signal, onToolCallHead) => {
+        complete: async (messages, onToken, onReasoning, signal, onToolCallHead, onContentReset) => {
           const urls = await imageUrls(messages);
           return withFailover(
             this.resolver,
@@ -913,7 +913,7 @@ export default class KodaPlugin extends Plugin {
                 model: resolved.model,
                 suppressThinking: s.suppressThinking,
               };
-              return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal, onToolCallHead, urls).then((r) => {
+              return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal, onToolCallHead, urls, onContentReset).then((r) => {
                 void this.checkContextWindow(ep, cfg.model, r.ok ? r.model : undefined);
                 this.reportToLab({
                   feature: this.labFeature(selection),
@@ -1031,6 +1031,7 @@ export default class KodaPlugin extends Plugin {
           if (e.kind === "vision-fallback") this.lastNotice = { text: t("view.visionFallback", e.paths.join(", ")), kind: "neutral" };
         },
         this.abort.signal,
+        () => { for (const v of this.views()) v.resetStreamContent(); },
       );
 
       this.chatLog.push(...appended);

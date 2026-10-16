@@ -20,6 +20,24 @@ const okTools: ToolRunner = {
 };
 
 describe("runAgent", () => {
+  it("reicht onContentReset an den Modellaufruf durch (Gemma-Denkkanal)", async () => {
+    let seen: (() => void) | undefined;
+    const llm: LoopLlm = {
+      async complete(_m, _t, _r, _s, _h, onContentReset) {
+        seen = onContentReset;
+        onContentReset?.();
+        return { ok: true, content: "Antwort", toolCalls: [] };
+      },
+    };
+    let resets = 0;
+    await runAgent(
+      { llm, tools: okTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, () => {}, sig(), () => { resets++; },
+    );
+    expect(seen).toBeTypeOf("function");
+    expect(resets).toBe(1);
+  });
+
   it("ohne Tool-Calls: final-Event + eine assistant-Nachricht", async () => {
     const events: string[] = [];
     const out = msgsOf(await runAgent(

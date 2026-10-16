@@ -462,6 +462,11 @@ export class KodaView extends ItemView {
     this.streamWriter?.push(text);
   }
 
+  /** Gemma 4 ohne Öffner: was als Antwort gezeigt wurde, war Denken. Anzeige leeren, das Denken steht im Denkblock. */
+  resetStreamContent(): void {
+    this.streamWriter?.resetContent();
+  }
+
   streamReasoning(text: string): void {
     this.ensureStreamArea().appendReasoning(text);
   }
