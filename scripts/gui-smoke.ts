@@ -3882,6 +3882,7 @@ async function main(): Promise<void> {
             await cdp.evaluate(`
               app.plugins.plugins[${JSON.stringify(PROV76)}] = { api: { version: 1, tools: () => [
                 { name: "smoke76_echo", description: "Smoke 76 Beschreibung", parameters: { type: "object", properties: {}, required: [] }, writes: false },
+                { name: "read_note", description: "Kollision 76", parameters: { type: "object", properties: {}, required: [] }, writes: false },
               ], executeTool: async () => ({ ok: true, content: "x" }) } };
               app.plugins.plugins[${JSON.stringify(ALT76)}] = { api: { tools: () => [], executeTool: async () => ({ ok: true, content: "x" }) } };
               app.setting.open(); app.setting.openTabById(${JSON.stringify(PLUGIN_ID)});
@@ -3892,7 +3893,10 @@ async function main(): Promise<void> {
             if (settings76 === null) unmeasured(P76, "Einstellungsfenster nicht gefunden");
             else {
               await pollUntil(settings76, `return document.querySelector('.koda-tool-row[data-tool="smoke76_echo"]') ? true : null;`, 8000);
-              const m76 = await settings76.evaluate<{ gruppe: string; zeile: boolean; platzhalter: string; warn: string }>(`
+              const m76 = await settings76.evaluate<{ gruppe: string; zeile: boolean; platzhalter: string; warn: string; linksEigen: number; linksFremd: number; breiteFremd: number; hoeheOk: boolean }>(`
+                const eigen = document.querySelector('.koda-tool-list > .koda-tool-row textarea');
+                const fremd = document.querySelector('.koda-tool-row[data-tool="smoke76_echo"] textarea');
+                const lh = fremd ? parseFloat(getComputedStyle(fremd).lineHeight) || 20 : 20;
                 const z = document.querySelector('.koda-tool-row[data-tool="smoke76_echo"]');
                 const g = z ? z.closest(".koda-tool-group") : null;
                 return {
@@ -3900,13 +3904,18 @@ async function main(): Promise<void> {
                   zeile: !!z,
                   platzhalter: z ? (z.querySelector("textarea")?.getAttribute("placeholder") ?? "") : "",
                   warn: [...document.querySelectorAll(".koda-tool-group.koda-warn")].map((e) => e.textContent).join(" | "),
+                  linksEigen: eigen ? eigen.getBoundingClientRect().left : -1,
+                  linksFremd: fremd ? fremd.getBoundingClientRect().left : -2,
+                  breiteFremd: fremd ? fremd.getBoundingClientRect().width : -1,
+                  hoeheOk: !!fremd && fremd.getBoundingClientRect().height >= lh * 3 - 1,
                 };
               `);
               await settings76.evaluate(`document.querySelector('.koda-tool-row[data-tool="smoke76_echo"] .checkbox-container').click(); return true;`);
               await pause22(900);
               const aus76 = await cdp.evaluate<boolean>(`return ${PL}.settings.toolsDisabled.includes("smoke76_echo");`);
-              record(P76, m76.zeile && m76.gruppe.includes(PROV76) && m76.platzhalter === "Smoke 76 Beschreibung" && m76.warn.includes(ALT76) && aus76,
-                `Gruppe „${m76.gruppe}“ · Zeile da: ${m76.zeile} · Platzhalter „${m76.platzhalter}“ · Ablehnung: „${m76.warn.slice(0, 120)}“ · nach dem Schalter in toolsDisabled: ${aus76}`);
+              record(P76, m76.zeile && m76.gruppe.includes(PROV76) && m76.platzhalter === "Smoke 76 Beschreibung" && m76.warn.includes(ALT76) && m76.warn.includes(`${PROV76}: `) && /read_note/.test(m76.warn) && /not offered to Koda/.test(m76.warn) && aus76
+                && Math.abs(m76.linksEigen - m76.linksFremd) <= 2 && m76.breiteFremd > 200 && m76.hoeheOk,
+                `Gruppe „${m76.gruppe}“ · Zeile da: ${m76.zeile} · Platzhalter „${m76.platzhalter}“ · Ablehnung und Kollision: „${m76.warn.slice(0, 400)}“ · nach dem Schalter in toolsDisabled: ${aus76} · Textarea links eigen ${Math.round(m76.linksEigen)} / fremd ${Math.round(m76.linksFremd)} px · Breite ${Math.round(m76.breiteFremd)} px (soll > 200) · Höhe für 3 Zeilen: ${m76.hoeheOk}`);
             }
           }
         } catch (error) { abbruch22(P76, error); } finally {

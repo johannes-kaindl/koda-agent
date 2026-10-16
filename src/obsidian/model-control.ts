@@ -157,7 +157,7 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
     controls.addTextArea((ta) => {
       textarea = ta;
       ta.setPlaceholder(row_.placeholder).setValue(row_.own);
-      ta.inputEl.rows = 2;
+      ta.inputEl.rows = 3;
       // Uebernahme bei blur, nicht bei onChange — sonst landet jeder Zwischenstand in der
       // data.json (dieselbe Regel wie beim Endpunkt-Zeilen-Editor, UI-STANDARD §8).
       ta.inputEl.addEventListener("blur", () => {
@@ -187,7 +187,7 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
   // Anbieter NICHT montiert wird, steht daneben (sonst fehlt er still, Welle 22).
   const fremd = ctx.providers;
   if (fremd !== undefined) {
-    const { groups, missing } = providerToolGroups(ctx.settings, fremd.offers, HOST_TOOL_NAMES);
+    const { groups, missing, collisions } = providerToolGroups(ctx.settings, fremd.offers, HOST_TOOL_NAMES);
     const gruppe = (titel: string, cls: string): HTMLElement => {
       const g = host.createDiv({ cls: `koda-tool-group ${cls}` });
       g.createDiv({ cls: "koda-tool-group-title", text: titel });
@@ -200,6 +200,15 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
     for (const r of fremd.rejections) {
       const el = host.createDiv({ cls: "koda-tool-group koda-warn is-warning" });
       const text = t("settings.tools.rejected", r.id, rejectionText(r.rejection));
+      setIcon(el.createSpan({ cls: "koda-warn-icon" }), "alert-triangle");
+      el.createSpan({ text });
+      el.setAttribute("aria-label", text);
+    }
+    for (const c of collisions) {
+      const text = c.with === null
+        ? t("settings.tools.collisionHost", c.id, c.name)
+        : t("settings.tools.collisionPlugin", c.id, c.name, c.with);
+      const el = host.createDiv({ cls: "koda-tool-group koda-warn is-warning" });
       setIcon(el.createSpan({ cls: "koda-warn-icon" }), "alert-triangle");
       el.createSpan({ text });
       el.setAttribute("aria-label", text);

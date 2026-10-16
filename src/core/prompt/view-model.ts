@@ -85,20 +85,27 @@ export function toolRows(
  *  mehr liefert (Plugin deaktiviert): sie bleiben als ausgegraute Zeile sichtbar, mit dem
  *  Schalter — sonst waere eine Einstellung ohne Ort, an dem man sie zuruecknimmt. */
 export interface ProviderToolGroup { id: string; rows: ToolRowModel[] }
+/** Ein Werkzeug, das nicht angeboten wird, weil sein Name schon vergeben ist. `with`: die Id des
+ *  Anbieters, der den Namen zuerst belegt hat; `null` heisst, ein eigenes Werkzeug Kodas. */
+export interface ProviderToolCollision { id: string; name: string; with: string | null }
 
 export function providerToolGroups(
   s: { toolsDisabled: string[]; toolDescriptions: Record<string, string> },
   offers: ReadonlyArray<{ id: string; tools: ReadonlyArray<{ name: string; description: string }> }>,
   hostNames: ReadonlySet<string>,
-): { groups: ProviderToolGroup[]; missing: ToolRowModel[] } {
+): { groups: ProviderToolGroup[]; missing: ToolRowModel[]; collisions: ProviderToolCollision[] } {
   const aus = new Set(s.toolsDisabled);
   const gesehen = new Set<string>();
+  const von = new Map<string, string>();
+  const collisions: ProviderToolCollision[] = [];
   const groups: ProviderToolGroup[] = [];
   for (const o of offers) {
     const rows: ToolRowModel[] = [];
     for (const t of o.tools) {
-      if (hostNames.has(t.name) || gesehen.has(t.name)) continue;
+      if (hostNames.has(t.name)) { collisions.push({ id: o.id, name: t.name, with: null }); continue; }
+      if (gesehen.has(t.name)) { collisions.push({ id: o.id, name: t.name, with: von.get(t.name) ?? null }); continue; }
       gesehen.add(t.name);
+      von.set(t.name, o.id);
       rows.push({ name: t.name, placeholder: t.description, own: s.toolDescriptions[t.name] ?? "", enabled: !aus.has(t.name), unavailable: false, needs: null });
     }
     if (rows.length > 0) groups.push({ id: o.id, rows });
@@ -108,5 +115,5 @@ export function providerToolGroups(
   const missing = namen.map((name): ToolRowModel => ({
     name, placeholder: "", own: s.toolDescriptions[name] ?? "", enabled: !aus.has(name), unavailable: true, needs: "plugin-missing",
   }));
-  return { groups, missing };
+  return { groups, missing, collisions };
 }

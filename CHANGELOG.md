@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`list_notes` can filter by frontmatter** (`where`: field, operator `=`, `!=`, `contains`, `exists` or `missing`, value; all conditions must match). "All open tasks of a project" is now one call. The count and the "N of M" line cover the filtered notes, the first lines name the filter, and an invalid filter is an error instead of a silently unfiltered list.
+- When vault-rag has paused semantic search, Koda says so ("Die semantische Suche ist pausiert") and keeps searching the full text, instead of looking like the search found nothing. The Vault context mode names the pause as well.
+
+### Changed
+
+- A tool of another plugin that Koda cannot offer because the name is already taken (by one of Koda's own tools or by another plugin that comes first) now gets a notice line in Settings → Model control → Tools, instead of just missing from the list.
+- `write_skill` tells the model that a skill contains only steps it can carry out with its own tools, no bash or python blocks as action steps.
+- Settings → Model control → Tools: the description fields show three lines and use the full row width.
+
 ## [0.25.0] — 2026-10-14
 
 ### Added
