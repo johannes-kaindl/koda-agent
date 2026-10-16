@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.26.0] — 2026-10-16
+
 ### Added
 
 - **`list_notes` can filter by frontmatter** (`where`: field, operator `=`, `!=`, `contains`, `exists` or `missing`, value; all conditions must match). "All open tasks of a project" is now one call. The count and the "N of M" line cover the filtered notes, the first lines name the filter, and an invalid filter is an error instead of a silently unfiltered list.
