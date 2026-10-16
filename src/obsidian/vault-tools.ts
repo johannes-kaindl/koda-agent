@@ -18,7 +18,7 @@ import {
   collectFolderNotes, pickFields, formatListResult, suggestFolders, formatEmptyFolder,
   collectSubfolders, folderExists,
 } from "../core/tools/list";
-import { validateInput, unsupportedSchemaKeywords, type ObjectSchema } from "../vendor/kit/validate-input";
+import { validateInput, unsupportedSchemaKeywords } from "../vendor/kit/validate-input";
 import { parseWhere, matchesWhere, describeWhere } from "../core/tools/where";
 import { collectFolderTree, renderTreeBlock } from "../core/tools/tree";
 import { decodeByteTokens } from "../core/tools/decode-byte-tokens";
@@ -198,7 +198,7 @@ export class VaultTools implements ToolRunner {
     let call = args;
     const schema = this.schemaOf(api, name, lang);
     if (schema !== null && unsupportedSchemaKeywords(schema).length === 0) {
-      const v = validateInput(schema as ObjectSchema, args, { unknownFields: "ignore" });
+      const v = validateInput(schema, args, { unknownFields: "ignore" });
       if (!v.ok) return { ok: false, error: `Ungueltige Argumente fuer ${name}: ${v.errors.join("; ")}` };
       call = v.value;
     }
