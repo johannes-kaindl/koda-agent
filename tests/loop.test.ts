@@ -326,6 +326,32 @@ describe("runAgent", () => {
     expect(persistedAssistant).not.toHaveProperty("reasoning");
   });
 
+  it("das Denken bleibt als Anzeige-Feld thinking an der Antwort und an der Tool-Call-Runde, reasoning ist weg", async () => {
+    let n = 0;
+    const llm: LoopLlm = {
+      complete: async () => (++n === 1
+        ? { ok: true, content: "", reasoning: "Erst suchen.", toolCalls: [{ id: "c1", name: "search_notes", arguments: '{"query":"x"}' }] }
+        : { ok: true, content: "Fertig", reasoning: "Jetzt antworten.", toolCalls: [] }),
+    };
+    const out = msgsOf(await runAgent(
+      { llm, tools: okTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, () => {}, sig(),
+    ));
+    const runde = out.find((m) => (m.toolCalls?.length ?? 0) > 0);
+    const antwort = out[out.length - 1];
+    expect(runde?.thinking).toBe("Erst suchen.");
+    expect(antwort?.thinking).toBe("Jetzt antworten.");
+    for (const m of out) expect(m).not.toHaveProperty("reasoning");
+  });
+
+  it("ohne Denken kein thinking-Feld", async () => {
+    const out = msgsOf(await runAgent(
+      { llm: scripted([{ ok: true, content: "Fertig", toolCalls: [] }]), tools: okTools, maxRounds: 8, textFallback: false },
+      user, () => {}, () => {}, () => {}, sig(),
+    ));
+    expect(out[0]).not.toHaveProperty("thinking");
+  });
+
   it("ohne Reasoning: kein reasoning-Feld auf der Tool-Call-Nachricht", async () => {
     const seen: ChatMessage[][] = [];
     const llm: LoopLlm = {

@@ -73,6 +73,13 @@ describe("skillHintInHistory", () => {
   });
 });
 
+describe("saveThinking", () => {
+  it("ist standardmaessig an und uebernimmt ein ausdrueckliches aus", () => {
+    expect(validateKodaSettings({}).saveThinking).toBe(true);
+    expect(validateKodaSettings({ saveThinking: false }).saveThinking).toBe(false);
+  });
+});
+
 describe("listNotesMaxRows", () => {
   it("hat 150 als Default", () => {
     expect(validateKodaSettings({}).listNotesMaxRows).toBe(150);

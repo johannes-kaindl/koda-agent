@@ -88,9 +88,9 @@ export interface AgentDeps {
  *  Pure: kennt nur die Ports. Rueckgabe sind die NEU erzeugten Eintraege — Nachrichten
  *  UND Verdichtungs-Marken im selben Kanal; der Aufrufer haengt sie an seine Session
  *  und persistiert. Vor jedem Modellaufruf wird der Verlauf projiziert und bei Bedarf
- *  verdichtet (Spec § Architektur). Duennes Aeusseres um `runAgentImpl`: entfernt das
- *  `reasoning`-Feld (s. types.ts), bevor die Nachrichten den Aufrufer erreichen — es ist
- *  Loop-lokal und darf nicht in die persistierte Session gelangen. */
+ *  verdichtet (Spec § Architektur). Duennes Aeusseres um `runAgentImpl`: macht das
+ *  Loop-lokale `reasoning` (s. types.ts) zum Anzeige-Feld `thinking`, bevor die Nachrichten den Aufrufer erreichen —
+ *  `reasoning` selbst darf nicht in die persistierte Session gelangen. */
 export async function runAgent(
   deps: AgentDeps,
   history: LogEntry[],
@@ -101,10 +101,12 @@ export async function runAgent(
   onContentReset?: () => void,
 ): Promise<LogEntry[]> {
   const appended = await runAgentImpl(deps, history, onToken, onReasoning, onEvent, signal, onContentReset);
+  // `reasoning` ist Loop-lokal und wird gestrichen; sein Text bleibt als Anzeige-Feld `thinking` an der Nachricht, damit
+  // der Block nach dem Antwortende aufklappbar bleibt. Der Draht sieht `thinking` nie.
   return appended.map((e) => {
     if (isChatMessage(e) && e.reasoning !== undefined) {
-      const { reasoning: _reasoning, ...rest } = e;
-      return rest;
+      const { reasoning, ...rest } = e;
+      return reasoning !== "" ? { ...rest, thinking: reasoning } : rest;
     }
     return e;
   });
@@ -251,7 +253,11 @@ async function runAgentImpl(
     }
 
     if (calls.length === 0) {
-      appended.push({ role: "assistant", content: r.content });
+      appended.push({
+        role: "assistant",
+        content: r.content,
+        ...(r.reasoning !== undefined && r.reasoning !== "" ? { reasoning: r.reasoning } : {}),
+      });
       onEvent({ kind: "final", text: r.content, truncated: r.finishReason === "length" });
       return appended;
     }

@@ -17,6 +17,7 @@ import { attachTextareaSuggest, type TextareaSuggest } from "../vendor/kit-obsid
 import { matchByQuery } from "../vendor/kit/slash-query";
 import { ContextPanel } from "./context-panel";
 import { AbilitiesPanel } from "./abilities-panel";
+import { buildThinkingBlock } from "./thinking-block";
 import { ArbeitNameModal } from "./arbeit-name-modal";
 import type KodaPlugin from "../main";
 
@@ -423,7 +424,9 @@ export class KodaView extends ItemView {
       this.logEl.createDiv({ cls: "koda-msg koda-notice koda-skills", text: this.plugin.skillNotice });
     }
     const pending: Promise<void>[] = [];
-    const assistantBubble = (content: string): void => {
+    const assistantBubble = (content: string, thinking?: string): void => {
+      // Das Denken steht VOR dem Antworttext, zugeklappt (Entscheidung 2026-10-17); es ist ein Anzeige-Feld und geht nie ans Modell.
+      if (thinking !== undefined && thinking !== "") buildThinkingBlock(this.logEl, thinking);
       const el = this.logEl.createDiv({ cls: "koda-msg koda-assistant" });
       pending.push(this.renderMarkdownInto(el, content));
     };
@@ -456,9 +459,10 @@ export class KodaView extends ItemView {
       } else if (m.role === "assistant") {
         if (m.toolCalls && m.toolCalls.length > 0) {
           toolNames = new Map(m.toolCalls.map((c) => [c.id, c.name]));
-          if (m.content !== "") assistantBubble(m.content);
+          if (m.content !== "") assistantBubble(m.content, m.thinking);
+          else if (m.thinking !== undefined && m.thinking !== "") buildThinkingBlock(this.logEl, m.thinking);
         } else if (m.content !== "") {
-          assistantBubble(m.content);
+          assistantBubble(m.content, m.thinking);
           if (offeneQuellen !== null) {
             const chips = sourceChips(offeneQuellen);
             if (chips.length > 0) {
@@ -516,7 +520,7 @@ export class KodaView extends ItemView {
   private ensureStreamArea(): StreamArea {
     if (this.streamArea !== null) return this.streamArea;
     const area = buildStreamArea(this.logEl, {
-      strings: { reasoning: t("view.thinking") },
+      strings: { reasoning: t("view.thinking"), copyReasoning: t("view.thinkingCopy"), copiedReasoning: t("view.thinkingCopied") },
       // `opts.cls` geht 1:1 in `rootEl.addClass()` — Obsidians `addClass` ist EIN Token
       // (DOMTokenList.add), kein klassenweiter String. Mehrere Klassen deshalb per
       // `addClasses` nachtragen statt sie hier mit Leerzeichen zu bündeln (das wirft zur

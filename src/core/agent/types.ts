@@ -26,6 +26,11 @@ export interface ChatMessage {
    *  Vorrunde nicht zurueckgeschickt wird — nur ueber die naechste(n) Folgerunde(n) desselben
    *  Laufs hinweg relevant, nicht ueber Sitzungsgrenzen. */
   reasoning?: string;
+  /** Das Denken dieser Antwort, nur zum ANZEIGEN: der aufklappbare Block nach dem Antwortende. PERSISTIERT mit der
+   *  Sitzung (Entscheidung Johannes 2026-10-17: aufklappbar, mit der Sitzung gespeichert, beim Teilen und Exportieren
+   *  standardmaessig weggelassen). Gegenstueck zu `reasoning`, das Loop-lokal bleibt: `thinking` geht NIE auf den Draht
+   *  (`toWireMessages` liest nur `reasoning`), zaehlt in keiner Schaetzung und wird von keiner Verdichtung angefasst. */
+  thinking?: string;
   /** Bilder, die an diesem Tool-Ergebnis haengen (`read_image` im Vision-Modus). PERSISTIERT,
    *  aber nur als Vault-PFAD — nie als Base64 in der JSONL-Sitzung. Erst `toWireMessages`
    *  macht daraus `image_url`-Parts, am Transport-Rand. Die Projektion entfernt das Feld

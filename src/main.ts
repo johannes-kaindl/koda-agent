@@ -1312,8 +1312,13 @@ export default class KodaPlugin extends Plugin {
         () => { for (const v of this.views()) v.resetStreamContent(); },
       );
 
-      this.chatLog.push(...appended);
-      await this.store.appendMessages(appended);
+      // `saveThinking` aus: das Denken verschwindet mit dem Antwortende (Anzeige-Feld, nie am Draht).
+      const toStore = s.saveThinking ? appended : appended.map((e) => {
+        if ("thinking" in e) { const { thinking: _gone, ...rest } = e; return rest; }
+        return e;
+      });
+      this.chatLog.push(...toStore);
+      await this.store.appendMessages(toStore);
       if (failure !== null) await this.recordFailure(failure);
     } catch (e) {
       const message = e instanceof Error ? e.message : "unknown error";

@@ -119,6 +119,8 @@ export interface KodaSettings {
   /** Ein per `load_skill` geholter Skill-Text, der inzwischen im System-Prompt steht (oder abgeschaltet ist), geht im
    *  Verlauf ans Modell als Hinweis statt als zweiter Text (Spec Faehigkeiten § 7). Aus: wie bisher. */
   skillHintInHistory: boolean;
+  /** Das Denken einer Antwort mit dem Gespraech speichern (aufklappbarer Block nach der Antwort). Aus: es verschwindet mit dem Antwortende. */
+  saveThinking: boolean;
   listNotesMaxRows: number;
   imageMaxKb: number;
   textFallback: boolean;
@@ -166,6 +168,7 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   timeoutSec: 300,
   skillBudgetChars: 6000,
   skillHintInHistory: true,
+  saveThinking: true,
   listNotesMaxRows: 150,
   imageMaxKb: 4096,
   textFallback: false, // Default laut koda-lab-Befund setzen (Vault-Cockpit `_Intern/LAB.md`)

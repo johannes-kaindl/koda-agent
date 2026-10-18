@@ -40,6 +40,8 @@ export function parseLines(text: string): LogEntry[] {
       if (typeof parsed.role === "string" && typeof parsed.content === "string") {
         // Ein kaputtes Kontextfeld kostet das Feld, nicht die Nachricht (Idiom wie bei der Marke).
         if ("context" in parsed && !isContextAttachment(parsed.context)) delete parsed.context;
+        // Dasselbe fuer das Denken: ein kaputtes Anzeige-Feld kostet das Feld, nicht die Antwort.
+        if ("thinking" in parsed && typeof parsed.thinking !== "string") delete parsed.thinking;
         out.push(parsed as unknown as LogEntry);
       }
     } catch {

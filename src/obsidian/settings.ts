@@ -173,6 +173,11 @@ export class KodaSettingsTab extends PluginSettingTab {
         control: { type: "toggle", key: "skillHintInHistory" },
       },
       {
+        name: t("settings.saveThinking"),
+        desc: t("settings.saveThinking.desc"),
+        control: { type: "toggle", key: "saveThinking" },
+      },
+      {
         name: t("settings.listRows"),
         desc: t("settings.listRows.desc"),
         control: {
