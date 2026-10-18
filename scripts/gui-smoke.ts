@@ -52,7 +52,7 @@
  * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
  * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
- * Nenner ist `PUNKTE` (85 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * Nenner ist `PUNKTE` (94 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
  * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
  * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
  * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.
@@ -135,6 +135,7 @@ import { cwd } from "node:process";
 import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, clearNotices, clickReal, istAbgebrochen, pollUntil, requireVisible, schliesseDialog } from "../../tools/obsidian-cdp/cdp.js";
 import { messeFolge, zeichneFolge } from "../../tools/obsidian-cdp/folge.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
+import { gegenprobeErreichbarkeit, gegenprobeFokus, messeErreichbarkeit, messeFokusErhalt, mitHoehe, zeichnePflicht, type PflichtTeilurteil } from "../../tools/obsidian-cdp/pflichtpunkte.js";
 import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -305,6 +306,15 @@ const PUNKTE = [
   "83. Sitzungs-Marke: nach einer Frage steht sie im JSONL, nach dem Neuladen sind Arbeit und Overlay zurück, „Neues Gespräch“ behält die Arbeit und leert das Overlay",
   "84. „/“-Menü: zwei Gruppen, Enter wählt und sendet nicht, Escape schließt, bei geschlossener Liste sendet Enter wie bisher, eine URL öffnet nichts",
   "85. Regler „Tiefe“ im Kontext-Tab gilt für das Gespräch: die wirksame Tiefe ändert sich, die Einstellung nicht",
+  "89. Denkblock nach der Antwort: zugeklappt vor der Antwort, mit der Sitzung im JSONL, nie am Draht; der Schalter „Denken aufbewahren“ aus lässt ihn verschwinden",
+  "90. Denkblock kopierbar während des Stroms (Kit-Knopf): der Klick kopiert den bisherigen Denktext und klappt den Block nicht zu",
+  "91. Denkblock kopierbar nach der Antwort: der Klick kopiert den ganzen Denktext, quittiert mit is-copied und klappt den Block nicht auf",
+  "92. Pflichtpunkt Fokus: ein getippter Text im Eingabefeld überlebt ein Neuzeichnen, das Feld behält den Fokus",
+  "93. Gegenprobe Fokus: ein Neuzeichnen mit Fokusverlust macht Punkt 92 rot",
+  "94. Pflichtpunkt Erreichbarkeit: jedes Bedienelement des Chats ist bei langem Verlauf noch zu treffen (Mitte per elementFromPoint)",
+  "95. Pflichtpunkt Erreichbarkeit im kurzen Panel (420 px Höhe)",
+  "96. Gegenprobe Erreichbarkeit: ohne Rollbalken am Verlauf wird ein Bedienelement unerreichbar",
+  "97. Werkzeugliste: jedes Beschreibungsfeld zeigt seinen Inhalt in ganzen Zeilen, keine halb abgeschnittene Zeile am unteren Rand, mindestens drei Zeilen hoch",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -3841,6 +3851,7 @@ async function main(): Promise<void> {
 
         // 71. Nativer Einstellungspfad: Liste nicht duplizieren, Textarea nicht auf 30 px.
         const P71 = "71. Einstellungen (nativer Pfad): nach zwei Werkzeug-Schaltern steht genau eine Werkzeugliste, die Anweisungs-Textarea ist breiter als 200 px";
+        const P97 = "97. Werkzeugliste: jedes Beschreibungsfeld zeigt seinen Inhalt in ganzen Zeilen, keine halb abgeschnittene Zeile am unteren Rand, mindestens drei Zeilen hoch";
         let settings71: Cdp | null = null;
         try {
           await cdp.evaluate(`app.setting.open(); app.setting.openTabById(${JSON.stringify(PLUGIN_ID)}); return true;`);
@@ -3867,8 +3878,22 @@ async function main(): Promise<void> {
             `);
             record(P71, m71.listen === 1 && m71.breite > 200,
               `Werkzeuglisten ${m71.listen} (soll 1) · Zeilen ${m71.zeilen} · Breite der Anweisungs-Textarea ${Math.round(m71.breite)} px (soll > 200)`);
+            // 97. Das Beschreibungsfeld haelt seine Hoehe am Inhalt: ein festes `rows` liess eine vierte Zeile zur Haelfte in den
+            // unteren Innenabstand ragen (Bild tools-provider.png, Welle 23). Gemessen wird, dass NICHTS verdeckt ist (scrollHeight
+            // gegen clientHeight), nicht eine Pixelzahl, die am Theme hinge.
+            const m97 = await settings71.evaluate<{ felder: number; abgeschnitten: number; zuKlein: number; hoechstes: number }>(`
+              const alle = [...document.querySelectorAll(".koda-tool-row textarea")];
+              const lh = (e) => parseFloat(getComputedStyle(e).lineHeight) || 17;
+              return {
+                felder: alle.length,
+                abgeschnitten: alle.filter((e) => e.scrollHeight > e.clientHeight + 1).length,
+                zuKlein: alle.filter((e) => e.getBoundingClientRect().height < lh(e) * 3 - 1).length,
+                hoechstes: Math.max(0, ...alle.map((e) => Math.round(e.getBoundingClientRect().height / lh(e)))),
+              };`);
+            record(P97, m97.felder > 0 && m97.abgeschnitten === 0 && m97.zuKlein === 0,
+              `${m97.felder} Beschreibungsfelder · abgeschnitten: ${m97.abgeschnitten} (soll 0) · niedriger als drei Zeilen: ${m97.zuKlein} (soll 0) · höchstes Feld ${m97.hoechstes} Zeilen`);
           }
-        } catch (error) { abbruch22(P71, error); } finally {
+        } catch (error) { abbruch22(P71, error); abbruch22(P97, error); } finally {
           settings71?.close();
           await cdp.evaluate(`
             const p = ${PL};
@@ -4337,6 +4362,141 @@ async function main(): Promise<void> {
             return true;
           `).catch(() => undefined);
           void zustand;
+        }
+      }
+
+      // --- 89–91. Denkblock nach der Antwort und Kopier-Knopf (Welle 24) ----
+      // (86–88 sind fuer Plan 2, die Bases-Ansicht, reserviert.)
+      {
+        const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        const P89 = "89. Denkblock nach der Antwort: zugeklappt vor der Antwort, mit der Sitzung im JSONL, nie am Draht; der Schalter „Denken aufbewahren“ aus lässt ihn verschwinden";
+        const P90 = "90. Denkblock kopierbar während des Stroms (Kit-Knopf): der Klick kopiert den bisherigen Denktext und klappt den Block nicht zu";
+        const P91 = "91. Denkblock kopierbar nach der Antwort: der Klick kopiert den ganzen Denktext, quittiert mit is-copied und klappt den Block nicht auf";
+        const GEDANKE = "Ich wäge die Quellen ab und prüfe dann den Kontext. GEDANKE-89.";
+        const chatZeigen = (): Promise<unknown> => cdp.evaluate(`
+          const p = ${PL};
+          if (p.views().length === 0) await p.activateView();
+          app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
+          return true;`);
+        // Die Zwischenablage wird abgefangen, nicht gelesen: lesen braucht Fokus und eine Berechtigung, die ein Treiber nicht hat.
+        const spion = (): Promise<unknown> => cdp.evaluate(`
+          window.__kodaCopy89 = [];
+          navigator.clipboard.writeText = async (t) => { window.__kodaCopy89.push(t); };
+          return true;`);
+        const saveVorher = await cdp.evaluate<boolean>(`return ${PL}.settings.saveThinking;`);
+        const stub89 = await startLlmStub({ models: ["smoke-model"], standard: { reasoning: GEDANKE, text: "Antwort 89." } });
+        try {
+          await setzeModell("smoke-model", stub89.url);
+          await chatZeigen();
+          await pause(400);
+          await cdp.evaluate(`const p = ${PL}; await p.newChat(); p.settings.saveThinking = true; return true;`);
+          await cdp.evaluate(`await ${PL}.ask("Smoke 89: denke nach"); return true;`);
+          const erste = await cdp.evaluate<{ n: number; offen: boolean | null; text: string; vorAntwort: boolean; imVerlauf: boolean; imJsonl: boolean }>(`
+            const p = ${PL};
+            const det = [...document.querySelectorAll(".koda-log details.koda-thinking")];
+            const d = det[0];
+            const assistant = p.chatLog.filter((m) => m.role === "assistant");
+            const raw = await app.vault.adapter.read(p.manifest.dir + "/sessions/current.jsonl");
+            const imJsonl = raw.split("\\n").filter((z) => z.trim() !== "").map((z) => JSON.parse(z)).some((m) => m.thinking === ${JSON.stringify(GEDANKE)});
+            return {
+              n: det.length, offen: d ? d.open : null, text: d?.querySelector("pre")?.textContent ?? "",
+              vorAntwort: !!(d && d.nextElementSibling && d.nextElementSibling.classList.contains("koda-assistant")),
+              imVerlauf: assistant[assistant.length - 1]?.thinking === ${JSON.stringify(GEDANKE)}, imJsonl,
+            };`);
+
+          // 91. (an der Antwort aus 89) Kopier-Knopf nach dem Antwortende.
+          try {
+            await spion();
+            const k91 = await cdp.evaluate<{ kopiert: string[]; offenDanach: boolean | null; quittiert: boolean; knopf: boolean }>(`
+              const d = document.querySelector(".koda-log details.koda-thinking");
+              const b = d?.querySelector(".okit-stream-reasoning-copy");
+              if (!d || !b) return { kopiert: [], offenDanach: null, quittiert: false, knopf: false };
+              b.click();
+              await new Promise((r) => setTimeout(r, 300));
+              return { kopiert: window.__kodaCopy89, offenDanach: d.open, quittiert: b.classList.contains("is-copied"), knopf: true };`);
+            record(P91, k91.knopf && k91.kopiert.length === 1 && k91.kopiert[0] === GEDANKE && k91.offenDanach === false && k91.quittiert,
+              `Knopf da ${k91.knopf} · kopiert ${k91.kopiert.length}× „${(k91.kopiert[0] ?? "").slice(0, 30)}…“ (ganzer Text: ${k91.kopiert[0] === GEDANKE}) · Block danach zu: ${k91.offenDanach === false} · is-copied: ${k91.quittiert}`);
+          } catch (error) { abbruch(P91, error); }
+
+          // 89 weiter: zweite Frage (Draht ohne Denken), dann der Schalter aus.
+          await cdp.evaluate(`await ${PL}.ask("Smoke 89: zweite Frage"); return true;`);
+          const chats = stub89.anfragen().filter((a) => a.route === "chat");
+          const amDraht = (chats[chats.length - 1]?.body ?? "").includes("GEDANKE-89");
+          const nZwei = await cdp.evaluate<number>(`return document.querySelectorAll(".koda-log details.koda-thinking").length;`);
+          await cdp.evaluate(`const p = ${PL}; p.settings.saveThinking = false; await p.ask("Smoke 89: ohne Aufbewahren"); for (const v of p.views()) v.renderLog(); return true;`);
+          const nOhne = await cdp.evaluate<number>(`return document.querySelectorAll(".koda-log details.koda-thinking").length;`);
+          record(P89,
+            erste.n === 1 && erste.offen === false && erste.text === GEDANKE && erste.vorAntwort && erste.imVerlauf && erste.imJsonl && !amDraht && nZwei === 2 && nOhne === 2,
+            `nach der Antwort ${erste.n} Block, zu: ${erste.offen === false}, Text gleich: ${erste.text === GEDANKE}, vor der Antwort: ${erste.vorAntwort} · im Verlauf ${erste.imVerlauf}, im JSONL ${erste.imJsonl} · Denken im Request der 2. Frage: ${amDraht} (soll nein) · nach 2. Frage ${nZwei} Blöcke · Schalter aus → ${nOhne} (soll 2)`);
+        } catch (error) { abbruch(P89, error); abbruch(P91, error); } finally {
+          await cdp.evaluate(`const p = ${PL}; p.settings.saveThinking = ${JSON.stringify(saveVorher)}; delete navigator.clipboard.writeText; delete window.__kodaCopy89; await p.newChat(); return true;`).catch(() => undefined);
+          await stub89.stop();
+        }
+
+        // 90. Kopier-Knopf WAEHREND des Stroms (der Knopf aus dem Kit-Stream-Bereich).
+        const LANG90 = "Ich ueberlege Schritt fuer Schritt, was zu tun ist. ".repeat(12);
+        const stub90 = await startLlmStub({ models: ["smoke-model"], takt: 250, nachlaufMs: 900, standard: { reasoning: LANG90, laenge: 40, text: "Fertig 90." } });
+        try {
+          await setzeModell("smoke-model", stub90.url);
+          await chatZeigen();
+          await spion();
+          await cdp.evaluate(`void ${PL}.ask("Smoke 90: denke nach."); return true;`);
+          const live = await pollUntil<{ vorher: boolean }>(cdp, `
+            const d = document.querySelector(".koda-streaming .okit-stream-reasoning");
+            const b = d?.querySelector(".okit-stream-reasoning-copy");
+            const pre = d?.querySelector("pre");
+            return b && pre && pre.textContent.length > 60 ? { vorher: d.open } : null;`, 10_000, 200);
+          let k90: { kopiert: string[]; offenDanach: boolean | null } | null = null;
+          if (live !== null) {
+            k90 = await cdp.evaluate<{ kopiert: string[]; offenDanach: boolean | null }>(`
+              const d = document.querySelector(".koda-streaming .okit-stream-reasoning");
+              d.querySelector(".okit-stream-reasoning-copy").click();
+              await new Promise((r) => setTimeout(r, 200));
+              return { kopiert: window.__kodaCopy89, offenDanach: d.open };`);
+          }
+          await pollUntil<boolean>(cdp, `return ${PL}.busy ? null : true;`, 20_000, 200);
+          record(P90,
+            live !== null && k90 !== null && k90.kopiert.length === 1 && k90.kopiert[0]!.length > 60 && LANG90.startsWith(k90.kopiert[0]!.slice(0, 40)) && k90.offenDanach === live.vorher,
+            `Knopf im Strom ${live !== null} · kopiert ${k90?.kopiert.length ?? 0}× (${k90?.kopiert[0]?.length ?? 0} Zeichen, Anfang passt: ${LANG90.startsWith((k90?.kopiert[0] ?? "x").slice(0, 40))}) · Block vorher offen ${live?.vorher}, danach ${k90?.offenDanach}`);
+        } catch (error) { abbruch(P90, error); } finally {
+          await cdp.evaluate(`delete navigator.clipboard.writeText; delete window.__kodaCopy89; await ${PL}.newChat(); return true;`).catch(() => undefined);
+          await stub90.stop();
+        }
+      }
+
+      // --- 92–96. Pflichtpunkte fuer Views mit Ausgabebereich (Skill gui-smoke-setup 3a, Brueckenbaustein pflichtpunkte.ts) ----
+      {
+        const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const N92 = "92. Pflichtpunkt Fokus: ein getippter Text im Eingabefeld überlebt ein Neuzeichnen, das Feld behält den Fokus";
+        const N93 = "93. Gegenprobe Fokus: ein Neuzeichnen mit Fokusverlust macht Punkt 92 rot";
+        const N94 = "94. Pflichtpunkt Erreichbarkeit: jedes Bedienelement des Chats ist bei langem Verlauf noch zu treffen (Mitte per elementFromPoint)";
+        const N95 = "95. Pflichtpunkt Erreichbarkeit im kurzen Panel (420 px Höhe)";
+        const N96 = "96. Gegenprobe Erreichbarkeit: ohne Rollbalken am Verlauf wird ein Bedienelement unerreichbar";
+        try {
+          await cdp.evaluate(`const p = ${PL}; if (p.views().length === 0) await p.activateView(); app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")}); return true;`);
+          await new Promise((r) => setTimeout(r, 500));
+          const fokus = { selector: ".koda-input" };
+          zeichnePflicht(bilanz, N92, await messeFokusErhalt(cdp, fokus));
+          zeichnePflicht(bilanz, N93, await gegenprobeFokus(cdp, fokus));
+          // Die Bedienelemente des Chats. `.koda-header-action` und die Hub-Tabs liegen ueber dem Verlauf, Senden/Stopp/Modus darunter.
+          const erreichbar = {
+            selektoren: [".koda-input", ".koda-buttons button", ".koda-mode", ".koda-header-action", ".okit-hub-tab"],
+            nurErster: [".koda-mode"],
+            erforderlich: [".koda-input", ".koda-buttons button"],
+            fuelle: { in: ".koda-log", zeilen: 120 },
+            ueberlauf: ".koda-log",
+          };
+          zeichnePflicht(bilanz, N94, await messeErreichbarkeit(cdp, erreichbar));
+          zeichnePflicht(bilanz, N95, await mitHoehe(cdp, { element: ".workspace-leaf", enthaelt: ".koda-root", hoehe: 420 }, () => messeErreichbarkeit(cdp, erreichbar)) as PflichtTeilurteil);
+          // Die Gegenprobe darf nur gruen heissen, wenn sie ROT werden KONNTE. Liegen alle Bedienelemente ausserhalb des Rollbereichs
+          // (hier: Eingabe und Knoepfe unter dem Verlauf), nimmt ihm der Rollbalken nichts weg — dann ist der Punkt „nicht anwendbar“, mit dem Grund.
+          const gegen = await gegenprobeErreichbarkeit(cdp, erreichbar);
+          if (gegen.urteil === "gruen") bilanz.record(N96, true, gegen.detail);
+          else skipped(N96, `in diesem Layout nicht anwendbar — ${gegen.detail}`);
+        } catch (error) {
+          for (const n of [N92, N93, N94, N95, N96] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     } finally {

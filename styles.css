@@ -295,7 +295,9 @@
 .koda-tool-controls { border-top: none; padding-top: 0; }
 .koda-tool-controls > .setting-item-info { display: none; }
 .koda-tool-controls > .setting-item-control { flex: 1 1 auto; justify-content: flex-start; }
-.koda-tool-controls textarea { flex: 1 1 auto; width: 100%; min-width: 0; }
+/* Die Hoehe folgt dem Inhalt (mindestens drei Zeilen): ein festes `rows` liess eine vierte Zeile zur Haelfte in den unteren Innenabstand ragen.
+   `lh` ist die Zeilenhoehe des Feldes, 10px sind Innenabstand und Rahmen. */
+.koda-tool-controls textarea { flex: 1 1 auto; width: 100%; min-width: 0; field-sizing: content; min-height: calc(3lh + 10px); }
 .koda-modal-sub { color: var(--text-muted); font-size: var(--font-ui-smaller); margin-bottom: var(--size-4-2); }
 .koda-prompt-preview {
   white-space: pre-wrap; max-height: 50vh; overflow-y: auto;
