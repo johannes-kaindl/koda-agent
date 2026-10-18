@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Tasks and the Abilities tab.** A task is a note under `<Koda folder>/Arbeiten/` (with `koda: arbeit` in its frontmatter) that names, for one conversation, which skills, tools and context apply. The new **Abilities** tab next to Chat and Context picks a task, switches each skill between **off**, **description** and **full**, and switches Koda's tools and the tool plugins on and off; a dot marks what you changed in this conversation, and **Save** and **Save as new task …** write the differences back. Everything applies from the next question, is kept with the conversation (it comes back after a restart; **New chat** keeps the task and clears the rest) and appears in the status line as the name of the task. See [Work in tasks](docs/how-to/tasks.md).
+- **`/` menu in the input field.** `/` at the start or after a space lists skills and tasks and narrows with every letter; Enter picks without sending, Escape closes. A skill goes to **full** for this conversation, a task is picked like in the tab.
+- **Settings → Koda → Skills:** each skill's default position (off, description, full), written into the skill's frontmatter.
+- **Settings: "Replace loaded skill texts in the history with a note"** (on) — a skill's full text no longer goes to the model twice: a text fetched with `load_skill` is replaced, in what is sent, by a short note once the skill stands in the prompt, or by a note that it is switched off.
+- **The thinking stays after the answer.** A reply's thinking is a collapsed block above the reply, saved with the conversation, with a button to copy it (the same button now sits on the live thinking block). It never goes to the model, and sharing and exporting leave it out. **Settings: "Keep the thinking with the conversation"** (on) turns the saving off.
+- The Abilities tab names a task entry that cannot be used (an unknown skill, a wrong value, a note that is not found, a key written without the umlaut) instead of dropping it silently.
+
+### Changed
+
+- **The sliders "Link depth" and "Notes from vault-rag" in the Context tab now apply to the conversation, not to the settings.** They no longer write `data.json`; the settings are the default, a task can set them, and Save writes them into a task.
+- **A switched-off skill is really off:** `load_skill` refuses it, whether it was switched off in the frontmatter, in the tab or by a task.
+- Koda's writes into `<Koda folder>/Arbeiten/` ask first, like writes into `Skills/` (the write rule lets a note decide what Koda may do).
+- The thinking block of a running reply has a copy button, and long lines in the running answer wrap instead of running off to the right (obsidian-kit 0.63.0).
+- Settings → Model control → Tools: a description field is as tall as its text (at least three lines), so no fourth line is cut in half.
+- **Path rules shared with other plugins (code-kit 0.31.0):** a path with a NUL byte or a segment `.. ` (with a blank) is refused, and a path with `..` is in no folder, so a write to `Koda/../x.md` asks first. The protection of `Skills/` and `Arbeiten/` also reads names the way Windows and case-insensitive volumes do (`Skills ` and `Skills.` are `Skills`, `Skills:x` is `Skills`, a long s counts as an `s`), so such a name asks as well.
+- Errors from image generation and text recognition come from the kit; the German sentences per code are unchanged.
+- The Thinking switch, the request section and the model checks gain what obsidian-kit 0.62.0 and 0.63.0 and code-kit 0.29.0–0.31.0 brought where Koda uses it: for LM Studio, thinking and vision of a model now come from its metadata instead of only from its name, so the Thinking button can appear for more models. The rest of those releases (Claude API transport, request section, retrieval kernel) concerns parts Koda does not use yet.
+- Kit pins moved to obsidian-kit 0.63.0 and code-kit 0.31.0.
+
 ## [0.26.0] — 2026-10-16
 
 ### Added

@@ -40,9 +40,11 @@ Notes added by hand go along in the full-text modes (**Note**, **All tabs**, **V
 
 Full text is capped by **Content budget per message** (default 20,000 characters). The budget is shared out so that short notes go along complete and only the long ones are cut. Nothing is dropped silently: a cut names how much was left out, and Koda can fetch the full text with `read_note`.
 
-In the **Note** mode, **Link depth** (1–3, in the Context tab and in the settings) decides how many levels of links are followed. Every level multiplies the notes and splits the budget further, so raise it for a small cluster of notes, not for a hub note.
+In the **Note** mode, **Link depth** (1–3, in the Context tab and in the settings) decides how many levels of links are followed. The slider in the tab changes it for the current conversation only (a task can set it, and **New chat** without a task keeps it); the settings hold the default. Every level multiplies the notes and splits the budget further, so raise it for a small cluster of notes, not for a hub note.
 
-**Notes from vault-rag** (0–20, default 5) decides how many notes Vault Retrieval contributes in the **Vault** and **Note** modes; 0 turns that off.
+**Notes from vault-rag** (0–20, default 5) decides how many notes Vault Retrieval contributes in the **Vault** and **Note** modes; 0 turns that off. Like the depth, its slider in the tab is for the current conversation.
+
+Context, skills and tools for a recurring job can be saved as a task; see [Work in tasks](tasks.md).
 
 ## See what went out
 

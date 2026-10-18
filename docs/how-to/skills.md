@@ -30,13 +30,15 @@ Writing a skill **always asks first**, even though skills live in the Koda folde
 
 ## Turn a skill off
 
-Set `enabled: false` in its frontmatter. The note stays, Koda ignores it. Deleting the note works too.
+Set `enabled: false` in its frontmatter, or pick **off** for it under Settings → Koda → **Skills**. The note stays, Koda ignores it. Deleting the note works too.
+
+For one conversation only, use the **Abilities** tab or a task; see [Work in tasks](tasks.md). A skill that is off there is gone for the model: it is not in the prompt, `load_skill` refuses it, and a text you had loaded earlier with `load_skill` is replaced in what is sent to the model by a note that it is switched off.
 
 ## Pin a skill, load the rest on demand
 
 By default a skill appears in the system prompt with its name and description only (the chat says **⚙ N skill(s) on demand**). When a task matches, Koda reads the full text itself with its `load_skill` tool. That keeps the prompt short with many skills.
 
-A skill Koda should always follow, for example a start routine, gets `pinned: true` in its frontmatter. Pinned skills always load in full. **Skill budget** (default 6000 characters) is the upper limit for them together: if they exceed it, they load anyway and the chat says **⚠ Pinned skills are over budget: N characters**. Raise the budget or pin fewer skills.
+A skill Koda should always follow, for example a start routine, gets `pinned: true` in its frontmatter (or **full** under Settings → Koda → **Skills**). Pinned skills always load in full. A skill's full text never goes to the model twice: a text fetched earlier with `load_skill` is replaced in what is sent by a short note once the skill is on **full**, because the text already stands in the prompt (switch this off with **Replace loaded skill texts in the history with a note**). The chat still shows everything. **Skill budget** (default 6000 characters) is the upper limit for them together: if they exceed it, they load anyway and the chat says **⚠ Pinned skills are over budget: N characters**. Raise the budget or pin fewer skills.
 
 When Koda rewrites a skill with `write_skill`, the pin stays.
 

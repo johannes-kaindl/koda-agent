@@ -9,6 +9,7 @@ Each entry starts with the message as Koda shows it (English interface; the Germ
 - [In the Context tab and the context modes](#in-the-context-tab-and-the-context-modes)
 - [Images](#images)
 - [Skills](#skills)
+- [Tasks and the Abilities tab](#tasks-and-the-abilities-tab)
 - [Settings and tools](#settings-and-tools)
 - [Getting help](#getting-help)
 
@@ -213,6 +214,46 @@ Not an error. These skills are not pinned: Koda sees their name and description 
 **Cause:** The skill note could not be read.
 
 **Fix:** Check that it is a normal Markdown note directly in `<Koda folder>/Skills/`; subfolders are not read.
+
+## Tasks and the Abilities tab
+
+A task is a note in `<Koda folder>/Arbeiten/`; see [Work in tasks](tasks.md). A task you write by hand does not have to be right: what cannot be used is skipped, the rest applies, and the Abilities tab lists each skipped entry under the task dropdown.
+
+### "Task “…” not found — it was renamed or deleted. Pick another or “No task”."
+
+**Cause:** The task picked in this conversation no longer exists as a note under `<Koda folder>/Arbeiten/` (renamed, moved, deleted, or its `koda: arbeit` line is gone). It stays picked so it does not disappear without a word, but nothing of it applies.
+
+**Fix:** Pick another task or **No task**, or restore the note.
+
+### "Invalid entry in the task, ignored: …"
+
+**Cause:** A value is not allowed: a skill position other than `aus`, `beschreibung` or `ganz`, a tool or plugin value other than `an` or `aus`, a context mode other than `off`, `workspace`, `note`, `tabs` or `vault`, a number outside its range (`tiefe` 1–3, `budget` 2000–200000, `nachbarn` 0–20), a list where a map belongs. The entry names the key (`skills.b`, `kontext.tiefe`). An entry such as `uebrige-skills (übrige-skills?)` means the key is spelled without the umlaut.
+
+**Fix:** Correct that line in the task note. The rest of the task applies meanwhile.
+
+### "The task names something that does not exist, ignored: …"
+
+**Cause:** The task names a skill, one of Koda's tools or a plugin that is not there (`skills.old-skill`, `werkzeuge.fly`, `anbieter.some-plugin`), because it was deleted, renamed or is not installed or active.
+
+**Fix:** Remove or correct the entry, or install the plugin.
+
+### "A note of the task was not found: …"
+
+**Cause:** An entry of `kontext.notizen` points to a note that does not exist, or to a folder without notes. A folder is read when you pick the task.
+
+**Fix:** Correct the path in the task note; a folder ends with `/`.
+
+### "A task with this name already exists." / "This name cannot be used as a file name."
+
+**Cause:** **Save as new task …** never replaces an existing task, and the name must be usable as a file name (no `/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`, `#`, `^`, `[`, `]`).
+
+**Fix:** Choose another name, or pick the existing task and use **Save**.
+
+### "Skill "…" ist abgeschaltet (in diesem Gespraech oder in der gewaehlten Arbeit). Verfuegbar: …"
+
+**Cause:** The model asked for a skill with `load_skill` that is switched off in this conversation or by the picked task. Koda's tool messages are German; the list after "Verfuegbar" names the skills that are on.
+
+**Fix:** Nothing, if you meant it. To allow the skill, switch it to **description** or **full** in the Abilities tab.
 
 ## Settings and tools
 

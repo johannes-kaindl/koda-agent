@@ -12,6 +12,9 @@ All settings are under **Settings → Koda**, in this order. Numbers outside the
 | Max tool calls per answer | 8 | 1–50 | How many tool calls Koda may chain for one question before it has to answer. |
 | Response timeout (seconds) | 300 | 30–900 | How long Koda waits for the endpoint to say anything once the answer has started. The clock restarts with every piece received, so only silence runs into it, not a long answer. Before the first piece arrives Koda waits at least 10 minutes (more if you set more), so a model that loads on demand has time to start. |
 | Skill budget | 6000 characters | 1000–100000 | Upper limit for pinned skills (`pinned: true`). They always load in full; if together they exceed the budget they still load and the chat names the overshoot. Other skills are listed with their description only. |
+| Skills | frontmatter | off / description / full | One row per skill with three positions, stored in the skill's frontmatter (`enabled: false`, nothing, `pinned: true`). A task and the Abilities tab lie over it for one conversation, see [Work in tasks](../how-to/tasks.md). |
+| Replace loaded skill texts in the history with a note | on | | When a skill is on **full**, its text goes along once at the top of the prompt; a text fetched earlier with `load_skill` is replaced by a short note in what is sent to the model (and by a note that it is off when the skill is switched off). The chat still shows everything. Off: the fetched text goes along as before until compaction shortens it. |
+| Keep the thinking with the conversation | on | | The thinking of a reply stays as a collapsed block under the reply, saved with the conversation, with a button to copy it. It never goes to the model and is left out when you share or export. Off: the block disappears when the reply ends. |
 | Maximum listed notes | 150 | 20–1000 | How many notes (and folders) `list_notes` returns at most. A capped result says so in its first line. |
 | Largest image Koda reads (KB) | 4096 | 256–20480 | `read_image` does not hand an image to the model above this file size. With Image to Markdown active the text is read instead; otherwise the answer says the image is too large. |
 
@@ -38,8 +41,8 @@ See [Choose what goes along with a question](../how-to/working-context.md).
 | Open tabs in the context | 12 | 1–100 | How many open tabs are listed by path; the rest is counted. |
 | Properties in the context (characters) | 300 | 0–2000 | How much of the active note's frontmatter goes along. 0 leaves it out everywhere, including `get_workspace`. |
 | Content budget per message (characters) | 20000 | 2000–200000 | How much note text the modes Note, All tabs and Vault (and notes added by hand) may send per message. Short notes go along complete; cuts are announced. With many small notes, headers and cut notices can add up to about 50 % on top. |
-| Link depth in the Note mode | 1 | 1–3 | How many levels of links and backlinks the Note mode follows. |
-| Notes from vault-rag | 5 | 0–20 | How many notes Vault Retrieval contributes in the Vault and Note modes. 0 turns that off. |
+| Link depth in the Note mode | 1 | 1–3 | How many levels of links and backlinks the Note mode follows. The slider in the Context tab changes it for the current conversation only; this setting is the default. |
+| Notes from vault-rag | 5 | 0–20 | How many notes Vault Retrieval contributes in the Vault and Note modes. 0 turns that off. The slider in the Context tab changes it for the current conversation only; this setting is the default. |
 | Keep context choices | on | | Whether what you deselect or add in the Context tab lasts beyond the next message. |
 
 ## Model control
