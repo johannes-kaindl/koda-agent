@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.27.0] — 2026-10-18
+
 ### Added
 
 - **Tasks and the Abilities tab.** A task is a note under `<Koda folder>/Arbeiten/` (with `koda: arbeit` in its frontmatter) that names, for one conversation, which skills, tools and context apply. The new **Abilities** tab next to Chat and Context picks a task, switches each skill between **off**, **description** and **full**, and switches Koda's tools and the tool plugins on and off; a dot marks what you changed in this conversation, and **Save** and **Save as new task …** write the differences back. Everything applies from the next question, is kept with the conversation (it comes back after a restart; **New chat** keeps the task and clears the rest) and appears in the status line as the name of the task. See [Work in tasks](docs/how-to/tasks.md).
