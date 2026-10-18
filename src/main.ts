@@ -72,7 +72,7 @@ import { buildPanelViewModel, type PanelViewModel } from "./core/context/panel-v
 import { addPaths, removePath } from "./core/context/manual";
 import { pickNote } from "./obsidian/note-picker";
 import { pickFolder } from "./obsidian/folder-picker";
-import { normalizeRel, resolveFolderPath } from "./core/tools/path-guard";
+import { resolveFolderPath } from "./core/tools/path-guard";
 import type { CollapsibleStorage } from "./vendor/kit-obsidian/collapsible";
 
 /** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
@@ -391,13 +391,11 @@ export default class KodaPlugin extends Plugin {
    *  `kontext.notizen` jetzt zu Einzelpfaden aufgeloest (Spec § 4). Eine fehlende Arbeit bleibt gewaehlt und
    *  meldet sich im Tab als „nicht gefunden“, statt still zu verschwinden. */
   chooseArbeit(name: string | null): void {
-    const a = name === null ? null : (this.arbeiten.find((x) => x.name === name) ?? null);
-    const exp = a === null
-      ? { paths: [] as string[], missing: [] as string[] }
-      : expandNotizen(a.kontext.notizen ?? [], this.app.vault.getMarkdownFiles().map((f) => f.path));
-    this.notizenMissing = exp.missing;
+    // TODO(B9): `kontext.notizen` zu Einzelpfaden aufloesen, sobald code-kit `folder-scope` (0.31.0) vendort ist —
+    // das Bibliotheks-Gate hat eine Fassung im Plugin abgelehnt, der Master hat die Bibliothek entschieden.
+    this.notizenMissing = [];
     this.contextOff.clear();
-    this.session = { arbeit: name, overlay: emptyOverlay(), manual: exp.paths };
+    this.session = { arbeit: name, overlay: emptyOverlay(), manual: [] };
     this.syncAll();
   }
 
@@ -1347,31 +1345,6 @@ export default class KodaPlugin extends Plugin {
     if (noDescription.length > 0) lines.push(t("skills.failed", noDescription.join(", ")));
     return lines.length === 0 ? null : lines.join("\n");
   }
-}
-
-/** Vorlaeufig hier, nicht in der Bibliothek: das Gate hat die exportierte Fassung abgelehnt (Gegenleser Welle 24,
- *  Zielort code-kit `folder-scope`; Cockpit-Task „expandNotizen auf code-kit umstellen“). Nicht exportiert, bis der Master entschieden hat.
- *  `kontext.notizen` einer Arbeit zu Einzelpfaden aufloesen — beim Anwenden, nicht beim Lesen (Spec § 4): ein Ordner
- *  (`/` am Ende) wird zu seinen Notizen, rekursiv und sortiert, ein Notizpfad bleibt. Was auf nichts zeigt, steht in
- *  `missing` (der Tab nennt es, statt es still zu verwerfen). Pfade mit `..` zaehlen als fehlend. */
-function expandNotizen(entries: readonly string[], markdownPaths: readonly string[]): { paths: string[]; missing: string[] } {
-  const paths: string[] = [];
-  const missing: string[] = [];
-  const known = new Set(markdownPaths);
-  const add = (p: string): void => { if (!paths.includes(p)) paths.push(p); };
-  for (const entry of entries) {
-    const isFolder = entry.endsWith("/");
-    const norm = normalizeRel(entry);
-    if (norm === "" || norm.split("/").includes("..")) { missing.push(entry); continue; }
-    if (isFolder) {
-      const prefix = `${norm}/`;
-      const inside = markdownPaths.filter((p) => p.startsWith(prefix)).sort();
-      if (inside.length === 0) missing.push(entry);
-      else inside.forEach(add);
-    } else if (known.has(norm)) add(norm);
-    else missing.push(entry);
-  }
-  return { paths, missing };
 }
 
 /** Sprach-Erkennung ueber Obsidians API. `null` heisst „hat nicht geklappt" — ausdruecklich
