@@ -59,4 +59,18 @@ describe("writePolicy — Skills sind trotz Lage bestaetigungspflichtig", () => 
     expect(writePolicy("Koda/Notiz.md", "Koda/")).toBe("free");
     expect(writePolicy("Koda/Skills/a.md", "Koda/")).toBe("confirm");
   });
+  // Sicherheitsbefund (Commit-Review 2026-10-18): Windows liest `Skills ` und `Skills.` als `Skills`. Der Schutz darf nicht an einem
+  // Leerzeichen oder Punkt am Ende hangen; fuer die Rueckfrage zaehlt die vorsichtigere der beiden Lesarten.
+  it("Skills/ und Arbeiten/ sind auch mit Leerraum oder Punkt am Ende des Ordnernamens geschuetzt", () => {
+    for (const p of ["Koda/Skills /x.md", "Koda/Skills./x.md", "Koda/Skills\u00a0/x.md", "Koda/Arbeiten /x.md", "Koda/skills . /x.md"]) {
+      expect(writePolicy(p, "Koda")).toBe("confirm");
+    }
+  });
+  it("ein Koda-Ordner mit Leerraum am Ende ist auf macOS ein anderer Ordner: kein Freibrief", () => {
+    expect(writePolicy("Koda /x.md", "Koda")).toBe("confirm");
+    expect(writePolicy("Koda./x.md", "Koda")).toBe("confirm");
+  });
+  it("gewoehnliche Pfade im Koda-Ordner bleiben frei", () => {
+    expect(writePolicy("Koda/Entwürfe/x.md", "Koda")).toBe("free");
+  });
 });
