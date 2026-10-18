@@ -14,6 +14,8 @@ import { isContextMode, type ContextAttachment } from "../core/context/types";
 import { contextSummary, sourceChips } from "../core/context/labels";
 import { fillModeSelect } from "./mode-select";
 import { ContextPanel } from "./context-panel";
+import { AbilitiesPanel } from "./abilities-panel";
+import { ArbeitNameModal } from "./arbeit-name-modal";
 import type KodaPlugin from "../main";
 
 // uebernommen aus vault-rag/src/chat_view.ts:103-106 (scheduleQuery, 400 ms), 2026-09-25
@@ -21,7 +23,7 @@ const CONTEXT_QUERY_DEBOUNCE_MS = 400;
 
 export const VIEW_TYPE_KODA = "koda-agent-view";
 
-type KodaTab = "chat" | "context";
+type KodaTab = "chat" | "context" | "abilities";
 
 /** Chat-Sidebar. Rendert plugin.chatLog; Streaming/Tool-Schritte kommen als
  *  gezielte DOM-Appends (kein Voll-Redraw pro Token). */
@@ -57,6 +59,7 @@ export class KodaView extends ItemView {
   // — Hub: Chat- und Kontext-Tab —
   private hub: HubController<KodaTab> | null = null;
   private ctxPanel: ContextPanel | null = null;
+  private abPanel: AbilitiesPanel | null = null;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: KodaPlugin) {
     super(leaf);
@@ -115,7 +118,18 @@ export class KodaView extends ItemView {
       sectionStorage: () => this.plugin.sectionStorage(),
       lang: () => this.lang(),
     });
-    this.hub = buildHubInto<KodaTab>(root.createDiv({ cls: "koda-hub" }), [chatPanel, this.ctxPanel], "chat");
+    this.abPanel = new AbilitiesPanel({
+      viewModel: () => this.plugin.abilitiesViewModel(),
+      chooseArbeit: (n) => { this.plugin.chooseArbeit(n); },
+      save: () => void this.plugin.saveArbeit(),
+      saveAs: () => { this.askArbeitName(); },
+      resetOverlay: () => { this.plugin.resetOverlay(); },
+      setSkillMode: (n, m) => void this.plugin.setSkillMode(n, m),
+      setToolOn: (n, on) => { this.plugin.setToolOn(n, on); },
+      setProviderOn: (id, on) => { this.plugin.setProviderOn(id, on); },
+      sectionStorage: () => this.plugin.sectionStorage(),
+    });
+    this.hub = buildHubInto<KodaTab>(root.createDiv({ cls: "koda-hub" }), [chatPanel, this.ctxPanel, this.abPanel], "chat");
 
     // Kontext-Tab lebt vom aktuellen Datei-Kontext — ohne diese Weiterleitung zeigt er
     // beim Notiz-Wechsel weiter den alten Stand (Befund 2, Review 2026-09-05).
@@ -149,8 +163,20 @@ export class KodaView extends ItemView {
   }
 
   syncContextPanel(): void { this.ctxPanel?.render(); }
-  /** Zeichnet den Tab „Fähigkeiten“ neu (Task B7 füllt ihn; bis dahin gibt es nichts zu zeichnen). */
-  syncAbilities(): void { /* kein Panel in B6 */ }
+  /** Zeichnet den Tab „Fähigkeiten“ und die Statuszeile neu (dort steht der Name der gewählten Arbeit). */
+  syncAbilities(): void {
+    this.abPanel?.render();
+    if (this.statusEl !== undefined) this.paintStatus();
+  }
+
+  /** „Als neue Arbeit …“: fragt nach dem Namen; ein belegter oder unbrauchbarer Name haelt den Dialog offen. */
+  private askArbeitName(): void {
+    new ArbeitNameModal(this.app, async (name) => {
+      const clean = name.trim().replace(/\.md$/i, "");
+      if (clean === "" || /[\\/:*?"<>|#^[\]]/.test(clean)) return "invalid";
+      return (await this.plugin.saveArbeitAs(clean)) ? "ok" : "exists";
+    }).open();
+  }
 
   /** Der Chat-Inhalt (Verlauf, Statuszeile, Eingabe) in einen beliebigen Container.
    *  Aufgeteilt fuer den Hub: bis Etappe 2 baute `onOpen` direkt in `contentEl`. Der Baum ist
@@ -281,15 +307,23 @@ export class KodaView extends ItemView {
       return;
     }
     const usage = this.plugin.contextUsage();
+    const arbeit = this.plugin.session.arbeit;
     if (usage === null) {
       // Ohne bekanntes Fenster gibt es nichts, wovon Prozent zu nehmen waeren — dann lieber
-      // nichts zeigen als eine Zahl erfinden.
-      el.hidden = true;
+      // nichts zeigen als eine Zahl erfinden. Die gewaehlte Arbeit steht trotzdem da: sie ist
+      // keine Schaetzung (Spec Faehigkeiten § 5).
+      if (arbeit === null) { el.hidden = true; return; }
+      el.addClass("is-ok");
+      setIcon(this.statusIconEl, "sliders-horizontal");
+      this.statusLabelEl.setText(arbeit);
+      el.setAttribute("aria-label", arbeit);
+      el.hidden = false;
       return;
     }
     el.addClass(usage.warn ? "is-warning" : "is-ok");
     setIcon(this.statusIconEl, usage.warn ? "alert-triangle" : "gauge");
-    const text = t("activity.context", String(usage.percent));
+    const base = t("activity.context", String(usage.percent));
+    const text = arbeit === null ? base : t("activity.withTask", arbeit, base);
     this.statusLabelEl.setText(text);
     el.setAttribute("aria-label", text);
     el.hidden = false;

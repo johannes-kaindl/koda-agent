@@ -398,3 +398,29 @@
 .koda-ctx-note { font-size: var(--font-ui-smaller); color: var(--text-muted); margin: var(--size-2-1) 0; }
 .koda-ctx-add { display: flex; flex-wrap: wrap; gap: var(--size-2-2); margin-top: var(--size-2-2); }
 .koda-ctx-add button { font-size: var(--font-ui-smaller); }
+
+/* Tab „Fähigkeiten“ (Plan 1, B7) — nur Theme-Variablen. */
+.koda-ab-body { padding: var(--size-4-2); overflow-y: auto; }
+.koda-ab-head { display: flex; align-items: center; gap: var(--size-4-2); }
+.koda-ab-head-label { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.koda-ab-select { flex: 1; min-width: 0; }
+.koda-ab-actions { display: flex; flex-wrap: wrap; gap: var(--size-2-2); margin: var(--size-2-2) 0; }
+.koda-ab-actions button { font-size: var(--font-ui-smaller); }
+.koda-ab-changes { display: flex; align-items: center; gap: var(--size-2-2); font-size: var(--font-ui-smaller); color: var(--text-muted); margin: var(--size-2-2) 0; }
+.koda-ab-reset { font-size: var(--font-ui-smaller); padding: 0 var(--size-2-2); }
+.koda-ab-hint { display: flex; align-items: flex-start; gap: var(--size-2-2); font-size: var(--font-ui-smaller); color: var(--text-warning); margin: var(--size-2-1) 0; }
+.koda-ab-hint-icon { display: flex; }
+.koda-ab-row { display: flex; align-items: center; gap: var(--size-2-2); padding: var(--size-2-1) 0; font-size: var(--font-ui-small); }
+.koda-ab-row.is-failed { color: var(--text-faint); }
+.koda-ab-dot { width: 1em; flex: none; text-align: center; color: var(--interactive-accent); }
+.koda-ab-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.koda-ab-size { color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: nowrap; }
+.koda-seg { display: inline-flex; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); overflow: hidden; flex: none; }
+.koda-seg-btn { font-size: var(--font-ui-smaller); padding: 2px var(--size-4-2); border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--text-muted); cursor: pointer; }
+.koda-seg-btn + .koda-seg-btn { border-left: 1px solid var(--background-modifier-border); }
+.koda-seg-btn.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
+.koda-ab-toggle { font-size: var(--font-ui-smaller); padding: 2px var(--size-4-2); min-width: 3.5em; }
+.koda-ab-toggle.is-off { color: var(--text-muted); }
+.koda-ab-footer { margin-top: var(--size-4-2); font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.koda-ab-footer.is-warning { color: var(--text-warning); }
+.koda-ab-name-input { width: 100%; }

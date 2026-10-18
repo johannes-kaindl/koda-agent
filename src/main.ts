@@ -22,6 +22,8 @@ import { skillTextRule } from "./core/abilities/projection";
 import { latestSessionState, needsSessionRecord, sessionForNewChat } from "./core/abilities/session";
 import { parseArbeit } from "./core/abilities/parse";
 import { emptyOverlay, emptySessionState, type Arbeit, type OnOff, type SessionState, type SkillMode } from "./core/abilities/types";
+import { abilitiesViewModel, type AbilitiesVM } from "./core/abilities/panel-vm";
+import { providerToolGroups, toolRows } from "./core/prompt/view-model";
 import { arbeitenDir, arbeitName, isArbeitPath, readArbeiten, writeArbeitFrontmatter } from "./obsidian/arbeiten";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
@@ -29,7 +31,6 @@ import { xhrSseTransport } from "./vendor/kit-obsidian/chat-transport";
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
 import { type ChatMessage, type ErrorRecord, type LogEntry, type SessionStateRecord } from "./core/agent/types";
 import { HOST_TOOL_NAMES, toolSet, toWireTools, type ToolDef, type ToolSet } from "./core/tools/defs";
-import { providerToolGroups } from "./core/prompt/view-model";
 import { findToolProvider, readProviderOffers } from "./vendor/kit-obsidian/tool-providers";
 import type { ProviderOffer } from "./vendor/kit/tool-provider";
 import { confirmAction } from "./vendor/kit-obsidian/confirm";
@@ -452,6 +453,22 @@ export default class KodaPlugin extends Plugin {
       .groups.map((g) => ({ id: g.id, tools: g.rows.map((r) => r.name) }));
   }
 
+  /** Speist den Tab „Fähigkeiten“: dieselben Quellen, die `ask()` liest — es gibt keinen zweiten Weg zu dem, was gilt. */
+  async abilitiesViewModel(): Promise<AbilitiesVM> {
+    const { skills, failed } = await this.readSkills();
+    const offers = readProviderOffers(this.app, this.promptLang());
+    const eigene = toolRows(
+      this.settings,
+      readRetrievalApi(this.app)?.status().indexed === true,
+      { read: this.imageMode() !== "none", generate: readImageGenApi(this.app) !== null },
+    ).filter((r) => !r.unavailable).map((r) => r.name);
+    return abilitiesViewModel({
+      skills, failed, arbeiten: this.arbeiten.map((a) => a.name), selected: this.session.arbeit, arbeit: this.currentArbeit(),
+      hints: await this.arbeitHints(), overlay: this.session.overlay, settingsDisabled: this.settings.toolsDisabled,
+      ownTools: eigene, providers: this.providerTools(offers), budgetChars: this.settings.skillBudgetChars,
+    });
+  }
+
   private async saveInput(arbeit: Arbeit | null): Promise<SaveInput> {
     const { skills } = await this.readSkills();
     return {
@@ -670,6 +687,7 @@ export default class KodaPlugin extends Plugin {
     // Jede Aktion braucht einen Weg, der nicht an der Darstellung haengt (Lehre 0.10.1):
     // ein Tab, den nur ein Knopf erreicht, ist bei ausgeblendetem Knopf unerreichbar.
     this.addCommand({ id: "tab-chat", name: t("cmd.tabChat"), callback: () => { void this.runInView((v) => { v.setTab("chat"); return Promise.resolve(); }); } });
+    this.addCommand({ id: "tab-abilities", name: t("cmd.tabAbilities"), callback: () => { void this.runInView((v) => { v.setTab("abilities"); return Promise.resolve(); }); } });
     this.addCommand({ id: "tab-context", name: t("cmd.tabContext"), callback: () => { void this.runInView((v) => { v.setTab("context"); return Promise.resolve(); }); } });
     this.addCommand({
       id: "context-add-active",
