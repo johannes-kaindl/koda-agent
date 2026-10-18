@@ -39,4 +39,11 @@ describe("writePolicy — Skills sind trotz Lage bestaetigungspflichtig", () => 
   it("Entwuerfe bleiben frei", () => {
     expect(writePolicy("Koda/Entwürfe/idee.md", "Koda")).toBe("free");
   });
+  // Eine Arbeit bestimmt wie ein Skill, was Koda darf.
+  it("Arbeiten/ ist bestaetigungspflichtig, case-insensitiv und segment-genau", () => {
+    expect(writePolicy("Koda/Arbeiten/Inbox.md", "Koda")).toBe("confirm");
+    expect(writePolicy("koda/arbeiten/x.md", "Koda")).toBe("confirm");
+    expect(writePolicy("Koda/Arbeiten", "Koda")).toBe("confirm");
+    expect(writePolicy("Koda/Arbeitenliste.md", "Koda")).toBe("free");
+  });
 });

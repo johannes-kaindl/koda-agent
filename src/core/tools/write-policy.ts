@@ -1,3 +1,4 @@
+import { ARBEITEN_SUBFOLDER } from "../abilities/types";
 import { normalizeRel } from "./path-guard";
 
 export type WriteDecision = "free" | "confirm";
@@ -22,6 +23,11 @@ export function writePolicy(path: string, kodaFolder: string): WriteDecision {
   if (folder === "") return "confirm";
   const inKoda = p === folder || p.startsWith(folder + "/");
   if (!inKoda) return "confirm";
-  const skills = `${folder}/${SKILLS_SUBFOLDER.toLowerCase()}`;
-  return p === skills || p.startsWith(skills + "/") ? "confirm" : "free";
+  // Eine Arbeit bestimmt wie ein Skill, was Koda darf (Spec Faehigkeiten § 13). Das Schreiben aus dem Tab
+  // („Speichern“) ist eine Nutzerhandlung und laeuft nicht durch diese Policy.
+  for (const sub of [SKILLS_SUBFOLDER, ARBEITEN_SUBFOLDER]) {
+    const dir = `${folder}/${sub.toLowerCase()}`;
+    if (p === dir || p.startsWith(dir + "/")) return "confirm";
+  }
+  return "free";
 }

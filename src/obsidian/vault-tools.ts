@@ -10,6 +10,7 @@ import { sanitizeSkillName, skillPath } from "../core/skills/path";
 import { cleanSkillRef } from "../core/skills/load";
 import { parseSkill } from "../core/skills/skill";
 import { SKILLS_SUBFOLDER } from "../core/tools/write-policy";
+import type { SkillMode } from "../core/abilities/types";
 import {
   formatSearchResult, formatRelatedResult, hasIndexableText,
   type RetrievalApi, type TextHit,
@@ -178,6 +179,10 @@ export class VaultTools implements ToolRunner {
       /** Bestaetigung VOR einer Bilderzeugung ausserhalb des Koda-Ordners. Fehlt der Port,
        *  wird dort nie erzeugt — dieselbe Regel wie beim Schreiben ohne Modal. */
       confirmImage?: (req: { prompt: string; folder: string }) => Promise<boolean>;
+      /** Effektive Stellung eines Skills in diesem Gespraech (Overlay, Arbeit, Frontmatter), frisch je
+       *  Aufruf; `null` = unbekannt. `load_skill` lehnt einen Skill ab, der `aus` ist — auch wenn ihn nur
+       *  das Overlay oder die Arbeit abgeschaltet hat (Spec Faehigkeiten § 7). Fehlt es, gilt das Frontmatter. */
+      skillMode?: (name: string) => SkillMode | null;
     },
   ) {}
 
@@ -575,14 +580,18 @@ export class VaultTools implements ToolRunner {
       const names: string[] = [];
       for (const p of files) {
         const r = parseSkill(nameOf(p), await this.vault.read(p).catch(() => ""));
-        if (r.ok && r.skill.enabled) names.push(r.skill.name);
+        if (r.ok && (this.opts.skillMode?.(r.skill.name) ?? (r.skill.enabled ? "beschreibung" : "aus")) !== "aus") names.push(r.skill.name);
       }
       return names.length === 0 ? "keine" : names.sort().join(", ");
     };
     if (hit === undefined) return { ok: false, error: `Skill nicht gefunden: "${ref}". Verfuegbar: ${await available()}` };
     const parsed = parseSkill(nameOf(hit), await this.vault.read(hit));
     if (!parsed.ok) return { ok: false, error: `Skill "${ref}" hat keine description im Frontmatter und ist damit nicht aktiv.` };
-    if (!parsed.skill.enabled) return { ok: false, error: `Skill "${ref}" ist abgeschaltet (enabled: false). Verfuegbar: ${await available()}` };
+    // Der effektive Stand gewinnt ueber das Frontmatter: ein im Tab eingeschalteter Skill mit `enabled: false`
+    // ist erreichbar, ein im Tab abgeschalteter nicht.
+    const mode = this.opts.skillMode?.(parsed.skill.name) ?? null;
+    if (mode === "aus") return { ok: false, error: `Skill "${ref}" ist abgeschaltet (in diesem Gespraech oder in der gewaehlten Arbeit). Verfuegbar: ${await available()}` };
+    if (mode === null && !parsed.skill.enabled) return { ok: false, error: `Skill "${ref}" ist abgeschaltet (enabled: false). Verfuegbar: ${await available()}` };
     const { name: skillName, description, body } = parsed.skill;
     return { ok: true, content: body === "" ? `### ${skillName}\n${description}` : `### ${skillName}\n${description}\n\n${body}` };
   }
