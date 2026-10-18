@@ -1,3 +1,4 @@
+import type { SessionState } from "../abilities/types";
 import type { ContextAttachment } from "../context/types";
 
 export interface ToolCall { id: string; name: string; arguments: string }
@@ -64,7 +65,16 @@ export interface ErrorRecord {
   text: string;
 }
 
-export type LogEntry = ChatMessage | CompactionRecord | ErrorRecord;
+/** Sitzungs-Marke: der Sitzungszustand (Arbeit, Overlay, manuelle Notizen) zum Zeitpunkt einer Frage.
+ *  Geht nie ans Modell; die jüngste Marke stellt den Zustand nach einem Neustart wieder her. */
+export interface SessionStateRecord {
+  kind: "session";
+  /** ISO-Zeitstempel, nur fuer Anzeige/Log. */
+  at: string;
+  state: SessionState;
+}
+
+export type LogEntry = ChatMessage | CompactionRecord | ErrorRecord | SessionStateRecord;
 
 export function isCompactionRecord(e: LogEntry): e is CompactionRecord {
   return (e as CompactionRecord).kind === "compaction";
@@ -72,8 +82,11 @@ export function isCompactionRecord(e: LogEntry): e is CompactionRecord {
 export function isErrorRecord(e: LogEntry): e is ErrorRecord {
   return (e as ErrorRecord).kind === "error";
 }
+export function isSessionStateRecord(e: LogEntry): e is SessionStateRecord {
+  return (e as SessionStateRecord).kind === "session";
+}
 export function isChatMessage(e: LogEntry): e is ChatMessage {
-  return !isCompactionRecord(e) && !isErrorRecord(e);
+  return !isCompactionRecord(e) && !isErrorRecord(e) && !isSessionStateRecord(e);
 }
 
 export type ToolOutcome = { ok: true; content: string; images?: { path: string }[] } | { ok: false; error: string };

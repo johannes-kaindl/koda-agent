@@ -2,7 +2,9 @@ import { Component, ItemView, MarkdownRenderer, setIcon, type WorkspaceLeaf } fr
 import { t, getLang } from "../vendor/kit/i18n";
 import { confirmAction } from "../vendor/kit-obsidian/confirm";
 import { buildHubInto, type HubController, type HubPanel } from "../vendor/kit-obsidian/hub";
-import { isCompactionRecord, isErrorRecord, type CompactionRecord } from "../core/agent/types";
+import type { SessionState } from "../core/abilities/types";
+import { describeStateChange } from "../core/abilities/session";
+import { isCompactionRecord, isErrorRecord, isSessionStateRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
 import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obsidian/stable-writer";
@@ -361,7 +363,14 @@ export class KodaView extends ItemView {
     // und unter der ersten abschliessenden Antwort danach ausgegeben (eine Antwort mit
     // toolCalls ist ein Zwischenschritt, kein Abschluss).
     let offeneQuellen: ContextAttachment | null = null;
+    let lastState: SessionState | null = null;
     for (const m of this.plugin.chatLog) {
+      if (isSessionStateRecord(m)) {
+        const line = describeStateChange(lastState, m.state, this.lang());
+        lastState = m.state;
+        if (line !== null) this.logEl.createDiv({ cls: "koda-msg koda-notice koda-session", text: line });
+        continue;
+      }
       if (isCompactionRecord(m)) { this.renderCompaction(this.logEl, m); continue; }
       if (isErrorRecord(m)) { this.logEl.createDiv({ cls: "koda-msg koda-error", text: m.text }); continue; }
       if (m.role === "user") {

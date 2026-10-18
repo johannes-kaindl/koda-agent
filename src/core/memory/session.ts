@@ -1,3 +1,4 @@
+import { isSessionState } from "../abilities/session";
 import type { LogEntry } from "../agent/types";
 import { isContextAttachment } from "../context/types";
 
@@ -29,6 +30,11 @@ export function parseLines(text: string): LogEntry[] {
       if (parsed.kind === "error") {
         // Dritter Shape: ohne Text keine Marke (Idiom wie bei der Verdichtungs-Marke).
         if (typeof parsed.text === "string" && typeof parsed.at === "string") out.push(parsed as unknown as LogEntry);
+        continue;
+      }
+      if (parsed.kind === "session") {
+        // Vierter Shape: eine Marke mit unlesbarem Zustand kostet die Marke, nicht das Gespraech.
+        if (typeof parsed.at === "string" && isSessionState(parsed.state)) out.push(parsed as unknown as LogEntry);
         continue;
       }
       if (typeof parsed.role === "string" && typeof parsed.content === "string") {
