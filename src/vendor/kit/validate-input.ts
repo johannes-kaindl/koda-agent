@@ -1,4 +1,4 @@
-// vendored from code-kit@0.28.0, src/ts/pure/validate-input.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.31.0, src/ts/pure/validate-input.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Checks a tool call's arguments against the JSON Schema that describes the tool — a small, flat subset of it, and
  *  an honest one: what it does not judge it can name ({@link unsupportedSchemaKeywords}).
  *
@@ -252,4 +252,37 @@ function fieldGaps(path: string, f: unknown, found: string[]): void {
     for (const k of Object.keys(items)) if (k !== "type" && k !== "format" && !ANNOTATIONS.has(k)) found.push(`${path}.items.${k}`);
     if (items["format"] !== undefined && !(typeof items["format"] === "string" && FORMATS.has(items["format"]))) found.push(`${path}.items.format=${show(items["format"])}`);
   }
+}
+
+/** The name of the first field whose list of choices is EMPTY (`type: "string"`, `enum: []`), else `null`.
+ *
+ *  Origin: mailstone `src/core/commands/schema.ts`. Such a field makes a form unusable: the dropdown shows no option and every attempt
+ *  to send fails with `must be one of []`, cancelling is the only way out. A flow asks BEFORE it opens the form. A field with no `enum`
+ *  at all is a free field and does not count. calendar-notes builds the same form without this check.
+ *  Never throws, for a malformed schema either (it is no choice field). */
+export function emptyChoiceField(schema: ObjectSchema): string | null {
+  const props = isObj(schema) && isObj(schema.properties) ? schema.properties : {};
+  for (const [name, field] of Object.entries(props)) {
+    if (isObj(field) && field["type"] === "string" && Array.isArray(field["enum"]) && field["enum"].length === 0) return name;
+  }
+  return null;
+}
+
+/** The input that is already decided, or `null` when the user has something to decide. The counterpart of {@link emptyChoiceField} on
+ *  the same axis: **no** option — the form is unusable and does not open; **one** option — there is nothing to choose and it need not
+ *  open; **two or more** — the user chooses. (Confirmation in a preview stays, so no consent is lost, only a click without content.)
+ *
+ *  Only a field that is a choice with exactly one option is decided. NOT decided: a `default` (a pre-fill is a suggestion and wants to be
+ *  edited), a switch (`false` is its start, not the user's decision), any free field. A schema without fields gives `{}`.
+ *
+ *  Origin: mailstone `src/core/commands/schema.ts`. Never throws; `null` for a schema that is no object. */
+export function predeterminedInput(schema: ObjectSchema): Record<string, unknown> | null {
+  if (!isObj(schema)) return null; // a schema nobody can read decides nothing
+  const props = isObj(schema.properties) ? schema.properties : {};
+  const out: [string, unknown][] = [];
+  for (const [name, field] of Object.entries(props)) {
+    if (!isObj(field) || field["type"] !== "string" || !Array.isArray(field["enum"]) || field["enum"].length !== 1) return null;
+    out.push([name, field["enum"][0]]);
+  }
+  return Object.fromEntries(out);
 }

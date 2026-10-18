@@ -1,4 +1,4 @@
-// vendored from code-kit@0.28.0, src/ts/pure/byte-tokens.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.31.0, src/ts/pure/byte-tokens.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // Origin: koda-agent `src/core/tools/decode-byte-tokens.ts` (2026-10, n = 1; "the place from one is the library").
 // Welle 22, Teil 2.
 

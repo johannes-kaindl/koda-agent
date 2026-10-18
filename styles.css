@@ -29,7 +29,7 @@
 .koda-tool { margin-bottom: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .koda-tool pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
 /* Streaming-Antwortbereich aus obsidian-kit (UI-STANDARD §8, `buildStreamArea` +
-   `createStableWriter`, Stand 0.43.0) — Kit-Vertrag: das Kit injiziert kein CSS, die
+   `createStableWriter`, Stand 0.63.0) — Kit-Vertrag: das Kit injiziert kein CSS, die
    Regeln gehoeren verbatim in die Consumer-`styles.css`. Nicht von Hand aendern, sondern
    den Block bei einem Re-Vendor ersetzen (Herkunft: obsidian-kit/src/obsidian/stream-area.ts). */
 .okit-stream { display: flex; flex-direction: column; min-height: 0; gap: var(--size-4-2); }
@@ -42,7 +42,8 @@
 .okit-stream--host-scroll .okit-stream-body { flex: 0 0 auto; min-height: auto; overflow-y: visible; }
 .okit-stream-block > :first-child { margin-top: 0; }
 .okit-stream-block > :last-child { margin-bottom: 0; }
-.okit-stream-tail { white-space: pre-wrap; color: var(--text-muted); }
+/* overflow-wrap: eine lange Zeile ohne Leerzeichen (JSON im Antwort-Tail) lief rechts aus dem Panel (3d-codeblocks, Welle 23). */
+.okit-stream-tail { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-muted); }
 .okit-stream-status {
   flex: 0 0 auto;
   display: flex; align-items: center; gap: var(--size-4-1);
@@ -53,6 +54,14 @@
   font-size: var(--font-ui-smaller); color: var(--text-muted);
 }
 .okit-stream-reasoning > summary { cursor: var(--cursor); color: var(--text-faint); }
+/* Der Kopier-Knopf sitzt IN der Zusammenfassung, bleibt inline und nimmt der Zeile keine Höhe. */
+.okit-stream-reasoning-copy {
+  display: inline-flex; vertical-align: middle; margin-inline-start: var(--size-4-2);
+  height: auto; padding: var(--size-2-1) var(--size-2-2);
+  color: var(--text-faint);
+}
+.okit-stream-reasoning-copy.is-copied { color: var(--text-success); }
+.okit-stream-reasoning-copy .svg-icon { width: var(--icon-xs); height: var(--icon-xs); }
 .okit-stream-reasoning > pre {
   max-height: 12em; overflow-y: auto; white-space: pre-wrap;
   background: var(--background-secondary); padding: var(--size-4-2);
@@ -427,3 +436,20 @@
 .koda-ab-footer { margin-top: var(--size-4-2); font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .koda-ab-footer.is-warning { color: var(--text-warning); }
 .koda-ab-name-input { width: 100%; }
+
+/* „/“-Menue im Eingabefeld (obsidian-kit `textarea-suggest`, Stand 0.63.0) — Kit-Vertrag wie oben: verbatim kopiert,
+   bei einem Re-Vendor ersetzen (Herkunft: obsidian-kit/src/obsidian/textarea-suggest.ts). */
+.okit-suggest-host { position: relative; }
+.okit-suggest:not(.is-open) { display: none; }
+.okit-suggest {
+  position: absolute; z-index: var(--layer-popover);
+  max-height: 16em; overflow-y: auto;
+  background: var(--background-primary);
+  border: var(--border-width) solid var(--background-modifier-border); border-radius: var(--radius-m);
+  box-shadow: var(--shadow-s);
+  padding: var(--size-2-1);
+  font-size: var(--font-ui-small);
+}
+.okit-suggest-group { padding: var(--size-2-1) var(--size-4-2); color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.okit-suggest-item { padding: var(--size-2-2) var(--size-4-2); border-radius: var(--radius-s); cursor: var(--cursor); }
+.okit-suggest-item:hover, .okit-suggest-item.is-selected { background: var(--background-modifier-hover); }
