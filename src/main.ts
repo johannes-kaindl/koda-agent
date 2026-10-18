@@ -23,6 +23,7 @@ import { latestSessionState, needsSessionRecord, sessionForNewChat } from "./cor
 import { parseArbeit } from "./core/abilities/parse";
 import { emptyOverlay, emptySessionState, type Arbeit, type OnOff, type SessionState, type SkillMode } from "./core/abilities/types";
 import { abilitiesViewModel, type AbilitiesVM } from "./core/abilities/panel-vm";
+import { expandPathEntries } from "./vendor/kit/folder-scope";
 import { providerToolGroups, toolRows } from "./core/prompt/view-model";
 import { arbeitenDir, arbeitName, isArbeitPath, readArbeiten, writeArbeitFrontmatter } from "./obsidian/arbeiten";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
@@ -374,6 +375,14 @@ export default class KodaPlugin extends Plugin {
     return isArbeitPath(path, this.settings.kodaFolder);
   }
 
+  /** Eine Datei unter `Arbeiten/` oder `Skills/` hat sich geaendert: die Arbeiten neu lesen bzw. den Skill-Cache
+   *  auffrischen (das „/“-Menue und `load_skill` fragen synchron). */
+  private onKodaFileChange(path: string): void {
+    if (this.isArbeitFile(path)) { this.refreshArbeiten(); return; }
+    const skills = `${this.settings.kodaFolder.replace(/\/+$/, "").toLowerCase()}/${SKILLS_SUBFOLDER.toLowerCase()}/`;
+    if (path.toLowerCase().startsWith(skills)) void this.readSkills().then(() => { this.syncAll(); });
+  }
+
   /** Zeichnet alles neu, was vom Sitzungszustand abhaengt: Modus-Dropdown, Kontext-Tab, Tab Faehigkeiten. */
   private syncAll(): void {
     for (const v of this.views()) { v.syncContextMode(); v.syncContextPanel(); v.syncAbilities(); }
@@ -392,11 +401,13 @@ export default class KodaPlugin extends Plugin {
    *  `kontext.notizen` jetzt zu Einzelpfaden aufgeloest (Spec § 4). Eine fehlende Arbeit bleibt gewaehlt und
    *  meldet sich im Tab als „nicht gefunden“, statt still zu verschwinden. */
   chooseArbeit(name: string | null): void {
-    // TODO(B9): `kontext.notizen` zu Einzelpfaden aufloesen, sobald code-kit `folder-scope` (0.31.0) vendort ist —
-    // das Bibliotheks-Gate hat eine Fassung im Plugin abgelehnt, der Master hat die Bibliothek entschieden.
-    this.notizenMissing = [];
+    const a = name === null ? null : (this.arbeiten.find((x) => x.name === name) ?? null);
+    // Ordner (`/` am Ende) werden JETZT zu Einzelpfaden, ein Eintrag ohne Ziel landet in `missing` und im Tab (Spec § 4).
+    // Die Aufloesung kommt aus code-kit `folder-scope`: das Bibliotheks-Gate hat eine Fassung im Plugin abgelehnt.
+    const exp = a === null ? { paths: [] as string[], missing: [] as string[] } : expandPathEntries(a.kontext.notizen ?? [], this.app.vault.getMarkdownFiles().map((f) => f.path));
+    this.notizenMissing = exp.missing;
     this.contextOff.clear();
-    this.session = { arbeit: name, overlay: emptyOverlay(), manual: [] };
+    this.session = { arbeit: name, overlay: emptyOverlay(), manual: exp.paths };
     this.syncAll();
   }
 
@@ -486,6 +497,12 @@ export default class KodaPlugin extends Plugin {
       hints: await this.arbeitHints(), overlay: this.session.overlay, settingsDisabled: this.settings.toolsDisabled,
       ownTools: eigene, providers: this.providerTools(offers), budgetChars: this.settings.skillBudgetChars,
     });
+  }
+
+  /** Die Namen der zuletzt gelesenen Skills — synchron, fuer das „/“-Menue. Die Liste wird bei jedem `readSkills()` frisch
+   *  (beim Oeffnen des Tabs, bei jeder Frage, im Settings-Tab); ein vor dem ersten Lesen geoeffnetes Menue stuende leer. */
+  skillNames(): string[] {
+    return this.skillsCache.map((s) => s.name);
   }
 
   private async saveInput(arbeit: Arbeit | null): Promise<SaveInput> {
@@ -656,12 +673,11 @@ export default class KodaPlugin extends Plugin {
       if (this.contextMode === "vault" && !this.vaultAvailable()) this.contextMode = "workspace";
       // Erst jetzt steht der metadataCache: die Arbeiten lesen und mit ihnen das Gespraech wiederherstellen.
       this.refreshArbeiten();
+      void this.readSkills();
     });
-    this.registerEvent(this.app.vault.on("delete", (file) => { if (this.isArbeitFile(file.path)) this.refreshArbeiten(); }));
-    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
-      if (this.isArbeitFile(file.path) || this.isArbeitFile(oldPath)) this.refreshArbeiten();
-    }));
-    this.registerEvent(this.app.metadataCache.on("changed", (file) => { if (this.isArbeitFile(file.path)) this.refreshArbeiten(); }));
+    this.registerEvent(this.app.vault.on("delete", (file) => { this.onKodaFileChange(file.path); }));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { this.onKodaFileChange(file.path); this.onKodaFileChange(oldPath); }));
+    this.registerEvent(this.app.metadataCache.on("changed", (file) => { this.onKodaFileChange(file.path); }));
     this.applyLanguage();
 
     const dir = normalizePath(`${this.manifest.dir ?? ""}/sessions`);

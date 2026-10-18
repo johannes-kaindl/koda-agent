@@ -13,6 +13,8 @@ import { thinkToggleView } from "../core/chat/reasoning-toggle";
 import { isContextMode, type ContextAttachment } from "../core/context/types";
 import { contextSummary, sourceChips } from "../core/context/labels";
 import { fillModeSelect } from "./mode-select";
+import { attachTextareaSuggest, type TextareaSuggest } from "../vendor/kit-obsidian/textarea-suggest";
+import { matchByQuery } from "../vendor/kit/slash-query";
 import { ContextPanel } from "./context-panel";
 import { AbilitiesPanel } from "./abilities-panel";
 import { ArbeitNameModal } from "./arbeit-name-modal";
@@ -24,6 +26,9 @@ const CONTEXT_QUERY_DEBOUNCE_MS = 400;
 export const VIEW_TYPE_KODA = "koda-agent-view";
 
 type KodaTab = "chat" | "context" | "abilities";
+
+/** Ein Eintrag im „/“-Menue: ein Skill (wird fuer dieses Gespraech auf „ganz“ gestellt) oder eine Arbeit. */
+type SlashItem = { kind: "skill"; name: string } | { kind: "arbeit"; name: string };
 
 /** Chat-Sidebar. Rendert plugin.chatLog; Streaming/Tool-Schritte kommen als
  *  gezielte DOM-Appends (kein Voll-Redraw pro Token). */
@@ -60,6 +65,9 @@ export class KodaView extends ItemView {
   private hub: HubController<KodaTab> | null = null;
   private ctxPanel: ContextPanel | null = null;
   private abPanel: AbilitiesPanel | null = null;
+  private suggest: TextareaSuggest | null = null;
+  /** Namen der Skills fuer das „/“-Menue, beim Oeffnen des Menues frisch gelesen (siehe `slashGroups`). */
+  private slashSkills: string[] = [];
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: KodaPlugin) {
     super(leaf);
@@ -144,7 +152,23 @@ export class KodaView extends ItemView {
     return Promise.resolve();
   }
 
+  /** Die Gruppen des „/“-Menues. Skills kommen aus dem Cache des Plugins (`readSkills` ist asynchron, das Menue
+   *  fragt synchron): nach jedem Tastendruck waere ein Dateizugriff zu teuer, und die Liste aendert sich selten. Keine
+   *  Werkzeuge — das Modell waehlt sie selbst. Ein abgeschalteter Skill steht trotzdem drin: „/name“ ist gerade der Weg,
+   *  ihn fuer dieses Gespraech einzuschalten. */
+  private slashGroups(query: string): { label: string; items: SlashItem[] }[] {
+    this.slashSkills = this.plugin.skillNames();
+    const skills = matchByQuery(this.slashSkills, query, (n) => n).map((name): SlashItem => ({ kind: "skill", name }));
+    const arbeiten = matchByQuery(this.plugin.arbeiten.map((a) => a.name), query, (n) => n).map((name): SlashItem => ({ kind: "arbeit", name }));
+    return [
+      { label: t("slash.skills"), items: skills },
+      { label: t("slash.arbeiten"), items: arbeiten },
+    ];
+  }
+
   onClose(): Promise<void> {
+    this.suggest?.destroy();
+    this.suggest = null;
     if (this.queryTimer !== null) { window.clearTimeout(this.queryTimer); this.queryTimer = null; }
     this.hub?.destroy();
     this.hub = null;
@@ -197,6 +221,16 @@ export class KodaView extends ItemView {
     this.inputEl = bar.createEl("textarea", { cls: "koda-input", attr: { placeholder: t("view.placeholder"), rows: "2" } });
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
+    });
+    // „/“-Menue (Spec Faehigkeiten § 8): der Baustein haengt seinen Tasten-Listener im Capture an dieses Feld, laeuft also VOR
+    // dem Senden-Listener oben und faengt Enter nur bei offener Liste ab; bei geschlossener Liste sendet Enter wie bisher.
+    this.suggest = attachTextareaSuggest<SlashItem>(this.inputEl, {
+      groups: (q) => this.slashGroups(q),
+      label: (item) => item.name,
+      onChoose: (item) => {
+        if (item.kind === "skill") void this.plugin.setSkillMode(item.name, "ganz");
+        else this.plugin.chooseArbeit(item.name);
+      },
     });
     // Der Entwurf speist die Vault-Vorschau im Kontext-Tab — entprellt, damit nicht jeder
     // Tastendruck eine Embedding-Anfrage ausloest. Der Generationszaehler im Panel verwirft
