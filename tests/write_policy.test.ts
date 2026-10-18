@@ -46,4 +46,17 @@ describe("writePolicy — Skills sind trotz Lage bestaetigungspflichtig", () => 
     expect(writePolicy("Koda/Arbeiten", "Koda")).toBe("confirm");
     expect(writePolicy("Koda/Arbeitenliste.md", "Koda")).toBe("free");
   });
+  // Seit dem Tausch auf code-kit folder-scope: Ordnerzugehoerigkeit ueber ganze Segmente, `..` liegt in keinem Ordner.
+  it("ein Pfad mit .. gilt nie als im Koda-Ordner (vorher verglich der Text)", () => {
+    expect(writePolicy("Koda/../Projekte/x.md", "Koda")).toBe("confirm");
+    expect(writePolicy("Koda/Entwürfe/../x.md", "Koda")).toBe("confirm");
+  });
+  it("ein leerer Koda-Ordner enthaelt nichts: alles fragt", () => {
+    expect(writePolicy("x.md", "")).toBe("confirm");
+    expect(writePolicy("Koda/x.md", "/")).toBe("confirm");
+  });
+  it("ein Schraegstrich am Ende des Koda-Ordners aendert nichts", () => {
+    expect(writePolicy("Koda/Notiz.md", "Koda/")).toBe("free");
+    expect(writePolicy("Koda/Skills/a.md", "Koda/")).toBe("confirm");
+  });
 });

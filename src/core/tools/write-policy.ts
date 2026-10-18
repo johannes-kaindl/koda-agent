@@ -1,5 +1,5 @@
 import { ARBEITEN_SUBFOLDER } from "../abilities/types";
-import { normalizeRel } from "./path-guard";
+import { isInFolder } from "../../vendor/kit/folder-scope";
 
 export type WriteDecision = "free" | "confirm";
 
@@ -18,16 +18,14 @@ export const SKILLS_SUBFOLDER = "Skills";
  *  Vergleich case-insensitiv und segment-genau: "Koda-Archiv" matcht "Koda" nicht,
  *  "Skillset.md" matcht "Skills/" nicht. */
 export function writePolicy(path: string, kodaFolder: string): WriteDecision {
-  const p = normalizeRel(path).toLowerCase();
-  const folder = normalizeRel(kodaFolder).toLowerCase();
-  if (folder === "") return "confirm";
-  const inKoda = p === folder || p.startsWith(folder + "/");
-  if (!inKoda) return "confirm";
+  // Ordnerzugehoerigkeit aus code-kit `folder-scope`: der Ordner selbst zaehlt mit (`self`), Gross/klein egal (`ignoreCase`), ganze
+  // Segmente. Ein leerer Koda-Ordner enthaelt NICHTS (kein `root`) — also Rueckfrage; ein Pfad mit `..` liegt in keinem Ordner.
+  const opts = { self: true, ignoreCase: true } as const;
+  if (!isInFolder(path, kodaFolder, opts)) return "confirm";
   // Eine Arbeit bestimmt wie ein Skill, was Koda darf (Spec Faehigkeiten § 13). Das Schreiben aus dem Tab
   // („Speichern“) ist eine Nutzerhandlung und laeuft nicht durch diese Policy.
   for (const sub of [SKILLS_SUBFOLDER, ARBEITEN_SUBFOLDER]) {
-    const dir = `${folder}/${sub.toLowerCase()}`;
-    if (p === dir || p.startsWith(dir + "/")) return "confirm";
+    if (isInFolder(path, `${kodaFolder}/${sub}`, opts)) return "confirm";
   }
   return "free";
 }

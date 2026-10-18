@@ -13,6 +13,7 @@
  *  leerer Ordner, also wieder ein Befund, der wie eine Tatsache aussieht.
  *  Nur fuer den VERGLEICH: ausgegeben wird immer der Originalpfad, denn mit dem muss
  *  `read_note` anschliessend die Datei finden. */
+import { pathsInFolder } from "../../vendor/kit/folder-scope";
 import type { TreeBlock } from "./tree";
 
 export const nf = (s: string): string => s.normalize("NFC");
@@ -42,15 +43,9 @@ export function isFolderNote(path: string): boolean {
  *  `localeCompare`: die ist ueber ICU-Versionen hinweg stabil, und „deterministisch"
  *  ist der Daseinszweck dieses Werkzeugs. */
 export function collectFolderNotes(allPaths: string[], folder: string, recursive: boolean): string[] {
-  const prefix = folder === "" ? "" : `${nf(folder)}/`;
-  const hits = allPaths.filter((p) => {
-    const n = nf(p);
-    if (!n.startsWith(prefix)) return false;
-    const rest = n.slice(prefix.length);
-    if (rest === "") return false;
-    return recursive || !rest.includes("/");
-  });
-  return hits.sort();
+  // Aus code-kit `folder-scope` (seit 0.31.0): ganze Segmente, NFC, nach UTF-16 sortiert, die Vault-Wurzel ausdruecklich (`root`). Neu
+  // gegenueber der Fassung davor: ein Pfad mit `..` liegt in keinem Ordner (vorher verglich der Text, `a/../b` war „in a“).
+  return pathsInFolder(allPaths, folder, { root: true, recursive });
 }
 
 /** Ab wann ein Feldwert gekuerzt wird. Eine Zeile soll eine Zeile bleiben: der Nutzen

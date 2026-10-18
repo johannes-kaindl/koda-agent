@@ -10,6 +10,7 @@ import { sanitizeSkillName, skillPath } from "../core/skills/path";
 import { cleanSkillRef } from "../core/skills/load";
 import { parseSkill } from "../core/skills/skill";
 import { SKILLS_SUBFOLDER } from "../core/tools/write-policy";
+import { isInFolder } from "../vendor/kit/folder-scope";
 import type { SkillMode } from "../core/abilities/types";
 import {
   formatSearchResult, formatRelatedResult, hasIndexableText,
@@ -565,8 +566,7 @@ export class VaultTools implements ToolRunner {
     const ref = cleanSkillRef(name);
     if (ref === null) return { ok: false, error: `Ungueltiger Skill-Name: "${name}" — nur der Name aus der Liste unter ## Skills, ohne Pfad.` };
     const dir = `${this.opts.kodaFolder().replace(/\/+$/, "")}/${SKILLS_SUBFOLDER}`;
-    const prefix = `${dir.toLowerCase()}/`;
-    const files = this.vault.listMarkdownPaths().filter((p) => p.toLowerCase().startsWith(prefix) && !p.slice(prefix.length).includes("/"));
+    const files = this.vault.listMarkdownPaths().filter((p) => isInFolder(p, dir, { recursive: false, ignoreCase: true }));
     const nameOf = (p: string): string => p.slice(dir.length + 1).replace(/\.md$/i, "");
     const hit = files.find((p) => nameOf(p).toLowerCase() === ref.toLowerCase());
     const available = async (): Promise<string> => {

@@ -57,3 +57,18 @@ describe("resolveNotePath mit erweiterter Erlaubnis (Lese-Haelfte)", () => {
     expect(() => resolveNotePath("../weg.base", READ_EXTENSIONS)).toThrow(/verlässt den Vault/);
   });
 });
+
+describe("Unterschiede seit dem Tausch auf code-kit rel-path (je mit Grund im Kopf von path-guard.ts)", () => {
+  it("lehnt ein NUL-Byte ab, Notiz- wie Ordnerpfad", () => {
+    expect(() => resolveNotePath("a\0b.md")).toThrow(/NUL/);
+    expect(() => resolveFolderPath("a\0b")).toThrow(/NUL/);
+  });
+  it("liest ein Segment `.. ` mit Leerraum als Traversal", () => {
+    expect(() => resolveNotePath("a/.. /b.md")).toThrow(/verlässt/);
+    expect(() => resolveFolderPath("a/.. /b")).toThrow(/verlässt/);
+  });
+  it("ein Pfad ohne Rest scheitert wie bisher an der Endung, nicht an einer neuen Meldung", () => {
+    expect(() => resolveNotePath("")).toThrow(/\.md/);
+    expect(() => resolveNotePath("./")).toThrow(/\.md/);
+  });
+});

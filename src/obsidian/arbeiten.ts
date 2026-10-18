@@ -6,6 +6,7 @@ import type { App, TFile } from "obsidian";
 import { parseArbeit, type ParsedArbeit } from "../core/abilities/parse";
 import { ARBEIT_KEYS } from "../core/abilities/save";
 import { ARBEITEN_SUBFOLDER } from "../core/abilities/types";
+import { isInFolder } from "../vendor/kit/folder-scope";
 
 /** `<Koda-Ordner>/Arbeiten` ohne schliessenden Schraegstrich. */
 export function arbeitenDir(kodaFolder: string): string {
@@ -14,9 +15,7 @@ export function arbeitenDir(kodaFolder: string): string {
 
 /** Liegt der Pfad direkt unter `Arbeiten/`? Flach, case-insensitiv wie `writePolicy` und `readSkills`. */
 export function isArbeitPath(path: string, kodaFolder: string): boolean {
-  const prefix = `${arbeitenDir(kodaFolder).toLowerCase()}/`;
-  const lower = path.toLowerCase();
-  return lower.startsWith(prefix) && !lower.slice(prefix.length).includes("/") && lower.endsWith(".md");
+  return isInFolder(path, arbeitenDir(kodaFolder), { recursive: false, ignoreCase: true }) && path.toLowerCase().endsWith(".md");
 }
 
 export function arbeitName(path: string, kodaFolder: string): string {

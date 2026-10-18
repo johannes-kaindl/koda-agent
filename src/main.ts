@@ -23,7 +23,7 @@ import { latestSessionState, needsSessionRecord, sessionForNewChat } from "./cor
 import { parseArbeit } from "./core/abilities/parse";
 import { emptyOverlay, emptySessionState, type Arbeit, type OnOff, type SessionState, type SkillMode } from "./core/abilities/types";
 import { abilitiesViewModel, type AbilitiesVM } from "./core/abilities/panel-vm";
-import { expandPathEntries } from "./vendor/kit/folder-scope";
+import { expandPathEntries, isInFolder, pathsInFolder } from "./vendor/kit/folder-scope";
 import { providerToolGroups, toolRows } from "./core/prompt/view-model";
 import { arbeitenDir, arbeitName, isArbeitPath, readArbeiten, writeArbeitFrontmatter } from "./obsidian/arbeiten";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
@@ -252,8 +252,7 @@ export default class KodaPlugin extends Plugin {
     // Ein leeres Feld normalisiert auf "" — das ist der ganze Vault, keine Auswahl, die
     // ohne Rueckfrage durchgehen sollte (Befund 2). Ablehnen und sagen, was passiert waere.
     if (norm === "") { new Notice(t("picker.folder.emptyRoot")); return; }
-    const praefix = `${norm}/`;
-    const pfade = this.app.vault.getMarkdownFiles().map((f) => f.path).filter((p) => p.startsWith(praefix)).sort();
+    const pfade = pathsInFolder(this.app.vault.getMarkdownFiles().map((f) => f.path), norm);
     if (pfade.length === 0) { new Notice(t("picker.folder.empty", ordner)); return; }
     this.addContextPaths(pfade);
   }
@@ -378,8 +377,7 @@ export default class KodaPlugin extends Plugin {
    *  auffrischen (das „/“-Menue und `load_skill` fragen synchron). */
   private onKodaFileChange(path: string): void {
     if (this.isArbeitFile(path)) { this.refreshArbeiten(); return; }
-    const skills = `${this.settings.kodaFolder.replace(/\/+$/, "").toLowerCase()}/${SKILLS_SUBFOLDER.toLowerCase()}/`;
-    if (path.toLowerCase().startsWith(skills)) void this.readSkills().then(() => { this.syncAll(); });
+    if (isInFolder(path, `${this.settings.kodaFolder}/${SKILLS_SUBFOLDER}`, { ignoreCase: true })) void this.readSkills().then(() => { this.syncAll(); });
   }
 
   /** Zeichnet alles neu, was vom Sitzungszustand abhaengt: Modus-Dropdown, Kontext-Tab, Tab Faehigkeiten. */
@@ -439,11 +437,9 @@ export default class KodaPlugin extends Plugin {
    *  laesst den uebrigen Frontmatter und den Body unberuehrt. */
   async setSkillDefault(name: string, mode: SkillMode): Promise<void> {
     const dir = `${this.settings.kodaFolder.replace(/\/+$/, "")}/${SKILLS_SUBFOLDER}`;
-    const prefix = `${dir.toLowerCase()}/`;
-    const file = this.app.vault.getMarkdownFiles().find((f) => {
-      const p = f.path.toLowerCase();
-      return p.startsWith(prefix) && !p.slice(prefix.length).includes("/") && f.path.slice(dir.length + 1).replace(/\.md$/i, "").toLowerCase() === name.toLowerCase();
-    });
+    const file = this.app.vault.getMarkdownFiles().find((f) =>
+      isInFolder(f.path, dir, { recursive: false, ignoreCase: true })
+      && f.path.slice(f.path.lastIndexOf("/") + 1).replace(/\.md$/i, "").toLowerCase() === name.toLowerCase());
     if (file === undefined) return;
     await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
       delete fm["enabled"];
@@ -1365,14 +1361,12 @@ export default class KodaPlugin extends Plugin {
    *  als bestaetigungspflichtig erkennt — ein stiller Bestaetigungs-Bypass. */
   async readSkills(): Promise<{ skills: Skill[]; selection: Selection; failed: SkillFailure[] }> {
     const dir = `${this.settings.kodaFolder.replace(/\/+$/, "")}/${SKILLS_SUBFOLDER}`;
-    const prefix = `${dir.toLowerCase()}/`;
     const skills: Skill[] = [];
     const failed: SkillFailure[] = [];
     for (const f of this.app.vault.getMarkdownFiles()) {
-      if (!f.path.toLowerCase().startsWith(prefix)) continue;
-      const rel = f.path.slice(dir.length + 1);
-      if (rel.includes("/")) continue; // flach: keine Unterordner
-      const name = rel.replace(/\.md$/i, "");
+      // Flach (keine Unterordner), Gross/klein egal — Ordnerzugehoerigkeit aus code-kit `folder-scope`.
+      if (!isInFolder(f.path, dir, { recursive: false, ignoreCase: true })) continue;
+      const name = f.path.slice(f.path.lastIndexOf("/") + 1).replace(/\.md$/i, "");
       const raw = await this.app.vault.cachedRead(f).catch(() => null);
       if (raw === null) { failed.push({ name, reason: "read-error" }); continue; }
       const r = parseSkill(name, raw);
