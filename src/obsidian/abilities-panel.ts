@@ -102,7 +102,7 @@ export class AbilitiesPanel implements HubPanel<"abilities"> {
     for (const s of vm.skills) {
       const row = skills.createDiv({ cls: "koda-ab-row" });
       this.dot(row, s.fromOverlay);
-      row.createSpan({ cls: "koda-ab-name", text: s.name });
+      row.createSpan({ cls: "koda-ab-name", text: s.name, attr: { title: s.name } });
       row.createSpan({ cls: "koda-ab-size", text: formatK(s.chars) });
       buildSkillSegment(row, { name: s.name, mode: s.mode, onChange: (m) => { this.host.setSkillMode(s.name, m); } });
     }

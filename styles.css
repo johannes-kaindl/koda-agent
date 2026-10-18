@@ -410,12 +410,12 @@
 .koda-ab-reset { font-size: var(--font-ui-smaller); padding: 0 var(--size-2-2); }
 .koda-ab-hint { display: flex; align-items: flex-start; gap: var(--size-2-2); font-size: var(--font-ui-smaller); color: var(--text-warning); margin: var(--size-2-1) 0; }
 .koda-ab-hint-icon { display: flex; }
-.koda-ab-row { display: flex; align-items: center; gap: var(--size-2-2); padding: var(--size-2-1) 0; font-size: var(--font-ui-small); }
+.koda-ab-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--size-2-2); padding: var(--size-2-1) 0; font-size: var(--font-ui-small); }
 .koda-ab-row.is-failed { color: var(--text-faint); }
 .koda-ab-dot { width: 1em; flex: none; text-align: center; color: var(--interactive-accent); }
-.koda-ab-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.koda-ab-name { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .koda-ab-size { color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: nowrap; }
-.koda-seg { display: inline-flex; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); overflow: hidden; flex: none; }
+.koda-seg { display: inline-flex; margin-left: auto; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); overflow: hidden; flex: none; }
 .koda-seg-btn { font-size: var(--font-ui-smaller); padding: 2px var(--size-4-2); border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--text-muted); cursor: pointer; }
 .koda-seg-btn + .koda-seg-btn { border-left: 1px solid var(--background-modifier-border); }
 .koda-seg-btn.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
