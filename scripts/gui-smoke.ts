@@ -52,7 +52,7 @@
  * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
  * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
- * Nenner ist `PUNKTE` (94 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * Nenner ist `PUNKTE` (96 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
  * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
  * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
  * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.
@@ -315,6 +315,8 @@ const PUNKTE = [
   "95. Pflichtpunkt Erreichbarkeit im kurzen Panel (420 px Höhe)",
   "96. Gegenprobe Erreichbarkeit: ohne Rollbalken am Verlauf wird ein Bedienelement unerreichbar",
   "97. Werkzeugliste: jedes Beschreibungsfeld zeigt seinen Inhalt in ganzen Zeilen, keine halb abgeschnittene Zeile am unteren Rand, mindestens drei Zeilen hoch",
+  "98. Handpunkt 17 an der Naht: ist der Embedding-Endpunkt nicht erreichbar, stehen die Volltext-Treffer UND die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)“ im Ergebnis; erreichbar fehlt die Zeile",
+  "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung und kein related_notes; mit dem Stub ist beides da",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -4497,6 +4499,61 @@ async function main(): Promise<void> {
           else skipped(N96, `in diesem Layout nicht anwendbar — ${gegen.detail}`);
         } catch (error) {
           for (const n of [N92, N93, N94, N95, N96] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+
+      // --- 98–99. Handpunkte 17 und 18 des Retrieval-Smokes, an der Naht (Welle 24) ----
+      // Die Handpunkte verlangen den Eingriff in geteilte Dienste (Ollama stoppen, vault-rag deaktivieren). Hier wird Kodas Seite der Naht
+      // gemessen: die Antwort der vault-rag-API ist ein Stub (`offline` bzw. kein Eintrag), `search_notes` laeuft ueber DENSELBEN Weg wie im Chat.
+      // Ein echtes vault-rag und ein echter Embedding-Dienst sind damit NICHT belegt.
+      {
+        const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const P98 = "98. Handpunkt 17 an der Naht: ist der Embedding-Endpunkt nicht erreichbar, stehen die Volltext-Treffer UND die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)“ im Ergebnis; erreichbar fehlt die Zeile";
+        const P99 = "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung und kein related_notes; mit dem Stub ist beides da";
+        const vorhanden = await cdp.evaluate<boolean>(`return !!app.plugins.plugins["vault-retrieval"];`);
+        if (vorhanden) {
+          const grund = "uebersprungen — ein vault-retrieval-Eintrag existiert bereits (echtes Plugin oder Rest eines abgebrochenen Laufs); Stub wuerde ihn ueberschreiben";
+          record(P98, true, grund);
+          record(P99, true, grund);
+        } else {
+          const stubAn = (aus: boolean): Promise<unknown> => cdp.evaluate(`
+            window.__kodaRag98 = { fail: ${aus} };
+            app.plugins.plugins["vault-retrieval"] = {
+              __kodaSmokeStub: true,
+              api: {
+                apiVersion: 1,
+                status: () => ({ apiVersion: 1, indexed: true, noteCount: 4, reindexing: false }),
+                search: async () => window.__kodaRag98.fail ? { ok: false, reason: "offline" } : { ok: true, hits: [{ path: "Notes/Compaction.md", score: 0.9 }] },
+                related: async () => ({ ok: true, hits: [{ path: "Koda/Memory.md", score: 0.8 }] }),
+              },
+            };
+            return true;`);
+          const suche = (): Promise<string> => cdp.evaluate<string>(`const r = await ${PL}.buildTools().run("search_notes", { query: "Compaction" }); return r.ok ? r.content : "FEHLER: " + r.error;`);
+          const namen = (): Promise<string[]> => cdp.evaluate<string[]>(`return ${PL}.currentToolNames();`);
+          // Der semantische Teil zeigt sich als Score hinter dem Volltext-Treffer „(0.90)“ oder als Block „Inhaltlich ähnlich“ (ein Treffer, der auch
+          // wörtlich gefunden wurde, steht nicht zweimal da).
+          const semantisch = (t: string): boolean => /\(0\.90\)|Inhaltlich ähnlich/.test(t);
+          try {
+            // 99, Teil 1: kein Eintrag — der Zustand jedes Store-Nutzers ohne vault-rag.
+            const ohneText = await suche();
+            const ohneNamen = await namen();
+            // 98: Stub mit „offline“, dann erreichbar (Gegenprobe: die Zeile verschwindet).
+            await stubAn(true);
+            const offText = await suche();
+            await cdp.evaluate(`window.__kodaRag98.fail = false; return true;`);
+            const anText = await suche();
+            const mitNamen = await namen();
+            record(P98,
+              offText.includes("Compaction") && offText.includes("(semantisch: Embedding-Endpunkt nicht erreichbar") && !anText.includes("Embedding-Endpunkt nicht erreichbar"),
+              `offline: Volltext-Treffer ${offText.includes("Compaction")} · Hinweiszeile ${offText.includes("(semantisch: Embedding-Endpunkt nicht erreichbar")} · erreichbar: Zeile weg ${!anText.includes("Embedding-Endpunkt nicht erreichbar")}, semantischer Teil ${semantisch(anText)}`);
+            record(P99,
+              !semantisch(ohneText) && !ohneNamen.includes("related_notes") && mitNamen.includes("related_notes") && semantisch(anText),
+              `ohne vault-rag: semantischer Teil ${semantisch(ohneText)} (soll nein) · related_notes ${ohneNamen.includes("related_notes")} (soll nein) · mit Stub: related_notes ${mitNamen.includes("related_notes")}, semantischer Teil ${semantisch(anText)} (soll ja)`);
+          } catch (error) {
+            for (const n of [P98, P99] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+          } finally {
+            await cdp.evaluate(`if (app.plugins.plugins["vault-retrieval"]?.__kodaSmokeStub) delete app.plugins.plugins["vault-retrieval"]; delete window.__kodaRag98; return true;`).catch(() => undefined);
+          }
         }
       }
     } finally {
