@@ -52,7 +52,7 @@
  * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
  * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
- * Nenner ist `PUNKTE` (78 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * Nenner ist `PUNKTE` (85 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
  * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
  * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
  * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.
@@ -249,7 +249,7 @@ const PUNKTE = [
   "26. delete_note fragt auch im Koda-Ordner nach und legt die Notiz in den Papierkorb",
   "27. Restaurierte, nicht besuchte Tabs (DeferredViews) stehen im Arbeitskontext",
   "28. Dieselbe Notiz in zwei Tabs steht einmal im Block, nicht zweimal",
-  "29. Hub-Tabs Chat und Kontext sind sichtbar (Hoehe > 0, nicht nur im DOM)",
+  "29. Hub-Tabs Chat, Kontext und Faehigkeiten sind sichtbar (Hoehe > 0, nicht nur im DOM)",
   "30. Ein abgewaehlter Chip verschwindet aus dem gesendeten Block, Zuruecksetzen holt ihn wieder",
   "31. Auf/Zu-Zustand der Abschnitte landet in data.json",
   "32. Chat-Panel ist Spalten-Flex, Eingabezeile sitzt am unteren Rand (nicht im Verlauf)",
@@ -298,6 +298,13 @@ const PUNKTE = [
   "77. Gemma 4 ohne Öffner: der Denktext steht im Denkblock, nicht in der Antwort (Stream und Verlauf)",
   "78. Anbieter-Werkzeug: ein Aufruf gegen das Schema (Pflichtfeld fehlt, unmögliches Datum) erreicht den Anbieter nicht, ein gültiger schon",
   "76. Einstellungen: Werkzeuge eines Anbieter-Plugins stehen in eigener Gruppe mit Schalter, ein Anbieter ohne version nennt seinen Grund, der Schalter schreibt toolsDisabled",
+  "79. Tab „Fähigkeiten“: sichtbar, ein Klick auf „ganz“ bringt den Skill-Text in den nächsten Prompt, der Overlay-Punkt erscheint und verschwindet mit dem Zurückschalten",
+  "80. Skill im Gespräch abgeschaltet: fehlt im Prompt, load_skill lehnt ab, ein früheres load_skill-Ergebnis wird in der Projektion zum Hinweis und steht im Chat wörtlich",
+  "81. Arbeit mit „übrige-skills: aus“: nur die genannten Skills im Prompt, Modus und Tiefe aus der Arbeit, Ordner zu Einzelpfaden, ungültige und fehlende Einträge als Hinweis",
+  "82. „Speichern“ schreibt die Abweichung in die Arbeits-Notiz, der Text darunter bleibt; der Schalter „Hinweis statt zweitem Skill-Text“ schaltet die Regel ab",
+  "83. Sitzungs-Marke: nach einer Frage steht sie im JSONL, nach dem Neuladen sind Arbeit und Overlay zurück, „Neues Gespräch“ behält die Arbeit und leert das Overlay",
+  "84. „/“-Menü: zwei Gruppen, Enter wählt und sendet nicht, Escape schließt, bei geschlossener Liste sendet Enter wie bisher, eine URL öffnet nichts",
+  "85. Regler „Tiefe“ im Kontext-Tab gilt für das Gespräch: die wirksame Tiefe ändert sich, die Einstellung nicht",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -1968,7 +1975,8 @@ async function main(): Promise<void> {
       if (mass === null) throw new Error("Hub-Tabs nach dem Oeffnen-Befehl nicht vollstaendig gerendert");
       // Größe, nicht Existenz: in einer Seitenleiste kann ein Element im DOM stehen und null
       // Pixel hoch sein — genau der Defekt von 0.10.1.
-      ok29 = mass.tabs === 2 && mass.hoehe > 0;
+      // Seit Plan 1 (Welle 24) drei Tabs: Chat, Kontext, Faehigkeiten. Die Zahl ist der Beleg, dass der dritte Tab da ist.
+      ok29 = mass.tabs === 3 && mass.hoehe > 0 && mass.labels.length === 3;
       detail29 = `Tabs: ${mass.tabs} · kleinste Hoehe: ${mass.hoehe}px · Labels: ${mass.labels.join(" | ")}`;
     } catch (error) {
       detail29 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
@@ -1978,7 +1986,7 @@ async function main(): Promise<void> {
     // Hub-Leiste hat nur noch einen Tab, `pollUntil` findet nie zwei Buttons und laeuft in
     // den 15s-Timeout, der Punkt wird rot mit „Hub-Tabs nach dem Oeffnen-Befehl nicht
     // vollstaendig gerendert".
-    record("29. Hub-Tabs Chat und Kontext sind sichtbar (Hoehe > 0, nicht nur im DOM)", ok29, detail29);
+    record("29. Hub-Tabs Chat, Kontext und Faehigkeiten sind sichtbar (Hoehe > 0, nicht nur im DOM)", ok29, detail29);
 
     // Nachgezogen (Etappe 2b, Task 11): `currentContext()` ist seit Task 6 async
     // (Volltext-Modi lesen Notizen). Ohne `await` liefert jeder Aufruf ein Promise-Objekt
@@ -4046,6 +4054,289 @@ async function main(): Promise<void> {
           }
         } catch (error) { abbruch22(P78, error); } finally {
           await cdp.evaluate(`delete app.plugins.plugins[${JSON.stringify(PROV78)}]; delete window.__kodaSmoke78; return true;`).catch(() => undefined);
+        }
+      }
+
+      // --- 79–85. Fähigkeiten und Arbeiten (Plan 1, Welle 24) ----
+      // Der Treiber setzt jeden Zustand, den er anlegt, VOR dem Lauf zurück (Skills, Arbeits-Notiz, Notizen, Sitzungszustand)
+      // und räumt nach dem Lauf alles ab, was er angelegt hat — ein abgebrochener Vorlauf misst sonst seinen eigenen Rest.
+      {
+        const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        const P79 = "79. Tab „Fähigkeiten“: sichtbar, ein Klick auf „ganz“ bringt den Skill-Text in den nächsten Prompt, der Overlay-Punkt erscheint und verschwindet mit dem Zurückschalten";
+        const P80 = "80. Skill im Gespräch abgeschaltet: fehlt im Prompt, load_skill lehnt ab, ein früheres load_skill-Ergebnis wird in der Projektion zum Hinweis und steht im Chat wörtlich";
+        const P81 = "81. Arbeit mit „übrige-skills: aus“: nur die genannten Skills im Prompt, Modus und Tiefe aus der Arbeit, Ordner zu Einzelpfaden, ungültige und fehlende Einträge als Hinweis";
+        const P82 = "82. „Speichern“ schreibt die Abweichung in die Arbeits-Notiz, der Text darunter bleibt; der Schalter „Hinweis statt zweitem Skill-Text“ schaltet die Regel ab";
+        const P83 = "83. Sitzungs-Marke: nach einer Frage steht sie im JSONL, nach dem Neuladen sind Arbeit und Overlay zurück, „Neues Gespräch“ behält die Arbeit und leert das Overlay";
+        const P84 = "84. „/“-Menü: zwei Gruppen, Enter wählt und sendet nicht, Escape schließt, bei geschlossener Liste sendet Enter wie bisher, eine URL öffnet nichts";
+        const P85 = "85. Regler „Tiefe“ im Kontext-Tab gilt für das Gespräch: die wirksame Tiefe ändert sich, die Einstellung nicht";
+        const BODY_A = "MARKER-A-79 Text von Skill A.";
+        const ARBEIT_TEXT = "Freitext fuer mich, geht nicht ans Modell.";
+        const ARBEIT_NOTE = [
+          "---", "koda: arbeit", "skills:", "  smoke79-a: ganz", "übrige-skills: aus", "werkzeuge:", "  write_skill: aus", '  move_note: "on"',
+          "kontext:", "  modus: note", "  tiefe: 2", "  notizen:", "    - Smoke79Ordner/", "    - Nirgends79.md", "---", ARBEIT_TEXT, "",
+        ].join("\n");
+        const zeile = (name: string): string => `[...document.querySelectorAll(".koda-ab-body .koda-ab-row")].find((r) => r.querySelector(".koda-ab-name")?.textContent === ${JSON.stringify(name)})`;
+        const zustand = { gesichert: false };
+        try {
+          // Vorlauf: Zustand sichern, Kulisse neu schreiben (Zurücksetzen VOR dem Lauf, nicht nur danach).
+          await cdp.evaluate(`
+            const p = ${PL};
+            window.__kodaSmoke79 = { session: JSON.stringify(p.session), hint: p.settings.skillHintInHistory };
+            const ensure = async (d) => { if (!app.vault.getFolderByPath(d)) await app.vault.createFolder(d); };
+            const mk = async (path, content) => { const f = app.vault.getFileByPath(path); if (f) await app.vault.modify(f, content); else await app.vault.create(path, content); };
+            for (const d of ["Koda/Skills", "Koda/Arbeiten", "Smoke79Ordner", "Smoke79Ordner/sub"]) await ensure(d);
+            await mk("Koda/Skills/smoke79-a.md", "---\\ndescription: Smoke Skill A\\n---\\n${BODY_A}");
+            await mk("Koda/Skills/smoke79-b.md", "---\\ndescription: Smoke Skill B\\npinned: true\\n---\\nMARKER-B-79 Text von Skill B.");
+            await mk("Koda/Arbeiten/Smoke79.md", ${JSON.stringify(ARBEIT_NOTE)});
+            await mk("Smoke79Ordner/n1.md", "n1");
+            await mk("Smoke79Ordner/sub/n2.md", "n2");
+            p.settings.skillHintInHistory = true;
+            p.chooseArbeit(null);
+            p.resetOverlay();
+            return true;
+          `);
+          zustand.gesichert = true;
+          const bereit = await pollUntil<boolean>(cdp, `
+            const p = ${PL};
+            p.refreshArbeiten();
+            await p.readSkills();
+            const a = p.arbeiten.find((x) => x.name === "Smoke79");
+            return a && (a.kontext.notizen ?? []).length === 2 && p.skillNames().includes("smoke79-a") && p.skillNames().includes("smoke79-b") ? true : null;`, 10_000, 300);
+          if (!bereit) throw new Error("Kulisse (Skills, Arbeit) wurde vom metadataCache nicht gelesen");
+          const prompt = (): Promise<string> => cdp.evaluate<string>(`return await ${PL}.previewSystemPrompt();`);
+
+          // 79. Der Tab, ein echter Klick auf den Schalter, der Prompt, der Punkt.
+          try {
+            await cdp.evaluate(`const p = ${PL}; if (p.views().length === 0) await p.activateView(); app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-abilities")}); return true;`);
+            const tab = await pollUntil<{ h: number; rows: number }>(cdp, `
+              const b = document.querySelector(".koda-ab-body"); const r = b?.getBoundingClientRect();
+              const rows = b ? b.querySelectorAll(".koda-ab-row").length : 0;
+              return r && r.height > 0 && ${zeile("smoke79-a")} ? { h: Math.round(r.height), rows } : null;`, 10_000, 300);
+            const vorher = await prompt();
+            await cdp.evaluate(`${zeile("smoke79-a")}.querySelector('.koda-seg-btn[data-mode="ganz"]').click(); return true;`);
+            const nachher = await pollUntil<string>(cdp, `const t = await ${PL}.previewSystemPrompt(); return t.includes(${JSON.stringify("MARKER-A-79")}) ? t : null;`, 8000, 300);
+            const punkt = await pollUntil<{ dots: number; aktiv: string }>(cdp, `
+              const row = ${zeile("smoke79-a")};
+              const dots = row ? row.querySelectorAll(".koda-ab-dot[aria-label]").length : 0;
+              const aktiv = row?.querySelector(".koda-seg-btn.is-active")?.getAttribute("data-mode") ?? "";
+              return dots > 0 && aktiv === "ganz" ? { dots, aktiv } : null;`, 8000, 300);
+            await cdp.evaluate(`${zeile("smoke79-a")}.querySelector('.koda-seg-btn[data-mode="beschreibung"]').click(); return true;`);
+            const zurueck = await pollUntil<{ ohneText: boolean; ohnePunkt: boolean; leer: boolean }>(cdp, `
+              const t = await ${PL}.previewSystemPrompt();
+              const row = ${zeile("smoke79-a")};
+              const ohnePunkt = !!row && row.querySelectorAll(".koda-ab-dot[aria-label]").length === 0;
+              const leer = Object.keys(${PL}.session.overlay.skills).length === 0;
+              return !t.includes("MARKER-A-79") && ohnePunkt && leer ? { ohneText: true, ohnePunkt, leer } : null;`, 8000, 300);
+            record(P79, tab !== null && !vorher.includes("MARKER-A-79") && nachher !== null && punkt !== null && zurueck !== null,
+              `Tab sichtbar ${tab ? `${tab.h} px, ${tab.rows} Zeilen` : "nein"} · vorher ohne Text: ${!vorher.includes("MARKER-A-79")} · nach Klick „ganz“ im Prompt: ${nachher !== null} unter ## Skills: ${nachher?.includes("## Skills") === true} · Punkt: ${punkt?.dots ?? 0} · nach Zurückschalten: ohne Text ${zurueck?.ohneText === true}, ohne Punkt ${zurueck?.ohnePunkt === true}, Overlay leer ${zurueck?.leer === true}`);
+          } catch (error) { abbruch(P79, error); }
+
+          // 80. Abgeschaltet: Prompt, load_skill, Projektion (Regel direkt, Kontrolle mit „Beschreibung“), Chat wörtlich.
+          try {
+            const r80 = await cdp.evaluate<{ beschr: string | null; ganz: string | null; aus: string | null; imPrompt: boolean; ablehnung: { ok: boolean; error?: string }; imLog: boolean; verfuegbar: boolean }>(`
+              const p = ${PL};
+              const body = "### smoke79-a\\nSmoke Skill A\\n\\n${BODY_A}";
+              p.chatLog = [
+                { role: "user", content: "Smoke 80" },
+                { role: "assistant", content: "", toolCalls: [{ id: "c80", name: "load_skill", arguments: JSON.stringify({ name: "smoke79-a" }) }] },
+                { role: "tool", toolCallId: "c80", content: body },
+                { role: "assistant", content: "ok" },
+              ];
+              const regel = () => p.projectionRules()[0]({ name: "load_skill", args: JSON.stringify({ name: "smoke79-a" }) }, body);
+              const beschr = regel();
+              await p.setSkillMode("smoke79-a", "ganz");
+              const ganz = regel();
+              await p.setSkillMode("smoke79-a", "aus");
+              const aus = regel();
+              const imPrompt = (await p.previewSystemPrompt()).includes("smoke79-a");
+              const ablehnung = await p.buildTools().run("load_skill", { name: "smoke79-a" });
+              await p.views()[0].renderLog();
+              const imLog = [...document.querySelectorAll(".koda-log .koda-tool pre")].some((e) => (e.textContent || "").includes("MARKER-A-79"));
+              const verfuegbar = ablehnung.ok === false && /smoke79-b/.test(ablehnung.error || "");
+              return { beschr, ganz, aus, imPrompt, ablehnung, imLog, verfuegbar };
+            `);
+            record(P80,
+              r80.beschr === null && (r80.ganz ?? "").includes("steht oben im System-Prompt") && (r80.aus ?? "").includes("abgeschaltet")
+                && !r80.imPrompt && !r80.ablehnung.ok && /abgeschaltet/.test(r80.ablehnung.error ?? "") && r80.imLog && r80.verfuegbar,
+              `Regel bei „Beschreibung“: ${r80.beschr === null ? "Ergebnis bleibt" : "ERSETZT"} · „ganz“: „${(r80.ganz ?? "").slice(0, 40)}“ · „aus“: „${(r80.aus ?? "").slice(0, 52)}“ · Name im Prompt: ${r80.imPrompt} · load_skill: „${(r80.ablehnung.error ?? "").slice(0, 60)}“ · Text im Chat wörtlich: ${r80.imLog}`);
+          } catch (error) { abbruch(P80, error); }
+
+          // 81. Die Arbeit wählen.
+          try {
+            const r81 = await cdp.evaluate<{ modus: string; dropdowns: string[]; tiefe: number; manuell: string[]; imPrompt: string[]; schreibWerkzeug: boolean; hinweise: string[] }>(`
+              const p = ${PL};
+              await p.setSkillMode("smoke79-a", "beschreibung");
+              p.chooseArbeit("Smoke79");
+              const t = await p.previewSystemPrompt();
+              const imPrompt = ["MARKER-A-79", "MARKER-B-79", "smoke79-b", "tidy-up"].filter((n) => t.includes(n));
+              // Der Kontext-Tab zeichnet asynchron (viewModel liest Dateien): auf beide Dropdowns warten, nicht einmal lesen.
+              const dropdowns = await new Promise((resolve) => {
+                const t0 = Date.now();
+                const tick = () => {
+                  const v = [...document.querySelectorAll("select.koda-mode")].map((e) => e.value);
+                  if ((v.length > 0 && v.every((x) => x === "note")) || Date.now() - t0 > 5000) resolve(v); else setTimeout(tick, 150);
+                };
+                tick();
+              });
+              return {
+                modus: p.contextMode,
+                dropdowns,
+                tiefe: p.effectiveContextNow().depth,
+                manuell: [...p.contextManual],
+                imPrompt,
+                schreibWerkzeug: p.currentToolNames().includes("write_skill"),
+                hinweise: await p.arbeitHints(),
+              };
+            `);
+            record(P81,
+              r81.modus === "note" && r81.dropdowns.length > 0 && r81.dropdowns.every((v) => v === "note") && r81.tiefe === 2
+                && JSON.stringify(r81.manuell) === JSON.stringify(["Smoke79Ordner/n1.md", "Smoke79Ordner/sub/n2.md"])
+                && JSON.stringify(r81.imPrompt) === JSON.stringify(["MARKER-A-79"]) && !r81.schreibWerkzeug
+                && r81.hinweise.some((h) => h.includes("werkzeuge.move_note")) && r81.hinweise.some((h) => h.includes("Nirgends79.md")),
+              `Modus ${r81.modus} · Dropdowns ${JSON.stringify(r81.dropdowns)} · Tiefe ${r81.tiefe} · Notizen ${JSON.stringify(r81.manuell)} · im Prompt nur ${JSON.stringify(r81.imPrompt)} · write_skill gesendet: ${r81.schreibWerkzeug} · Hinweise ${r81.hinweise.length}: ${r81.hinweise.map((h) => h.slice(-32)).join(" | ")}`);
+          } catch (error) { abbruch(P81, error); }
+
+          // 82. Speichern und der Schalter für den Skill-Hinweis.
+          try {
+            const r82 = await cdp.evaluate<{ gespeichert: boolean; note: string; overlayLeer: boolean; mitHinweis: string | null; ohneHinweis: number }>(`
+              const p = ${PL};
+              p.chooseArbeit("Smoke79");
+              await p.setSkillMode("smoke79-b", "ganz");
+              p.setToolOn("move_note", false);
+              const gespeichert = await p.saveArbeit();
+              const note = await app.vault.adapter.read("Koda/Arbeiten/Smoke79.md");
+              const overlayLeer = Object.keys(p.session.overlay.skills).length === 0 && Object.keys(p.session.overlay.werkzeuge).length === 0;
+              const call = { name: "load_skill", args: JSON.stringify({ name: "smoke79-a" }) };
+              const mitHinweis = p.projectionRules()[0](call, "x");
+              p.settings.skillHintInHistory = false;
+              const ohneHinweis = p.projectionRules().length;
+              p.settings.skillHintInHistory = true;
+              return { gespeichert, note, overlayLeer, mitHinweis, ohneHinweis };
+            `);
+            const n = r82.note;
+            record(P82,
+              r82.gespeichert && n.includes("smoke79-b: ganz") && n.includes("smoke79-a: ganz") && n.includes("move_note: aus") && n.includes("write_skill: aus")
+                && /übrige-skills: aus/.test(n) && n.includes(ARBEIT_TEXT) && n.trimEnd().endsWith(ARBEIT_TEXT) && r82.overlayLeer
+                && (r82.mitHinweis ?? "").includes("steht oben") && r82.ohneHinweis === 0,
+              `gespeichert ${r82.gespeichert} · Abweichungen in der Notiz: b ganz ${n.includes("smoke79-b: ganz")}, move_note aus ${n.includes("move_note: aus")} · Text darunter unverändert ${n.trimEnd().endsWith(ARBEIT_TEXT)} · Overlay danach leer ${r82.overlayLeer} · Regel an: ${r82.mitHinweis === null ? "nein" : "ja"}, Schalter aus → ${r82.ohneHinweis} Regeln`);
+          } catch (error) { abbruch(P82, error); }
+
+          // 83. Sitzungs-Marke: Frage gegen einen Stub, JSONL, Neuladen, Neues Gespräch.
+          const stub83 = await startLlmStub({ models: ["smoke-model"], antwort: () => ({ text: "Smoke-Antwort 83" }) });
+          try {
+            await setzeModell("smoke-model", stub83.url);
+            await cdp.evaluate(`
+              const p = ${PL};
+              await p.newChat();
+              p.chooseArbeit("Smoke79");
+              await p.setSkillMode("smoke79-a", "beschreibung");
+              p.setToolOn("save_memory", false);
+              await p.ask("Smoke 83: Frage");
+              return true;`);
+            const jsonl = await cdp.evaluate<{ marken: number; arbeit: string | null; werkzeug: string | null; imChat: boolean }>(`
+              const p = ${PL};
+              const raw = await app.vault.adapter.read(p.manifest.dir + "/sessions/current.jsonl");
+              const zeilen = raw.split("\\n").filter((z) => z.trim() !== "").map((z) => JSON.parse(z));
+              const marken = zeilen.filter((m) => m.kind === "session");
+              return { marken: marken.length, arbeit: marken[0]?.state.arbeit ?? null, werkzeug: marken[0]?.state.overlay.werkzeuge.save_memory ?? null,
+                imChat: [...document.querySelectorAll(".koda-log .koda-session")].some((e) => (e.textContent || "").includes("Smoke79")) };`);
+            await cdp.evaluate(`await app.plugins.disablePlugin(${JSON.stringify(PLUGIN_ID)}); await app.plugins.enablePlugin(${JSON.stringify(PLUGIN_ID)}); return true;`);
+            const zurueck = await pollUntil<{ arbeit: string | null; werkzeug: string | null; manuell: number }>(cdp, `
+              const p = ${PL};
+              if (!p || !p.session) return null;
+              return { arbeit: p.session.arbeit, werkzeug: p.session.overlay.werkzeuge.save_memory ?? null, manuell: p.contextManual.length };`, 10_000, 300);
+            const neu = await cdp.evaluate<{ arbeit: string | null; overlay: number; manuell: number; wirksam: string }>(`
+              const p = ${PL};
+              await p.newChat();
+              return { arbeit: p.session.arbeit, overlay: Object.keys(p.session.overlay.werkzeuge).length + Object.keys(p.session.overlay.skills).length,
+                manuell: p.contextManual.length, wirksam: p.currentToolNames().includes("save_memory") ? "an" : "aus" };`);
+            record(P83,
+              jsonl.marken === 1 && jsonl.arbeit === "Smoke79" && jsonl.werkzeug === "aus" && jsonl.imChat
+                && zurueck !== null && zurueck.arbeit === "Smoke79" && zurueck.werkzeug === "aus" && zurueck.manuell === 2
+                && neu.arbeit === "Smoke79" && neu.overlay === 0 && neu.manuell === 2 && neu.wirksam === "an",
+              `Marken im JSONL ${jsonl.marken} (Arbeit ${jsonl.arbeit}, save_memory ${jsonl.werkzeug}) · Zeile im Chat ${jsonl.imChat} · nach Neuladen: Arbeit ${zurueck?.arbeit}, save_memory ${zurueck?.werkzeug}, Notizen ${zurueck?.manuell} · Neues Gespräch: Arbeit ${neu.arbeit}, Overlay-Einträge ${neu.overlay}, Notizen ${neu.manuell}, save_memory wieder ${neu.wirksam}`);
+          } catch (error) { abbruch(P83, error); } finally { await stub83.stop(); }
+
+          // 84. „/“-Menü im Eingabefeld.
+          try {
+            await cdp.evaluate(`const p = ${PL}; if (p.views().length === 0) await p.activateView(); app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")}); return true;`);
+            await pause(400);
+            const r84 = await cdp.evaluate<{ gruppen: string[]; offen: boolean; gewaehlt: boolean; geleert: boolean; gesendetBeiOffen: number; geschlossenNachEsc: boolean; gesendetBeiZu: string | null; url: boolean }>(`
+              const p = ${PL};
+              p.chooseArbeit(null);
+              await p.readSkills();
+              window.__ask84 = [];
+              p.ask = async (q) => { window.__ask84.push(q); };
+              const ta = document.querySelector(".koda-input");
+              const box = () => ta.parentElement.querySelector(".okit-suggest");
+              const tippe = (text) => { ta.focus(); ta.value = text; ta.setSelectionRange(text.length, text.length); ta.dispatchEvent(new Event("input", { bubbles: true })); };
+              const taste = (key) => ta.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+              tippe("/smoke79");
+              const gruppen = [...box().querySelectorAll(".okit-suggest-group")].map((e) => e.textContent);
+              const offen = box().classList.contains("is-open");
+              tippe("/smoke79-a");
+              taste("Enter");
+              // setSkillMode liest erst die Skill-Dateien (async): auf den Overlay-Eintrag warten.
+              let gewaehlt = false;
+              for (let i = 0; i < 30 && !gewaehlt; i++) { gewaehlt = p.session.overlay.skills["smoke79-a"] === "ganz"; if (!gewaehlt) await new Promise((r) => setTimeout(r, 100)); }
+              const geleert = ta.value === "";
+              const gesendetBeiOffen = window.__ask84.length;
+              tippe("/smoke79-b");
+              taste("Escape");
+              const geschlossenNachEsc = !box().classList.contains("is-open");
+              tippe("Hallo Smoke 84");
+              taste("Enter");
+              const gesendetBeiZu = window.__ask84[0] ?? null;
+              tippe("https://x/");
+              const url = !box().classList.contains("is-open");
+              delete p.ask;
+              delete window.__ask84;
+              return { gruppen, offen, gewaehlt, geleert, gesendetBeiOffen, geschlossenNachEsc, gesendetBeiZu, url };
+            `);
+            record(P84,
+              r84.gruppen.length === 2 && r84.offen && r84.gewaehlt && r84.geleert && r84.gesendetBeiOffen === 0 && r84.geschlossenNachEsc
+                && r84.gesendetBeiZu === "Hallo Smoke 84" && r84.url,
+              `Gruppen ${JSON.stringify(r84.gruppen)} · offen ${r84.offen} · Enter wählt (Skill auf ganz ${r84.gewaehlt}, Feld leer ${r84.geleert}, gesendet ${r84.gesendetBeiOffen}×) · Escape schließt ${r84.geschlossenNachEsc} · geschlossen sendet „${r84.gesendetBeiZu}“ · URL öffnet nichts ${r84.url}`);
+          } catch (error) { abbruch(P84, error); }
+
+          // 85. Regler „Tiefe“ im Kontext-Tab.
+          try {
+            await cdp.evaluate(`const p = ${PL}; p.chooseArbeit(null); p.setContextMode("note"); app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-context")}); return true;`);
+            const vor = await pollUntil<{ eff: number; sett: number }>(cdp, `
+              const p = ${PL};
+              const plus = [...document.querySelectorAll(".koda-ctx-depth button")].find((b) => b.textContent === "+");
+              return plus ? { eff: p.effectiveContextNow().depth, sett: p.settings.contextLinkDepth } : null;`, 8000, 300);
+            if (!vor) throw new Error("Regler „Tiefe“ im Kontext-Tab nicht gefunden");
+            await cdp.evaluate(`[...document.querySelectorAll(".koda-ctx-depth button")].find((b) => b.textContent === "+").click(); return true;`);
+            const nach = await pollUntil<{ eff: number; sett: number }>(cdp, `
+              const p = ${PL};
+              const d = p.effectiveContextNow().depth;
+              return d !== ${vor.eff} ? { eff: d, sett: p.settings.contextLinkDepth } : null;`, 8000, 300);
+            record(P85, nach !== null && nach.eff === vor.eff + 1 && nach.sett === vor.sett,
+              `wirksame Tiefe ${vor.eff} → ${nach?.eff} · settings.contextLinkDepth ${vor.sett} → ${nach?.sett} (soll unverändert)`);
+          } catch (error) { abbruch(P85, error); }
+        } finally {
+          // Nachlauf: alles abräumen, was dieser Block angelegt hat, und den Zustand wiederherstellen.
+          await cdp.evaluate(`
+            const p = ${PL};
+            const rest = window.__kodaSmoke79;
+            for (const pfad of ["Koda/Skills/smoke79-a.md", "Koda/Skills/smoke79-b.md", "Koda/Arbeiten/Smoke79.md", "Smoke79Ordner/n1.md", "Smoke79Ordner/sub/n2.md"]) {
+              const f = app.vault.getFileByPath(pfad); if (f) await app.vault.delete(f);
+            }
+            for (const d of ["Smoke79Ordner/sub", "Smoke79Ordner"]) { const f = app.vault.getFolderByPath(d); if (f) await app.vault.delete(f, true); }
+            if (rest) {
+              delete p.ask; p.settings.skillHintInHistory = rest.hint;
+              await p.newChat();
+              p.session = JSON.parse(rest.session);
+              delete window.__kodaSmoke79;
+            }
+            p.refreshArbeiten();
+            await p.readSkills();
+            return true;
+          `).catch(() => undefined);
+          void zustand;
         }
       }
     } finally {
