@@ -9,7 +9,7 @@ import {
 } from "./types";
 import type { LlmResult } from "../../llm/KodaChatClient";
 import { parseTextToolCall } from "./text-fallback";
-import { projectForModel } from "./compaction/project";
+import { projectForModel, type ToolResultRule } from "./compaction/project";
 import { estimateTokens } from "./compaction/estimate";
 import { planStage1 } from "./compaction/stage1";
 import { splitTurns, summarizeTurns, makeStage2Record, PACK_RATIO } from "./compaction/stage2";
@@ -79,6 +79,9 @@ export interface AgentDeps {
   /** Rueckfall fuer Bilder: liest ein Bild per Texterkennung. Fehlt er (kein OCR-Anbieter),
    *  bleibt ein HTTP-Fehler nach einem Bild ein Fehler. */
   ocrFallback?: (path: string) => Promise<ToolOutcome>;
+  /** Regeln, die ein Werkzeug-Ergebnis in der Projektion ersetzen (Skill-Hinweis). Als Funktion, weil ein
+   *  Schalter im Tab mitten in einem Lauf schon ab der naechsten Runde greifen soll (wie `currentToolNames`). */
+  projectionRules?: () => readonly ToolResultRule[];
 }
 
 /** Der Agent-Loop: LLM → Tools → LLM … bis finale Antwort, Fehler oder Runden-Limit.
@@ -130,14 +133,14 @@ async function runAgentImpl(
   const compact = async (forced: boolean): Promise<boolean> => {
     if (c === undefined) return false;
     let did = false;
-    let msgs = projectForModel(entries());
+    let msgs = projectForModel(entries(), deps.projectionRules?.() ?? []);
     if (forced || overBudget(msgs)) {
       const r1 = planStage1(msgs, forced ? 0 : c.keepToolResults, c.now(), forced);
       if (r1 !== null) {
         appended.push(r1);
         onEvent({ kind: "compaction", record: r1 });
         did = true;
-        msgs = projectForModel(entries());
+        msgs = projectForModel(entries(), deps.projectionRules?.() ?? []);
       }
     }
     if ((forced || overBudget(msgs)) && c.summarize !== null) {
@@ -202,7 +205,7 @@ async function runAgentImpl(
   while (round < deps.maxRounds) {
     await compact(false);
     const r = await deps.llm.complete(
-      projectForModel(entries()), onToken, onReasoning, signal,
+      projectForModel(entries(), deps.projectionRules?.() ?? []), onToken, onReasoning, signal,
       (name) => onEvent({ kind: "tool-call-head", name }),
       onContentReset,
     );

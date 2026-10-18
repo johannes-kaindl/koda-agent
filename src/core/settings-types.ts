@@ -116,6 +116,9 @@ export interface KodaSettings {
   maxRounds: number;
   timeoutSec: number;
   skillBudgetChars: number;
+  /** Ein per `load_skill` geholter Skill-Text, der inzwischen im System-Prompt steht (oder abgeschaltet ist), geht im
+   *  Verlauf ans Modell als Hinweis statt als zweiter Text (Spec Faehigkeiten § 7). Aus: wie bisher. */
+  skillHintInHistory: boolean;
   listNotesMaxRows: number;
   imageMaxKb: number;
   textFallback: boolean;
@@ -162,6 +165,7 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   maxRounds: 8,
   timeoutSec: 300,
   skillBudgetChars: 6000,
+  skillHintInHistory: true,
   listNotesMaxRows: 150,
   imageMaxKb: 4096,
   textFallback: false, // Default laut koda-lab-Befund setzen (Vault-Cockpit `_Intern/LAB.md`)

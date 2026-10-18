@@ -160,6 +160,11 @@ export class KodaSettingsTab extends PluginSettingTab {
         },
       },
       {
+        name: t("settings.skillHint"),
+        desc: t("settings.skillHint.desc"),
+        control: { type: "toggle", key: "skillHintInHistory" },
+      },
+      {
         name: t("settings.listRows"),
         desc: t("settings.listRows.desc"),
         control: {

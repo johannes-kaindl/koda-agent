@@ -149,7 +149,30 @@ function applyStage2(slots: Slot[], rec: CompactionRecord): Slot[] {
   return [...slots.slice(0, start), merged, summary, ...slots.slice(lastUser)];
 }
 
-export function projectForModel(entries: LogEntry[]): ChatMessage[] {
+/** Eine Art Projektion neben Stufe 1 und 2: eine Regel ueber den AKTUELLEN Zustand statt einer Marke mit
+ *  Position. Sie sieht ein Werkzeug-Ergebnis samt Aufruf (Name, Argumente) und liefert den Ersatztext oder
+ *  `null` („nicht meine“). Die Skill-Regel (`abilities/projection.ts`) ist die erste, die Kontext-Werkstatt
+ *  (Welle 25) haengt ihre Arten daneben, ohne diese umzubauen. */
+export type ToolResultRule = (call: { name: string; args: string }, content: string) => string | null;
+
+/** Regeln nach dem Fold, auf jedes Ergebnis, das nicht schon ein Stub und kein Fehler ist; die erste Regel
+ *  mit Ergebnis gewinnt. Der Ersatz ist selbst ein Stub (`stubbed`), damit Stufe 1 ihn nicht noch einmal anfasst. */
+function applyRules(slots: Slot[], rules: readonly ToolResultRule[], calls: Map<string, { name: string; args: string }>): void {
+  for (let i = 0; i < slots.length; i++) {
+    const m = slots[i].msg;
+    if (m.role !== "tool" || m.stubbed === true || m.content.startsWith("ERROR:")) continue;
+    const c = calls.get(m.toolCallId ?? "");
+    if (c === undefined) continue;
+    for (const rule of rules) {
+      const out = rule(c, m.content);
+      if (out === null) continue;
+      slots[i] = { msg: { role: "tool", toolCallId: m.toolCallId, content: out, stubbed: true } };
+      break;
+    }
+  }
+}
+
+export function projectForModel(entries: LogEntry[], rules: readonly ToolResultRule[] = []): ChatMessage[] {
   let slots: Slot[] = [];
   const calls = new Map<string, { name: string; args: string }>();
   for (const e of entries) {
@@ -164,6 +187,7 @@ export function projectForModel(entries: LogEntry[]): ChatMessage[] {
     }
     slots.push({ msg: e });
   }
+  applyRules(slots, rules, calls);
   return slots.map(renderSlot);
 }
 

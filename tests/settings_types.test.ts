@@ -65,6 +65,14 @@ describe("skillBudgetChars", () => {
   });
 });
 
+describe("skillHintInHistory", () => {
+  it("ist standardmaessig an und uebernimmt ein ausdrueckliches aus", () => {
+    expect(validateKodaSettings({}).skillHintInHistory).toBe(true);
+    expect(validateKodaSettings({ skillHintInHistory: false }).skillHintInHistory).toBe(false);
+    expect(validateKodaSettings({ skillHintInHistory: "nein" }).skillHintInHistory).toBe(true);
+  });
+});
+
 describe("listNotesMaxRows", () => {
   it("hat 150 als Default", () => {
     expect(validateKodaSettings({}).listNotesMaxRows).toBe(150);
