@@ -3,6 +3,7 @@
 import { isContextMode } from "../context/types";
 import type { LogEntry } from "../agent/types";
 import { isSessionStateRecord } from "../agent/types";
+import { overlayCount } from "./resolve";
 import { emptyOverlay, SKILL_MODES, type Overlay, type SessionState } from "./types";
 
 function isMap(v: unknown): v is Record<string, unknown> {
@@ -75,4 +76,13 @@ export function describeStateChange(prev: SessionState | null, next: SessionStat
     ...changed(base.anbieter, next.overlay.anbieter, lang),
   );
   return parts.length === 0 ? null : parts.join(" · ");
+}
+
+/** Muss vor der naechsten Frage eine Marke in den Verlauf? Nur wenn sich der Zustand gegenueber der juengsten
+ *  Marke geaendert hat; ohne fruehere Marke nur, wenn er nicht der leere Anfangszustand ist (ein Gespraech ohne
+ *  Arbeiten bleibt damit so, wie es vor den Arbeiten war). */
+export function needsSessionRecord(entries: readonly LogEntry[], state: SessionState): boolean {
+  const prev = latestSessionState(entries);
+  if (prev === null) return state.arbeit !== null || overlayCount(state.overlay) > 0 || state.manual.length > 0;
+  return JSON.stringify(prev) !== JSON.stringify(state);
 }

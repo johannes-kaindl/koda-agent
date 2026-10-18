@@ -1,6 +1,6 @@
 import {
   baseSkillMode, effectiveContext, effectiveDisabledTools, effectiveSkillMode, frontmatterMode, overlayCount,
-  selectEffective, skillModeLookup, unknownEntries, withOverlayProvider, withOverlaySkill, withOverlayTool,
+  selectEffective, skillModeLookup, unknownEntries, withOverlayKontext, withOverlayProvider, withOverlaySkill, withOverlayTool,
 } from "../src/core/abilities/resolve";
 import { emptyOverlay, type Arbeit } from "../src/core/abilities/types";
 import type { Skill } from "../src/core/skills/skill";
@@ -103,5 +103,16 @@ describe("unknownEntries", () => {
     const a = arbeit({ skills: { Triage: "ganz", weg: "aus" }, werkzeuge: { move_note: "aus", fly: "an" }, anbieter: { "vault-retrieval": "an", "calendar-notes": "aus" } });
     expect(unknownEntries(a, { skills: ["triage"], ownTools: ["move_note"], providers: ["vault-retrieval"] }))
       .toEqual(["skills.weg", "werkzeuge.fly", "anbieter.calendar-notes"]);
+  });
+});
+
+describe("withOverlayKontext", () => {
+  it("setzt abweichende Werte und entfernt gleiche, der Eingang bleibt", () => {
+    const o0 = emptyOverlay();
+    const o1 = withOverlayKontext(o0, "tiefe", 2, 1);
+    expect(o1.kontext).toEqual({ tiefe: 2 });
+    expect(o0.kontext).toEqual({});
+    expect(withOverlayKontext(o1, "tiefe", 1, 1).kontext).toEqual({});
+    expect(overlayCount(withOverlayKontext(o1, "modus", "note", "workspace"))).toBe(2);
   });
 });

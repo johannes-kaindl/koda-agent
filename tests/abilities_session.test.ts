@@ -1,4 +1,4 @@
-import { describeStateChange, latestSessionState, sessionForNewChat } from "../src/core/abilities/session";
+import { describeStateChange, latestSessionState, needsSessionRecord, sessionForNewChat } from "../src/core/abilities/session";
 import { emptyOverlay, emptySessionState, type SessionState } from "../src/core/abilities/types";
 import { parseLines, serializeLine } from "../src/core/memory/session";
 import type { LogEntry } from "../src/core/agent/types";
@@ -49,5 +49,20 @@ describe("describeStateChange", () => {
     const b = st({ overlay: { ...emptyOverlay(), werkzeuge: { write_skill: "aus" } } });
     expect(describeStateChange(a, b, "en")).toBe("x: reset");
     expect(describeStateChange(a, st({ arbeit: "Inbox" }), "de")).toBe("Arbeit: Inbox");
+  });
+});
+
+describe("needsSessionRecord", () => {
+  it("ohne fruehere Marke nur fuer einen Zustand, der nicht leer ist", () => {
+    expect(needsSessionRecord([], emptySessionState())).toBe(false);
+    expect(needsSessionRecord([{ role: "user", content: "q" }], st({ arbeit: "Inbox" }))).toBe(true);
+    expect(needsSessionRecord([], st({ manual: ["A.md"] }))).toBe(true);
+    expect(needsSessionRecord([], st({ overlay: { ...emptyOverlay(), skills: { a: "ganz" } } }))).toBe(true);
+  });
+  it("mit frueherer Marke nur bei Aenderung, auch zurueck auf leer", () => {
+    const log: LogEntry[] = [{ kind: "session", at: "1", state: st({ arbeit: "A" }) }];
+    expect(needsSessionRecord(log, st({ arbeit: "A" }))).toBe(false);
+    expect(needsSessionRecord(log, st({ arbeit: "B" }))).toBe(true);
+    expect(needsSessionRecord(log, emptySessionState())).toBe(true);
   });
 });

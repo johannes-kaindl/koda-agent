@@ -137,3 +137,13 @@ export function unknownEntries(arbeit: Arbeit, known: KnownNames): string[] {
     ...Object.keys(arbeit.anbieter).filter((n) => !known.providers.includes(n)).map((n) => `anbieter.${n}`),
   ];
 }
+
+type KontextOverlayKey = keyof Overlay["kontext"];
+
+/** Overlay-Setter fuer Modus, Tiefe und Nachbarn: gleich dem Wert ohne Overlay (`base`) entfernt den Eintrag. */
+export function withOverlayKontext<K extends KontextOverlayKey>(o: Overlay, key: K, value: NonNullable<Overlay["kontext"][K]>, base: NonNullable<Overlay["kontext"][K]>): Overlay {
+  const kontext = { ...o.kontext };
+  if (value === base) delete kontext[key];
+  else kontext[key] = value;
+  return { ...o, kontext };
+}
