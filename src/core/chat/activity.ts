@@ -14,7 +14,7 @@
 export type ActivityEvent =
   /** ask() startet. */                       | { kind: "ask" }
   /** Tool-Call-Kopf da (Name bekannt), Argumente werden noch gepuffert generiert — die lange
-   *  Stille aus KodaChatClient.TOOL_CALL_IDLE_TIMEOUT_MS braucht ein eigenes Lebenszeichen,
+   *  Stille aus Kit DEFAULT_TOOL_CALL_IDLE_TIMEOUT_MS braucht ein eigenes Lebenszeichen,
    *  sonst steht die Statuszeile noch auf "denkt nach" waehrend das Modell schon schreibt. */
                                               | { kind: "tool-call-head"; name: string }
   /** ein Werkzeug beginnt (args = roher JSON-String des Modells). */

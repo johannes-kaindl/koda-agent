@@ -34,11 +34,12 @@ export const DEFAULT_TIMEOUT_MS = 120_000;
  *  Argumente auf einmal folgen — die Stille entspricht der vollen Generierungszeit der
  *  Argumente (llm-setup `6f75737`, `docs/reference/setup.md` § „Tool-Calls im Stream").
  *  Das normale Idle-Timeout wuerde einen gesunden Schreib-Call darin abbrechen; ab dem
- *  Kopf-Chunk gilt deshalb diese laengere Frist — Groessenordnung von OpenCodes
+ *  Kopf-Chunk gilt deshalb eine laengere Frist — Groessenordnung von OpenCodes
  *  `chunkTimeout`-Default (llm-setup `docs/explanation/qwen3.8-27b-toolcall-loop.md`
- *  § „Gegenmittel"). Der Kit-Client kennt dieselbe Frist (`toolCallIdleTimeoutMs`); sie wird
- *  hier ausdruecklich gesetzt, damit ein Kit-Default sie nicht still verschieben kann. */
-export const TOOL_CALL_IDLE_TIMEOUT_MS = 900_000;
+ *  § „Gegenmittel"). Sie kommt aus dem Kit (`DEFAULT_TOOL_CALL_IDLE_TIMEOUT_MS`, 900 000 ms): Koda hatte denselben Wert als eigene
+ *  Konstante gesetzt, „damit ein Kit-Default sie nicht still verschieben kann“. Dieser Grund traegt nicht — das Kit ist auf eine feste
+ *  Ref gepinnt und jede Aenderung des Defaults steht im Kit-CHANGELOG, die Pin-Hebung ist der Ort, an dem man sie liest. Zwei
+ *  Konstanten fuer denselben Wert waeren Drift (Welle 24). */
 
 /** Kit-Ergebnis → Kodas `LlmResult`. Der Text von `detail` ist hier deutsch und bleibt es: der
  *  Kit-Client liefert Servermeldung bzw. englischen Kurztext, den Satz baut der Konsument. */
@@ -97,7 +98,6 @@ export class KodaChatClient {
       // Ein JIT-ladendes Modell schweigt Minuten, bevor der erste Chunk kommt; die Idle-Frist
       // (Default 300 s) gilt sonst auch dafuer. Die Idle-Einstellung bleibt die Untergrenze.
       firstChunkTimeoutMs: Math.max(timeoutMs, JIT_FIRST_CHUNK_TIMEOUT_MS),
-      toolCallIdleTimeoutMs: TOOL_CALL_IDLE_TIMEOUT_MS,
     });
   }
 

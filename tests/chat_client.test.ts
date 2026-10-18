@@ -1,4 +1,5 @@
-import { KodaChatClient, TOOL_CALL_IDLE_TIMEOUT_MS, type SseTransport } from "../src/llm/KodaChatClient";
+import { KodaChatClient, type SseTransport } from "../src/llm/KodaChatClient";
+import { DEFAULT_TOOL_CALL_IDLE_TIMEOUT_MS } from "../src/vendor/kit-obsidian/chat-client";
 import { JIT_FIRST_CHUNK_TIMEOUT_MS } from "../src/vendor/kit-obsidian/chat-client";
 import type { ChatMessage } from "../src/core/agent/types";
 
@@ -203,7 +204,7 @@ describe("KodaChatClient.complete", () => {
     expect(sentBody?.max_tokens).toBe(8192);
   });
 
-  it("wechselt ab dem Tool-Call-Kopf auf die lange Idle-Frist (TOOL_CALL_IDLE_TIMEOUT_MS)", async () => {
+  it("wechselt ab dem Tool-Call-Kopf auf die lange Idle-Frist (DEFAULT_TOOL_CALL_IDLE_TIMEOUT_MS)", async () => {
     const ms: number[] = [];
     let n = 0;
     const capturingClock = {
@@ -222,7 +223,7 @@ describe("KodaChatClient.complete", () => {
     // Minuten) — auch bei einer kleineren Idle-Einstellung.
     expect(ms[0]).toBe(JIT_FIRST_CHUNK_TIMEOUT_MS);
     // Ab dem Kopf-Chunk (und danach) gilt die lange Frist.
-    expect(ms[ms.length - 1]).toBe(TOOL_CALL_IDLE_TIMEOUT_MS);
+    expect(ms[ms.length - 1]).toBe(DEFAULT_TOOL_CALL_IDLE_TIMEOUT_MS);
   });
 
   it("meldet den Tool-Call-Kopf genau einmal je Index ueber onToolCallHead", async () => {
@@ -292,7 +293,7 @@ describe("KodaChatClient.complete", () => {
       line({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "write_note", arguments: "" } }] } }] }),
     ]), 1000, clock);
     await client.complete(cfg, msgs, [], () => {}, () => {}, new AbortController().signal);
-    expect(ms[ms.length - 1]).toBe(TOOL_CALL_IDLE_TIMEOUT_MS);
+    expect(ms[ms.length - 1]).toBe(DEFAULT_TOOL_CALL_IDLE_TIMEOUT_MS);
   });
 
   // Was der Kit-Client dazugibt: kein Verlust, aber sichtbar — CHANGELOG.

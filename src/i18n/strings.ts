@@ -73,7 +73,7 @@ defineStrings({
     "activity.tool.save_memory": "Saving something to memory…",
     "activity.tool.generic": "Running {0}…",
     // Zwischen Kopf-Chunk und Argumenten puffert LM Studio bis zu 15 Minuten still
-    // (KodaChatClient.TOOL_CALL_IDLE_TIMEOUT_MS) — ohne dieses Label sieht das nach
+    // (Kit DEFAULT_TOOL_CALL_IDLE_TIMEOUT_MS) — ohne dieses Label sieht das nach
     // "denkt nach" aus, obwohl das Modell schon den Tool-Aufruf schreibt.
     "activity.writingToolCall": "Writing tool call {0}…",
     "activity.context": "Context {0} % used",

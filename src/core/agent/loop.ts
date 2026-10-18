@@ -22,7 +22,7 @@ export interface LoopLlm {
     signal: AbortSignal,
     // Optional: feuert, sobald ein Tool-Call-Kopf (Name bekannt, Argumente noch leer) da ist —
     // die UI kann daraus "schreibt Tool-Aufruf <name> …" zeigen, statt in der gepufferten
-    // Stille (KodaChatClient TOOL_CALL_IDLE_TIMEOUT_MS) ohne Lebenszeichen dazustehen.
+    // Stille (Kit DEFAULT_TOOL_CALL_IDLE_TIMEOUT_MS) ohne Lebenszeichen dazustehen.
     onToolCallHead?: (name: string) => void,
     // Optional: Gemma 4 auf LM Studio schreibt das Denken ohne Öffner in `content`; erst das Kanalende verrät es.
     // Der Aufruf heißt: den bisher gezeigten Antworttext verwerfen, das Denken kommt über `onReasoning`.
