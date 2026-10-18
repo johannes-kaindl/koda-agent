@@ -17,14 +17,17 @@ export const SKILLS_SUBFOLDER = "Skills";
  *
  *  Vergleich case-insensitiv und segment-genau: "Koda-Archiv" matcht "Koda" nicht,
  *  "Skillset.md" matcht "Skills/" nicht. */
-/** Die Lesart des strengsten Dateisystems: Windows streicht Leerraum und Punkte am Ende eines Ordnernamens (`Skills ` und `Skills.`
- *  sind dort `Skills`), und ein geschuetztes Leerzeichen (U+00A0, U+202F) ist ein Leerzeichen. Segmente, die nur aus Punkten und
- *  Leerraum bestehen (`.`, `..`), bleiben stehen: sie sind Sache von `rel-path`/`folder-scope`. */
-function windowsReading(path: string): string {
+/** Die Lesarten der strengsten Dateisysteme, in einer: Windows streicht Leerraum und Punkte am Ende eines Ordnernamens (`Skills ` und
+ *  `Skills.` sind dort `Skills`) und liest alles ab einem `:` als Datenstrom-Suffix des Namens davor (`Skills:x`); ein geschuetztes
+ *  Leerzeichen (U+00A0, U+202F) ist ein Leerzeichen. Case-insensitive Volumes (APFS, NTFS) falten nach Unicode, nicht nach ASCII:
+ *  das lange s (U+017F) ist dort ein `s`, das Kelvin-Zeichen (U+212A) ein `k` — NFKC und Hoch-/Kleinschreibung nacheinander bilden das nach.
+ *  Segmente, die nur aus Punkten und Leerraum bestehen (`.`, `..`), bleiben stehen: sie sind Sache von `rel-path`/`folder-scope`. */
+function strictReading(path: string): string {
   return path.split(/[\\/]/).map((seg) => {
     const spaced = seg.replace(/[\u00a0\u202f]/g, " ");
-    const stripped = spaced.replace(/[ .]+$/, "");
-    return stripped === "" ? seg : stripped;
+    const cut = spaced.split(":")[0] ?? "";
+    const stripped = cut.replace(/[ .]+$/, "");
+    return stripped === "" ? seg : stripped.normalize("NFKC").toUpperCase().toLowerCase();
   }).join("/");
 }
 
@@ -32,9 +35,9 @@ function windowsReading(path: string): string {
  *  drin ist; fuer einen geschuetzten Unterordner genuegt EINE. Ein Pfad `Koda/Skills /x.md` landet auf Windows in `Skills`, auf macOS
  *  in einem anderen Ordner: fuer die Rueckfrage zaehlt die vorsichtigere Antwort. */
 const inBoth = (path: string, folder: string, opts: { self: true; ignoreCase: true }): boolean =>
-  isInFolder(path, folder, opts) && isInFolder(windowsReading(path), windowsReading(folder), opts);
+  isInFolder(path, folder, opts) && isInFolder(strictReading(path), strictReading(folder), opts);
 const inEither = (path: string, folder: string, opts: { self: true; ignoreCase: true }): boolean =>
-  isInFolder(path, folder, opts) || isInFolder(windowsReading(path), windowsReading(folder), opts);
+  isInFolder(path, folder, opts) || isInFolder(strictReading(path), strictReading(folder), opts);
 
 export function writePolicy(path: string, kodaFolder: string): WriteDecision {
   // Ordnerzugehoerigkeit aus code-kit `folder-scope`: der Ordner selbst zaehlt mit (`self`), Gross/klein egal (`ignoreCase`), ganze

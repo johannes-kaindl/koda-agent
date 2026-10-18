@@ -73,4 +73,10 @@ describe("writePolicy — Skills sind trotz Lage bestaetigungspflichtig", () => 
   it("gewoehnliche Pfade im Koda-Ordner bleiben frei", () => {
     expect(writePolicy("Koda/Entwürfe/x.md", "Koda")).toBe("free");
   });
+  // Zweite Runde des Commit-Reviews: Unicode-Faltung und NTFS-Datenstrom-Suffix.
+  it("Skills/ ist auch gegen Namen geschuetzt, die ein case-insensitives Volume als Skills faltet oder liest", () => {
+    for (const p of ["Koda/Skillſ/x.md", "Koda/SKILLS/x.md", "Koda/Skills:x/y.md", "Koda/Skills::$INDEX_ALLOCATION/y.md", "Koda/Arbeiten:ads/y.md"]) {
+      expect(writePolicy(p, "Koda")).toBe("confirm");
+    }
+  });
 });
