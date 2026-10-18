@@ -1334,7 +1334,7 @@ Pin-Hebung von 0.56.0/0.23.0; `ENDPOINT_LIST_CSS` neu kopiert (der CSS-Test miss
 
 ## Belegter Lauf: 2026-10-18, Welle 24 — Fähigkeiten und Arbeiten, Denkblock nach der Antwort, Kit 0.63.0/0.31.0 (94 Punkte)
 
-Baseline davor (frischer Prozess, Obsidian 1.14.4 Zweitinstanz, Port 9521, Aufwärmlauf davor): Gate 1032/1032, Smoke 77 grün, 0 rot, 1 übersprungen (1b, vault-retrieval nicht installiert), 0 nichts gemessen von 78. Danach: Gate 1099/1099, Smoke 92 grün, 0 rot, 2 übersprungen (1b und 96), 0 nichts gemessen von 94. Punkt 29 zählt seit dem dritten Tab drei Hub-Tabs.
+Baseline davor (frischer Prozess, Obsidian 1.14.4 Zweitinstanz, Port 9521, Aufwärmlauf davor): Gate 1032/1032, Smoke 77 grün, 0 rot, 1 übersprungen (1b, vault-retrieval nicht installiert), 0 nichts gemessen von 78. Danach: Gate 1100/1100, Smoke 92 grün, 0 rot, 2 übersprungen (1b und 96), 0 nichts gemessen von 94. Punkt 29 zählt seit dem dritten Tab drei Hub-Tabs.
 
 Der Treiber setzt den Zustand der neuen Punkte VOR dem Lauf zurück (Skills `smoke79-a`/`-b`, Arbeit `Smoke79`, Ordner `Smoke79Ordner`, `skillHintInHistory`, Sitzungszustand) und räumt danach alles ab; die Punkte 86–88 sind für Plan 2 (Bases-Ansicht) reserviert.
 
