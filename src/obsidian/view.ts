@@ -149,6 +149,8 @@ export class KodaView extends ItemView {
   }
 
   syncContextPanel(): void { this.ctxPanel?.render(); }
+  /** Zeichnet den Tab „Fähigkeiten“ neu (Task B7 füllt ihn; bis dahin gibt es nichts zu zeichnen). */
+  syncAbilities(): void { /* kein Panel in B6 */ }
 
   /** Der Chat-Inhalt (Verlauf, Statuszeile, Eingabe) in einen beliebigen Container.
    *  Aufgeteilt fuer den Hub: bis Etappe 2 baute `onOpen` direkt in `contentEl`. Der Baum ist

@@ -13,13 +13,25 @@ import { KodaChatClient, type LlmResult } from "./llm/KodaChatClient";
 import { probeEndpoint, probeModels } from "./core/llm/probe";
 import { probeModelContextInfo } from "./core/llm/context-probe";
 import { effectiveContext, type ModelContext } from "./vendor/kit/model-context";
+import {
+  baseSkillMode, effectiveContext as resolveContext, effectiveDisabledTools, selectEffective, skillModeLookup,
+  unknownEntries, withOverlayKontext, withOverlayProvider, withOverlaySkill, withOverlayTool, type EffectiveContext, type ProviderTools,
+} from "./core/abilities/resolve";
+import { arbeitFrontmatter, type SaveInput } from "./core/abilities/save";
+import { skillTextRule } from "./core/abilities/projection";
+import { latestSessionState, needsSessionRecord, sessionForNewChat } from "./core/abilities/session";
+import { parseArbeit } from "./core/abilities/parse";
+import { emptyOverlay, emptySessionState, type Arbeit, type OnOff, type SessionState, type SkillMode } from "./core/abilities/types";
+import { arbeitenDir, arbeitName, isArbeitPath, readArbeiten, writeArbeitFrontmatter } from "./obsidian/arbeiten";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { xhrSseTransport } from "./vendor/kit-obsidian/chat-transport";
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
-import { type ChatMessage, type ErrorRecord, type LogEntry } from "./core/agent/types";
-import { toolSet, toWireTools, type ToolDef, type ToolSet } from "./core/tools/defs";
+import { type ChatMessage, type ErrorRecord, type LogEntry, type SessionStateRecord } from "./core/agent/types";
+import { HOST_TOOL_NAMES, toolSet, toWireTools, type ToolDef, type ToolSet } from "./core/tools/defs";
+import { providerToolGroups } from "./core/prompt/view-model";
 import { findToolProvider, readProviderOffers } from "./vendor/kit-obsidian/tool-providers";
+import type { ProviderOffer } from "./vendor/kit/tool-provider";
 import { confirmAction } from "./vendor/kit-obsidian/confirm";
 import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/prompt/build";
@@ -30,7 +42,7 @@ import { toLabMessages, describeLlmFailure, readNotePathOf } from "./core/agent/
 import { logToLab } from "./vendor/kit-obsidian/lab-client";
 import { SessionStore } from "./core/memory/session";
 import { parseSkill, type Skill } from "./core/skills/skill";
-import { selectSkills, type Selection } from "./core/skills/select";
+import type { Selection } from "./core/skills/select";
 import { CONTEXT_AUTO_K_MAX, CONTEXT_AUTO_K_MIN, CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN, DEFAULT_SETTINGS, type KodaSettings } from "./core/settings-types";
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { readRetrievalApi } from "./obsidian/retrieval";
@@ -45,6 +57,7 @@ import { contextUsage, type ContextUsage } from "./core/chat/context-usage";
 import { KodaView, VIEW_TYPE_KODA } from "./obsidian/view";
 import { KodaSettingsTab } from "./obsidian/settings";
 import { projectForModel } from "./core/agent/compaction/project";
+
 import { AVAILABLE_MODES, type ContextAttachment, type ContextMode } from "./core/context/types";
 import { modeLabel } from "./core/context/labels";
 import { renderWorkspaceContext } from "./core/context/workspace-line";
@@ -59,7 +72,7 @@ import { buildPanelViewModel, type PanelViewModel } from "./core/context/panel-v
 import { addPaths, removePath } from "./core/context/manual";
 import { pickNote } from "./obsidian/note-picker";
 import { pickFolder } from "./obsidian/folder-picker";
-import { resolveFolderPath } from "./core/tools/path-guard";
+import { normalizeRel, resolveFolderPath } from "./core/tools/path-guard";
 import type { CollapsibleStorage } from "./vendor/kit-obsidian/collapsible";
 
 /** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
@@ -85,10 +98,46 @@ export default class KodaPlugin extends Plugin {
    *  Nur im Speicher — er traegt Memory-Zeilen und gehoert nicht auf Platte (Spec E6). */
   lastSystemPrompt: string | null = null;
 
-  /** Der Modus fuer die NAECHSTE Nachricht. Beim Laden der Default aus den Einstellungen;
-   *  danach ueberstimmt der Chat (Dropdown, Befehle), bis das Plugin neu laedt (Spec E1).
-   *  „Neues Gespraech" aendert ihn nicht. */
-  contextMode: ContextMode = "workspace";
+  /** Der Sitzungszustand an EINER Stelle (Spec Faehigkeiten § 9): gewaehlte Arbeit, Overlay dieses Gespraechs und
+   *  die manuell hinzugefuegten Notizen. Wird mit dem Gespraech gespeichert (Sitzungs-Marke im JSONL). Die Werkstatt
+   *  (Welle 25) haengt ihre Entscheidungen hier an. `contextOff` bleibt bewusst ausserhalb: die Abwahl gilt je
+   *  Nachricht und geht nicht in die Arbeit (Spec § 5). */
+  session: SessionState = emptySessionState();
+
+  /** Die Arbeiten aus `<Koda-Ordner>/Arbeiten/`, sortiert; gepflegt von `refreshArbeiten`. */
+  arbeiten: Arbeit[] = [];
+  private arbeitParseInvalid = new Map<string, string[]>();
+  /** Die zuletzt gelesenen Skills — fuer die synchrone Abfrage „welche Stellung hat dieser Skill“ (`load_skill`,
+   *  Projektion). Aktualisiert bei jedem `readSkills()`. */
+  private skillsCache: Skill[] = [];
+  /** Eintraege von `kontext.notizen`, die beim letzten Anwenden auf nichts zeigten. */
+  private notizenMissing: string[] = [];
+
+  currentArbeit(): Arbeit | null {
+    const name = this.session.arbeit;
+    return name === null ? null : (this.arbeiten.find((a) => a.name === name) ?? null);
+  }
+
+  /** Was fuer die naechste Nachricht gilt: Overlay, sonst Arbeit, sonst Einstellung. EINE Stelle fuer alle
+   *  Lesestellen von Modus, Tiefe, Budget und Nachbarn (Spec § 3). */
+  effectiveContextNow(): EffectiveContext {
+    return resolveContext(this.settings, this.currentArbeit(), this.session.overlay);
+  }
+
+  /** Der Wert ohne Overlay — gegen ihn entscheidet ein Setter, ob ein Eintrag noetig ist. */
+  private contextBase(): EffectiveContext {
+    return resolveContext(this.settings, this.currentArbeit(), emptyOverlay());
+  }
+
+  /** Der Modus fuer die NAECHSTE Nachricht — kein eigenes Feld mehr, sondern die Antwort auf „was gilt“.
+   *  Schreiben legt einen Overlay-Eintrag an (oder nimmt ihn zurueck, wenn der Wert dem Grundwert gleicht).
+   *  „Neues Gespraech" aendert ihn nicht, solange keine Arbeit gewaehlt ist (Spec § 3). */
+  get contextMode(): ContextMode {
+    return this.effectiveContextNow().mode;
+  }
+  set contextMode(m: ContextMode) {
+    this.session = { ...this.session, overlay: withOverlayKontext(this.session.overlay, "modus", m, this.contextBase().mode) };
+  }
 
   /** Ist vault-rags API da (Version und Form geprueft)? Je Aufruf frisch — vault-rag kann zur
    *  Laufzeit an- oder abgeschaltet werden (Muster `readRetrievalApi`). Ob ein Index geladen
@@ -114,12 +163,16 @@ export default class KodaPlugin extends Plugin {
    *  ob sie das Senden überlebt. */
   contextOff: Set<SelectionKey> = new Set();
 
-  /** Vom Nutzer hinzugefuegte Notizen, in der Reihenfolge des Hinzufuegens. Wie
-   *  `contextOff` nicht persistiert — eine Zusammenstellung gilt fuer diese Sitzung.
-   *  Wirkt in den Modi Notiz und Alle Tabs; im Modus Arbeitsplatz stehen die Chips
-   *  weiter da, tragen dort aber einen Hinweis statt einer Groesse (der Block schickt
-   *  Zeiger, keine Inhalte — Spec E1). */
-  contextManual: string[] = [];
+  /** Vom Nutzer hinzugefuegte Notizen, in der Reihenfolge des Hinzufuegens (oder aus `kontext.notizen` der
+   *  Arbeit aufgeloest). Liegt im Sitzungszustand und wird mit dem Gespraech gespeichert. Wirkt in den Modi Notiz
+   *  und Alle Tabs; im Modus Arbeitsplatz stehen die Chips weiter da, tragen dort aber einen Hinweis statt einer
+   *  Groesse (der Block schickt Zeiger, keine Inhalte — Spec E1). */
+  get contextManual(): string[] {
+    return this.session.manual;
+  }
+  set contextManual(v: string[]) {
+    this.session = { ...this.session, manual: v };
+  }
 
   /** Der Entwurf im Eingabefeld, entprellt aus der View gemeldet. Speist NUR die Vorschau im
    *  Kontext-Tab — gesendet wird mit dem echten Nachrichtentext (`ask(question)`), sonst
@@ -138,15 +191,15 @@ export default class KodaPlugin extends Plugin {
   /** vault-rag fragen, falls der Modus es verlangt. Ein Weg fuer Vorschau und Senden. */
   private semanticHits(mode: ContextMode, query: string, snap: WorkspaceSnapshot): Promise<SemanticHits> {
     return fetchSemanticHits(readRetrievalApi(this.app), {
-      mode, query, activePath: snap.active?.path ?? null, k: this.settings.contextAutoK,
+      mode, query, activePath: snap.active?.path ?? null, k: this.effectiveContextNow().autoK,
     });
   }
 
+  /** Regler „Nachbarn“: gilt fuer dieses Gespraech, nicht mehr dauerhaft (Spec § 3); der Default steht im Settings-Tab. */
   setContextAutoK(n: number): void {
     const geklemmt = Math.min(CONTEXT_AUTO_K_MAX, Math.max(CONTEXT_AUTO_K_MIN, Math.round(n)));
-    if (geklemmt === this.settings.contextAutoK) return;
-    this.settings.contextAutoK = geklemmt;
-    void this.saveSettings();
+    if (geklemmt === this.effectiveContextNow().autoK) return;
+    this.session = { ...this.session, overlay: withOverlayKontext(this.session.overlay, "nachbarn", geklemmt, this.contextBase().autoK) };
     for (const v of this.views()) v.syncContextPanel();
   }
 
@@ -222,7 +275,8 @@ export default class KodaPlugin extends Plugin {
    *  `currentContext()` — es gibt keinen zweiten Weg zu dem, was angezeigt wird. */
   async contextViewModel(): Promise<PanelViewModel> {
     const s = this.settings;
-    const modus = this.contextMode === "off" ? "workspace" : this.contextMode;
+    const eff = this.effectiveContextNow();
+    const modus = eff.mode === "off" ? "workspace" : eff.mode;
     const snap = readWorkspace(this.app, VIEW_TYPE_KODA);
     const hits = await this.semanticHits(modus, this.contextQuery, snap);
     return buildPanelViewModel(modus, snap, this.contextOff, {
@@ -231,9 +285,9 @@ export default class KodaPlugin extends Plugin {
       tabsMax: s.contextTabsMax,
       frontmatterMax: s.contextFrontmatterChars,
       windowTokens: s.contextWindowTokens,
-      budget: s.contextBudgetChars,
-      linkDepth: s.contextLinkDepth,
-      autoK: s.contextAutoK,
+      budget: eff.budget,
+      linkDepth: eff.depth,
+      autoK: eff.autoK,
       hits,
       query: this.contextQuery,
       manual: this.contextManual,
@@ -242,11 +296,11 @@ export default class KodaPlugin extends Plugin {
     });
   }
 
+  /** Regler „Tiefe“: wie `setContextAutoK` ein Wert fuer dieses Gespraech. */
   setContextLinkDepth(n: number): void {
     const geklemmt = Math.min(CONTEXT_LINK_DEPTH_MAX, Math.max(CONTEXT_LINK_DEPTH_MIN, Math.round(n)));
-    if (geklemmt === this.settings.contextLinkDepth) return;
-    this.settings.contextLinkDepth = geklemmt;
-    void this.saveSettings();
+    if (geklemmt === this.effectiveContextNow().depth) return;
+    this.session = { ...this.session, overlay: withOverlayKontext(this.session.overlay, "tiefe", geklemmt, this.contextBase().depth) };
     for (const v of this.views()) v.syncContextPanel();
   }
 
@@ -272,8 +326,9 @@ export default class KodaPlugin extends Plugin {
    *  mit dem Entwurf. */
   async currentContext(query?: string): Promise<ContextAttachment | null> {
     const s = this.settings;
+    const eff = this.effectiveContextNow();
     const snap = readWorkspace(this.app, VIEW_TYPE_KODA);
-    switch (this.contextMode) {
+    switch (eff.mode) {
       case "off":
         return null;
       case "workspace":
@@ -287,17 +342,17 @@ export default class KodaPlugin extends Plugin {
       case "tabs":
       case "vault":
         return await buildFullContext({
-          mode: this.contextMode,
+          mode: eff.mode,
           snap,
           links: linkPort(this.app),
           content: contentPort(this.app),
           manual: this.contextManual,
           off: this.contextOff,
-          linkDepth: s.contextLinkDepth,
-          budget: s.contextBudgetChars,
+          linkDepth: eff.depth,
+          budget: eff.budget,
           lang: this.promptLang(),
           // `query` fehlt nur beim GUI-Smoke und bei gui:ask ohne Frage — dann gilt der Entwurf.
-          hits: await this.semanticHits(this.contextMode, query ?? this.contextQuery, snap),
+          hits: await this.semanticHits(eff.mode, query ?? this.contextQuery, snap),
         });
     }
   }
@@ -310,6 +365,150 @@ export default class KodaPlugin extends Plugin {
     // wuerde sonst nicht aufgeklappt — dieselbe Lehre wie 0.10.1 (Aktion ohne sichtbare Wirkung).
     await this.activateView();
     await this.runInView((v) => { v.focusInput(); return Promise.resolve(); });
+  }
+
+  // ── Arbeiten und Faehigkeiten (Spec Faehigkeiten und Arbeiten, Plan 1) ─────────────────────────────
+
+  private isArbeitFile(path: string): boolean {
+    return isArbeitPath(path, this.settings.kodaFolder);
+  }
+
+  /** Zeichnet alles neu, was vom Sitzungszustand abhaengt: Modus-Dropdown, Kontext-Tab, Tab Faehigkeiten. */
+  private syncAll(): void {
+    for (const v of this.views()) { v.syncContextMode(); v.syncContextPanel(); v.syncAbilities(); }
+  }
+
+  /** Die Arbeiten neu lesen (Start, Aenderung einer Arbeits-Notiz). Die gewaehlte Arbeit wirkt danach mit dem
+   *  neuen Inhalt ab der naechsten Frage; ihre Notizen-Liste wird erst beim erneuten Waehlen neu aufgeloest. */
+  refreshArbeiten(): void {
+    const { arbeiten } = readArbeiten(this.app, this.settings.kodaFolder);
+    this.arbeiten = arbeiten.map((a) => a.arbeit);
+    this.arbeitParseInvalid = new Map(arbeiten.map((a) => [a.arbeit.name, a.invalid]));
+    this.syncAll();
+  }
+
+  /** Waehlt eine Arbeit (oder `null` = keine): das Overlay wird geleert, die Arbeit frisch angewendet, ihre
+   *  `kontext.notizen` jetzt zu Einzelpfaden aufgeloest (Spec § 4). Eine fehlende Arbeit bleibt gewaehlt und
+   *  meldet sich im Tab als „nicht gefunden“, statt still zu verschwinden. */
+  chooseArbeit(name: string | null): void {
+    const a = name === null ? null : (this.arbeiten.find((x) => x.name === name) ?? null);
+    const exp = a === null
+      ? { paths: [] as string[], missing: [] as string[] }
+      : expandNotizen(a.kontext.notizen ?? [], this.app.vault.getMarkdownFiles().map((f) => f.path));
+    this.notizenMissing = exp.missing;
+    this.contextOff.clear();
+    this.session = { arbeit: name, overlay: emptyOverlay(), manual: exp.paths };
+    this.syncAll();
+  }
+
+  /** Eine Skill-Stellung fuer dieses Gespraech. Der Grundwert (ohne Overlay) kommt aus Arbeit und Frontmatter;
+   *  steht der Schalter wieder darauf, verschwindet der Overlay-Eintrag. */
+  async setSkillMode(name: string, mode: SkillMode): Promise<void> {
+    const { skills } = await this.readSkills();
+    const skill = skills.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    if (skill === undefined) return;
+    this.session = { ...this.session, overlay: withOverlaySkill(this.session.overlay, skill.name, mode, baseSkillMode(skill, this.currentArbeit())) };
+    this.syncAll();
+  }
+
+  setToolOn(name: string, on: boolean): void {
+    const base: OnOff = this.currentArbeit()?.werkzeuge[name] ?? (this.settings.toolsDisabled.includes(name) ? "aus" : "an");
+    this.session = { ...this.session, overlay: withOverlayTool(this.session.overlay, name, on ? "an" : "aus", base) };
+    this.syncAll();
+  }
+
+  /** Anbieter-Schalter: „an“ heisst „wie in den Einstellungen“ (Spec § 3), der Grundwert ohne Overlay ist deshalb
+   *  der der Arbeit oder „an“. */
+  setProviderOn(id: string, on: boolean): void {
+    const base: OnOff = this.currentArbeit()?.anbieter[id] ?? "an";
+    this.session = { ...this.session, overlay: withOverlayProvider(this.session.overlay, id, on ? "an" : "aus", base) };
+    this.syncAll();
+  }
+
+  resetOverlay(): void {
+    this.session = { ...this.session, overlay: emptyOverlay() };
+    this.syncAll();
+  }
+
+  /** Was der Tab als Hinweis nennt: ungueltige und unbekannte Eintraege der Arbeit, Notizen ohne Ziel — die Arbeit
+   *  gilt trotzdem (CORE-DATA-01: nicht still verwerfen). */
+  async arbeitHints(): Promise<string[]> {
+    const name = this.session.arbeit;
+    if (name === null) return [];
+    const a = this.currentArbeit();
+    if (a === null) return [t("abilities.hint.notFound", name)];
+    const { skills } = await this.readSkills();
+    const offers = readProviderOffers(this.app, this.promptLang());
+    const unknown = unknownEntries(a, { skills: skills.map((x) => x.name), ownTools: [...HOST_TOOL_NAMES], providers: offers.map((o) => o.id) });
+    return [
+      ...(this.arbeitParseInvalid.get(a.name) ?? []).map((e) => t("abilities.hint.invalid", e)),
+      ...unknown.map((e) => t("abilities.hint.unknown", e)),
+      ...this.notizenMissing.map((e) => t("abilities.hint.missingNote", e)),
+    ];
+  }
+
+  /** Fremde Werkzeuge je Anbieter, wie sie wirklich montiert sind (Kollisionen mit Kodas eigenen Namen fallen
+   *  heraus — ein „Anbieter aus“ darf kein eigenes Werkzeug mit abschalten). Dieselbe Gruppierung wie der Settings-Tab. */
+  providerTools(offers: ProviderOffer[] = readProviderOffers(this.app, this.promptLang())): ProviderTools[] {
+    return providerToolGroups({ toolsDisabled: [], toolDescriptions: {} }, offers, HOST_TOOL_NAMES)
+      .groups.map((g) => ({ id: g.id, tools: g.rows.map((r) => r.name) }));
+  }
+
+  private async saveInput(arbeit: Arbeit | null): Promise<SaveInput> {
+    const { skills } = await this.readSkills();
+    return {
+      skills, arbeit, overlay: this.session.overlay,
+      settings: this.settings, ownTools: [...HOST_TOOL_NAMES], providers: this.providerTools(), manual: this.session.manual,
+    };
+  }
+
+  private findArbeitFile(name: string) {
+    return this.app.vault.getMarkdownFiles().find((f) => this.isArbeitFile(f.path) && arbeitName(f.path, this.settings.kodaFolder) === name) ?? null;
+  }
+
+  /** Nach dem Schreiben gilt der Stand sofort, nicht erst wenn der metadataCache nachzieht. */
+  private adoptArbeit(name: string, fm: Record<string, unknown>): void {
+    const parsed = parseArbeit(name, fm);
+    if (parsed === null) return;
+    this.arbeiten = [...this.arbeiten.filter((a) => a.name !== name), parsed.arbeit].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    this.arbeitParseInvalid.set(name, parsed.invalid);
+  }
+
+  /** „Speichern“: der effektive Stand als Abweichung in die gewaehlte Arbeit (Spec § 5). Das ist eine Handlung
+   *  des Nutzers und fragt nicht nach; der Text unter dem Frontmatter bleibt unberuehrt. */
+  async saveArbeit(): Promise<boolean> {
+    const a = this.currentArbeit();
+    const file = a === null ? null : this.findArbeitFile(a.name);
+    if (a === null || file === null) return false;
+    const fm = arbeitFrontmatter(await this.saveInput(a));
+    await writeArbeitFrontmatter(this.app, file, fm);
+    this.adoptArbeit(a.name, fm);
+    this.session = { ...this.session, overlay: emptyOverlay() };
+    this.syncAll();
+    return true;
+  }
+
+  /** „Als neue Arbeit …“: legt `<Koda-Ordner>/Arbeiten/<name>.md` an. `false`, wenn der Name nicht taugt oder
+   *  die Datei schon existiert (Gross/klein egal) — eine bestehende Arbeit wird nie ueberschrieben. */
+  async saveArbeitAs(rawName: string): Promise<boolean> {
+    const name = rawName.trim().replace(/\.md$/i, "");
+    if (name === "" || /[\\/:*?"<>|#^[\]]/.test(name)) return false;
+    const path = `${arbeitenDir(this.settings.kodaFolder)}/${name}.md`;
+    if (this.app.vault.getMarkdownFiles().some((f) => f.path.toLowerCase() === path.toLowerCase())) return false;
+    await this.ensureParents(path);
+    const file = await this.app.vault.create(path, "");
+    const fm = arbeitFrontmatter(await this.saveInput(this.currentArbeit()));
+    await writeArbeitFrontmatter(this.app, file, fm);
+    this.adoptArbeit(name, fm);
+    this.session = { ...this.session, arbeit: name, overlay: emptyOverlay() };
+    this.syncAll();
+    return true;
+  }
+
+  /** Regeln der Projektion (Skill-Hinweis statt zweitem Skill-Text); aus, wenn der Schalter es sagt. */
+  projectionRules(): ReturnType<typeof skillTextRule>[] {
+    if (!this.settings.skillHintInHistory) return [];
+    return [skillTextRule(skillModeLookup(this.skillsCache, this.currentArbeit(), this.session.overlay))];
   }
 
   private abort: AbortController | null = null;
@@ -413,18 +612,22 @@ export default class KodaPlugin extends Plugin {
     // Das globale Modell-Feld ist weg: sein Wert ist einmal in die Zeilen gewandert, der
     // Schlüssel fliegt beim Speichern aus data.json (sonst liefe die Migration bei jedem Start).
     if (loaded.changed) await this.saveData(this.settings);
-    this.contextMode = this.settings.contextModeDefault;
-    // Ein gespeicherter Default aus einer spaeteren Etappe (z. B. "note") ist hier noch
-    // nicht angeboten — dann faellt der Start auf Arbeitsplatz zurueck, statt den Chat in
-    // einem Modus zu starten, den er gar nicht anbietet.
+    // Ein gespeicherter Default aus einer spaeteren Etappe ist hier noch nicht angeboten — dann faellt der Start
+    // auf Arbeitsplatz zurueck, statt den Chat in einem Modus zu starten, den er gar nicht anbietet.
     if (!AVAILABLE_MODES.includes(this.contextMode)) this.contextMode = "workspace";
     // Erst wenn alle Plugins geladen sind, ist die Frage „gibt es vault-rag?" beantwortbar.
     // Ein gespeicherter Default „vault" ohne vault-rag faellt dann auf Arbeitsplatz zurueck,
     // und die Dropdowns bekommen ihre Sperre (sie wurden womoeglich vor vault-rag gebaut).
     this.app.workspace.onLayoutReady(() => {
       if (this.contextMode === "vault" && !this.vaultAvailable()) this.contextMode = "workspace";
-      for (const v of this.views()) v.syncContextMode();
+      // Erst jetzt steht der metadataCache: die Arbeiten lesen und mit ihnen das Gespraech wiederherstellen.
+      this.refreshArbeiten();
     });
+    this.registerEvent(this.app.vault.on("delete", (file) => { if (this.isArbeitFile(file.path)) this.refreshArbeiten(); }));
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+      if (this.isArbeitFile(file.path) || this.isArbeitFile(oldPath)) this.refreshArbeiten();
+    }));
+    this.registerEvent(this.app.metadataCache.on("changed", (file) => { if (this.isArbeitFile(file.path)) this.refreshArbeiten(); }));
     this.applyLanguage();
 
     const dir = normalizePath(`${this.manifest.dir ?? ""}/sessions`);
@@ -444,6 +647,10 @@ export default class KodaPlugin extends Plugin {
       dir,
     );
     this.chatLog = await this.store.load();
+    // Arbeit und Overlay gehoeren zum Gespraech (Spec § 3): die juengste Sitzungs-Marke stellt sie her. Eine
+    // Marke aus einer Sitzung vor den Arbeiten gibt es nicht — dann beginnt der Zustand leer.
+    const restored = latestSessionState(this.chatLog);
+    if (restored !== null) this.session = restored;
 
     this.registerView(VIEW_TYPE_KODA, (leaf) => new KodaView(leaf, this));
     this.addRibbonIcon("dog", t("cmd.open"), () => void this.activateView());
@@ -556,7 +763,7 @@ export default class KodaPlugin extends Plugin {
     const used = estimateTokens(
       // Die PROJEKTION, nicht der rohe Verlauf: gestubbte Tool-Ergebnisse zaehlen so mit ihrer
       // Stub-Laenge, und der Kontextblock zaehlt ueberhaupt (er steht nur dort in content).
-      projectForModel(this.chatLog),
+      projectForModel(this.chatLog, this.projectionRules()),
       JSON.stringify(toWireTools(this.currentToolDefs())).length,
     );
     return contextUsage(used, s.contextWindowTokens, s.compactAtPercent);
@@ -575,14 +782,19 @@ export default class KodaPlugin extends Plugin {
    *  — ein zweiter Aufbau waere eine zweite Wahrheit. */
   currentToolSet(): ToolSet {
     const lang = this.promptLang();
-    return toolSet({
+    const providers = readProviderOffers(this.app, lang);
+    const opts = {
       related: readRetrievalApi(this.app)?.status().indexed === true,
       readImage: this.imageMode() !== "none",
       generateImage: readImageGenApi(this.app) !== null,
-      disabled: this.settings.toolsDisabled,
       descriptions: this.settings.toolDescriptions,
-      providers: readProviderOffers(this.app, lang),
-    });
+      providers,
+    };
+    // Abgeschaltet ist, was die Einstellungen, die gewaehlte Arbeit und das Overlay dieses Gespraechs zusammen sagen.
+    const disabled = effectiveDisabledTools(
+      this.settings.toolsDisabled, [...HOST_TOOL_NAMES], this.providerTools(providers), this.currentArbeit(), this.session.overlay,
+    );
+    return toolSet({ ...opts, disabled });
   }
 
   /** Das Modell, über das der Chat tatsächlich sendet (aufgelöster Endpunkt, davor die erste
@@ -708,6 +920,7 @@ export default class KodaPlugin extends Plugin {
         if (id === undefined) return null;
         return findToolProvider(this.app, id);
       },
+      skillMode: (name) => skillModeLookup(this.skillsCache, this.currentArbeit(), this.session.overlay)(name),
       imageMode: () => this.imageMode(),
       ocr: () => readOcrApi(this.app),
       imageGen: () => readImageGenApi(this.app),
@@ -765,7 +978,12 @@ export default class KodaPlugin extends Plugin {
     this.chatLog = [];
     this.lastNotice = null;
     this.skillNotice = null;
+    // Mit Arbeit bleibt sie und wird frisch angewendet; ohne Arbeit ueberlebt nur der Kontext-Teil des Overlays,
+    // wie heute der Modus (Spec § 3).
+    this.session = sessionForNewChat(this.session);
     this.resetContextSelection();
+    if (this.session.arbeit !== null) this.chooseArbeit(this.session.arbeit);
+    this.syncAll();
     for (const v of this.views()) v.renderLog();
   }
 
@@ -843,8 +1061,16 @@ export default class KodaPlugin extends Plugin {
       const userMsg: ChatMessage = { role: "user", content: question };
       const ctx = await this.currentContext(question);
       if (ctx !== null) userMsg.context = ctx;
-      this.chatLog.push(userMsg);
-      await this.store.appendMessages([userMsg]);
+      // Der Sitzungszustand geht mit der Frage in den Verlauf, wenn er sich geaendert hat — nie ans Modell,
+      // aber ein Neustart stellt Arbeit und Overlay daraus wieder her (Spec § 3).
+      const toAppend: LogEntry[] = [];
+      if (needsSessionRecord(this.chatLog, this.session)) {
+        const rec: SessionStateRecord = { kind: "session", at: new Date().toISOString(), state: JSON.parse(JSON.stringify(this.session)) as SessionState };
+        toAppend.push(rec);
+      }
+      toAppend.push(userMsg);
+      this.chatLog.push(...toAppend);
+      await this.store.appendMessages(toAppend);
       for (const v of this.views()) v.renderLog();
 
       // `contextKeepChoices` aus: die Abwahl galt nur für diese eine Nachricht. Nach dem
@@ -984,6 +1210,7 @@ export default class KodaPlugin extends Plugin {
       const appended = await runAgent(
         {
           llm, tools, maxRounds: s.maxRounds, textFallback: s.textFallback, compaction,
+          projectionRules: () => this.projectionRules(),
           // Nur mit aktivem OCR-Anbieter: ein Vision-Aufruf, den der Server mit HTTP-Fehler
           // quittiert, faellt auf den Text im Bild zurueck. Frisch gelesen — der Anbieter
           // kann waehrend des Laufs weg sein, dann scheitert die Texterkennung mit Klartext.
@@ -1081,7 +1308,7 @@ export default class KodaPlugin extends Plugin {
    *  eigenen Literal: liefen die beiden je auseinander, laese diese Methode weiterhin
    *  aus dem alten Ordner in den System-Prompt, waehrend `writePolicy` ihn nicht mehr
    *  als bestaetigungspflichtig erkennt — ein stiller Bestaetigungs-Bypass. */
-  private async readSkills(): Promise<{ selection: Selection; failed: SkillFailure[] }> {
+  private async readSkills(): Promise<{ skills: Skill[]; selection: Selection; failed: SkillFailure[] }> {
     const dir = `${this.settings.kodaFolder.replace(/\/+$/, "")}/${SKILLS_SUBFOLDER}`;
     const prefix = `${dir.toLowerCase()}/`;
     const skills: Skill[] = [];
@@ -1097,7 +1324,9 @@ export default class KodaPlugin extends Plugin {
       if (r.ok) skills.push(r.skill);
       else failed.push({ name: r.name, reason: "no-description" });
     }
-    return { selection: selectSkills(skills, this.settings.skillBudgetChars), failed };
+    this.skillsCache = skills;
+    // Die Stellungen aus Overlay, Arbeit und Frontmatter (Spec § 3) — ohne beides dasselbe wie das alte `selectSkills`.
+    return { skills, selection: selectEffective(skills, this.currentArbeit(), this.session.overlay, this.settings.skillBudgetChars), failed };
   }
 
   private skillStatusText(sel: Selection, failed: SkillFailure[]): string | null {
@@ -1118,6 +1347,31 @@ export default class KodaPlugin extends Plugin {
     if (noDescription.length > 0) lines.push(t("skills.failed", noDescription.join(", ")));
     return lines.length === 0 ? null : lines.join("\n");
   }
+}
+
+/** Vorlaeufig hier, nicht in der Bibliothek: das Gate hat die exportierte Fassung abgelehnt (Gegenleser Welle 24,
+ *  Zielort code-kit `folder-scope`; Cockpit-Task „expandNotizen auf code-kit umstellen“). Nicht exportiert, bis der Master entschieden hat.
+ *  `kontext.notizen` einer Arbeit zu Einzelpfaden aufloesen — beim Anwenden, nicht beim Lesen (Spec § 4): ein Ordner
+ *  (`/` am Ende) wird zu seinen Notizen, rekursiv und sortiert, ein Notizpfad bleibt. Was auf nichts zeigt, steht in
+ *  `missing` (der Tab nennt es, statt es still zu verwerfen). Pfade mit `..` zaehlen als fehlend. */
+function expandNotizen(entries: readonly string[], markdownPaths: readonly string[]): { paths: string[]; missing: string[] } {
+  const paths: string[] = [];
+  const missing: string[] = [];
+  const known = new Set(markdownPaths);
+  const add = (p: string): void => { if (!paths.includes(p)) paths.push(p); };
+  for (const entry of entries) {
+    const isFolder = entry.endsWith("/");
+    const norm = normalizeRel(entry);
+    if (norm === "" || norm.split("/").includes("..")) { missing.push(entry); continue; }
+    if (isFolder) {
+      const prefix = `${norm}/`;
+      const inside = markdownPaths.filter((p) => p.startsWith(prefix)).sort();
+      if (inside.length === 0) missing.push(entry);
+      else inside.forEach(add);
+    } else if (known.has(norm)) add(norm);
+    else missing.push(entry);
+  }
+  return { paths, missing };
 }
 
 /** Sprach-Erkennung ueber Obsidians API. `null` heisst „hat nicht geklappt" — ausdruecklich
