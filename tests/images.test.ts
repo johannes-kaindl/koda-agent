@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  chooseImageMode, describeOcrError, imageExtension, isImagePath,
+  chooseImageMode, imageExtension, isImagePath,
   IMAGE_EST_CHARS, ocrResult, visionResult,
 } from "../src/core/tools/images";
 import { binaryToDataUrl } from "../src/vendor/kit/data-url";
@@ -63,13 +63,21 @@ describe("ocrResult", () => {
     expect(r.ok).toBe(true);
     expect(r.ok && r.content).toMatch(/kein Text/i);
   });
-  it("uebersetzt Vertragsfehler in Klartext", async () => {
-    for (const error of ["backend-unavailable", "not-found", "timeout", "busy", "unsupported", "failed"] as const) {
+  it("uebersetzt Vertragsfehler in Klartext, deutsch und wortgleich mit dem Stand vor dem Kit-Tausch", async () => {
+    // Die Saetze kommen seit obsidian-kit 0.63.0 aus `ocrErrorText`; die Tabelle hier haelt fest, dass sich fuer Koda kein Wort aendert.
+    const erwartet = {
+      "backend-unavailable": "Texterkennung nicht verfügbar: m",
+      "not-found": "Bild nicht gefunden: m",
+      timeout: "Texterkennung hat zu lange gebraucht: m",
+      busy: "Texterkennung ist beschäftigt, später erneut versuchen: m",
+      unsupported: "Dieses Bildformat liest die Texterkennung nicht: m",
+      failed: "Texterkennung fehlgeschlagen: m",
+    } as const;
+    for (const [error, text] of Object.entries(erwartet) as [keyof typeof erwartet, string][]) {
       const r = await ocrResult({ extractText: async () => ({ error, message: "m" }) }, "a.png");
       expect(r.ok).toBe(false);
-      expect(!r.ok && r.error).toBe(describeOcrError({ error, message: "m" }));
+      expect(!r.ok && r.error).toBe(text);
     }
-    expect(describeOcrError({ error: "busy", message: "x" })).toMatch(/beschäftigt|laeuft|läuft/i);
   });
   it("faengt einen werfenden Anbieter ab", async () => {
     const r = await ocrResult({ extractText: async () => { throw new Error("kaputt"); } }, "a.png");

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readOcrApi } from "../src/obsidian/ocr";
-import { readImageGenApi } from "../src/obsidian/image-gen";
+import { readImageGenApi, readOcrApi } from "../src/vendor/kit-obsidian/capability-apis";
 
 const ocr = { version: 1, extractText: async () => "x" };
 const gen = { version: 1, generateImage: async () => "a.png" };

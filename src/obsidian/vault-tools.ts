@@ -30,6 +30,7 @@ import { DEFAULT_SETTINGS } from "../core/settings-types";
 import { ocrResult, visionResult, type ImageMode } from "../core/tools/images";
 import type { OcrProviderApi } from "../vendor/kit/ocr-provider";
 import type { ImageGenProviderApi, ImageGenProviderError } from "../vendor/kit/image-gen-provider";
+import { imageGenErrorText } from "../vendor/kit/provider-error-texts";
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
@@ -109,15 +110,6 @@ const SEARCH_CAP = 10;
 /** Endungen, die `read_image` annimmt — dieselbe Menge wie `isImagePath`. */
 const IMAGE_READ_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
 
-function describeImageGenError(e: ImageGenProviderError): string {
-  switch (e.error) {
-    case "backend-unavailable": return `Bildgenerierung nicht verfügbar: ${e.message}`;
-    case "timeout": return `Bildgenerierung hat zu lange gebraucht: ${e.message}`;
-    case "busy": return `Bildgenerierung ist beschäftigt, später erneut versuchen: ${e.message}`;
-    case "refused": return `Bildgenerierung hat den Auftrag abgelehnt: ${e.message}`;
-    case "failed": return `Bildgenerierung fehlgeschlagen: ${e.message}`;
-  }
-}
 const SNIPPET = 80;
 
 export class VaultTools implements ToolRunner {
@@ -350,7 +342,8 @@ export class VaultTools implements ToolRunner {
     } catch (e) {
       return { ok: false, error: `Bildgenerierung fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}` };
     }
-    if (typeof r !== "string") return { ok: false, error: describeImageGenError(r) };
+    // Die Saetze kommen aus dem Kit; deutsch wie jeder Werkzeug-Text Kodas, nicht nach UI-Sprache (siehe `ocrResult`).
+    if (typeof r !== "string") return { ok: false, error: imageGenErrorText(r, "de") };
     return { ok: true, content: `Bild erzeugt: ${r}\n\n![[${r}]]` };
   }
 

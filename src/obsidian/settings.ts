@@ -44,7 +44,7 @@ import { readProviderOffers, readToolProviderRejections } from "../vendor/kit-ob
 import { renderSkillDefaults } from "./skill-defaults";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "./model-control";
 import { PromptPreviewModal } from "./prompt-modal";
-import { readImageGenApi } from "./image-gen";
+import { readImageGenApi } from "../vendor/kit-obsidian/capability-apis";
 import { readRetrievalApi } from "./retrieval";
 import {
   DEFAULT_SETTINGS,

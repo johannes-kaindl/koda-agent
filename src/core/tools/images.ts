@@ -1,5 +1,6 @@
 import type { Confidence } from "../../vendor/kit/capabilities";
-import type { OcrProviderApi, OcrProviderError } from "../../vendor/kit/ocr-provider";
+import type { OcrProviderApi } from "../../vendor/kit/ocr-provider";
+import { ocrErrorText } from "../../vendor/kit/provider-error-texts";
 
 /** Formate, die Vision-Modelle und der OCR-Anbieter lesen. SVG fehlt mit Absicht: es ist Text,
  *  kein Rasterbild, und kein Vision-Endpunkt nimmt es als `image_url`. */
@@ -39,17 +40,6 @@ export function visionResult(path: string): ImageReadOutcome {
   return { ok: true, source: "vision", content: `Bild ${path} — es ist diesem Ergebnis angehängt.`, images: [{ path }] };
 }
 
-export function describeOcrError(e: OcrProviderError): string {
-  switch (e.error) {
-    case "backend-unavailable": return `Texterkennung nicht verfügbar: ${e.message}`;
-    case "not-found": return `Bild nicht gefunden: ${e.message}`;
-    case "timeout": return `Texterkennung hat zu lange gebraucht: ${e.message}`;
-    case "busy": return `Texterkennung ist beschäftigt, später erneut versuchen: ${e.message}`;
-    case "unsupported": return `Dieses Bildformat liest die Texterkennung nicht: ${e.message}`;
-    case "failed": return `Texterkennung fehlgeschlagen: ${e.message}`;
-  }
-}
-
 /** OCR ueber den Anbieter image-to-markdown. Der Vertrag wirft nie — ein Wurf ist trotzdem
  *  ein Anbieter-Defekt und darf den Lauf nicht mitreissen. */
 /** Warum der Text statt des Bildes kommt — das Ergebnis sagt es dazu, damit Koda (und der
@@ -69,7 +59,9 @@ export async function ocrResult(api: Pick<OcrProviderApi, "extractText">, path: 
   } catch (e) {
     return { ok: false, error: `Texterkennung fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}` };
   }
-  if (typeof r !== "string") return { ok: false, error: describeOcrError(r) };
+  // Die Saetze kommen aus dem Kit (`ocrErrorText`). Deutsch, nicht nach UI-Sprache: der Rest dieses Ergebnisses und jeder andere
+  // Werkzeug-Text Kodas ist deutsch, ein englischer Satz davor waere ein gemischtes Ergebnis fuer das Modell.
+  if (typeof r !== "string") return { ok: false, error: ocrErrorText(r, "de") };
   const text = r.trim();
   const body = text === "" ? `Im Bild ${path} wurde kein Text erkannt.` : `Text aus ${path} (Texterkennung):\n\n${text}`;
   const content = why === undefined ? body : `${OCR_NOTE[why]}\n\n${body}`;

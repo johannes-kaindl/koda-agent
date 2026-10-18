@@ -104,10 +104,19 @@ describe("generate_image", () => {
     expect(spy).not.toHaveBeenCalled();
     expect(r.ok).toBe(false);
   });
-  it("Vertragsfehler sind Klartext-Ergebnisse, kein Wurf", async () => {
-    for (const error of ["backend-unavailable", "timeout", "busy", "refused", "failed"] as const) {
+  it("Vertragsfehler sind Klartext-Ergebnisse, kein Wurf, deutsch und wortgleich mit dem Stand vor dem Kit-Tausch", async () => {
+    // Die Saetze kommen seit obsidian-kit 0.63.0 aus `imageGenErrorText`; die Tabelle haelt fest, dass sich fuer Koda kein Wort aendert.
+    const erwartet = {
+      "backend-unavailable": "Bildgenerierung nicht verfügbar: m",
+      timeout: "Bildgenerierung hat zu lange gebraucht: m",
+      busy: "Bildgenerierung ist beschäftigt, später erneut versuchen: m",
+      refused: "Bildgenerierung hat den Auftrag abgelehnt: m",
+      failed: "Bildgenerierung fehlgeschlagen: m",
+    } as const;
+    for (const [error, text] of Object.entries(erwartet) as [keyof typeof erwartet, string][]) {
       const r = await tools({ gen: { version: 1, generateImage: async () => ({ error, message: "m" }) } }).run("generate_image", { prompt: "x" });
       expect(r.ok).toBe(false);
+      expect(!r.ok && r.error).toBe(text);
     }
     const thrown = await tools({ gen: { version: 1, generateImage: async () => { throw new Error("kaputt"); } } }).run("generate_image", { prompt: "x" });
     expect(!thrown.ok && thrown.error).toContain("kaputt");
