@@ -59,4 +59,10 @@ describe("parseArbeit", () => {
       "kontext.modus", "kontext.tiefe", "kontext.nachbarn", "kontext.notizen.1", "base",
     ]);
   });
+
+  it("eine ASCII-Schreibweise eines bekannten Schluessels wird genannt, andere Frontmatter-Felder nicht", () => {
+    const r = parseArbeit("T", { koda: "arbeit", "uebrige-skills": "aus", tags: ["x"], created: "2026-10-18" });
+    expect(r!.arbeit.uebrigeSkills).toBe("grundeinstellung");
+    expect(r!.invalid).toEqual(["uebrige-skills (übrige-skills?)"]);
+  });
 });

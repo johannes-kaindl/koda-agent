@@ -5,6 +5,12 @@ import {
 } from "../settings-types";
 import { SKILL_MODES, type Arbeit, type ArbeitKontext, type OnOff, type SkillMode } from "./types";
 
+const KNOWN_KEYS = ["koda", "skills", "übrige-skills", "werkzeuge", "anbieter", "kontext", "base"] as const;
+
+function asciiFold(key: string): string {
+  return key.toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss");
+}
+
 export interface ParsedArbeit {
   arbeit: Arbeit;
   /** Einträge, die nicht gelten (`skills.b`, `kontext.tiefe`, …) — der Tab nennt sie, statt sie still zu verwerfen. */
@@ -85,6 +91,13 @@ export function parseArbeit(name: string, fm: unknown): ParsedArbeit | null {
   const b = fm["base"];
   if (typeof b === "string" && b.trim() !== "") base = b.trim();
   else if (b !== undefined && b !== null) invalid.push("base");
+
+  // Eine ASCII-Schreibweise eines bekannten Schluessels (`uebrige-skills`) waere sonst ein stiller Fehler: weitere
+  // Frontmatter-Felder einer Notiz sind erlaubt, also ist ein unbekannter Schluessel allein kein Befund — dieser schon.
+  for (const key of Object.keys(fm)) {
+    const gemeint = KNOWN_KEYS.find((k) => k !== key && asciiFold(k) === asciiFold(key));
+    if (gemeint !== undefined) invalid.push(`${key} (${gemeint}?)`);
+  }
 
   return { arbeit: { name, skills, uebrigeSkills, werkzeuge, anbieter, kontext, base }, invalid };
 }
