@@ -41,6 +41,7 @@ import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
 import { readProviderOffers, readToolProviderRejections } from "../vendor/kit-obsidian/tool-providers";
+import { renderSkillDefaults } from "./skill-defaults";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "./model-control";
 import { PromptPreviewModal } from "./prompt-modal";
 import { readImageGenApi } from "./image-gen";
@@ -158,6 +159,13 @@ export class KodaSettingsTab extends PluginSettingTab {
           max: SKILL_BUDGET_MAX,
           step: SKILL_BUDGET_STEP,
         },
+      },
+      {
+        name: t("settings.skills"),
+        render: (setting) => { renderSkillDefaults(setting, {
+          readSkills: () => this.plugin.readSkills(),
+          setDefault: (n, m) => this.plugin.setSkillDefault(n, m),
+        }); },
       },
       {
         name: t("settings.skillHint"),

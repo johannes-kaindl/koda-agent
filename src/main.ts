@@ -17,7 +17,7 @@ import {
   baseSkillMode, effectiveContext as resolveContext, effectiveDisabledTools, selectEffective, skillModeLookup,
   unknownEntries, withOverlayKontext, withOverlayProvider, withOverlaySkill, withOverlayTool, type EffectiveContext, type ProviderTools,
 } from "./core/abilities/resolve";
-import { arbeitFrontmatter, type SaveInput } from "./core/abilities/save";
+import { arbeitFrontmatter, skillModeFrontmatter, type SaveInput } from "./core/abilities/save";
 import { skillTextRule } from "./core/abilities/projection";
 import { latestSessionState, needsSessionRecord, sessionForNewChat } from "./core/abilities/session";
 import { parseArbeit } from "./core/abilities/parse";
@@ -421,6 +421,25 @@ export default class KodaPlugin extends Plugin {
   setProviderOn(id: string, on: boolean): void {
     const base: OnOff = this.currentArbeit()?.anbieter[id] ?? "an";
     this.session = { ...this.session, overlay: withOverlayProvider(this.session.overlay, id, on ? "an" : "aus", base) };
+    this.syncAll();
+  }
+
+  /** Grundeinstellung eines Skills: schreibt ins Frontmatter der Skill-Datei (Spec § 6). Eine Handlung des Nutzers im
+   *  Settings-Tab, kein Modell-Werkzeug — die Bestaetigungspflicht von `write_skill` gilt dafuer nicht. `processFrontMatter`
+   *  laesst den uebrigen Frontmatter und den Body unberuehrt. */
+  async setSkillDefault(name: string, mode: SkillMode): Promise<void> {
+    const dir = `${this.settings.kodaFolder.replace(/\/+$/, "")}/${SKILLS_SUBFOLDER}`;
+    const prefix = `${dir.toLowerCase()}/`;
+    const file = this.app.vault.getMarkdownFiles().find((f) => {
+      const p = f.path.toLowerCase();
+      return p.startsWith(prefix) && !p.slice(prefix.length).includes("/") && f.path.slice(dir.length + 1).replace(/\.md$/i, "").toLowerCase() === name.toLowerCase();
+    });
+    if (file === undefined) return;
+    await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+      delete fm["enabled"];
+      delete fm["pinned"];
+      Object.assign(fm, skillModeFrontmatter(mode));
+    });
     this.syncAll();
   }
 
@@ -1324,7 +1343,7 @@ export default class KodaPlugin extends Plugin {
    *  eigenen Literal: liefen die beiden je auseinander, laese diese Methode weiterhin
    *  aus dem alten Ordner in den System-Prompt, waehrend `writePolicy` ihn nicht mehr
    *  als bestaetigungspflichtig erkennt — ein stiller Bestaetigungs-Bypass. */
-  private async readSkills(): Promise<{ skills: Skill[]; selection: Selection; failed: SkillFailure[] }> {
+  async readSkills(): Promise<{ skills: Skill[]; selection: Selection; failed: SkillFailure[] }> {
     const dir = `${this.settings.kodaFolder.replace(/\/+$/, "")}/${SKILLS_SUBFOLDER}`;
     const prefix = `${dir.toLowerCase()}/`;
     const skills: Skill[] = [];

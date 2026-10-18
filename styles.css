@@ -271,6 +271,9 @@
 .koda-warn-icon { display: flex; }
 .koda-tools-setting { flex-wrap: wrap; }
 .koda-tools-setting > .koda-tool-list { flex: 1 1 100%; }
+.koda-skills-setting { flex-wrap: wrap; }
+.koda-skills-setting > .koda-skill-list { flex: 1 1 100%; }
+.koda-skill-list { display: flex; flex-direction: column; margin-top: var(--size-4-2); }
 .koda-tool-list { display: flex; flex-direction: column; gap: var(--size-4-2); margin-top: var(--size-4-2); }
 .koda-tool-row { display: flex; flex-direction: column; gap: var(--size-4-1); }
 .koda-tool-row.is-unavailable { opacity: 0.5; }
