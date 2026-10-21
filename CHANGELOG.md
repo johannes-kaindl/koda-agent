@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.28.0] — 2026-10-21
+
 ### Added
 
 - **Claude (Anthropic API) through the LLM Endpoint Manager.** **Settings → Take endpoints from the LLM Endpoint Manager** (off by default, only shown when the manager is installed): the endpoint, API key and model then come from the manager, with an **Endpoint** and **Model** choice, **Add Koda's endpoints to the manager** and a named reason when the manager has nothing usable (no endpoint, endpoint gone, switched off, key missing, no answer). Koda's own list stays and keeps working unchanged; nothing in `data.json` is migrated, and without the manager Koda behaves as before.
