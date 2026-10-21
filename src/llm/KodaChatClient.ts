@@ -7,6 +7,8 @@
    Kein Obsidian-Import: der Transport wird injiziert (`chat-transport` liefert XHR). */
 import { createChatClient, JIT_FIRST_CHUNK_TIMEOUT_MS, type ChatResult, type ChatWireMessage, type SseTransport } from "../vendor/kit-obsidian/chat-client";
 import { suppressParams } from "../vendor/kit/reasoning";
+import { resolveRequestParams, type FamilyId } from "../vendor/kit/sampling-profiles";
+import type { EndpointTransport } from "../vendor/kit/endpoint-source";
 // Anzeige- und Request-Seite treffen dieselbe Entscheidung — deshalb EINE Definition,
 // im uebernommenen Toggle-Modul (REGISTRY: „wer nur die Anzeige uebernimmt, hat die Haelfte").
 import { effectiveSuppress } from "../core/chat/reasoning-toggle";
@@ -22,7 +24,16 @@ export interface ChatConfig {
   apiKey: string;
   model: string;
   suppressThinking: boolean;
+  /** Verbindungsart des aufgelösten Endpunkts; fehlt sie, gilt HTTP (lokale Zeile). */
+  transport?: EndpointTransport;
+  /** Familie des Modells (Manager-Tabelle oder Namensrater); nur für Anthropic gelesen. */
+  family?: FamilyId | null;
 }
+
+/** Transporte für Endpunkte mit `transport: "anthropic"` (native Messages-API): der Strom und, wenn der XHR
+ *  ausfällt, ein Rückfall über Obsidians `requestUrl` (CORS-frei). Beide teilen EINEN Zustand (Denkblöcke,
+ *  Modell-Liste), sonst fehlt dem Rückfall das Denken der Werkzeug-Runde. */
+export interface AnthropicTransports { primary: SseTransport; fallback?: SseTransport }
 
 export type LlmResult =
   | { ok: true; content: string; toolCalls: ToolCall[]; finishReason?: string; reasoning?: string; model?: string }
@@ -80,24 +91,53 @@ function toLlmResult(r: ChatResult): LlmResult {
   }
 }
 
+/** Anfrage-Parameter. HTTP-Endpunkte bekommen Kodas feste Werte. Für die Messages-API von Anthropic
+ *  baut das Profil `claude` sie: kein `temperature` (auf Claude 4.7 und neuer ein HTTP 400), die Tiefe
+ *  des Denkens als `effort` — „aus“ ist dort `low`, weil Claude das Denken nicht abschalten lässt —
+ *  und kein festes `max_tokens` (es schließt das adaptive Denken ein; fehlt es, setzt der Transport die
+ *  Grenze des Modells). */
+function paramsFor(cfg: ChatConfig, suppress: boolean): Record<string, unknown> {
+  if (cfg.transport === "anthropic") {
+    return resolveRequestParams({ family: cfg.family ?? null, mode: "agent", backend: "anthropic", thinking: suppress ? "off" : "medium" }).params;
+  }
+  return {
+    temperature: 0.2,
+    // 2048 reichte nicht fuer ein write_note mit ~9 KB Text (~2000 Tokens allein fuer den
+    // Inhalt). Vorlaeufiger Wert — die Sampling-Spec (Design-Session obsidian-kit-d8) legt
+    // Budgets spaeter je Modus fest; llm-setup empfahl mindestens 8192, siehe Befundnotiz
+    // "Tool-Use-Budget und Gemma-Schemas" 2026-09-23.
+    max_tokens: 8192,
+    ...suppressParams(suppress),
+  };
+}
+
 export class KodaChatClient {
   private readonly chat: ReturnType<typeof createChatClient>;
+  private readonly chatAnthropic: ReturnType<typeof createChatClient> | null;
 
   constructor(
     transport: SseTransport,
     timeoutMs: number = DEFAULT_TIMEOUT_MS,
     clock: ClockPort = realClock,
+    anthropic?: AnthropicTransports,
   ) {
     // Kein `fallbackTransport`, bewusst: ein Chat, den der Server per Origin-Pruefung (CORS)
     // abweist, soll als „Probe gruen, Chat rot" sichtbar bleiben (`error.chatBlocked`), statt
     // still ohne Stream weiterzulaufen — der Nutzer soll den Server richtig einstellen.
-    this.chat = createChatClient({
-      transport,
+    const timeouts = {
       clock,
       idleTimeoutMs: timeoutMs,
       // Ein JIT-ladendes Modell schweigt Minuten, bevor der erste Chunk kommt; die Idle-Frist
       // (Default 300 s) gilt sonst auch dafuer. Die Idle-Einstellung bleibt die Untergrenze.
       firstChunkTimeoutMs: Math.max(timeoutMs, JIT_FIRST_CHUNK_TIMEOUT_MS),
+    };
+    this.chat = createChatClient({ transport, ...timeouts });
+    // Anders als beim lokalen Server mit Fallback: ein CORS-Block ist bei Anthropic nichts, was der Nutzer
+    // einstellen koennte, und der Rueckfall ueber den Hauptprozess macht die Antwort moeglich.
+    this.chatAnthropic = anthropic === undefined ? null : createChatClient({
+      transport: anthropic.primary,
+      ...(anthropic.fallback !== undefined ? { fallbackTransport: anthropic.fallback } : {}),
+      ...timeouts,
     });
   }
 
@@ -119,19 +159,17 @@ export class KodaChatClient {
     // Gemma 4 ohne Öffner: der bisher gezeigte Antworttext war Denken und wird verworfen (obsidian-kit 0.60.3).
     onContentReset?: () => void,
   ): Promise<LlmResult> {
-    const result = await this.chat.complete({
+    const transport = cfg.transport ?? "http";
+    if (transport !== "http" && (transport !== "anthropic" || this.chatAnthropic === null)) {
+      return { ok: false, kind: "network", detail: `Der Endpunkt braucht eine Verbindungsart, die Koda nicht unterstützt (${transport}).`, partial: "" };
+    }
+    const chat = transport === "anthropic" && this.chatAnthropic !== null ? this.chatAnthropic : this.chat;
+    const suppress = effectiveSuppress(cfg.model, cfg.suppressThinking);
+    const result = await chat.complete({
       endpoint: { url: cfg.endpoint, ...(cfg.apiKey === "" ? {} : { apiKey: cfg.apiKey }) },
       model: cfg.model,
       messages: toWireMessages(messages, imageUrls) as ChatWireMessage[],
-      params: {
-        temperature: 0.2,
-        // 2048 reichte nicht fuer ein write_note mit ~9 KB Text (~2000 Tokens allein fuer den
-        // Inhalt). Vorlaeufiger Wert — die Sampling-Spec (Design-Session obsidian-kit-d8) legt
-        // Budgets spaeter je Modus fest; llm-setup empfahl mindestens 8192, siehe Befundnotiz
-        // "Tool-Use-Budget und Gemma-Schemas" 2026-09-23.
-        max_tokens: 8192,
-        ...suppressParams(effectiveSuppress(cfg.model, cfg.suppressThinking)),
-      },
+      params: paramsFor(cfg, suppress),
       tools: tools.length > 0 ? toWireTools(tools) : [],
       signal,
       onToken,

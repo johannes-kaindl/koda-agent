@@ -38,3 +38,9 @@ describe("loadKodaSettings — globales Modell wandert in die Zeilen", () => {
     expect(loadKodaSettings({}).changed).toBe(false);
   });
 });
+
+describe("loadKodaSettings — Endpunkt-Quelle", () => {
+  it("eine alte data.json ohne die neuen Felder muss nicht neu gespeichert werden", () => {
+    expect(loadKodaSettings({ endpoints: [{ url: "http://a:1234" }] }).changed).toBe(false);
+  });
+});

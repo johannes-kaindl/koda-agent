@@ -36,6 +36,7 @@ import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from ".
 import { rowModel, type EndpointConfig } from "../vendor/kit/endpoint_config";
 import { effectiveContext, type ModelContext } from "../vendor/kit/model-context";
 import { buildEndpointList, type EndpointListStrings } from "../vendor/kit-obsidian/endpoint-list";
+import { buildEndpointSourceSection, findEndpointManager, type EndpointSourceSectionStrings } from "../vendor/kit-obsidian/endpoint-source";
 import { createModelListCache, type ModelListCache, type ModelListClient } from "../vendor/kit/model-list-cache";
 import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
@@ -119,7 +120,7 @@ export class KodaSettingsTab extends PluginSettingTab {
       {
         name: t("settings.endpoints"),
         desc: t("settings.endpoints.desc"),
-        render: (setting) => this.renderEndpointList(setting),
+        render: (setting) => this.renderEndpointSource(setting),
       },
       {
         name: t("settings.suppress"),
@@ -386,6 +387,57 @@ export class KodaSettingsTab extends PluginSettingTab {
 
   // ── Endpunkt-Liste (render-Hatch auf den Kit-Baustein) ───────────────────
 
+  /** Endpunkte: ist der LLM Endpoint Manager installiert, steht davor der Schalter „vom Manager nehmen“ (Opt-in,
+   *  Default aus); an → der Manager-Abschnitt des Kits (Endpunkt, Modell, Import), sonst die lokale Liste. Ohne
+   *  Manager sieht der Nutzer genau das, was er vor dem Schalter sah. */
+  private renderEndpointSource(setting: Setting): void {
+    const host = settingBodyHost(setting);
+    if (findEndpointManager(this.app) === null) { this.renderEndpointList(host); return; }
+    new Setting(host)
+      .setName(t("settings.source.useManager"))
+      .setDesc(t("settings.source.useManager.desc"))
+      .addToggle((tg) => tg.setValue(this.plugin.settings.useEndpointManager).onChange((v) => {
+        void this.setControlValue("useEndpointManager", v).then(() => { this.refreshUi(); });
+      }));
+    if (!this.plugin.settings.useEndpointManager) { this.renderEndpointList(host); return; }
+    buildEndpointSourceSection({
+      app: this.app,
+      containerEl: host,
+      capability: "chat",
+      transports: ["http", "anthropic"],
+      caller: "koda-agent",
+      choice: () => this.plugin.settings.choice,
+      setChoice: async (c) => {
+        this.plugin.settings = validateKodaSettings({ ...this.plugin.settings, choice: c });
+        await this.plugin.saveSettings();
+      },
+      local: () => this.plugin.settings.endpoints,
+      pluginId: this.plugin.manifest.id,
+      renderLocalList: () => { this.renderEndpointList(host); },
+      rerender: () => { this.refreshUi(); },
+      strings: this.sourceStrings(),
+    });
+  }
+
+  private sourceStrings(): EndpointSourceSectionStrings {
+    const e = this.endpointStrings();
+    return {
+      managed: t("settings.source.managed"),
+      managedDesc: t("settings.source.managedDesc"),
+      openManager: t("settings.source.openManager"),
+      pickEndpoint: t("settings.source.pick"),
+      automatic: t("settings.source.automatic"),
+      importLocal: t("settings.source.import"),
+      imported: (r) => t("settings.source.imported", String(r.added.length), String(r.merged.length), String(r.skipped.length)),
+      importFailed: t("settings.source.importFailed"),
+      saveFailed: t("settings.source.saveFailed"),
+      model: t("settings.source.model"),
+      modelHint: (key) => (key === "" ? "" : t(`settings.model.hint.${key}`)),
+      savedSuffix: e.savedSuffix,
+      refreshModels: e.refreshModels,
+    };
+  }
+
   /** render-Hatch: delegiert an `buildEndpointList` (obsidian-kit@0.27.0). Bis 0.7.1 stand
    *  hier ein Eigenbau — begruendet als „gegenueber vault-rag bewusst abgespeckt: kein
    *  Erreichbarkeits-Ping, keine Modell-Liste, kein Test-Knopf (MVP-Schnitt)". Alle drei
@@ -398,9 +450,7 @@ export class KodaSettingsTab extends PluginSettingTab {
    *  fuer einen Sonderweg: der Status sitzt in `controlEl` statt als `setText` im `descEl`,
    *  und Knoepfe schalten ueber `buttonEl.disabled` statt `setDisabled()` (beides
    *  Renderer-Endlosschleifen, 2026-08-06, `_docs/docs/obsidian-api-gotchas.md`). */
-  private renderEndpointList(setting: Setting): void {
-    const host = settingBodyHost(setting);
-
+  private renderEndpointList(host: HTMLElement): void {
     buildEndpointList({
       containerEl: host,
       label: t("settings.endpoints"),

@@ -30,6 +30,7 @@ Koda runs against an OpenAI-compatible model you choose, typically one on your o
 
 - **Obsidian 1.11.4** or newer, desktop or mobile.
 - **An OpenAI-compatible chat endpoint with a tool-calling model**: a local server (LM Studio, Ollama, …) or a hosted provider with an API key. Models without native tool calling work through a text fallback, less reliably.
+- **Claude (Anthropic API)** works through the [LLM Endpoint Manager](https://github.com/johannes-kaindl/llm-endpoint-manager): install it, add a Claude endpoint there, and switch on **Take endpoints from the LLM Endpoint Manager** in Koda's settings. Off by default; without the manager nothing changes.
 - **A local server needs CORS switched on** (LM Studio: *Enable CORS*, or `lms server start --cors`; Ollama: `OLLAMA_ORIGINS`). The connection test passes without it, the chat does not; Koda names this case when it happens.
 - *Optional:* [Vault Retrieval](https://github.com/johannes-kaindl/vault-rag) with an indexed vault, for search by meaning, the **Vault** context mode and the `related_notes` tool.
 - *Optional:* [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown) for reading images with a model that cannot see them, and [Local Image Generator](https://github.com/johannes-kaindl/local-image-generator) for the `generate_image` tool.

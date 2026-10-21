@@ -70,3 +70,15 @@ describe("Nicht-Regression: die Heuristik ändert nur die Beschriftung", () => {
     });
   }
 });
+
+describe("thinkToggleView — Claude (Backend anthropic)", () => {
+  it("der Schalter bleibt bedienbar und sagt, dass Aus nur den Aufwand senkt", () => {
+    const v = thinkToggleView("claude-sonnet-5-5", true, "anthropic");
+    expect(v).toMatchObject({ hintKey: "view.thinkingHintClaude", disabled: false, labelKey: "view.thinkingOff" });
+    expect(thinkToggleView("claude-sonnet-5-5", false, "anthropic").hintKey).toBe("view.thinkingHintClaude");
+  });
+  it("jedes andere Backend behaelt seinen Hinweis", () => {
+    expect(thinkToggleView("qwen3:8b", true, "lmstudio").hintKey).toBeNull();
+    expect(thinkToggleView("qwq:32b", true, "lmstudio").hintKey).toBe("view.thinkingHintAlways");
+  });
+});

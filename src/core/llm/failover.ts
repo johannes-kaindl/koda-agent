@@ -10,19 +10,39 @@
    jede Frage diesen Preis zahlen. Also einmal je Sitzung, und erneut erst, wenn eine
    Anfrage wirklich scheitert. */
 import { rowModel, type EndpointConfig } from "../../vendor/kit/endpoint_config";
-import { resolveEndpointSource } from "../../vendor/kit/endpoint-source";
+import {
+  resolveEndpointSource,
+  type ApiErrorCode, type EndpointChoice, type EndpointTransport, type LlmEndpointManagerApi,
+} from "../../vendor/kit/endpoint-source";
+import type { BackendId, FamilyId } from "../../vendor/kit/sampling-profiles";
 
 /** Der aufgelöste Endpunkt samt dem Modell, das an ihn geht (das Modell der Zeile, in der
  *  gesendeten Schreibweise der Kit-Auflösung). */
 export interface ResolvedEndpoint {
   config: EndpointConfig;
   model: string;
+  /** Woher die Zeile kam: Manager oder lokale Liste. */
+  kind: "manager" | "local";
+  /** `"anthropic"` nur vom Manager; lokale Zeilen sind immer HTTP. */
+  transport: EndpointTransport;
+  family: FamilyId | null;
+  backend: BackendId;
+}
+
+/** Die Quelle der Auflösung, frisch bei jedem Durchlauf gelesen: Manager (nur mit Opt-in und nur,
+ *  wenn er da ist) und die Wahl an ihm. Ohne Manager gilt `choice` nicht — eine alte Wahl darf das
+ *  Modell der lokalen Zeile nicht übersteuern. */
+export interface EndpointSourceState {
+  manager: LlmEndpointManagerApi | null;
+  choice: EndpointChoice;
 }
 
 export class EndpointResolver {
   private cached: ResolvedEndpoint | null = null;
   /** Laufender Durchlauf, geteilt — sonst pingt jede gleichzeitige Frage die Liste selbst. */
   private pending: Promise<ResolvedEndpoint | null> | null = null;
+  /** Grund der letzten Auflösung ohne Endpunkt; nur der Manager nennt einen. */
+  private reason: ApiErrorCode | null = null;
 
   constructor(
     private readonly getEndpoints: () => EndpointConfig[],
@@ -30,6 +50,7 @@ export class EndpointResolver {
     /** Nach jeder neuen Auflösung (nicht beim Treffer aus dem Zwischenspeicher): wer das
      *  gesendete Modell liest (Thinking-Schalter), zieht damit nach. */
     private readonly onResolved: () => void = () => {},
+    private readonly getSource: () => EndpointSourceState = () => ({ manager: null, choice: {} }),
   ) {}
 
   /** Das Modell, über das der Chat tatsächlich sendet — synchron. Nach einer Auflösung das des
@@ -37,25 +58,49 @@ export class EndpointResolver {
    *  kein globales Modell mehr; eine Zeile ohne Modell sendet `""`. */
   peek(rows: readonly EndpointConfig[]): string {
     if (this.cached !== null) return this.cached.model;
+    const src = this.getSource();
+    if (src.manager !== null) return src.choice.model?.trim() ?? "";
     const first = rows[0];
     return first === undefined ? "" : rowModel(first);
+  }
+
+  /** Transport und Backend des gemerkten Endpunkts, synchron; davor HTTP und unbekannt. */
+  peekTransport(): { transport: EndpointTransport; backend: BackendId } {
+    return this.cached === null ? { transport: "http", backend: "unknown" } : { transport: this.cached.transport, backend: this.cached.backend };
+  }
+
+  /** Warum die letzte Auflösung keinen Endpunkt fand (`null`: lokal, oder es klappte). */
+  failure(): ApiErrorCode | null {
+    return this.reason;
   }
 
   /** Erster erreichbarer Eintrag, sonst `null`. Ein Fehlschlag wird NICHT gemerkt:
    *  beim nächsten Versuch kann das Netz zurück sein.
    *
-   *  Die Auflösung ist die des Kits (`resolveEndpointSource`) mit `manager: null`: Koda hat kein
-   *  `choice`-Feld, ein Manager-Abschnitt wäre ein neues Feature (Entscheidung Master Welle 15).
-   *  Das Zwischenspeichern und genau EINEN Neuversuch (`withFailover`) behält Koda selbst. */
+   *  Die Auflösung ist die des Kits (`resolveEndpointSource`). Der Manager ist Opt-in
+   *  (`useEndpointManager`, Entscheidung Johannes 2026-10-21): ohne ihn bleibt es die lokale Liste wie
+   *  bisher. Das Zwischenspeichern und genau EINEN Neuversuch (`withFailover`) behält Koda selbst. */
   async resolve(): Promise<ResolvedEndpoint | null> {
     if (this.cached !== null) return this.cached;
     if (this.pending !== null) return this.pending;
+    const src = this.getSource();
     this.pending = resolveEndpointSource(
-      { manager: null, local: this.getEndpoints(), capability: "chat", caller: "koda-agent" },
+      {
+        manager: src.manager,
+        local: this.getEndpoints(),
+        capability: "chat",
+        caller: "koda-agent",
+        // Ohne Manager gilt `choice` nicht (sonst übersteuerte eine alte Wahl das Modell der Zeile).
+        ...(src.manager !== null ? { choice: src.choice, transports: ["http", "anthropic"] as EndpointTransport[] } : {}),
+      },
       this.ping,
     )
       .then((r) => {
-        const ep = r.config === null ? null : { config: r.config, model: r.sentModel || r.model };
+        const ep: ResolvedEndpoint | null = r.config === null ? null : {
+          config: r.config, model: r.sentModel || r.model, kind: r.kind,
+          transport: r.transport ?? "http", family: r.family, backend: r.backend,
+        };
+        this.reason = r.config === null && r.kind === "manager" ? (r.reason ?? "no-endpoint") : null;
         this.cached = ep;
         this.onResolved();
         return ep;

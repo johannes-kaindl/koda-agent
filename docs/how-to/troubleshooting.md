@@ -55,6 +55,38 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 
 **Fix:** Open **Settings → Koda** and hover over the cross next to each endpoint row; it says why that row does not answer.
 
+### "The LLM Endpoint Manager has no usable endpoint. Add or switch on an endpoint in the manager's settings."
+
+**Cause:** **Take endpoints from the LLM Endpoint Manager** is on, and the manager has no switched-on endpoint that can chat.
+
+**Fix:** Open the manager's settings (**Open manager settings** in Koda's settings), add or switch on an endpoint, or switch the setting off to use Koda's own list again.
+
+### "The endpoint chosen in Koda's settings no longer exists in the LLM Endpoint Manager. Pick another one."
+
+**Cause:** The endpoint you picked was removed or renamed in the manager.
+
+**Fix:** Pick another one under **Endpoint** in Koda's settings, or choose **Automatic**.
+
+### "The endpoint chosen in Koda's settings is switched off in the LLM Endpoint Manager. Switch it on there."
+
+**Fix:** Switch the endpoint on in the manager's settings.
+
+### "The chosen endpoint has no API key in the LLM Endpoint Manager. Add it in the manager's settings."
+
+**Cause:** The key lives in the manager's key store, not in Koda. A Claude endpoint without a key cannot answer.
+
+**Fix:** Enter the key in the manager's settings.
+
+### "The LLM Endpoint Manager did not answer. Check that the plugin is switched on."
+
+**Fix:** Switch the LLM Endpoint Manager plugin on, then ask again.
+
+### "The Claude API can't be reached — check your network connection."
+
+**Cause:** The request to the Anthropic API failed on the network, twice (the second time without streaming).
+
+**Fix:** Check the connection and any proxy or VPN. An invalid key is a different message: "Access denied — API key missing or invalid."
+
 ### "The endpoint answers the connection test but not the chat request from Obsidian. A local server usually needs CORS enabled for that — …"
 
 **Cause:** CORS. Obsidian sends the chat with its own origin (`app://obsidian.md`), which a local server rejects until CORS is switched on. The endpoint check in the settings cannot show this, because it takes a different route that sends no origin.

@@ -2,7 +2,7 @@
   "source": "obsidian-kit",
   "version": "0.63.0",
   "sha": "9209efa",
-  "vendored": "clock.ts, confirm.ts, folder-suggest.ts, settings_walker.ts, model-picker.ts, hub.ts, collapsible.ts, stable-writer.ts, dom-guard.ts, help-setting.ts, chat-client.ts, chat-transport.ts, lab-client.ts, endpoint-list.ts, stream-area.ts, endpoint-secrets.ts, secrets.ts, endpoint-source.ts, shortcuts-bridge.ts, tool-providers.ts, plugin-api.ts, capability-apis.ts, textarea-suggest.ts, clipboard.ts",
+  "vendored": "clock.ts, confirm.ts, folder-suggest.ts, settings_walker.ts, model-picker.ts, hub.ts, collapsible.ts, stable-writer.ts, dom-guard.ts, help-setting.ts, chat-client.ts, chat-transport.ts, lab-client.ts, endpoint-list.ts, stream-area.ts, endpoint-secrets.ts, secrets.ts, endpoint-source.ts, anthropic-transport.ts, shortcuts-bridge.ts, tool-providers.ts, plugin-api.ts, capability-apis.ts, textarea-suggest.ts, clipboard.ts",
   "help_setting": "help-setting.ts (Kit 0.43.0, bcd1805)",
   "chat_pin": "chat-client chat-transport lab-client endpoint-list stream-area (Kit 0.43.0, bcd1805)",
   "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; help-setting.ts (Feld help_setting) und die Chat-Client-Module (Feld chat_pin) liegen auf eigenem Pin; ihr Header nennt ihn. endpoint-list.ts, chat-client.ts, model-picker.ts und stable-writer.ts tragen EINE mechanische Abweichung: kit-interne Importe ../vendor/code-kit/{pure,web}/ sind auf ../kit/ umgeschrieben (Vendor-Layout). Bei jedem Re-Vendoring reproduzieren; sonst darf nichts abweichen. Praezedenz: vim-dojo, markdown-presentation, vault-crews, kuro-gamification, lingotuner."

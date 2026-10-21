@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Claude (Anthropic API) through the LLM Endpoint Manager.** **Settings → Take endpoints from the LLM Endpoint Manager** (off by default, only shown when the manager is installed): the endpoint, API key and model then come from the manager, with an **Endpoint** and **Model** choice, **Add Koda's endpoints to the manager** and a named reason when the manager has nothing usable (no endpoint, endpoint gone, switched off, key missing, no answer). Koda's own list stays and keeps working unchanged; nothing in `data.json` is migrated, and without the manager Koda behaves as before.
+- Requests to Claude go to the native Messages API with streaming, tool calls (the thinking of a tool round goes back with the result) and images; if the stream breaks, the same request is repeated once without streaming.
+
+### Changed
+
+- For Claude the request parameters come from the sampling profile, not from Koda's fixed values: no `temperature` (refused on Claude 4.7 and newer), the thinking switch sets the effort (off: low, on: medium — Claude cannot switch thinking off, and the button says so), and no fixed token limit (it includes the thinking). Requests to local servers are unchanged.
+- Claude models can read images (`read_image` is offered); Koda's name guess did not know them.
+
 ## [0.27.0] — 2026-10-18
 
 ### Added

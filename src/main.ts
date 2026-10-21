@@ -9,7 +9,7 @@ import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 import { realClock } from "./vendor/kit-obsidian/clock";
 import { hydrateLocalEndpoints, prepareLocalEndpoints } from "./vendor/kit-obsidian/endpoint-secrets";
 import { redactExchange } from "./vendor/kit-obsidian/chat-client";
-import { KodaChatClient, type LlmResult } from "./llm/KodaChatClient";
+import { KodaChatClient, type AnthropicTransports, type LlmResult } from "./llm/KodaChatClient";
 import { probeEndpoint, probeModels } from "./core/llm/probe";
 import { probeModelContextInfo } from "./core/llm/context-probe";
 import { effectiveContext, type ModelContext } from "./vendor/kit/model-context";
@@ -28,7 +28,9 @@ import { providerToolGroups, toolRows } from "./core/prompt/view-model";
 import { arbeitenDir, arbeitName, isArbeitPath, readArbeiten, writeArbeitFrontmatter } from "./obsidian/arbeiten";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { requestUrlProbe } from "./obsidian/http-probe";
-import { xhrSseTransport } from "./vendor/kit-obsidian/chat-transport";
+import { requestUrlTransport, xhrSseTransport } from "./vendor/kit-obsidian/chat-transport";
+import { createAnthropicChatTransport, createAnthropicState } from "./vendor/kit-obsidian/anthropic-transport";
+import { findEndpointManager, onEndpointManagerChanged } from "./vendor/kit-obsidian/endpoint-source";
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
 import { type ChatMessage, type ErrorRecord, type LogEntry, type SessionStateRecord } from "./core/agent/types";
 import { HOST_TOOL_NAMES, toolSet, toWireTools, type ToolDef, type ToolSet } from "./core/tools/defs";
@@ -560,6 +562,19 @@ export default class KodaPlugin extends Plugin {
   private abort: AbortController | null = null;
   private labMismatchWarned = false;
   private readonly transport = xhrSseTransport;
+  /** Zustand der Anthropic-Transporte (Denkbloecke je Werkzeug-Aufruf, Modell-Liste): lebt mit dem Plugin, nicht mit
+   *  dem Chat-Client je Lauf — die zweite Runde eines Werkzeug-Aufrufs braucht den Denkblock der ersten. Stream und
+   *  Rueckfall ueber `requestUrl` teilen ihn. */
+  private readonly anthropicState = createAnthropicState();
+  private readonly anthropic: AnthropicTransports = {
+    primary: createAnthropicChatTransport({ http: xhrSseTransport, state: this.anthropicState }),
+    fallback: createAnthropicChatTransport({ http: requestUrlTransport, state: this.anthropicState }),
+  };
+
+  /** Der Manager ist Opt-in: nur mit dem Schalter, und nur wenn er installiert und an ist, sonst die lokale Liste. */
+  private endpointSource(): { manager: ReturnType<typeof findEndpointManager>; choice: KodaSettings["choice"] } {
+    return { manager: this.settings.useEndpointManager ? findEndpointManager(this.app) : null, choice: this.settings.choice };
+  }
 
   /** Loest "erster erreichbarer Endpunkt" auf und merkt sich das Ergebnis fuer die Sitzung.
    *  Liest `this.settings` bei jedem Durchlauf frisch — eine im Editor geaenderte Liste
@@ -580,6 +595,7 @@ export default class KodaPlugin extends Plugin {
     async (ep) => (await this.probe(ep)).reachable,
     // Der gemerkte Endpunkt hat sich geändert: der Thinking-Schalter liest sein Modell.
     () => { for (const v of this.views()) v.syncThinkAction(); },
+    () => this.endpointSource(),
   );
 
   /** Die Zeile mit `apiKey` aus dem Schlüsselbund. Die Listen-Zeilen der Settings tragen nur
@@ -658,6 +674,11 @@ export default class KodaPlugin extends Plugin {
     // Das globale Modell-Feld ist weg: sein Wert ist einmal in die Zeilen gewandert, der
     // Schlüssel fliegt beim Speichern aus data.json (sonst liefe die Migration bei jedem Start).
     if (loaded.changed) await this.saveData(this.settings);
+    // Der Manager kann jederzeit installiert, an- oder ausgeschaltet oder umkonfiguriert werden: dann neu aufloesen.
+    this.register(onEndpointManagerChanged(this.app, () => {
+      this.resolver.invalidate();
+      for (const v of this.views()) v.syncThinkAction();
+    }));
     // Ein gespeicherter Default aus einer spaeteren Etappe ist hier noch nicht angeboten — dann faellt der Start
     // auf Arbeitsplatz zurueck, statt den Chat in einem Modus zu starten, den er gar nicht anbietet.
     if (!AVAILABLE_MODES.includes(this.contextMode)) this.contextMode = "workspace";
@@ -849,11 +870,24 @@ export default class KodaPlugin extends Plugin {
     return this.resolver.peek(this.settings.endpoints);
   }
 
+  /** Backend des gemerkten Endpunkts (`"anthropic"` bei Claude); vor der ersten Aufloesung `unknown`. */
+  sentBackend(): string {
+    return this.resolver.peekTransport().backend;
+  }
+
+  /** Der Text zu „kein Endpunkt“: beim Manager nennt er den Grund des Managers, sonst die lokale Liste. */
+  private noEndpointText(): string {
+    const reason = this.resolver.failure();
+    return reason === null ? t("error.noEndpoint") : t(`error.manager.${reason}`);
+  }
+
   /** Wie Koda ein Bild liest: Vision (Namens-Heuristik des Kits, `likely` genuegt), sonst OCR,
    *  wenn image-to-markdown aktiv ist. Das Modell ist das gesendete (`sentModel()`) — dasselbe
    *  wie beim Thinking-Schalter. */
   imageMode(): ImageMode {
-    return chooseImageMode(guessFromName(this.sentModel()).vision, readOcrApi(this.app) !== null);
+    // Jedes Claude-Modell der Messages-API liest Bilder; der Namensrater kennt „claude“ nicht und sagte „nein“.
+    const vision = this.resolver.peekTransport().transport === "anthropic" ? "confirmed" : guessFromName(this.sentModel()).vision;
+    return chooseImageMode(vision, readOcrApi(this.app) !== null);
   }
 
   /** Nur die Namen — was der GUI-Smoke braucht (Pruefpunkt 17). */
@@ -1151,7 +1185,7 @@ export default class KodaPlugin extends Plugin {
 
       // Client pro Lauf: der Idle-Timeout ist eine Einstellung und darf ohne
       // Plugin-Neustart wirken.
-      const client = new KodaChatClient(this.transport, s.timeoutSec * 1000);
+      const client = new KodaChatClient(this.transport, s.timeoutSec * 1000, realClock, this.anthropic);
 
       // llm-lab-Anbindung (Task „llm-lab als Konsument anschliessen", Design §9):
       // EIN turnId je Nutzer-Handlung, durch alle Runden des Agent-Loops durchgereicht —
@@ -1184,9 +1218,12 @@ export default class KodaPlugin extends Plugin {
                 apiKey: ep.apiKey ?? "",
                 model: resolved.model,
                 suppressThinking: s.suppressThinking,
+                transport: resolved.transport,
+                family: resolved.family,
               };
               return client.complete(cfg, messages, defs, timedOnToken, timedOnReasoning, signal, onToolCallHead, urls, onContentReset).then((r) => {
-                void this.checkContextWindow(ep, cfg.model, r.ok ? r.model : undefined);
+                // Die Probe fragt `GET /v1/models` mit Bearer — bei der Messages-API von Anthropic sinnlos (anderer Header).
+                if (resolved.transport !== "anthropic") void this.checkContextWindow(ep, cfg.model, r.ok ? r.model : undefined);
                 this.reportToLab({
                   feature: this.labFeature(selection),
                   model: cfg.model,
@@ -1209,9 +1246,9 @@ export default class KodaPlugin extends Plugin {
             // Antwort sonst ein zweites Mal in der Blase. Ein HTTP-Fehler wird nicht
             // wiederholt (der Server antwortet ja), ein Abbruch schon gar nicht.
             (r) => !r.ok && r.kind === "network" && r.partial === "",
-            () => ({ ok: false, kind: "network", detail: t("error.noEndpoint"), partial: "" }),
+            () => ({ ok: false, kind: "network", detail: this.noEndpointText(), partial: "" }),
             // Probe gruen, Chat rot: „Server aus" waere der falsche Rat (siehe withFailover).
-            () => ({ ok: false, kind: "network", detail: t("error.chatBlocked"), partial: "" }),
+            () => ({ ok: false, kind: "network", detail: this.resolver.peekTransport().transport === "anthropic" ? t("error.anthropicUnreachable") : t("error.chatBlocked"), partial: "" }),
           );
         },
       };
@@ -1227,12 +1264,12 @@ export default class KodaPlugin extends Plugin {
           this.resolver,
           (resolved) =>
             client.complete(
-              { endpoint: resolved.config.url, apiKey: resolved.config.apiKey ?? "", model: resolved.model, suppressThinking: true },
+              { endpoint: resolved.config.url, apiKey: resolved.config.apiKey ?? "", model: resolved.model, suppressThinking: true, transport: resolved.transport, family: resolved.family },
               messages, [], () => {}, () => {}, this.abort?.signal ?? new AbortController().signal,
             ),
           (r) => !r.ok && r.kind === "network" && r.partial === "",
-          () => ({ ok: false, kind: "network", detail: t("error.noEndpoint"), partial: "" }),
-          () => ({ ok: false, kind: "network", detail: t("error.chatBlocked"), partial: "" }),
+          () => ({ ok: false, kind: "network", detail: this.noEndpointText(), partial: "" }),
+          () => ({ ok: false, kind: "network", detail: this.resolver.peekTransport().transport === "anthropic" ? t("error.anthropicUnreachable") : t("error.chatBlocked"), partial: "" }),
         );
         if (r.ok && r.content.trim() !== "") return r.content;
         // Ein stilles null macht Stufe 2 undiagnostizierbar — derselbe Idiom wie der

@@ -1,5 +1,6 @@
 import { EndpointResolver, withFailover } from "../src/core/llm/failover";
 import type { EndpointConfig } from "../src/vendor/kit/endpoint_config";
+import type { ApiError, LlmEndpointManagerApi, ResolvedEndpoint } from "../src/vendor/kit/endpoint-source";
 
 const eps = (...urls: string[]): EndpointConfig[] => urls.map((url) => ({ url }));
 
@@ -176,5 +177,86 @@ describe("withFailover — Widerspruch zwischen Probe und Chat-Aufruf", () => {
       (res) => `${res}, obwohl die Probe gruen war`,
     );
     expect(out).toBe("ok");
+  });
+});
+
+describe("EndpointResolver — LLM Endpoint Manager (Opt-in)", () => {
+  const claudeEp = { id: "claude", label: "Claude API", config: { url: "https://api.anthropic.com", apiKey: "k" }, defaultModel: "claude-sonnet-5-5", backend: "anthropic" as const, transport: "anthropic" as const, models: [{ id: "claude-sonnet-5-5" }] };
+  function fakeManager(over: { resolve?: ApiError } = {}) {
+    const calls: { art: string; opts: unknown }[] = [];
+    const api: LlmEndpointManagerApi = {
+      version: 1,
+      list: () => [],
+      get: () => null,
+      resolve: async (_c, opts) => { calls.push({ art: "resolve", opts }); return (over.resolve ?? claudeEp) as ResolvedEndpoint | ApiError; },
+      materialize: async (id, opts) => { calls.push({ art: "materialize", opts }); return (id === "claude" ? claudeEp : { error: "not-found" }) as ResolvedEndpoint | ApiError; },
+      models: async () => [],
+      importEndpoints: async () => ({ added: [], merged: [], skipped: [] }),
+      on: () => () => {},
+    };
+    return { api, calls };
+  }
+  const local = (): EndpointConfig[] => [{ url: "http://lokal", model: "zeile" }];
+  const ping = async (): Promise<boolean> => true;
+
+  it("ohne Manager in der Quelle (Opt-in aus) fragt nichts den Manager — es bleibt die lokale Liste", async () => {
+    const m = fakeManager();
+    const r = new EndpointResolver(local, ping, () => {}, () => ({ manager: null, choice: { endpointId: "claude" } }));
+    const ep = await r.resolve();
+    expect(m.calls).toEqual([]);
+    expect(ep).toMatchObject({ kind: "local", transport: "http", model: "zeile" });
+    expect(ep?.config.url).toBe("http://lokal");
+  });
+
+  it("eine alte Wahl uebersteuert ohne Manager das Modell der Zeile nicht", async () => {
+    const r = new EndpointResolver(local, ping, () => {}, () => ({ manager: null, choice: { model: "fremd" } }));
+    expect((await r.resolve())?.model).toBe("zeile");
+  });
+
+  it("mit Manager: fragt mit Opt-in auf http und anthropic und liefert Transport, Backend und Familie", async () => {
+    const m = fakeManager();
+    const r = new EndpointResolver(local, ping, () => {}, () => ({ manager: m.api, choice: {} }));
+    const ep = await r.resolve();
+    expect(m.calls[0]).toEqual({ art: "resolve", opts: { caller: "koda-agent", transports: ["http", "anthropic"] } });
+    expect(ep).toMatchObject({ kind: "manager", transport: "anthropic", backend: "anthropic", family: "claude", model: "claude-sonnet-5-5" });
+    expect(r.peekTransport()).toEqual({ transport: "anthropic", backend: "anthropic" });
+  });
+
+  it("die gewaehlte Zeile geht ueber materialize, das gewaehlte Modell gilt", async () => {
+    const m = fakeManager();
+    const r = new EndpointResolver(local, ping, () => {}, () => ({ manager: m.api, choice: { endpointId: "claude", model: "claude-haiku-5-5" } }));
+    const ep = await r.resolve();
+    expect(m.calls[0]?.art).toBe("materialize");
+    expect(ep?.model).toBe("claude-haiku-5-5");
+  });
+
+  it("peek: vor der ersten Aufloesung gilt mit Manager das gewaehlte Modell, nicht das der lokalen Zeile", () => {
+    const m = fakeManager();
+    const r = new EndpointResolver(local, ping, () => {}, () => ({ manager: m.api, choice: { model: "claude-haiku-5-5" } }));
+    expect(r.peek(local())).toBe("claude-haiku-5-5");
+  });
+
+  it("ein Manager ohne Endpunkt nennt seinen Grund und faellt nicht auf die lokale Liste zurueck", async () => {
+    const m = fakeManager({ resolve: { error: "no-endpoint" } });
+    const r = new EndpointResolver(local, ping, () => {}, () => ({ manager: m.api, choice: {} }));
+    expect(await r.resolve()).toBeNull();
+    expect(r.failure()).toBe("no-endpoint");
+  });
+
+  it("eine ausgeschaltete Wahl: der Grund ist disabled", async () => {
+    const m = fakeManager({ resolve: { error: "no-endpoint" } });
+    m.api.materialize = async () => ({ error: "disabled" });
+    const r = new EndpointResolver(local, ping, () => {}, () => ({ manager: m.api, choice: { endpointId: "claude" } }));
+    expect(await r.resolve()).toBeNull();
+    expect(r.failure()).toBe("disabled");
+  });
+
+  it("der Grund ist nach einer erfolgreichen Aufloesung wieder leer", async () => {
+    const m = fakeManager({ resolve: { error: "no-endpoint" } });
+    const r = new EndpointResolver(local, ping, () => {}, () => ({ manager: m.api, choice: {} }));
+    await r.resolve();
+    m.api.resolve = async () => claudeEp as ResolvedEndpoint;
+    await r.resolve();
+    expect(r.failure()).toBeNull();
   });
 });

@@ -293,7 +293,7 @@ export class KodaView extends ItemView {
     // Sperre steht im Zustand, und der Handler prueft sie erneut: ein veralteter Klick auf
     // einen gerade gesperrten Knopf darf nicht durchschlagen (Muster canActivatePack).
     const s = this.plugin.settings;
-    if (thinkToggleView(this.plugin.sentModel(), s.suppressThinking).disabled) return;
+    if (thinkToggleView(this.plugin.sentModel(), s.suppressThinking, this.plugin.sentBackend()).disabled) return;
     s.suppressThinking = !s.suppressThinking;
     await this.plugin.saveSettings();
   }
@@ -304,7 +304,7 @@ export class KodaView extends ItemView {
     const el = this.thinkActionEl;
     if (el === null) return;
     const s = this.plugin.settings;
-    const v = thinkToggleView(this.plugin.sentModel(), s.suppressThinking);
+    const v = thinkToggleView(this.plugin.sentModel(), s.suppressThinking, this.plugin.sentBackend());
     const parts = [t(v.labelKey)];
     if (v.hintKey !== null) parts.push(t(v.hintKey));
     if (v.actionKey !== null) parts.push(t(v.actionKey));

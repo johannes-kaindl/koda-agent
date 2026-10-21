@@ -4,7 +4,7 @@
     "code-kit": { "ref": "0.31.0" }
   },
   "targets": [
-    { "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["frontmatter", "explain-texts", "ocr-provider", "image-gen-provider", "endpoint-source", "endpoint-secret-hook", "tool-provider", "provider-error-texts", "audio-provider"], "rewrite": [["../vendor/code-kit/pure/", "./"]] },
+    { "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["frontmatter", "explain-texts", "ocr-provider", "image-gen-provider", "endpoint-source", "anthropic-wire", "endpoint-secret-hook", "tool-provider", "provider-error-texts", "audio-provider"], "rewrite": [["../vendor/code-kit/pure/", "./"]] },
     {
       "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/pure",
       "modules": [
@@ -20,7 +20,7 @@
       "modules": [
         "clock", "confirm", "folder-suggest", "settings_walker", "model-picker", "hub", "collapsible", "stable-writer", "dom-guard",
         "help-setting", "chat-client", "chat-transport", "lab-client", "endpoint-list", "stream-area",
-        "endpoint-secrets", "secrets", "endpoint-source", "shortcuts-bridge", "tool-providers", "plugin-api", "capability-apis", "textarea-suggest", "clipboard"
+        "endpoint-secrets", "secrets", "endpoint-source", "anthropic-transport", "shortcuts-bridge", "tool-providers", "plugin-api", "capability-apis", "textarea-suggest", "clipboard"
       ],
       "rewrite": [["../pure/", "../kit/"], ["../vendor/code-kit/pure/", "../kit/"], ["../vendor/code-kit/web/", "../kit/"]]
     },

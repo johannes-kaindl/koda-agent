@@ -232,3 +232,25 @@ describe("imageMaxKb", () => {
     expect(validateKodaSettings({ imageMaxKb: "gross" }).imageMaxKb).toBe(4096);
   });
 });
+
+describe("Endpunkt-Quelle (LLM Endpoint Manager, Opt-in)", () => {
+  it("Default: Manager aus, keine Wahl", () => {
+    expect(DEFAULT_SETTINGS.useEndpointManager).toBe(false);
+    expect(validateKodaSettings(null).choice).toEqual({});
+  });
+  it("eine data.json aus der Zeit davor aendert sich nicht: Liste bleibt, Manager aus, nichts zu migrieren", () => {
+    const s = validateKodaSettings({ endpoints: [{ url: "http://a:1234", model: "m" }], suppressThinking: false });
+    expect(s.endpoints).toEqual([{ url: "http://a:1234", model: "m" }]);
+    expect(s.useEndpointManager).toBe(false);
+    expect(s.choice).toEqual({});
+  });
+  it("choice behaelt nur nicht-leere Strings und kein fremdes Feld", () => {
+    expect(validateKodaSettings({ choice: { endpointId: "claude", model: "m", apiKey: "geheim" } }).choice).toEqual({ endpointId: "claude", model: "m" });
+    expect(validateKodaSettings({ choice: { endpointId: "", model: 3 } }).choice).toEqual({});
+    expect(validateKodaSettings({ choice: "claude" }).choice).toEqual({});
+  });
+  it("useEndpointManager nimmt nur ein Boolean", () => {
+    expect(validateKodaSettings({ useEndpointManager: true }).useEndpointManager).toBe(true);
+    expect(validateKodaSettings({ useEndpointManager: "ja" }).useEndpointManager).toBe(false);
+  });
+});

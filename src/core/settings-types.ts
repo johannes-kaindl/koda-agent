@@ -8,6 +8,7 @@ import {
   type SettingsSchema,
 } from "../vendor/kit/settings_schema";
 import { migrateEndpointList, type EndpointConfig } from "../vendor/kit/endpoint_config";
+import { sanitizeChoice, type EndpointChoice } from "../vendor/kit/endpoint-source";
 import { CONTEXT_MODES, type ContextMode } from "./context/types";
 
 /** Obergrenze für `maxRounds` — einzige Quelle, gegen die sowohl `validateKodaSettings`
@@ -111,6 +112,11 @@ export const IMAGE_MAX_KB_STEP = 256;
 
 export interface KodaSettings {
   endpoints: EndpointConfig[];
+  /** Endpunkte vom LLM Endpoint Manager statt aus der lokalen Liste. Opt-in: aus heisst wie bisher,
+   *  auch wenn der Manager installiert ist. Ohne installierten Manager gilt die lokale Liste. */
+  useEndpointManager: boolean;
+  /** Wahl am Manager (Endpunkt und Modell); ohne Manager ohne Wirkung. */
+  choice: EndpointChoice;
   suppressThinking: boolean;
   kodaFolder: string;
   maxRounds: number;
@@ -162,6 +168,8 @@ export interface KodaSettings {
 
 export const DEFAULT_SETTINGS: KodaSettings = {
   endpoints: [{ url: "http://127.0.0.1:1234" }],
+  useEndpointManager: false,
+  choice: {},
   suppressThinking: true,
   kodaFolder: "Koda",
   maxRounds: 8,
@@ -228,6 +236,7 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
   // Ganze Liste durch die Migration, nicht Element fuer Element: Alt-Eintraege sind
   // Strings und werden umgeschrieben, nicht gefiltert.
   endpoints: arrayThen((items) => migrateEndpointList(undefined, items as (string | EndpointConfig)[])),
+  choice: (raw) => sanitizeChoice(raw),
   maxRounds: clampIntField(1, MAX_ROUNDS_LIMIT),
   timeoutSec: clampIntField(TIMEOUT_SEC_MIN, TIMEOUT_SEC_MAX),
   skillBudgetChars: clampIntField(SKILL_BUDGET_MIN, SKILL_BUDGET_MAX),

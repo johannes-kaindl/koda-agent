@@ -11,7 +11,7 @@ export interface ThinkToggleView {
   labelKey: "view.thinkingOn" | "view.thinkingOff" | "view.thinkingAlways";
   /** Zusatz für Tooltip + aria-label; null = kein Hinweis. Ändert NIE den sichtbaren Button-Text
    *  und NIE das Request-Verhalten. */
-  hintKey: "view.thinkingHintAlways" | null;
+  hintKey: "view.thinkingHintAlways" | "view.thinkingHintClaude" | null;
   /** Aktions-Nachsatz fuer den Tooltip ("… — click turns off"); null nur bei disabled — ein
    *  Klick auf einen gesperrten Knopf hat keine Aktion, die man ankuendigen koennte. */
   actionKey: "view.thinkingClickOn" | "view.thinkingClickOff" | null;
@@ -28,12 +28,14 @@ export interface ThinkToggleView {
 }
 
 /** Beschriftung, Icon und Klasse des Knopfes aus dem Kit-Zustand. */
-export function thinkToggleView(model: string, suppress: boolean): ThinkToggleView {
+export function thinkToggleView(model: string, suppress: boolean, backend?: string): ThinkToggleView {
   const st = thinkToggleState(model, suppress);
   if (st.mode === "always") {
     return { labelKey: "view.thinkingAlways", hintKey: null, actionKey: null, icon: "brain", pressed: true, cls: "is-disabled", disabled: true };
   }
-  const hintKey = st.hint === "alwaysGuess" ? "view.thinkingHintAlways" : null;
+  // Claude lässt das Denken nicht abschalten: „Aus“ ist dort der niedrigste Aufwand (Profil `claude`).
+  // Der Schalter bleibt bedienbar, sagt aber, was er tut — sonst verspräche er mehr als die Anfrage liefert.
+  const hintKey = backend === "anthropic" ? "view.thinkingHintClaude" : st.hint === "alwaysGuess" ? "view.thinkingHintAlways" : null;
   if (st.mode === "off") {
     return { labelKey: "view.thinkingOff", hintKey, actionKey: "view.thinkingClickOn", icon: "brain-cog", pressed: false, cls: "is-off", disabled: false };
   }
