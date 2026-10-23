@@ -123,6 +123,8 @@ export default class KodaPlugin extends Plugin {
   /** Die Base, die eine Arbeit geoeffnet hat und uebernommen haben will; die Ansicht (`bases-view.ts`) liest sie und uebernimmt,
    *  sobald Obsidian Zeilen liefert. `null`, wenn keine wartet. */
   pendingBase: BaseRef | null = null;
+  /** Der Tab, den eine Arbeit fuer ihre Base geoeffnet hat — nur den schliesst Koda wieder (`openArbeitBase`). */
+  private arbeitBaseLeaf: WorkspaceLeaf | null = null;
 
   currentArbeit(): Arbeit | null {
     const name = this.session.arbeit;
@@ -470,10 +472,17 @@ export default class KodaPlugin extends Plugin {
     if (check === "wrong-type") { melde(t("abilities.hint.baseWrongType", ref.view)); return; }
     this.pendingBase = ref;
     this.syncAll();
-    // Ein schon offener Tab derselben Base wird wiederverwendet, sonst entstuende bei jedem „Neuen Gespraech“ ein weiterer.
-    const offen = this.app.workspace.getLeavesOfType("bases").find((l) => (l.view as { file?: { path: string } }).file?.path === ref.path);
-    if (offen !== undefined) this.app.workspace.setActiveLeaf(offen, { focus: true });
-    else await this.app.workspace.openLinkText(`${ref.path}#${ref.view}`, "", "tab");
+    // Den Tab, den Koda selbst beim letzten Mal geoeffnet hat, schliessen und frisch oeffnen: nur eine NEUE Ansicht bekommt von Obsidian
+    // ein `onDataUpdated` (ein schon offener Tab schickt keins, die Uebernahme bliebe aus). Ein Tab, den der Nutzer selbst geoeffnet hat,
+    // wird nie angefasst — dann entsteht ein zweiter.
+    const bases = (): WorkspaceLeaf[] => this.app.workspace.getLeavesOfType("bases");
+    if (this.arbeitBaseLeaf !== null) {
+      if (bases().includes(this.arbeitBaseLeaf)) this.arbeitBaseLeaf.detach();
+      this.arbeitBaseLeaf = null;
+    }
+    const davor = new Set(bases());
+    await this.app.workspace.openLinkText(`${ref.path}#${ref.view}`, "", "tab");
+    this.arbeitBaseLeaf = bases().find((l) => !davor.has(l)) ?? null;
   }
 
   /** Eine Skill-Stellung fuer dieses Gespraech. Der Grundwert (ohne Overlay) kommt aus Arbeit und Frontmatter;
