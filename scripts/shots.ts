@@ -36,7 +36,7 @@
 import { join } from "node:path";
 import { argv, cwd, exit } from "node:process";
 
-import { attachTo, Cdp, clearNotices, closeExtraLeaves, openExisting, pollUntil, requireUntil, setAppConfig } from "../../tools/obsidian-cdp/cdp.js";
+import { attachTo, Cdp, clearNotices, closeExtraLeaves, openExisting, pollUntil, requireUntil, schliesseEinstellungen, setAppConfig } from "../../tools/obsidian-cdp/cdp.js";
 import { startLlmStub, type Antwort, type StubAnfrage } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture, setWindowSize, writeShot, type Rect } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -358,7 +358,7 @@ async function main(): Promise<void> {
         console.log(`  ✓ ${await writeShot(quelle, shot.name, png, { outDir: OUT_DIR, captureWidth: CAPTURE_WIDTH, thumbWidth: THUMB_WIDTH, thumb: shot.klasse === "detail" })}`);
       }
       if (aus) {
-        await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+        await schliesseEinstellungen(cdp).catch(() => undefined);
         aus.close();
       }
       await dialogeSchliessen(cdp);

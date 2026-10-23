@@ -132,10 +132,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "node:process";
-import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, clearNotices, clickReal, istAbgebrochen, pollUntil, requireVisible, schliesseDialog } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, clearNotices, clickReal, istAbgebrochen, pollUntil, requireVisible, schliesseDialog, schliesseEinstellungen } from "../../tools/obsidian-cdp/cdp.js";
 import { messeFolge, zeichneFolge } from "../../tools/obsidian-cdp/folge.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
-import { gegenprobeErreichbarkeit, gegenprobeFokus, messeErreichbarkeit, messeFokusErhalt, mitHoehe, zeichnePflicht, type PflichtTeilurteil } from "../../tools/obsidian-cdp/pflichtpunkte.js";
+import { gegenprobeErreichbarkeit, gegenprobeFokus, messeDenkblockKopierbar, messeErreichbarkeit, messeFokusErhalt, mitHoehe, zeichnePflicht, type PflichtTeilurteil } from "../../tools/obsidian-cdp/pflichtpunkte.js";
 import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -317,6 +317,8 @@ const PUNKTE = [
   "97. Werkzeugliste: jedes Beschreibungsfeld zeigt seinen Inhalt in ganzen Zeilen, keine halb abgeschnittene Zeile am unteren Rand, mindestens drei Zeilen hoch",
   "98. Handpunkt 17 an der Naht: ist der Embedding-Endpunkt nicht erreichbar, stehen die Volltext-Treffer UND die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)“ im Ergebnis; erreichbar fehlt die Zeile",
   "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung; mit dem Stub ist sie da, und Koda traegt related_notes nie selbst (es kommt nur ueber einen Anbieter, Punkt 78)",
+  "100. Gegenprobe Denkblock kopierbar nach der Antwort: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht",
+  "101. Gegenprobe Denkblock kopierbar während des Stroms: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -520,11 +522,11 @@ async function main(): Promise<void> {
         p.settings.suppressThinking = ${JSON.stringify(previous.suppressThinking)};
         await p.saveSettings();
         await p.newChat();
-        app.setting.close();
         return true;
       `,
       )
       .catch(() => undefined);
+    await schliesseEinstellungen(cdp).catch(() => undefined);
   };
 
   try {
@@ -920,7 +922,7 @@ async function main(): Promise<void> {
       }
     } finally {
       settings?.close();
-      await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+      await schliesseEinstellungen(cdp).catch(() => undefined);
     }
 
     // --- 5. Failover-Klartext statt Stacktrace ------------------------------
@@ -1303,10 +1305,10 @@ async function main(): Promise<void> {
           const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
           p.settings.systemPromptOverride = ${JSON.stringify(vorherPrompt)};
           await p.saveSettings();
-          app.setting.close();
           return true;
         `)
         .catch(() => undefined);
+      await schliesseEinstellungen(cdp).catch(() => undefined);
     }
 
     // --- 17. Ein abgeschaltetes Werkzeug wird nicht gesendet -----------------
@@ -1410,7 +1412,7 @@ async function main(): Promise<void> {
       }
     } finally {
       settings18?.close();
-      await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+      await schliesseEinstellungen(cdp).catch(() => undefined);
     }
 
     // --- 19. `hide()` verwirft den Modell-Cache ------------------------------
@@ -1511,7 +1513,7 @@ async function main(): Promise<void> {
       // C: Fenster zu (das ist der `hide()`-Aufruf) und wieder auf.
       settings19.close();
       settings19 = null;
-      await cdp.evaluate(`app.setting.close(); return true;`);
+      await schliesseEinstellungen(cdp);
       await new Promise((resolve) => setTimeout(resolve, 600));
       await oeffneTab();
       settings19 = await attachTo("settings", port, vault);
@@ -1531,7 +1533,7 @@ async function main(): Promise<void> {
       hidePunkt = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
     } finally {
       settings19?.close();
-      await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+      await schliesseEinstellungen(cdp).catch(() => undefined);
     }
     record("19. `hide()` verwirft den Modell-Cache (toter Endpunkt bleibt nicht tot)", hideOk, hidePunkt);
 
@@ -3648,7 +3650,7 @@ async function main(): Promise<void> {
         detail63 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
       } finally {
         settings63?.close();
-        await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+        await schliesseEinstellungen(cdp).catch(() => undefined);
       }
       record("63. Globales Modell-Feld abgeschafft: Altwert wandert in die Zeile, keine Zeile „Model“, keine Option „global model“", ok63, detail63);
 
@@ -3695,7 +3697,7 @@ async function main(): Promise<void> {
         detail64 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
       } finally {
         settings64?.close();
-        await cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+        await schliesseEinstellungen(cdp).catch(() => undefined);
         await ctxServer64.stop();
       }
       record("64. Kontextlaenge je Endpunkt-Zeile: geladen und hoechstens unter der Zeile, Leer-Option „Server waehlt“, eine Anfrage je Zeile und Modell", ok64, detail64);
@@ -3901,9 +3903,9 @@ async function main(): Promise<void> {
             const p = ${PL};
             p.settings.toolsDisabled = [];
             await p.saveSettings();
-            app.setting.close();
             return true;
           `).catch(() => undefined);
+          await schliesseEinstellungen(cdp).catch(() => undefined);
         }
 
 
@@ -3962,9 +3964,9 @@ async function main(): Promise<void> {
             const p = ${PL};
             p.settings.toolsDisabled = [];
             await p.saveSettings();
-            app.setting.close();
             return true;
           `).catch(() => undefined);
+          await schliesseEinstellungen(cdp).catch(() => undefined);
         }
 
         // 72–74. Werkzeuge ueber DENSELBEN Weg wie ask() (`buildTools().run`).
@@ -4376,16 +4378,13 @@ async function main(): Promise<void> {
         const P89 = "89. Denkblock nach der Antwort: zugeklappt vor der Antwort, mit der Sitzung im JSONL, nie am Draht; der Schalter „Denken aufbewahren“ aus lässt ihn verschwinden";
         const P90 = "90. Denkblock kopierbar während des Stroms (Kit-Knopf): der Klick kopiert den bisherigen Denktext und klappt den Block nicht zu";
         const P91 = "91. Denkblock kopierbar nach der Antwort: der Klick kopiert den ganzen Denktext, quittiert mit is-copied und klappt den Block nicht auf";
+        const P100 = "100. Gegenprobe Denkblock kopierbar nach der Antwort: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht";
+        const P101 = "101. Gegenprobe Denkblock kopierbar während des Stroms: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht";
         const GEDANKE = "Ich wäge die Quellen ab und prüfe dann den Kontext. GEDANKE-89.";
         const chatZeigen = (): Promise<unknown> => cdp.evaluate(`
           const p = ${PL};
           if (p.views().length === 0) await p.activateView();
           app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
-          return true;`);
-        // Die Zwischenablage wird abgefangen, nicht gelesen: lesen braucht Fokus und eine Berechtigung, die ein Treiber nicht hat.
-        const spion = (): Promise<unknown> => cdp.evaluate(`
-          window.__kodaCopy89 = [];
-          navigator.clipboard.writeText = async (t) => { window.__kodaCopy89.push(t); };
           return true;`);
         const saveVorher = await cdp.evaluate<boolean>(`return ${PL}.settings.saveThinking;`);
         const stub89 = await startLlmStub({ models: ["smoke-model"], standard: { reasoning: GEDANKE, text: "Antwort 89." } });
@@ -4408,19 +4407,15 @@ async function main(): Promise<void> {
               imVerlauf: assistant[assistant.length - 1]?.thinking === ${JSON.stringify(GEDANKE)}, imJsonl,
             };`);
 
-          // 91. (an der Antwort aus 89) Kopier-Knopf nach dem Antwortende.
+          // 91 und 100. (an der Antwort aus 89) Kopier-Knopf nach dem Antwortende: Baustein der Bruecke (`messeDenkblockKopierbar`), der die
+          // Zwischenablage aufzeichnet und den vorgefundenen Deskriptor zurueckstellt; die Gegenprobe lehnt `writeText` ab.
           try {
-            await spion();
-            const k91 = await cdp.evaluate<{ kopiert: string[]; offenDanach: boolean | null; quittiert: boolean; knopf: boolean }>(`
-              const d = document.querySelector(".koda-log details.koda-thinking");
-              const b = d?.querySelector(".okit-stream-reasoning-copy");
-              if (!d || !b) return { kopiert: [], offenDanach: null, quittiert: false, knopf: false };
-              b.click();
-              await new Promise((r) => setTimeout(r, 300));
-              return { kopiert: window.__kodaCopy89, offenDanach: d.open, quittiert: b.classList.contains("is-copied"), knopf: true };`);
-            record(P91, k91.knopf && k91.kopiert.length === 1 && k91.kopiert[0] === GEDANKE && k91.offenDanach === false && k91.quittiert,
-              `Knopf da ${k91.knopf} · kopiert ${k91.kopiert.length}× „${(k91.kopiert[0] ?? "").slice(0, 30)}…“ (ganzer Text: ${k91.kopiert[0] === GEDANKE}) · Block danach zu: ${k91.offenDanach === false} · is-copied: ${k91.quittiert}`);
-          } catch (error) { abbruch(P91, error); }
+            const dk = await messeDenkblockKopierbar(cdp, {
+              block: ".koda-log details.koda-thinking", knopf: ".koda-log details.koda-thinking .okit-stream-reasoning-copy", enthaelt: "GEDANKE-89",
+            });
+            zeichnePflicht(bilanz, P91, dk.kopie);
+            zeichnePflicht(bilanz, P100, dk.gegen);
+          } catch (error) { abbruch(P91, error); abbruch(P100, error); }
 
           // 89 weiter: zweite Frage (Draht ohne Denken), dann der Schalter aus.
           await cdp.evaluate(`await ${PL}.ask("Smoke 89: zweite Frage"); return true;`);
@@ -4432,38 +4427,37 @@ async function main(): Promise<void> {
           record(P89,
             erste.n === 1 && erste.offen === false && erste.text === GEDANKE && erste.vorAntwort && erste.imVerlauf && erste.imJsonl && !amDraht && nZwei === 2 && nOhne === 2,
             `nach der Antwort ${erste.n} Block, zu: ${erste.offen === false}, Text gleich: ${erste.text === GEDANKE}, vor der Antwort: ${erste.vorAntwort} · im Verlauf ${erste.imVerlauf}, im JSONL ${erste.imJsonl} · Denken im Request der 2. Frage: ${amDraht} (soll nein) · nach 2. Frage ${nZwei} Blöcke · Schalter aus → ${nOhne} (soll 2)`);
-        } catch (error) { abbruch(P89, error); abbruch(P91, error); } finally {
-          await cdp.evaluate(`const p = ${PL}; p.settings.saveThinking = ${JSON.stringify(saveVorher)}; delete navigator.clipboard.writeText; delete window.__kodaCopy89; await p.newChat(); return true;`).catch(() => undefined);
+        } catch (error) { abbruch(P89, error); abbruch(P91, error); abbruch(P100, error); } finally {
+          await cdp.evaluate(`const p = ${PL}; p.settings.saveThinking = ${JSON.stringify(saveVorher)}; await p.newChat(); return true;`).catch(() => undefined);
           await stub89.stop();
         }
 
-        // 90. Kopier-Knopf WAEHREND des Stroms (der Knopf aus dem Kit-Stream-Bereich).
+        // 90 und 101. Kopier-Knopf WAEHREND des Stroms (der Knopf aus dem Kit-Stream-Bereich). Der Stub haelt die Antwort nach dem letzten Stueck
+        // zwoelf Sekunden offen: der Baustein klickt, wartet das Ende der Quittung ab und macht dann die Gegenprobe — ohne diese Haltezeit
+        // waere der Strom dazwischen zu Ende und die Gegenprobe „nichts gemessen“.
         const LANG90 = "Ich ueberlege Schritt fuer Schritt, was zu tun ist. ".repeat(12);
-        const stub90 = await startLlmStub({ models: ["smoke-model"], takt: 250, nachlaufMs: 900, standard: { reasoning: LANG90, laenge: 40, text: "Fertig 90." } });
+        const stub90 = await startLlmStub({ models: ["smoke-model"], takt: 250, nachlaufMs: 12_000, standard: { reasoning: LANG90, laenge: 40, text: "Fertig 90." } });
         try {
           await setzeModell("smoke-model", stub90.url);
           await chatZeigen();
-          await spion();
           await cdp.evaluate(`void ${PL}.ask("Smoke 90: denke nach."); return true;`);
           const live = await pollUntil<{ vorher: boolean }>(cdp, `
             const d = document.querySelector(".koda-streaming .okit-stream-reasoning");
             const b = d?.querySelector(".okit-stream-reasoning-copy");
             const pre = d?.querySelector("pre");
             return b && pre && pre.textContent.length > 60 ? { vorher: d.open } : null;`, 10_000, 200);
-          let k90: { kopiert: string[]; offenDanach: boolean | null } | null = null;
           if (live !== null) {
-            k90 = await cdp.evaluate<{ kopiert: string[]; offenDanach: boolean | null }>(`
-              const d = document.querySelector(".koda-streaming .okit-stream-reasoning");
-              d.querySelector(".okit-stream-reasoning-copy").click();
-              await new Promise((r) => setTimeout(r, 200));
-              return { kopiert: window.__kodaCopy89, offenDanach: d.open };`);
+            const dk = await messeDenkblockKopierbar(cdp, {
+              block: ".koda-streaming .okit-stream-reasoning", knopf: ".koda-streaming .okit-stream-reasoning-copy", enthaelt: "Ich ueberlege Schritt fuer Schritt",
+            });
+            zeichnePflicht(bilanz, P90, dk.kopie);
+            zeichnePflicht(bilanz, P101, dk.gegen);
+          } else {
+            for (const n of [P90, P101] as const) unmeasured(n, "der Denkblock im Strom erschien nicht binnen 10 s — es gibt nichts zu kopieren");
           }
-          await pollUntil<boolean>(cdp, `return ${PL}.busy ? null : true;`, 20_000, 200);
-          record(P90,
-            live !== null && k90 !== null && k90.kopiert.length === 1 && k90.kopiert[0]!.length > 60 && LANG90.startsWith(k90.kopiert[0]!.slice(0, 40)) && k90.offenDanach === live.vorher,
-            `Knopf im Strom ${live !== null} · kopiert ${k90?.kopiert.length ?? 0}× (${k90?.kopiert[0]?.length ?? 0} Zeichen, Anfang passt: ${LANG90.startsWith((k90?.kopiert[0] ?? "x").slice(0, 40))}) · Block vorher offen ${live?.vorher}, danach ${k90?.offenDanach}`);
-        } catch (error) { abbruch(P90, error); } finally {
-          await cdp.evaluate(`delete navigator.clipboard.writeText; delete window.__kodaCopy89; await ${PL}.newChat(); return true;`).catch(() => undefined);
+          await pollUntil<boolean>(cdp, `return ${PL}.busy ? null : true;`, 30_000, 200);
+        } catch (error) { abbruch(P90, error); abbruch(P101, error); } finally {
+          await cdp.evaluate(`await ${PL}.newChat(); return true;`).catch(() => undefined);
           await stub90.stop();
         }
       }
