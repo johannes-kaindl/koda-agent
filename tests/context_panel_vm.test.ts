@@ -2,6 +2,7 @@ import { buildPanelViewModel } from "../src/core/context/panel-vm";
 import { buildFullContext } from "../src/core/context/build";
 import { itemKey } from "../src/core/context/selection";
 import type { WorkspaceSnapshot } from "../src/core/context/ports";
+import type { BaseSnapshot } from "../src/core/context/bases";
 
 const snap: WorkspaceSnapshot = {
   active: { path: "Notes/Project plan.md", frontmatter: { status: "active" }, selection: "Model control", cursorLine: 9, lineCount: 11 },
@@ -295,5 +296,45 @@ describe("buildPanelViewModel — semantische Nachbarn und K", () => {
   it("jeder Abschnitt hat ein note-Feld (leer, wenn nichts zu sagen ist)", async () => {
     const vm = await buildPanelViewModel("workspace", snap, new Set(), opts);
     for (const s of vm.sections) expect(s.note).toBe("");
+  });
+});
+
+describe("buildPanelViewModel — Bases", () => {
+  const b: BaseSnapshot = {
+    id: "Notes/Koda context.base · Context table", basePath: "Notes/Koda context.base", viewName: "Context table",
+    takenAt: "2026-09-18 14:02", form: "table", columns: ["Status"],
+    rows: [{ path: "Notes/Tools.md", group: null, values: ["active"] }],
+  };
+  it("zeigt je Schnappschuss einen entfernbaren Chip, der die Base-Datei oeffnet", async () => {
+    const vm = await buildPanelViewModel("workspace", snap, new Set(), { ...opts, bases: [b] });
+    const chip = vm.sections.find((s) => s.id === "bases")?.chips[0];
+    expect(chip).toMatchObject({
+      source: "base", path: b.id, openPath: "Notes/Koda context.base",
+      label: "Koda context · Context table", removable: true,
+    });
+    expect(chip?.hint).toContain("1 Zeile");
+    expect(chip?.hint).toContain("14:02");
+  });
+  it("zaehlt die Tabelle im Modus Arbeitsplatz in die Summenzeile", async () => {
+    const ohne = await buildPanelViewModel("workspace", snap, new Set(), opts);
+    const mit = await buildPanelViewModel("workspace", snap, new Set(), { ...opts, bases: [b] });
+    expect(mit.chars).toBeGreaterThan(ohne.chars);
+  });
+  it("nennt im Modus Arbeitsplatz, dass Form notes dort nicht wirkt", async () => {
+    const vm = await buildPanelViewModel("workspace", snap, new Set(), { ...opts, bases: [{ ...b, form: "notes" }] });
+    expect(vm.sections.find((s) => s.id === "bases")?.chips[0]?.hint).toContain("wirken in den Modi");
+  });
+  it("hat ohne Schnappschuss einen erklaerenden Empty-State", async () => {
+    const sec = (await buildPanelViewModel("workspace", snap, new Set(), opts)).sections.find((s) => s.id === "bases");
+    expect(sec?.chips).toEqual([]);
+    expect(sec?.empty).toContain("Als Kontext übernehmen");
+  });
+  it("Zeilen aus Form notes erscheinen im Modus-Abschnitt mit Hinweis „aus Base“", async () => {
+    const vm = await buildPanelViewModel("tabs", snap, new Set(), {
+      ...opts, content: { read: () => Promise.resolve("x") },
+      bases: [{ ...b, form: "notes", rows: [{ path: "Notes/Other.md", group: null, values: [] }] }],
+    });
+    const chip = vm.sections.find((s) => s.id === "tabs")?.chips.find((c) => c.source === "base");
+    expect(chip?.hint).toContain("aus Base");
   });
 });

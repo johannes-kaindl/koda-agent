@@ -19,6 +19,9 @@ export function isSessionState(v: unknown): v is SessionState {
   if (!isMap(v)) return false;
   if (v["arbeit"] !== null && typeof v["arbeit"] !== "string") return false;
   if (!Array.isArray(v["manual"]) || !v["manual"].every((p) => typeof p === "string")) return false;
+  // `bases` fehlt in Marken aus der Zeit vor Plan 2 (gueltig); die Schnappschuesse selbst prueft nur die Form der Liste — ein
+  // kaputter Eintrag kostet beim Rendern den Eintrag, nicht das Gespraech.
+  if (v["bases"] !== undefined && !Array.isArray(v["bases"])) return false;
   const o = v["overlay"];
   if (!isMap(o)) return false;
   if (!isValueMap(o["skills"], SKILL_MODES) || !isValueMap(o["werkzeuge"], ["an", "aus"]) || !isValueMap(o["anbieter"], ["an", "aus"])) return false;
@@ -42,7 +45,7 @@ export function latestSessionState(entries: readonly LogEntry[]): SessionState |
  *  ohne Arbeit bleibt nur der Kontext-Teil des Overlays — wie heute der Modus. */
 export function sessionForNewChat(s: SessionState): SessionState {
   const overlay: Overlay = s.arbeit !== null ? emptyOverlay() : { ...emptyOverlay(), kontext: { ...s.overlay.kontext } };
-  return { arbeit: s.arbeit, overlay, manual: [] };
+  return { arbeit: s.arbeit, overlay, manual: [] };  // ohne `bases`: die Schnappschuesse gehoeren dem alten Gespraech
 }
 
 const WORDS = {
@@ -83,6 +86,6 @@ export function describeStateChange(prev: SessionState | null, next: SessionStat
  *  Arbeiten bleibt damit so, wie es vor den Arbeiten war). */
 export function needsSessionRecord(entries: readonly LogEntry[], state: SessionState): boolean {
   const prev = latestSessionState(entries);
-  if (prev === null) return state.arbeit !== null || overlayCount(state.overlay) > 0 || state.manual.length > 0;
+  if (prev === null) return state.arbeit !== null || overlayCount(state.overlay) > 0 || state.manual.length > 0 || (state.bases?.length ?? 0) > 0;
   return JSON.stringify(prev) !== JSON.stringify(state);
 }

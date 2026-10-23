@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf, normalizePath, Notice, type Editor, type Menu } from "obsidian";
+import { Plugin, WorkspaceLeaf, normalizePath, Notice, parseYaml, type Editor, type Menu } from "obsidian";
 import "./i18n/strings";
 import { getLanguage } from "obsidian";
 import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
@@ -21,6 +21,9 @@ import { arbeitFrontmatter, skillModeFrontmatter, type SaveInput } from "./core/
 import { skillTextRule } from "./core/abilities/projection";
 import { latestSessionState, needsSessionRecord, sessionForNewChat } from "./core/abilities/session";
 import { parseArbeit } from "./core/abilities/parse";
+import { checkBaseView, parseBaseRef, type BaseRef } from "./core/abilities/base-ref";
+import { removeBase, renderTables, upsertBase, withBaseTables, type BaseSnapshot } from "./core/context/bases";
+import { registerKodaBasesView } from "./obsidian/bases-view";
 import { emptyOverlay, emptySessionState, type Arbeit, type OnOff, type SessionState, type SkillMode } from "./core/abilities/types";
 import { abilitiesViewModel, type AbilitiesVM } from "./core/abilities/panel-vm";
 import { expandPathEntries, isInFolder, pathsInFolder } from "./vendor/kit/folder-scope";
@@ -115,6 +118,11 @@ export default class KodaPlugin extends Plugin {
   private skillsCache: Skill[] = [];
   /** Eintraege von `kontext.notizen`, die beim letzten Anwenden auf nichts zeigten. */
   private notizenMissing: string[] = [];
+  /** Gruende, aus denen die `base:` der gewaehlten Arbeit nicht geoeffnet wurde (Verweis, Datei, Ansicht) — als Hinweis im Tab. */
+  private baseHints: string[] = [];
+  /** Die Base, die eine Arbeit geoeffnet hat und uebernommen haben will; die Ansicht (`bases-view.ts`) liest sie und uebernimmt,
+   *  sobald Obsidian Zeilen liefert. `null`, wenn keine wartet. */
+  pendingBase: BaseRef | null = null;
 
   currentArbeit(): Arbeit | null {
     const name = this.session.arbeit;
@@ -175,6 +183,31 @@ export default class KodaPlugin extends Plugin {
   }
   set contextManual(v: string[]) {
     this.session = { ...this.session, manual: v };
+  }
+
+  /** Uebernommene Bases-Schnappschuesse — wie `contextManual` im Sitzungszustand, damit sie mit dem Gespraech zurueckkommen. „Auswahl
+   *  zuruecksetzen“ und ein neues Gespraech raeumen sie ab. */
+  get contextBases(): BaseSnapshot[] {
+    return this.session.bases ?? [];
+  }
+  set contextBases(v: BaseSnapshot[]) {
+    this.session = { ...this.session, bases: v };
+  }
+
+  /** `auto`: die Ansicht hat selbst uebernommen (Arbeit mit `base:`) — andere Meldung, gleicher Weg. */
+  adoptContextBase(snap: BaseSnapshot, auto = false): void {
+    this.contextBases = upsertBase(this.contextBases, snap);
+    new Notice(auto ? t("bases.adoptedAuto", snap.viewName, String(snap.rows.length)) : t("bases.adopted", String(snap.rows.length), snap.viewName));
+    const p = this.pendingBase;
+    if (p !== null && p.path === snap.basePath && p.view === snap.viewName) this.pendingBase = null;
+    this.syncAll();
+  }
+
+  removeContextBase(id: string): void {
+    const naechste = removeBase(this.contextBases, id);
+    if (naechste === this.contextBases) return;
+    this.contextBases = naechste;
+    for (const v of this.views()) v.syncContextPanel();
   }
 
   /** Der Entwurf im Eingabefeld, entprellt aus der View gemeldet. Speist NUR die Vorschau im
@@ -267,9 +300,10 @@ export default class KodaPlugin extends Plugin {
   }
 
   resetContextSelection(): void {
-    if (this.contextOff.size === 0 && this.contextManual.length === 0) return;
+    if (this.contextOff.size === 0 && this.contextManual.length === 0 && this.contextBases.length === 0) return;
     this.contextOff.clear();
     this.contextManual = [];
+    if (this.contextBases.length > 0) this.contextBases = [];
     for (const v of this.views()) v.syncContextPanel();
   }
 
@@ -295,6 +329,7 @@ export default class KodaPlugin extends Plugin {
       manual: this.contextManual,
       links: linkPort(this.app),
       content: contentPort(this.app),
+      bases: this.contextBases,
     });
   }
 
@@ -334,12 +369,15 @@ export default class KodaPlugin extends Plugin {
       case "off":
         return null;
       case "workspace":
-        return renderWorkspaceContext(applySelection(snap, this.contextOff), {
-          lang: this.promptLang(),
-          selectionMax: s.contextSelectionChars,
-          tabsMax: s.contextTabsMax,
-          frontmatterMax: s.contextFrontmatterChars,
-        });
+        return withBaseTables(
+          renderWorkspaceContext(applySelection(snap, this.contextOff), {
+            lang: this.promptLang(),
+            selectionMax: s.contextSelectionChars,
+            tabsMax: s.contextTabsMax,
+            frontmatterMax: s.contextFrontmatterChars,
+          }),
+          renderTables(this.contextBases, eff.budget, this.promptLang()),
+        );
       case "note":
       case "tabs":
       case "vault":
@@ -353,6 +391,7 @@ export default class KodaPlugin extends Plugin {
           linkDepth: eff.depth,
           budget: eff.budget,
           lang: this.promptLang(),
+          bases: this.contextBases,
           // `query` fehlt nur beim GUI-Smoke und bei gui:ask ohne Frage — dann gilt der Entwurf.
           hits: await this.semanticHits(eff.mode, query ?? this.contextQuery, snap),
         });
@@ -405,9 +444,36 @@ export default class KodaPlugin extends Plugin {
     // Die Aufloesung kommt aus code-kit `folder-scope`: das Bibliotheks-Gate hat eine Fassung im Plugin abgelehnt.
     const exp = a === null ? { paths: [] as string[], missing: [] as string[] } : expandPathEntries(a.kontext.notizen ?? [], this.app.vault.getMarkdownFiles().map((f) => f.path));
     this.notizenMissing = exp.missing;
+    this.baseHints = [];
+    this.pendingBase = null;
     this.contextOff.clear();
     this.session = { arbeit: name, overlay: emptyOverlay(), manual: exp.paths };
     this.syncAll();
+    if (a !== null && a.base !== null) void this.openArbeitBase(a);
+  }
+
+  /** `base:` einer Arbeit (Plan 2): die Ansicht muss in der .base schon vom Typ „Koda-Kontext“ sein — Koda schreibt nie in eine .base
+   *  des Nutzers. Stimmt alles, wird die Base geoeffnet und die Ansicht uebernimmt, sobald Obsidian Zeilen liefert (`pendingBase`);
+   *  sonst steht der Grund als Hinweis im Tab und nichts wird geoeffnet. */
+  private async openArbeitBase(a: Arbeit): Promise<void> {
+    const gewaehlt = (): boolean => this.session.arbeit === a.name;
+    const melde = (hint: string): void => { if (gewaehlt()) { this.baseHints = [hint]; this.syncAll(); } };
+    const ref = parseBaseRef(a.base ?? "");
+    if (ref === null) { melde(t("abilities.hint.baseInvalid")); return; }
+    const file = this.app.vault.getFileByPath(ref.path);
+    if (file === null) { melde(t("abilities.hint.baseNoFile", ref.path)); return; }
+    let yaml: unknown = null;
+    try { yaml = parseYaml(await this.app.vault.cachedRead(file)); } catch { yaml = null; }
+    if (!gewaehlt()) return;
+    const check = checkBaseView(yaml, ref.view);
+    if (check === "missing") { melde(t("abilities.hint.baseViewMissing", ref.view, ref.path)); return; }
+    if (check === "wrong-type") { melde(t("abilities.hint.baseWrongType", ref.view)); return; }
+    this.pendingBase = ref;
+    this.syncAll();
+    // Ein schon offener Tab derselben Base wird wiederverwendet, sonst entstuende bei jedem „Neuen Gespraech“ ein weiterer.
+    const offen = this.app.workspace.getLeavesOfType("bases").find((l) => (l.view as { file?: { path: string } }).file?.path === ref.path);
+    if (offen !== undefined) this.app.workspace.setActiveLeaf(offen, { focus: true });
+    else await this.app.workspace.openLinkText(`${ref.path}#${ref.view}`, "", "tab");
   }
 
   /** Eine Skill-Stellung fuer dieses Gespraech. Der Grundwert (ohne Overlay) kommt aus Arbeit und Frontmatter;
@@ -470,6 +536,9 @@ export default class KodaPlugin extends Plugin {
       ...(this.arbeitParseInvalid.get(a.name) ?? []).map((e) => t("abilities.hint.invalid", e)),
       ...unknown.map((e) => t("abilities.hint.unknown", e)),
       ...this.notizenMissing.map((e) => t("abilities.hint.missingNote", e)),
+      ...this.baseHints,
+      // Solange die Base auf ihre Zeilen wartet (oder die Ansicht nicht die genannte ist), sagt der Tab, was der Nutzer tun kann.
+      ...(this.pendingBase === null ? [] : [t("abilities.hint.basePending", this.pendingBase.view)]),
     ];
   }
 
@@ -718,6 +787,7 @@ export default class KodaPlugin extends Plugin {
     if (restored !== null) this.session = restored;
 
     this.registerView(VIEW_TYPE_KODA, (leaf) => new KodaView(leaf, this));
+    registerKodaBasesView(this, { adopt: (snap, auto) => { this.adoptContextBase(snap, auto); }, pending: () => this.pendingBase });
     this.addRibbonIcon("dog", t("cmd.open"), () => void this.activateView());
     this.addCommand({ id: "open", name: t("cmd.open"), callback: () => void this.activateView() });
     // Zweiter Zugang zu beiden Kopfzeilen-Aktionen. Nicht Bequemlichkeit, sondern Lehre aus

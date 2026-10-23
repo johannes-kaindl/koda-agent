@@ -11,6 +11,7 @@ import { applySelection, itemKey, type SelectionKey } from "./selection";
 import { dedupeTabs, renderWorkspaceContext } from "./workspace-line";
 import { collectCandidates } from "./candidates";
 import { buildFullContext } from "./build";
+import { basePaths, renderTables, withBaseTables, type BaseSnapshot } from "./bases";
 import { MIN_QUERY_CHARS, NO_HITS, semanticNotice, type SemanticHits } from "./semantic";
 
 export interface PanelChip {
@@ -22,6 +23,8 @@ export interface PanelChip {
   /** Das Kreuz ENTFERNT statt abzuwaehlen — nur bei manuellen Eintraegen. Ein abgewaehlter
    *  manueller Eintrag bliebe sonst fuer immer als Chip ohne Zweck stehen. */
   removable: boolean;
+  /** Was ein Klick auf den Namen oeffnet; fehlt es, gilt `path`. Base-Chips tragen als `path` die Schnappschuss-ID — die ist keine Datei. */
+  openPath?: string;
 }
 export interface PanelSection {
   id: string;
@@ -62,6 +65,8 @@ export interface PanelOptions {
   manual: readonly string[];
   links: LinkPort;
   content: ContentPort;
+  /** Uebernommene Bases (Etappe 3b). */
+  bases?: readonly BaseSnapshot[];
 }
 
 const T = {
@@ -84,6 +89,11 @@ const T = {
     level: (n: number) => `Ebene ${n}`,
     manualOff: "wirkt in den Modi Notiz, Alle Tabs und Vault",
     unreadable: "nicht lesbar",
+    bases: "Bases",
+    fromBase: "aus Base",
+    rows: (n: number) => (n === 1 ? "1 Zeile" : `${n} Zeilen`),
+    emptyBases: "Keine Base übernommen — öffne eine Base, wähle die Ansicht „Koda-Kontext“ und drücke „Als Kontext übernehmen“.",
+    baseNotesOff: "Notizen wirken in den Modi Notiz, Alle Tabs und Vault",
   },
   en: {
     workspace: "Workspace",
@@ -104,6 +114,11 @@ const T = {
     level: (n: number) => `level ${n}`,
     manualOff: "takes effect in the Note, All tabs and Vault modes",
     unreadable: "not readable",
+    bases: "Bases",
+    fromBase: "from a base",
+    rows: (n: number) => (n === 1 ? "1 row" : `${n} rows`),
+    emptyBases: "No base adopted — open a base, pick the view “Koda context” and press “Use as context”.",
+    baseNotesOff: "notes take effect in the Note, All tabs and Vault modes",
   },
 } as const;
 
@@ -193,6 +208,7 @@ function sourceSection(
       // Die Quelle steht am Chip: wer im Vault-Modus einen Treffer sieht, soll lesen koennen,
       // dass er aus vault-rag kommt (Nachtrag Johannes, 2026-09-25).
       if (c.source === "vault") teile.push("vault-rag");
+      if (c.source === "base") teile.push(t.fromBase);
       return {
         source: c.source, path: c.path, label: chipLabel(c.path),
         hint: teile.join(", "), off: chipOff, removable: false,
@@ -248,6 +264,21 @@ function manualSection(
   return { id: "manual", title: t.manual, chips, empty: chips.length === 0 ? t.emptyManual : "", note: "" };
 }
 
+/** Die uebernommenen Bases — immer da: der Empty-State erklaert, wie man eine Base uebernimmt. Der Chip oeffnet die Base-Datei und
+ *  entfernt den Schnappschuss (kein Abwaehlen, wie beim manuellen Eintrag: ein abgewaehlter bliebe als Chip ohne Zweck stehen). */
+function basesSection(bases: readonly BaseSnapshot[], fullMode: boolean, t: (typeof T)[keyof typeof T]): PanelSection {
+  const chips: PanelChip[] = bases.map((b) => {
+    const teile = [t.rows(b.rows.length), b.takenAt.slice(11)];
+    if (b.form === "notes" && !fullMode) teile.push(t.baseNotesOff);
+    return {
+      source: "base" as const, path: b.id, openPath: b.basePath,
+      label: `${chipLabel(b.basePath).replace(/\.base$/, "")} · ${b.viewName}`,
+      hint: teile.join(", "), off: false, removable: true,
+    };
+  });
+  return { id: "bases", title: t.bases, chips, empty: chips.length === 0 ? t.emptyBases : "", note: "" };
+}
+
 /** Was der Vault-Abschnitt ueber seine Treffer sagt. Nur Vault meldet sich — die Nachbarn im
  *  Modus Notiz sind eine Zugabe und schweigen (Etappe-3-Zuschnitt Punkt 4). */
 function vaultNote(hits: SemanticHits, query: string, lang: "de" | "en", t: (typeof T)[keyof typeof T]): string {
@@ -268,13 +299,14 @@ export async function buildPanelViewModel(
   const manualEnabled = mode !== "workspace";
   const manualSet = new Set(opts.manual);
   const hits = opts.hits ?? NO_HITS;
+  const bases = opts.bases ?? [];
   let kandidatenByPath: ReadonlyMap<string, Candidate> = new Map();
   let groessen: ReadonlyMap<string, { chars: number }> = new Map();
 
   let text: string;
   if (mode === "workspace") {
     sections.push(workspaceSection(snap, off, opts, t));
-    text = renderWorkspaceContext(applySelection(snap, off), opts).text;
+    text = withBaseTables(renderWorkspaceContext(applySelection(snap, off), opts), renderTables(bases, opts.budget, opts.lang)).text;
   } else {
     // Chips kommen aus der UNGEFILTERTEN Kandidatenliste: ein abgewaehlter Eintrag muss
     // sichtbar bleiben, sonst gaebe es keinen Weg zurueck. Die GROESSEN kommen dagegen aus
@@ -283,18 +315,20 @@ export async function buildPanelViewModel(
     // Riss auf, der kein Task-Review sah.
     const ctx = await buildFullContext({
       mode, snap, links: opts.links, content: opts.content,
-      manual: opts.manual, off, linkDepth: opts.linkDepth, budget: opts.budget, lang: opts.lang, hits,
+      manual: opts.manual, off, linkDepth: opts.linkDepth, budget: opts.budget, lang: opts.lang, hits, bases,
     });
     groessen = new Map(ctx.items.map((i) => [`${i.source}:${i.path}`, i]));
     const kandidaten = collectCandidates({
       mode, snap, links: opts.links, linkDepth: opts.linkDepth, manual: opts.manual,
       semantic: hits.kind === "ok" ? hits.paths : [],
+      basePaths: basePaths(bases),
     });
     kandidatenByPath = new Map(kandidaten.map((c) => [c.path, c]));
     sections.push(sourceSection(mode, kandidaten, manualSet, off, groessen, t, mode === "vault" ? vaultNote(hits, opts.query ?? "", opts.lang, t) : ""));
     text = ctx.text;
   }
   sections.push(manualSection(opts.manual, kandidatenByPath, off, groessen, manualEnabled, t));
+  sections.push(basesSection(bases, mode !== "workspace", t));
 
   const kb = (text.length / 1024).toFixed(1);
   const pct = Math.min(100, Math.round((text.length / CHARS_PER_TOKEN / Math.max(1, opts.windowTokens)) * 100));
@@ -303,7 +337,7 @@ export async function buildPanelViewModel(
     chars: text.length,
     summary: t.summary(kb, pct),
     state: pct >= WARN_AT * 100 ? "is-warning" : "is-ok",
-    hasOff: off.size > 0 || opts.manual.length > 0,
+    hasOff: off.size > 0 || opts.manual.length > 0 || bases.length > 0,
     depth: mode === "note" ? opts.linkDepth : null,
     manualEnabled,
     autoK: mode === "note" || mode === "vault" ? opts.autoK : null,

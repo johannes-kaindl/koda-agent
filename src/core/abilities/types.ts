@@ -1,6 +1,7 @@
 /* Fähigkeiten und Arbeiten (Spec Vault-Cockpit `_SDD/2026-10-17-koda-faehigkeiten-und-arbeiten-design.md`).
  * Drei Ebenen: Grundeinstellung (Frontmatter der Skills, Einstellungen), Arbeit (Notiz unter
  * `<Koda-Ordner>/Arbeiten/`), Overlay (dieses Gespräch). Pure — kein Obsidian-Import. */
+import type { BaseSnapshot } from "../context/bases";
 import type { ContextMode } from "../context/types";
 
 export type SkillMode = "aus" | "beschreibung" | "ganz";
@@ -50,6 +51,8 @@ export interface SessionState {
   overlay: Overlay;
   /** Entspricht dem bisherigen `contextManual`. */
   manual: string[];
+  /** Uebernommene Bases-Schnappschuesse (Plan 2). Optional: eine Marke aus der Zeit davor bleibt gueltig. */
+  bases?: BaseSnapshot[];
 }
 
 export function emptyOverlay(): Overlay {

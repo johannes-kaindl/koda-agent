@@ -116,6 +116,7 @@ export class KodaView extends ItemView {
       viewModel: () => this.plugin.contextViewModel(),
       toggle: (s, p) => { this.plugin.toggleContextItem(s, p); },
       remove: (p) => { this.plugin.removeContextPath(p); },
+      removeBase: (id) => { this.plugin.removeContextBase(id); },
       // Befund 6 (Review 2026-09-05): Knopf und Befehl (main.ts) rufen dieselbe
       // Plugin-Methode — kein zweiter geschriebener Weg zum selben Zustand.
       addActive: () => { this.plugin.addContextActive(); },

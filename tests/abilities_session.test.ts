@@ -1,4 +1,4 @@
-import { describeStateChange, latestSessionState, needsSessionRecord, sessionForNewChat } from "../src/core/abilities/session";
+import { describeStateChange, isSessionState, latestSessionState, needsSessionRecord, sessionForNewChat } from "../src/core/abilities/session";
 import { emptyOverlay, emptySessionState, type SessionState } from "../src/core/abilities/types";
 import { parseLines, serializeLine } from "../src/core/memory/session";
 import type { LogEntry } from "../src/core/agent/types";
@@ -64,5 +64,21 @@ describe("needsSessionRecord", () => {
     expect(needsSessionRecord(log, st({ arbeit: "A" }))).toBe(false);
     expect(needsSessionRecord(log, st({ arbeit: "B" }))).toBe(true);
     expect(needsSessionRecord(log, emptySessionState())).toBe(true);
+  });
+});
+
+describe("Sitzungszustand mit Bases", () => {
+  const snapB = { id: "K.base · V", basePath: "K.base", viewName: "V", takenAt: "2026-10-17 01:00", form: "table" as const, columns: ["S"], rows: [] };
+  it("isSessionState akzeptiert bases fehlend oder als Liste, sonst nicht", () => {
+    expect(isSessionState({ arbeit: null, overlay: emptyOverlay(), manual: [] })).toBe(true);
+    expect(isSessionState({ arbeit: null, overlay: emptyOverlay(), manual: [], bases: [snapB] })).toBe(true);
+    expect(isSessionState({ arbeit: null, overlay: emptyOverlay(), manual: [], bases: "x" })).toBe(false);
+  });
+  it("sessionForNewChat räumt die Schnappschüsse ab", () => {
+    expect(sessionForNewChat({ ...emptySessionState(), arbeit: "Inbox", bases: [snapB] }).bases).toBeUndefined();
+  });
+  it("eine übernommene Base verlangt eine Marke, auch ohne frühere", () => {
+    expect(needsSessionRecord([], { ...emptySessionState(), bases: [snapB] })).toBe(true);
+    expect(needsSessionRecord([], emptySessionState())).toBe(false);
   });
 });

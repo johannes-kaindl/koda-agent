@@ -17,6 +17,8 @@ export interface ContextPanelHost {
   viewModel(): Promise<PanelViewModel>;
   toggle(source: ContextSource, path: string): void;
   remove(path: string): void;
+  /** Entfernt den Schnappschuss einer uebernommenen Base (Chip-Pfad = Schnappschuss-ID). */
+  removeBase(id: string): void;
   addActive(): void;
   addNote(): void;
   addFolder(): void;
@@ -196,7 +198,7 @@ export class ContextPanel implements HubPanel<"context"> {
           const name = el.createSpan({ cls: "koda-ctx-chip-label", text: chip.label });
           name.setAttribute("role", "button");
           name.setAttribute("tabindex", "0");
-          const openNote = (): void => { this.host.openNote(chip.path); };
+          const openNote = (): void => { this.host.openNote(chip.openPath ?? chip.path); };
           name.addEventListener("click", openNote);
           name.addEventListener("keydown", (evt: KeyboardEvent) => {
             if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); openNote(); }
@@ -208,7 +210,7 @@ export class ContextPanel implements HubPanel<"context"> {
           if (chip.removable) {
             setIcon(x, "x");
             x.setAttribute("aria-label", t("context.chipRemove"));
-            const removeChip = (): void => { this.host.remove(chip.path); };
+            const removeChip = (): void => { if (chip.source === "base") this.host.removeBase(chip.path); else this.host.remove(chip.path); };
             x.addEventListener("click", removeChip);
             x.addEventListener("keydown", (evt: KeyboardEvent) => {
               if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); removeChip(); }

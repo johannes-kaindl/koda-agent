@@ -455,3 +455,9 @@
 .okit-suggest-group { padding: var(--size-2-1) var(--size-4-2); color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .okit-suggest-item { padding: var(--size-2-2) var(--size-4-2); border-radius: var(--radius-s); cursor: var(--cursor); }
 .okit-suggest-item:hover, .okit-suggest-item.is-selected { background: var(--background-modifier-hover); }
+
+/* Bases-Ansicht „Koda-Kontext“ (Plan 2) */
+.koda-bases-view { padding: var(--size-4-2); }
+.koda-bases-head { display: flex; align-items: center; gap: var(--size-4-2); margin-bottom: var(--size-4-2); }
+.koda-bases-meta, .koda-bases-more { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.koda-bases-row { font-size: var(--font-ui-small); padding: var(--size-2-1) 0; border-bottom: 1px solid var(--background-modifier-border); }

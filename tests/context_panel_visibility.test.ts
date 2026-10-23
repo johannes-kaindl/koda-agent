@@ -47,6 +47,7 @@ function makeHost(vm: () => Promise<PanelViewModel>): ContextPanelHost {
     viewModel: vm,
     toggle: () => {},
     remove: () => {},
+    removeBase: () => {},
     addActive: () => {},
     addNote: () => {},
     addFolder: () => {},
