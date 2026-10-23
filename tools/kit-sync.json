@@ -11,7 +11,7 @@
         "think-splitter", "reasoning", "capabilities", "endpoint", "endpoint_config",
         "endpoint_diagnostics", "settings", "i18n", "num", "timeout",
         "model-context", "error_body", "diff", "settings_schema", "model-choice",
-        "model-list-cache", "stream-blocks", "sse", "redact", "secrets", "safe-markdown", "sampling-profiles", "llm-json", "data-url", "think-toggle", "byte-tokens", "validate-input", "slash-query", "rel-path", "folder-scope"
+        "model-list-cache", "stream-blocks", "sse", "redact", "secrets", "safe-markdown", "sampling-profiles", "llm-json", "data-url", "think-toggle", "byte-tokens", "validate-input", "slash-query", "rel-path", "folder-scope", "local-stamp"
       ]
     },
     { "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/web", "modules": ["remote-resources", "clipboard"], "rewrite": [["../pure/", "./"]] },
