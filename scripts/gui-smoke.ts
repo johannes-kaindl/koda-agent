@@ -4384,6 +4384,9 @@ async function main(): Promise<void> {
         const P87 = "87. Bases: Übergabeform Notizen schickt die Zeilen im Volltext";
         const P88 = "88. Base in der Arbeit: die Arbeit öffnet die Base und übernimmt sie selbst, eine Ansicht fremden Typs wird mit Hinweis abgelehnt, „Neues Gespräch“ übernimmt frisch";
         const ID_TABELLE = "Notes/Koda context.base · Context table";
+        // Die Base der Arbeit hat ZWEI Ansichten (erst eine Tabelle, dann die Koda-Ansicht): nur wenn Obsidian über `#Ansicht` die genannte wählt,
+        // kommt der Schnappschuss der zweiten. Mit nur einer Ansicht in der Base bliebe die Frage ungemessen.
+        const ID88 = "Notes/Koda two views.base · Second view";
         const basesBlaetter = (): Promise<number> => cdp.evaluate<number>(`return app.workspace.getLeavesOfType("bases").length;`);
         const schliesseBases = (): Promise<unknown> => cdp.evaluate(`for (const l of app.workspace.getLeavesOfType("bases")) l.detach(); return true;`);
         // Öffnet die Base in einem Tab und drückt „Als Kontext übernehmen“, sobald der Knopf bereit ist.
@@ -4399,7 +4402,7 @@ async function main(): Promise<void> {
           await cdp.evaluate(`document.querySelector(".workspace-leaf.mod-active .koda-bases-view .koda-bases-adopt").click(); return true;`);
           return null;
         };
-        const ARBEIT_OK = ["---", "koda: arbeit", 'base: "Notes/Koda context.base#Context table"', "---", "Smoke 88.", ""].join("\n");
+        const ARBEIT_OK = ["---", "koda: arbeit", 'base: "Notes/Koda two views.base#Second view"', "---", "Smoke 88.", ""].join("\n");
         const ARBEIT_FALSCH = ["---", "koda: arbeit", 'base: "Notes/Overview.base#All notes"', "---", "Smoke 88 falsch.", ""].join("\n");
         const zustand = { gesichert: false };
         try {
@@ -4473,7 +4476,7 @@ async function main(): Promise<void> {
               const p = ${PL};
               const ids = p.contextBases.map((b) => b.id);
               const notice = [...document.querySelectorAll(".notice")].some((n) => n.textContent.includes("aus der Arbeit") || n.textContent.includes("from the task"));
-              return ids.includes(${JSON.stringify(ID_TABELLE)}) ? { ids, pending: p.pendingBase !== null, notice } : null;`, 10_000, 100);
+              return ids.includes(${JSON.stringify(ID88)}) ? { ids, pending: p.pendingBase !== null, notice } : null;`, 10_000, 100);
             // (b) Ansicht fremden Typs: kein neuer Tab, Hinweis im Tab.
             await cdp.evaluate(`const p = ${PL}; p.chooseArbeit(null); p.resetContextSelection(); return true;`);
             await schliesseBases();
@@ -4489,11 +4492,11 @@ async function main(): Promise<void> {
             await cdp.evaluate(`const p = ${PL}; p.chooseArbeit(null); p.resetContextSelection(); return true;`);
             await schliesseBases();
             await cdp.evaluate(`const p = ${PL}; p.chooseArbeit("Smoke Base"); return true;`);
-            const erst = await pollUntil<string>(cdp, `const b = ${PL}.contextBases.find((x) => x.id === ${JSON.stringify(ID_TABELLE)}); return b ? b.takenAt : null;`, 10_000, 100);
+            const erst = await pollUntil<string>(cdp, `const b = ${PL}.contextBases.find((x) => x.id === ${JSON.stringify(ID88)}); return b ? b.takenAt : null;`, 10_000, 100);
             await cdp.evaluate(`await ${PL}.newChat(); return true;`);
             const danach = await pollUntil<{ n: number; takenAt: string; pending: boolean }>(cdp, `
               const p = ${PL};
-              const b = p.contextBases.find((x) => x.id === ${JSON.stringify(ID_TABELLE)});
+              const b = p.contextBases.find((x) => x.id === ${JSON.stringify(ID88)});
               return b ? { n: p.contextBases.length, takenAt: b.takenAt, pending: p.pendingBase !== null } : null;`, 10_000, 100);
             const okA = a !== null && a.ids.length === 1 && !a.pending && a.notice;
             const okB = hinweis !== null && nachher === vorher && !pendingFalsch;

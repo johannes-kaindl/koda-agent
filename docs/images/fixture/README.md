@@ -48,7 +48,7 @@ that have nothing to do with the plugin:
   (the check measures the default in the reading code) and lists a column `owner` that no
   note has (the check measures that a missing value arrives empty, never as the word “null”).
   The second sets `uebergabeform: notes`. Both filter on `status == "active"` — four notes in the scenery (`Notes/Project plan.md`, `Notes/Tools.md`, `Garden/Garden plan.md`, `Garden/Watering schedule.md`); `status != ""` would also match notes without the property and let the row count drift with every file the smoke creates.
-  Check 88 also needs `Notes/Overview.base` (its view is of type `table`, not `koda-context`).
+  Check 88 also needs `Notes/Koda two views.base` (a `table` view first, then a `koda-context` view named `Second view`: the check measures that `<path>#<view>` opens the named view) and `Notes/Overview.base` (its view is of type `table`, not `koda-context`).
 - **The three notes check 34 collects must together hold roughly 820 characters** — the
   check sets the budget to **300** to force a cut. With a larger scenery nothing would be
   truncated and the check would stop touching its subject; it does not pass silently in

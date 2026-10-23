@@ -265,8 +265,7 @@ selbst — die zeigt erst Handpunkt 20 mit einem echten Modell-Lauf.
 
 Prüfpunkt **1b** verdient eine Einordnung, weil er weniger zeigt, als sein Name nahelegt: Er
 prüft die **Naht**, nicht die Suche — `apiVersion`, die Fläche (`Object.keys`), und
-`status().indexed`. Das ist die Vorbedingung dafür, dass `related_notes` überhaupt in die
-Werkzeugliste kommt, und der Teil, der **ohne** eine echte Modell-Antwort entscheidbar ist.
+`status().indexed`. Das ist die Vorbedingung für die semantische Suche und die Nachbarn im Kontext (seit Welle 25 kommt `related_notes` nicht mehr aus Kodas Liste, sondern über den Anbieter-Vertrag von vault-rag), und der Teil, der **ohne** eine echte Modell-Antwort entscheidbar ist.
 Dass Koda die API im Gespräch tatsächlich benutzt, zeigt er nicht — das bleiben die
 Handpunkte 14–18. Ist vault-rag gar nicht installiert, meldet er das und bleibt **grün**:
 die weiche Kopplung sieht genau diesen Fall vor.
@@ -1357,3 +1356,23 @@ Der Treiber setzt den Zustand der neuen Punkte VOR dem Lauf zurück (Skills `smo
 Gegenproben, je gebaut, deployt, frischer Prozess, zurückgenommen (`git status` sauber, `grep` im `main.js` ohne Markierung): **Lauf 1**, sieben Mutationen gleichzeitig: `selectEffective` ignoriert die Arbeit → 81 rot („im Prompt nur MARKER-B-79, smoke79-b, tidy-up“); Regel für „aus“ liefert nichts → 80 rot („‚aus‘: ‚‘“); `skillHintInHistory` wird ignoriert → 82 rot („Schalter aus → 1 Regeln“); keine Sitzungs-Marke → 83 rot („Marken im JSONL 0“); `textarea-suggest` ohne Capture → 84 rot („gesendet 1×“, geschlossen sendet „/smoke79-a“); `setContextLinkDepth` schreibt die Einstellung → 85 rot („contextLinkDepth 1 → 2“); der Segment-Knopf ruft `onChange` nicht → 79 rot („nach Klick ‚ganz‘ im Prompt: false“). Ergebnis 77/84, genau diese sieben rot. **Lauf 2**: `reasoning` wird nicht zu `thinking` → 89 rot (0 Blöcke) und 91 rot (kein Knopf); der Kit-Kopier-Knopf wird nie angelegt → 90 rot („Knopf im Strom false“); `field-sizing` aus der CSS → 97 rot („abgeschnitten: 10“). **Lauf 3**: der Kopier-Knopf nach der Antwort kopiert den leeren String → 91 rot allein („Knopf da true · kopiert 1× ‚…‘ (ganzer Text: false)“), 89 grün. **Lauf 4**: `outageNote` liefert bei `offline` nichts → 98 rot („Hinweiszeile false“); `related_notes` immer angeboten → 99 rot („related_notes true (soll nein)“). Ergebnis 92/94, genau diese zwei rot. Das erste Kriterium von 99 suchte die Beschriftung „semantisch“ im Ergebnis und war mit dem Stub rot: ein Treffer, der auch wörtlich gefunden wird, steht nicht als Block da, sondern nur mit Score hinter dem Volltext-Treffer — das Kriterium misst jetzt „(0.90)“ oder den Block.
 
 Gemessene Fallen: Punkt 16 stand im ersten Lauf nach dem Umbau einmal rot („danach: SMOKE-EIGENE-ANWEISUNG“, Override leer, Textarea nicht neu gezeichnet) und in allen sechs Läufen danach grün; ein Flake, nicht reproduziert (n=1), Ursache offen. Beide Dropdowns des Kontext-Tabs und der Overlay-Eintrag nach `Enter` im „/“-Menü entstehen asynchron (das ViewModel liest Dateien): ein Prüfpunkt, der einmal liest statt zu warten, sah die alte Lage (zweimal rot im ersten Entwurf von 81 und 84, im Treiber auf Warten umgestellt).
+
+## Belegter Lauf: 2026-10-23, Welle 25 — Bases-Ansicht, Base in der Arbeit, Schreibgrenze und Vision auf code-kit 0.34.0, `related_notes` vom Anbieter (101 Punkte)
+
+Zweitinstanz :9550 auf Obsidian 1.14.5 (Version im Fenstertitel gelesen), Staging-Vault frisch aus der Fixture. Baseline vor dem Umbau: Gate 1124/1124, Smoke **94 grün · 0 rot · 2 übersprungen (1b, 96) · 0 nichts gemessen** von 96 (der erste Lauf auf dem frischen Profil brach bei Punkt 3 mit „Promise was collected" ab, der zweite mit frischem Prozess lief durch). Danach: Gate **1130/1130**, Smoke **99 grün · 0 rot · 2 übersprungen (1b, 96) · 0 nichts gemessen** von 101, unter `--exclusive all --port 9550` (die frühen Läufe unter `focus` lieferten dieselbe Bilanz).
+
+Neu: **86** Übernahme als Tabelle (vier Zeilen, Form `table` aus dem Default im Lesecode, die Zeile `Notes/Tools.md` hat eine leere Spalte `owner`, das Wort „null“ steht nicht in der Tabelle), **87** Übergabeform Notizen (zwei Schnappschüsse nacheinander, die Zeilen gehen im Volltext mit, die Tabelle der Notizen-Ansicht nicht), **88** Base in der Arbeit — (a) die Arbeit öffnet `Notes/Koda two views.base#Second view` und übernimmt selbst, (b) eine Ansicht fremden Typs wird mit Hinweis abgelehnt und öffnet keinen Tab, (c) „Neues Gespräch“ übernimmt frisch. **100/101** sind die Gegenproben des Kopier-Knopfs am Denkblock (Baustein `messeDenkblockKopierbar` der Brücke, Punkte 90/91 laufen jetzt darüber).
+
+**Gegenproben**, je an einem eigenen Build:
+- 86a: `valueText` ohne den `NullValue`-Zweig → 86 **rot** („null“ in der Tabelle: true).
+- 86b: `normalizeForm` gibt `raw` zurück → 86 **rot** (Form „—“).
+- 87: die `basePaths`-Schleife in `candidates.ts` entfernt → 87 **rot** (Volltext aus Base: keiner).
+- 88a: die Auto-Übernahme in `onDataUpdated` abgeschaltet → 88 **rot** ((a) Schnappschuss nicht übernommen, (c) nichts).
+- 88b: `checkBaseView` liefert immer „ok“ → 88 **rot** ((b) Hinweis fehlt, Base-Tabs 0 → 1, die Arbeit wartet).
+
+**Befunde:**
+- Ob `openLinkText("<Pfad>#<Ansicht>")` die genannte Ansicht wählt, war ungemessen. Mit einer Base, deren erste Ansicht eine Tabelle ist, wählt Obsidian (1.14.5) die zweite, genannte Ansicht — Punkt 88 (a) trennt das.
+- Ein schon offener Tab derselben Base schickt kein `onDataUpdated`: wiederverwendet übernimmt „Neues Gespräch“ nichts. Koda schließt deshalb den Tab, den es selbst geöffnet hat, und öffnet ihn neu (einen Tab des Nutzers lässt es stehen).
+- Der Plan erwartete drei Zeilen für `status != ""`; gemessen waren es 13, weil der Filter auch Notizen ohne die Eigenschaft trifft. Die Fixture-Bases filtern jetzt auf `status == "active"` (vier Notizen).
+- Der Kit-Mock kennt `BasesView`/`NullValue` nicht; `main.ts` importiert `bases-view.ts`, und zwei Tests laden `main.ts`. Leere Hüllen in `tests/__mocks__/obsidian.ts` genügen, die Ansicht selbst belegt nur dieser Smoke.
+

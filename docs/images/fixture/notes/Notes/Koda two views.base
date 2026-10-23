@@ -1,0 +1,14 @@
+filters:
+  and:
+    - 'status == "active"'
+views:
+  - type: table
+    name: Plain table
+    order:
+      - file.name
+      - status
+  - type: koda-context
+    name: Second view
+    order:
+      - file.name
+      - status
