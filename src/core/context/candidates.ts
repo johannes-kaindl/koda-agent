@@ -20,6 +20,8 @@ export interface CandidateInput {
   /** Pfade aus vault-rag (`semantic.ts`): im Modus Vault die Treffer zur Frage, im Modus
    *  Notiz die Nachbarn der aktiven Notiz. Reihenfolge der API — Koda sortiert nicht um. */
   semantic?: readonly string[];
+  /** Zeilenpfade aus Bases-Schnappschuessen mit Uebergabeform notes/both (`basePaths`). */
+  basePaths?: readonly string[];
 }
 
 export function collectCandidates(input: CandidateInput): Candidate[] {
@@ -37,6 +39,10 @@ export function collectCandidates(input: CandidateInput): Candidate[] {
   // Manuelles vor Automatischem: es ist die einzige Quelle, die der Nutzer ausdruecklich
   // gewaehlt hat — bei knappem Budget soll sie nicht hinter einer Link-Ebene anstehen.
   for (const p of input.manual) nimm({ source: "manual", path: p });
+
+  // Bases nach Manuellem: ebenfalls vom Nutzer gewaehlt (per „Als Kontext uebernehmen"),
+  // aber ueber einen Filter statt einzeln — Einzelwahl gewinnt bei knappem Budget.
+  for (const p of input.basePaths ?? []) nimm({ source: "base", path: p });
 
   if (input.mode === "tabs") {
     for (const tab of input.snap.tabs) nimm({ source: "tab", path: tab.path });

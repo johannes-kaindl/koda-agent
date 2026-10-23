@@ -57,3 +57,12 @@ describe("collectCandidates — semantische Nachbarn im Modus Notiz", () => {
     expect(out.map((c) => c.path)).toEqual(["A.md", "T.md"]);
   });
 });
+
+describe("collectCandidates — Pfade aus Bases (Form notes/both)", () => {
+  it("reiht sie nach Manuellem und vor den Modus-Quellen ein", () => {
+    const out = collectCandidates({
+      mode: "tabs", snap, links, linkDepth: 1, manual: ["M.md"], basePaths: ["X.md", "T.md"],
+    });
+    expect(out.map((c) => `${c.source}:${c.path}`)).toEqual(["active:A.md", "manual:M.md", "base:X.md", "base:T.md"]);
+  });
+});

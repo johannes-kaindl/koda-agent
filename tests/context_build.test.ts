@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from "vitest";
 import { buildFullContext } from "../src/core/context/build";
 import { itemKey } from "../src/core/context/selection";
 import type { LinkPort, WorkspaceSnapshot } from "../src/core/context/ports";
+import type { BaseSnapshot } from "../src/core/context/bases";
 
 const links: LinkPort = { outgoing: (p) => (p === "A.md" ? ["B.md"] : []), backlinks: () => [] };
 
@@ -132,5 +133,38 @@ describe("buildFullContext — Modus Vault", () => {
       linkDepth: 1, budget: 10000, lang: "de", hits: { kind: "failed", reason: "offline" },
     });
     expect(still.text).not.toContain("nicht verfügbar");
+  });
+});
+
+describe("buildFullContext — Bases", () => {
+  const tabelle: BaseSnapshot = {
+    id: "K.base · V", basePath: "K.base", viewName: "V", takenAt: "2026-09-18 14:02", form: "table",
+    columns: ["Status"], rows: [{ path: "A.md", group: null, values: ["active"] }],
+  };
+  it("haengt die Tabelle hinter die Notizen und zieht sie vom Budget ab", async () => {
+    const ctx = await buildFullContext({
+      mode: "note", snap, links, content: inhalt({ "A.md": "Text A", "B.md": "Text B" }), manual: [], off: new Set(),
+      linkDepth: 1, budget: 10000, lang: "de", bases: [tabelle],
+    });
+    expect(ctx.text).toContain("## Base: K.base · V");
+    expect(ctx.text.indexOf("## Base:")).toBeGreaterThan(ctx.text.indexOf("Text B"));
+    expect(ctx.items[ctx.items.length - 1]).toMatchObject({ source: "base", kind: "table", via: "K.base · V" });
+  });
+  it("Form notes: die Zeilen gehen als Volltext mit, Quelle base", async () => {
+    const ctx = await buildFullContext({
+      mode: "tabs", snap, links, content: inhalt({ "A.md": "Text A", "T.md": "Text T", "X.md": "Text X" }), manual: [], off: new Set(),
+      linkDepth: 1, budget: 10000, lang: "de",
+      bases: [{ ...tabelle, form: "notes", rows: [{ path: "X.md", group: null, values: [] }] }],
+    });
+    expect(ctx.items.map((i) => `${i.source}:${i.path}`)).toContain("base:X.md");
+    expect(ctx.text).not.toContain("## Base:");
+  });
+  it("nur eine Tabelle, keine Notizen: der Block sagt nicht „nichts ausgewählt“", async () => {
+    const ctx = await buildFullContext({
+      mode: "note", snap: { active: null, tabs: [] }, links, content: inhalt({}), manual: [], off: new Set(),
+      linkDepth: 1, budget: 10000, lang: "de", bases: [tabelle],
+    });
+    expect(ctx.text).not.toContain("nichts ausgewählt");
+    expect(ctx.text).toContain("## Base:");
   });
 });

@@ -8,7 +8,8 @@ import type { ContentPort, LinkPort, WorkspaceSnapshot } from "./ports";
 import type { ContextAttachment } from "./types";
 import { collectCandidates } from "./candidates";
 import { allocateBudget, type LoadedCandidate } from "./select";
-import { renderFullContext, headerLine, cutMessage } from "./render";
+import { renderFullContext, headerLine, cutMessage, type RenderExtras } from "./render";
+import { basePaths, renderTables, type BaseSnapshot } from "./bases";
 import { itemKey, type SelectionKey } from "./selection";
 import { NO_HITS, semanticNotice, type SemanticHits } from "./semantic";
 
@@ -24,6 +25,8 @@ export interface BuildOptions {
   lang: "de" | "en";
   /** vault-rag-Ergebnis (`fetchSemanticHits`). Fehlt es, verhaelt sich der Bau wie in Etappe 2. */
   hits?: SemanticHits;
+  /** Uebernommene Bases (Etappe 3b). */
+  bases?: readonly BaseSnapshot[];
 }
 
 /** Fixe Zeichenlast eines Eintrags, die `allocateBudget` nicht sieht, weil sie erst beim
@@ -46,10 +49,15 @@ function overheadFor(c: LoadedCandidate, lang: BuildOptions["lang"]): number {
 
 export async function buildFullContext(opts: BuildOptions): Promise<ContextAttachment> {
   const hits = opts.hits ?? NO_HITS;
+  const bases = opts.bases ?? [];
+  // Tabellen zuerst ans Budget: sie sind klein und die Form, die Bases besonders macht (Spec E7).
+  // Was sie verbrauchen, fehlt den Notizen — ein Budget, nicht zwei.
+  const tabellen = renderTables(bases, opts.budget, opts.lang);
   const kandidaten = collectCandidates({
     mode: opts.mode, snap: opts.snap, links: opts.links,
     linkDepth: opts.linkDepth, manual: opts.manual,
     semantic: hits.kind === "ok" ? hits.paths : [],
+    basePaths: basePaths(bases),
   }).filter((c) => !opts.off.has(itemKey(c.source, c.path)));
   // Nur der Vault-Modus meldet einen Fehlschlag: dort IST die Suche der Modus. Im Modus Notiz
   // sind die Nachbarn eine Zugabe und fehlen still (Etappe-3-Zuschnitt Punkt 4).
@@ -63,6 +71,8 @@ export async function buildFullContext(opts: BuildOptions): Promise<ContextAttac
   }
 
   const overhead = geladen.reduce((sum, c) => sum + overheadFor(c, opts.lang), 0) + (notice?.length ?? 0) + 1;
-  const inhaltsBudget = Math.max(0, opts.budget - overhead);
-  return renderFullContext(allocateBudget(geladen, inhaltsBudget), opts.mode, opts.lang, notice !== undefined ? { notice } : {});
+  const inhaltsBudget = Math.max(0, opts.budget - overhead - tabellen.used);
+  const extras: RenderExtras = { extraBlocks: tabellen.blocks, extraItems: tabellen.items };
+  if (notice !== undefined) extras.notice = notice;
+  return renderFullContext(allocateBudget(geladen, inhaltsBudget), opts.mode, opts.lang, extras);
 }

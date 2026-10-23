@@ -20,7 +20,7 @@ const T = {
   de: {
     head: (m: string) => `[Arbeitskontext · ${m}]`,
     mode: { note: "Notiz", tabs: "Alle Tabs", vault: "Vault" },
-    src: { active: "aktive Notiz", manual: "manuell hinzugefügt", tab: "offener Tab", link: "verlinkt", backlink: "verlinkt hierher", related: "semantisch ähnlich", vault: "Treffer der Vault-Suche" },
+    src: { active: "aktive Notiz", manual: "manuell hinzugefügt", tab: "offener Tab", link: "verlinkt", backlink: "verlinkt hierher", related: "semantisch ähnlich", vault: "Treffer der Vault-Suche", base: "aus einer Base" },
     level: (n: number) => `, Ebene ${n}`,
     cut: (a: number, b: number, p: string) => `[gekürzt: ${a} von ${b} Zeichen — vollständig über read_note("${p}")]`,
     empty: "nichts ausgewählt — der Kontext-Tab in Kodas Seitenleiste zeigt, was zur Auswahl steht.",
@@ -28,7 +28,7 @@ const T = {
   en: {
     head: (m: string) => `[Working context · ${m}]`,
     mode: { note: "Note", tabs: "All tabs", vault: "Vault" },
-    src: { active: "active note", manual: "added by hand", tab: "open tab", link: "linked from here", backlink: "links to here", related: "semantically similar", vault: "vault search match" },
+    src: { active: "active note", manual: "added by hand", tab: "open tab", link: "linked from here", backlink: "links to here", related: "semantically similar", vault: "vault search match", base: "from a base" },
     level: (n: number) => `, level ${n}`,
     cut: (a: number, b: number, p: string) => `[cut: ${a} of ${b} chars — full text via read_note("${p}")]`,
     empty: "nothing selected — the Context tab in Koda's sidebar shows what is on offer.",
@@ -56,6 +56,9 @@ export function cutMessage(shown: number, full: number, path: string, lang: Lang
 export interface RenderExtras {
   /** Eine Zeile direkt unter der Kopfzeile — z. B. „Vault-Suche nicht verfuegbar". */
   notice?: string;
+  /** Fertige Bloecke hinter den Eintraegen (Bases-Tabellen) samt ihren Items. */
+  extraBlocks?: string[];
+  extraItems?: ContextItem[];
 }
 
 export function renderFullContext(
@@ -71,7 +74,8 @@ export function renderFullContext(
   const bloecke: string[] = [extras.notice !== undefined ? `${kopfzeile}\n${extras.notice}` : kopfzeile];
   const items: ContextItem[] = [];
 
-  if (entries.length === 0) {
+  const extraBlocks = extras.extraBlocks ?? [];
+  if (entries.length === 0 && extraBlocks.length === 0) {
     bloecke.push(t.empty);
     return { mode, items, text: bloecke.join("\n") };
   }
@@ -85,5 +89,7 @@ export function renderFullContext(
     if (e.depth !== undefined) item.depth = e.depth;
     items.push(item);
   }
+  bloecke.push(...extraBlocks);
+  items.push(...(extras.extraItems ?? []));
   return { mode, items, text: bloecke.join("\n\n") };
 }
