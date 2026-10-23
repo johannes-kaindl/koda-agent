@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.29.0] — 2026-10-23
+
 ### Added
 
 - **Bases view "Koda context".** A base can show a view of the type *Koda context*: **Use as context** stores a snapshot of its rows with the time it was taken, handed over as a **table**, as **notes** (in full text) or **both** (option *Hand over as*). The table goes along in every mode except Off, the notes in the modes that send full text; both share the context budget and a table is cut by whole rows. The Context tab has a **Bases** section with one chip per snapshot (the × removes it), and snapshots are kept with the conversation. Missing values arrive empty, never as the word "null".
