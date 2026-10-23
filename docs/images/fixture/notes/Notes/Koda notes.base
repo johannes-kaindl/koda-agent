@@ -1,0 +1,10 @@
+filters:
+  and:
+    - 'status == "active"'
+views:
+  - type: koda-context
+    name: Context notes
+    uebergabeform: notes
+    order:
+      - file.name
+      - status

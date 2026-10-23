@@ -43,6 +43,12 @@ that have nothing to do with the plugin:
 - **`Notes/Overview.base` must exist** — check 36 reads it through `read_note` and expects
   the string `views:` in the result. It is the only non-Markdown file in the scenery; its
   content is irrelevant beyond being valid YAML with that key.
+- **`Notes/Koda context.base` and `Notes/Koda notes.base` with a view of type `koda-context`**
+  — checks 86 to 88 open them and press “Use as context”. The first sets no hand-over form
+  (the check measures the default in the reading code) and lists a column `owner` that no
+  note has (the check measures that a missing value arrives empty, never as the word “null”).
+  The second sets `uebergabeform: notes`. Both filter on `status == "active"` — four notes in the scenery (`Notes/Project plan.md`, `Notes/Tools.md`, `Garden/Garden plan.md`, `Garden/Watering schedule.md`); `status != ""` would also match notes without the property and let the row count drift with every file the smoke creates.
+  Check 88 also needs `Notes/Overview.base` (its view is of type `table`, not `koda-context`).
 - **The three notes check 34 collects must together hold roughly 820 characters** — the
   check sets the budget to **300** to force a cut. With a larger scenery nothing would be
   truncated and the check would stop touching its subject; it does not pass silently in

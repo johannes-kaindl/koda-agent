@@ -306,6 +306,9 @@ const PUNKTE = [
   "83. Sitzungs-Marke: nach einer Frage steht sie im JSONL, nach dem Neuladen sind Arbeit und Overlay zurück, „Neues Gespräch“ behält die Arbeit und leert das Overlay",
   "84. „/“-Menü: zwei Gruppen, Enter wählt und sendet nicht, Escape schließt, bei geschlossener Liste sendet Enter wie bisher, eine URL öffnet nichts",
   "85. Regler „Tiefe“ im Kontext-Tab gilt für das Gespräch: die wirksame Tiefe ändert sich, die Einstellung nicht",
+  "86. Bases: Übernahme als Tabelle, Default aus dem Lesecode, fehlende Werte leer",
+  "87. Bases: Übergabeform Notizen schickt die Zeilen im Volltext",
+  "88. Base in der Arbeit: die Arbeit öffnet die Base und übernimmt sie selbst, eine Ansicht fremden Typs wird mit Hinweis abgelehnt, „Neues Gespräch“ übernimmt frisch",
   "89. Denkblock nach der Antwort: zugeklappt vor der Antwort, mit der Sitzung im JSONL, nie am Draht; der Schalter „Denken aufbewahren“ aus lässt ihn verschwinden",
   "90. Denkblock kopierbar während des Stroms (Kit-Knopf): der Klick kopiert den bisherigen Denktext und klappt den Block nicht zu",
   "91. Denkblock kopierbar nach der Antwort: der Klick kopiert den ganzen Denktext, quittiert mit is-copied und klappt den Block nicht auf",
@@ -4369,8 +4372,161 @@ async function main(): Promise<void> {
         }
       }
 
+      // --- 86–88. Bases-Ansicht „Koda-Kontext“ und Base in der Arbeit (Plan 2, Welle 25) ----
+      // Der Treiber setzt jeden Zustand, den er anlegt, VOR dem Lauf zurück (Sitzungszustand, Arbeits-Notizen, offene Base-Tabs) und räumt
+      // danach ab. Die Arbeits-Notizen entstehen zur Laufzeit wie in 79–85 (die Fixture trägt keine Arbeiten: sie stünden sonst im „/“-Menü und
+      // in den README-Bildern). Die Ansicht selbst ist die Schicht des Hosts: kein Unit-Test sieht sie, nur diese Punkte.
+      {
+        const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        const P86 = "86. Bases: Übernahme als Tabelle, Default aus dem Lesecode, fehlende Werte leer";
+        const P87 = "87. Bases: Übergabeform Notizen schickt die Zeilen im Volltext";
+        const P88 = "88. Base in der Arbeit: die Arbeit öffnet die Base und übernimmt sie selbst, eine Ansicht fremden Typs wird mit Hinweis abgelehnt, „Neues Gespräch“ übernimmt frisch";
+        const ID_TABELLE = "Notes/Koda context.base · Context table";
+        const basesBlaetter = (): Promise<number> => cdp.evaluate<number>(`return app.workspace.getLeavesOfType("bases").length;`);
+        const schliesseBases = (): Promise<unknown> => cdp.evaluate(`for (const l of app.workspace.getLeavesOfType("bases")) l.detach(); return true;`);
+        // Öffnet die Base in einem Tab und drückt „Als Kontext übernehmen“, sobald der Knopf bereit ist.
+        const adoptFrom = async (pfad: string): Promise<string | null> => {
+          await cdp.evaluate(`
+            const f = app.vault.getFileByPath(${JSON.stringify(pfad)});
+            await app.workspace.getLeaf("tab").openFile(f);
+            return true;`);
+          const bereit = await pollUntil<boolean>(cdp, `
+            const b = document.querySelector(".workspace-leaf.mod-active .koda-bases-view .koda-bases-adopt");
+            return b && !b.disabled ? true : null;`, 10_000, 200);
+          if (bereit === null) return `Übernehmen-Knopf in ${pfad} nicht binnen 10 s bereit`;
+          await cdp.evaluate(`document.querySelector(".workspace-leaf.mod-active .koda-bases-view .koda-bases-adopt").click(); return true;`);
+          return null;
+        };
+        const ARBEIT_OK = ["---", "koda: arbeit", 'base: "Notes/Koda context.base#Context table"', "---", "Smoke 88.", ""].join("\n");
+        const ARBEIT_FALSCH = ["---", "koda: arbeit", 'base: "Notes/Overview.base#All notes"', "---", "Smoke 88 falsch.", ""].join("\n");
+        const zustand = { gesichert: false };
+        try {
+          await cdp.evaluate(`
+            const p = ${PL};
+            window.__kodaSmoke86 = { session: JSON.stringify(p.session), mode: p.contextMode };
+            const ensure = async (d) => { if (!app.vault.getFolderByPath(d)) await app.vault.createFolder(d); };
+            const mk = async (path, content) => { const f = app.vault.getFileByPath(path); if (f) await app.vault.modify(f, content); else await app.vault.create(path, content); };
+            await ensure("Koda"); await ensure("Koda/Arbeiten");
+            await mk("Koda/Arbeiten/Smoke Base.md", ${JSON.stringify(ARBEIT_OK)});
+            await mk("Koda/Arbeiten/Smoke Base falsch.md", ${JSON.stringify(ARBEIT_FALSCH)});
+            p.chooseArbeit(null);
+            p.resetOverlay();
+            p.resetContextSelection();
+            p.refreshArbeiten();
+            return true;`);
+          zustand.gesichert = true;
+          await schliesseBases();
+
+          // 86 ── Tabelle, Default aus dem Lesecode, fehlender Wert leer.
+          let ok86 = false; let detail86 = "";
+          try {
+            const fehler = await adoptFrom("Notes/Koda context.base");
+            if (fehler !== null) throw new Error(fehler);
+            const r = await cdp.evaluate<{ bases: { id: string; form: string; rows: number; columns: string[] }[]; text: string; items: string[] }>(`
+              const p = ${PL};
+              p.setContextMode("workspace");
+              const ctx = await p.currentContext();
+              return {
+                bases: p.contextBases.map((b) => ({ id: b.id, form: b.form, rows: b.rows.length, columns: b.columns })),
+                text: ctx?.text ?? "",
+                items: (ctx?.items ?? []).map((i) => i.source + ":" + i.kind),
+              };`);
+            const b = r.bases[0];
+            const tabelle = r.text.slice(Math.max(0, r.text.indexOf("## Base:")));
+            ok86 = r.bases.length === 1 && b !== undefined && b.id === ID_TABELLE && b.form === "table" && b.rows === 4
+              && r.items.includes("base:table") && /\| Notes\/Tools\.md \| Tools \| active \|\s*\|/.test(tabelle) && !/\bnull\b/.test(tabelle);
+            detail86 = `Schnappschuss ${b?.id ?? "—"} · Form ${b?.form ?? "—"} · ${String(b?.rows)} Zeilen (soll 4) · Zeile Tools mit leerer Spalte owner: ${String(/\| Notes\/Tools\.md \| Tools \| active \|\s*\|/.test(tabelle))} · Spalten ${b?.columns.join(", ") ?? "—"} · „null“ in der Tabelle: ${String(/\bnull\b/.test(tabelle))}`;
+          } catch (error) { abbruch(P86, error); }
+          if (detail86 !== "") record(P86, ok86, detail86);
+
+          // 87 ── Übergabeform „Notizen“ (steht im Feld der Ansicht).
+          let ok87 = false; let detail87 = "";
+          try {
+            const fehler = await adoptFrom("Notes/Koda notes.base");
+            if (fehler !== null) throw new Error(fehler);
+            const r = await cdp.evaluate<{ form: string; items: string[]; hatTabelle: boolean; n: number }>(`
+              const p = ${PL};
+              p.setContextMode("tabs");
+              const ctx = await p.currentContext();
+              const notes = p.contextBases.find((b) => b.viewName === "Context notes");
+              return {
+                form: notes?.form ?? "", n: p.contextBases.length,
+                items: (ctx?.items ?? []).map((i) => i.source + ":" + i.path + ":" + i.kind),
+                hatTabelle: (ctx?.text ?? "").includes("· Context notes ("),
+              };`);
+            const baseVolltext = r.items.filter((i) => i.startsWith("base:") && i.endsWith(":full"));
+            // Zwei Ansichten nacheinander: beide Schnappschüsse stehen da (ID aus Pfad UND Ansicht), keiner überschreibt den anderen.
+            ok87 = r.form === "notes" && r.n === 2 && baseVolltext.length >= 1 && !r.hatTabelle;
+            detail87 = `Form ${r.form} · Schnappschüsse ${r.n} (soll 2) · Volltext aus Base: ${baseVolltext.join(", ") || "keiner"} · Tabelle der Notizen-Ansicht im Block: ${String(r.hatTabelle)}`;
+          } catch (error) { abbruch(P87, error); }
+          if (detail87 !== "") record(P87, ok87, detail87);
+          await cdp.evaluate(`const p = ${PL}; p.resetContextSelection(); p.setContextMode("workspace"); return true;`);
+          await schliesseBases();
+
+          // 88 ── Base in der Arbeit.
+          try {
+            // (a) richtige Ansicht: die Arbeit öffnet die Base, die Ansicht übernimmt selbst.
+            await cdp.evaluate(`const p = ${PL}; p.chooseArbeit("Smoke Base"); return true;`);
+            const a = await pollUntil<{ ids: string[]; pending: boolean; notice: boolean }>(cdp, `
+              const p = ${PL};
+              const ids = p.contextBases.map((b) => b.id);
+              const notice = [...document.querySelectorAll(".notice")].some((n) => n.textContent.includes("aus der Arbeit") || n.textContent.includes("from the task"));
+              return ids.includes(${JSON.stringify(ID_TABELLE)}) ? { ids, pending: p.pendingBase !== null, notice } : null;`, 10_000, 100);
+            // (b) Ansicht fremden Typs: kein neuer Tab, Hinweis im Tab.
+            await cdp.evaluate(`const p = ${PL}; p.chooseArbeit(null); p.resetContextSelection(); return true;`);
+            await schliesseBases();
+            const vorher = await basesBlaetter();
+            await cdp.evaluate(`const p = ${PL}; p.chooseArbeit("Smoke Base falsch"); return true;`);
+            const hinweis = await pollUntil<string[]>(cdp, `
+              const h = await ${PL}.arbeitHints();
+              return h.some((x) => x.includes("nicht vom Typ") || x.includes("not of type")) ? h : null;`, 10_000, 200);
+            await pause(800);
+            const nachher = await basesBlaetter();
+            const pendingFalsch = await cdp.evaluate<boolean>(`return ${PL}.pendingBase !== null;`);
+            // (c) „Neues Gespräch“ mit der Arbeit: die Schnappschüsse des alten Gesprächs sind weg, die Base wird frisch übernommen.
+            await cdp.evaluate(`const p = ${PL}; p.chooseArbeit(null); p.resetContextSelection(); return true;`);
+            await schliesseBases();
+            await cdp.evaluate(`const p = ${PL}; p.chooseArbeit("Smoke Base"); return true;`);
+            const erst = await pollUntil<string>(cdp, `const b = ${PL}.contextBases.find((x) => x.id === ${JSON.stringify(ID_TABELLE)}); return b ? b.takenAt : null;`, 10_000, 100);
+            await cdp.evaluate(`await ${PL}.newChat(); return true;`);
+            const danach = await pollUntil<{ n: number; takenAt: string; pending: boolean }>(cdp, `
+              const p = ${PL};
+              const b = p.contextBases.find((x) => x.id === ${JSON.stringify(ID_TABELLE)});
+              return b ? { n: p.contextBases.length, takenAt: b.takenAt, pending: p.pendingBase !== null } : null;`, 10_000, 100);
+            const okA = a !== null && a.ids.length === 1 && !a.pending && a.notice;
+            const okB = hinweis !== null && nachher === vorher && !pendingFalsch;
+            const okC = erst !== null && danach !== null && danach.n === 1 && !danach.pending && danach.takenAt >= erst;
+            record(P88, okA && okB && okC,
+              `(a) Schnappschuss ${a === null ? "nicht übernommen" : `${a.ids.join(", ")}`} · wartet noch: ${String(a?.pending)} · Notice „aus der Arbeit“: ${String(a?.notice)}`
+              + ` · (b) Hinweis ${hinweis === null ? "fehlt" : `„${hinweis.find((x) => x.includes("nicht vom Typ") || x.includes("not of type"))}“`}, Base-Tabs ${vorher} → ${nachher}, wartet noch: ${String(pendingFalsch)}`
+              + ` · (c) nach „Neues Gespräch“ ${danach === null ? "nichts" : `${danach.n} Schnappschuss, Stand ${danach.takenAt} (vorher ${erst ?? "—"}), wartet noch: ${String(danach.pending)}`}`);
+          } catch (error) { abbruch(P88, error); }
+        } catch (error) {
+          for (const n of [P86, P87, P88] as const) abbruch(n, error);
+        } finally {
+          await schliesseBases().catch(() => undefined);
+          await cdp.evaluate(`
+            const p = ${PL};
+            for (const pfad of ["Koda/Arbeiten/Smoke Base.md", "Koda/Arbeiten/Smoke Base falsch.md"]) {
+              const f = app.vault.getFileByPath(pfad); if (f) await app.vault.delete(f);
+            }
+            const rest = window.__kodaSmoke86;
+            if (rest) {
+              p.chooseArbeit(null);
+              p.resetContextSelection();
+              p.session = JSON.parse(rest.session);
+              p.setContextMode(rest.mode);
+              delete window.__kodaSmoke86;
+            }
+            p.refreshArbeiten();
+            return true;`).catch(() => undefined);
+          void zustand;
+        }
+      }
+
       // --- 89–91. Denkblock nach der Antwort und Kopier-Knopf (Welle 24) ----
-      // (86–88 sind fuer Plan 2, die Bases-Ansicht, reserviert.)
       {
         const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
         const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -4411,7 +4567,7 @@ async function main(): Promise<void> {
           // Zwischenablage aufzeichnet und den vorgefundenen Deskriptor zurueckstellt; die Gegenprobe lehnt `writeText` ab.
           try {
             const dk = await messeDenkblockKopierbar(cdp, {
-              block: ".koda-log details.koda-thinking", knopf: ".koda-log details.koda-thinking .okit-stream-reasoning-copy", enthaelt: "GEDANKE-89",
+              block: ".koda-log details.koda-thinking", knopf: ".koda-log details.koda-thinking .okit-stream-reasoning-copy", enthaelt: "GEDANKE-89", erwartetKnopf: true,
             });
             zeichnePflicht(bilanz, P91, dk.kopie);
             zeichnePflicht(bilanz, P100, dk.gegen);
@@ -4448,7 +4604,7 @@ async function main(): Promise<void> {
             return b && pre && pre.textContent.length > 60 ? { vorher: d.open } : null;`, 10_000, 200);
           if (live !== null) {
             const dk = await messeDenkblockKopierbar(cdp, {
-              block: ".koda-streaming .okit-stream-reasoning", knopf: ".koda-streaming .okit-stream-reasoning-copy", enthaelt: "Ich ueberlege Schritt fuer Schritt",
+              block: ".koda-streaming .okit-stream-reasoning", knopf: ".koda-streaming .okit-stream-reasoning-copy", enthaelt: "Ich ueberlege Schritt fuer Schritt", erwartetKnopf: true,
             });
             zeichnePflicht(bilanz, P90, dk.kopie);
             zeichnePflicht(bilanz, P101, dk.gegen);

@@ -1,0 +1,10 @@
+filters:
+  and:
+    - 'status == "active"'
+views:
+  - type: koda-context
+    name: Context table
+    order:
+      - file.name
+      - status
+      - owner
