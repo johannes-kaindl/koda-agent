@@ -6,7 +6,7 @@ import type { SessionState } from "../core/abilities/types";
 import { describeStateChange } from "../core/abilities/session";
 import { isCompactionRecord, isErrorRecord, isSessionStateRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
-import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
+import { buildReasoningBlock, buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obsidian/stable-writer";
 import { neutralizeModelMarkdown } from "../vendor/kit/safe-markdown";
 import { thinkToggleView } from "../core/chat/reasoning-toggle";
@@ -17,7 +17,6 @@ import { attachTextareaSuggest, type TextareaSuggest } from "../vendor/kit-obsid
 import { matchByQuery } from "../vendor/kit/slash-query";
 import { ContextPanel } from "./context-panel";
 import { AbilitiesPanel } from "./abilities-panel";
-import { buildThinkingBlock } from "./thinking-block";
 import { ArbeitNameModal } from "./arbeit-name-modal";
 import type KodaPlugin from "../main";
 
@@ -369,6 +368,15 @@ export class KodaView extends ItemView {
    *  Listen/Fettung erscheinen als das, was sie sind, statt als Rohtext. Nutzertext bleibt
    *  bewusst Plaintext: was jemand eingetippt hat, soll nicht nachtraeglich zu einer
    *  Ueberschrift werden. */
+  /** Der Denkblock einer fertigen Antwort: zugeklappt, mit Kopier-Knopf — derselbe Aufbau und dieselben Klassen wie im Strom
+   *  (Kit `buildReasoningBlock`, vorher ein Nachbau in `thinking-block.ts`). `koda-thinking` ist der Griff fuer Tests und Treiber. */
+  private thinkingBlock(text: string): void {
+    buildReasoningBlock(this.logEl, {
+      text, cls: "koda-thinking",
+      strings: { summary: t("view.thinkingDone"), copyReasoning: t("view.thinkingCopy"), copiedReasoning: t("view.thinkingCopied") },
+    });
+  }
+
   private renderMarkdownInto(el: HTMLElement, markdown: string): Promise<void> {
     const comp = this.mdComp;
     if (comp === null) return Promise.resolve();
@@ -427,7 +435,7 @@ export class KodaView extends ItemView {
     const pending: Promise<void>[] = [];
     const assistantBubble = (content: string, thinking?: string): void => {
       // Das Denken steht VOR dem Antworttext, zugeklappt (Entscheidung 2026-10-17); es ist ein Anzeige-Feld und geht nie ans Modell.
-      if (thinking !== undefined && thinking !== "") buildThinkingBlock(this.logEl, thinking);
+      if (thinking !== undefined && thinking !== "") this.thinkingBlock(thinking);
       const el = this.logEl.createDiv({ cls: "koda-msg koda-assistant" });
       pending.push(this.renderMarkdownInto(el, content));
     };
@@ -461,7 +469,7 @@ export class KodaView extends ItemView {
         if (m.toolCalls && m.toolCalls.length > 0) {
           toolNames = new Map(m.toolCalls.map((c) => [c.id, c.name]));
           if (m.content !== "") assistantBubble(m.content, m.thinking);
-          else if (m.thinking !== undefined && m.thinking !== "") buildThinkingBlock(this.logEl, m.thinking);
+          else if (m.thinking !== undefined && m.thinking !== "") this.thinkingBlock(m.thinking);
         } else if (m.content !== "") {
           assistantBubble(m.content, m.thinking);
           if (offeneQuellen !== null) {

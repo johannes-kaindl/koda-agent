@@ -1,6 +1,7 @@
 import { ButtonComponent, Modal, type App } from "obsidian";
 import { applyDestructive } from "../vendor/kit-obsidian/confirm";
 import { diffLines } from "../vendor/kit/diff";
+import { renderRedline, type RedlineSegment } from "../vendor/kit-obsidian/redline";
 import { t } from "../vendor/kit/i18n";
 import type { DeleteRequest, MoveRequest, WriteFileRequest, WriteRequest } from "./vault-tools";
 
@@ -70,9 +71,12 @@ export function confirmWrite(app: App, req: WriteRequest): Promise<boolean> {
         }
         const box = this.contentEl.createDiv({ cls: "koda-preview" });
         if (r.mode === "replace") {
-          for (const lineItem of diffLines(r.oldText, r.newText)) {
-            box.createDiv({ cls: `koda-diff-${lineItem.kind}`, text: lineItem.text });
-          }
+          // Die Zeilen des Diffs als Segmente (Kit `renderRedline`, vorher eigene Farbflaechen): Loeschung durchgestrichen, Einfuegung
+          // unterstrichen — die Art der Aenderung traegt die Form, nicht allein die Farbe (Rot-Gruen-Schwaeche).
+          const segmente: RedlineSegment[] = diffLines(r.oldText, r.newText).map((l) => ({
+            kind: l.kind === "add" ? "ins" : l.kind === "del" ? "del" : "same", text: `${l.text}\n`,
+          }));
+          renderRedline(box, segmente, { labels: { del: t("confirm.diff.del"), ins: t("confirm.diff.ins") } });
         } else {
           box.createEl("pre", { text: r.newText });
         }

@@ -4147,14 +4147,14 @@ async function main(): Promise<void> {
               const rows = b ? b.querySelectorAll(".koda-ab-row").length : 0;
               return r && r.height > 0 && ${zeile("smoke79-a")} ? { h: Math.round(r.height), rows } : null;`, 10_000, 300);
             const vorher = await prompt();
-            await cdp.evaluate(`${zeile("smoke79-a")}.querySelector('.koda-seg-btn[data-mode="ganz"]').click(); return true;`);
+            await cdp.evaluate(`${zeile("smoke79-a")}.querySelector('.okit-segmented-btn[data-value="ganz"]').click(); return true;`);
             const nachher = await pollUntil<string>(cdp, `const t = await ${PL}.previewSystemPrompt(); return t.includes(${JSON.stringify("MARKER-A-79")}) ? t : null;`, 8000, 300);
             const punkt = await pollUntil<{ dots: number; aktiv: string }>(cdp, `
               const row = ${zeile("smoke79-a")};
               const dots = row ? row.querySelectorAll(".koda-ab-dot[aria-label]").length : 0;
-              const aktiv = row?.querySelector(".koda-seg-btn.is-active")?.getAttribute("data-mode") ?? "";
+              const aktiv = row?.querySelector(".okit-segmented-btn.is-active")?.getAttribute("data-value") ?? "";
               return dots > 0 && aktiv === "ganz" ? { dots, aktiv } : null;`, 8000, 300);
-            await cdp.evaluate(`${zeile("smoke79-a")}.querySelector('.koda-seg-btn[data-mode="beschreibung"]').click(); return true;`);
+            await cdp.evaluate(`${zeile("smoke79-a")}.querySelector('.okit-segmented-btn[data-value="beschreibung"]').click(); return true;`);
             const zurueck = await pollUntil<{ ohneText: boolean; ohnePunkt: boolean; leer: boolean }>(cdp, `
               const t = await ${PL}.previewSystemPrompt();
               const row = ${zeile("smoke79-a")};
