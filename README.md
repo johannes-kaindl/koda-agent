@@ -80,7 +80,7 @@ A question starts an agent loop: the model answers or calls a tool, Koda runs th
 
 ## Contributing
 
-The canonical repository is [git.jkaindl.de/jkaindl/koda-agent](https://git.jkaindl.de/jkaindl/koda-agent); GitHub is its mirror. Issues are welcome on [GitHub](https://github.com/johannes-kaindl/koda-agent/issues). Development notes (commands, structure, the smoke checklist) are in `CLAUDE.md` in the repository.
+The canonical repository is [git.jkaindl.de/jkaindl/koda-agent](https://git.jkaindl.de/jkaindl/koda-agent); GitHub is its mirror. Issues are welcome on [GitHub](https://github.com/johannes-kaindl/koda-agent/issues). Development notes (commands, conventions) are in `AGENTS.md` in the repository, the structure and the reasons behind it in `docs/internal/`, the smoke checklist in `docs/SMOKE.md`.
 
 ## License
 

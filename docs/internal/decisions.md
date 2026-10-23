@@ -1,0 +1,72 @@
+# Entscheidungen — warum koda-agent so gebaut ist
+
+Das Warum hinter dem Code, damit niemand eine Altentscheidung blind übernimmt oder blind kippt. Ein „bewusst so“ ist hier der Anlass nachzusehen, nicht der Grund: wer eine Zeile ändern will, prüft, ob ihr Grund noch trägt. Aufbau: `docs/internal/architecture.md`; Herleitung mit Arbeitskontext liegt im Coding-Cockpit (`_SDD`), nicht hier.
+
+## Zuschnitt
+
+- **Koda ist das offene, plugin-übergreifende Gespräch; Fähigkeiten wandern zur Quelle.** Koda baut kein eigenes Retrieval (das ist vault-rag), keine Aufgabenverwaltung (TaskNotes) und kein Persona- oder Ablauf-System (vault-crews). Genuin neu ist nur der Agent-Kern: Tool-Calling-Loop, Skill-Loader, Compaction. Zuständigkeiten: Dach-`AGENTS.md`.
+- **Nie** Terminal- oder System-Zugriff (Store und Sicherheit).
+- **Geparkt:** die Freeze-Gegenprobe zu Prüfpunkt 3 (der Punkt hat nie rot geleuchtet und ist deshalb unbewiesen; ein erneutes Auftreten holt sie zurück, `docs/SMOKE.md`).
+- **Stufen:** 1 Vault-Q&A mit Aktion, 2 Skill-System, Compaction und Aufräum-Assistent, 3 Synthese-Workflows und Voice (STT/TTS gehört zu Koda, nicht zu vault-rag). **Baustein C, der Aufräum-Assistent, ist seit 2026-08-21 geparkt:** er ist ein Schnitt, kein Feature; bei Wiederaufnahme beginnt man mit `superpowers:brainstorming`, nicht mit Code.
+- **`isDesktopOnly: false`:** alles muss auch auf Mobile laufen. Deshalb liest Koda vault-rag nicht über MCP (ein HTTP-Server steht auf Mobile nicht bereit).
+
+## Schreiben
+
+- **Koda-Ordner frei, alles andere nach Bestätigung.** Löschen fragt immer, auch im Koda-Ordner; Verschieben fragt, sobald eines der beiden Enden nicht frei ist (`movePolicy`: nur die Quelle zu prüfen ließe aus dem Koda-Ordner hinaus schreiben, nur das Ziel ließe jede Notiz einsammeln); Skills und Arbeiten fragen immer.
+- **Die Skill-/Arbeits-Grenze sitzt in `writePolicy`, nicht im Werkzeug `write_skill`.** Sonst wäre sie über ein gewöhnliches `write_note` nach `<Koda>/Skills/` zu umgehen. Ein Skill oder eine Arbeit bestimmt, was Koda künftig darf; deshalb entscheidet nicht nur wo, sondern was geschrieben wird.
+- **Die Freizone liest den Pfad, wie er dasteht; die geschützten Unterordner lesen ihn wie das strengste Dateisystem** (`reading: "filesystem"` aus code-kit `folder-scope`): `Skills `, `Skills.`, `Skills:x`, ein langes s oder ein Kelvin-Zeichen im Namen sind dort `Skills`. Ein Pfad, den EINE Lesart in den geschützten Ordner legt, fragt. Befund aus dem Commit-Review der Welle 24.
+- **Vorschau gleich dem geschriebenen Inhalt** (`edit_active_note`: der Pfad muss zur aktiven Notiz passen). Byte-Token-Folgen (Bytes ≥ 0x80 als Text) werden vor dem Bestätigen abgelehnt, wenn sie unvollständig sind.
+- **Nur `.md` wird geschrieben.** `.base` und `.canvas` liest Koda (`read_note`), schreibt sie nie; in eine `.base` des Nutzers schreibt auch die Bases-Ansicht nicht.
+
+## Retrieval und Werkzeuge anderer Plugins
+
+- **vault-rag über dessen Plugin-API** (`app.plugins.plugins["vault-retrieval"]?.api`, `apiVersion: 1`), nicht durch Selbstlesen von `_vaultrag/index.bin` (zwei Kopien, eine veraltet).
+- **`search_notes` fragt immer beide Wege ab, beschriftet statt gemischt:** die Scores sind nicht vergleichbar. Bis 0.5.0 gab es eine Schwelle (semantisch nur bei weniger als drei Volltext-Treffern); sie schnitt gemessen genau die thematischen Fragen ab, für die es den semantischen Weg gibt, und wurde zurückgenommen (Kommentar in `src/core/tools/retrieval.ts`).
+- **Die Kopplung ist weich:** fehlt vault-rag, verhält sich Koda wie ohne; APIs anderer Plugins werden defensiv aus `app.plugins` gelesen.
+- **`related_notes` kommt seit Welle 25 nur noch von vault-rag** (Werkzeug-Anbieter-Vertrag). Kodas eigene Kopie unterschied bei einer nicht indexierten Notiz „nur Frontmatter, bleibt draußen“ von „der Indexer zieht gleich nach“; vault-rag meldet nur „nicht im Index“. Der Unterschied wurde dort gemeldet, nicht lokal behalten; den Pfad prüft vault-rag selbst und trägt Tests für feindliche Pfade.
+- **Der Wirt gewinnt jede Namenskollision; unter Anbietern der zuerst gelesene.** Kollisionen werden gemeldet, nie überschrieben.
+- **Der Runner routet nach der Route, nicht nach dem Namen.** Praxistest 2026-09-25: die erste Fassung routete nach dem Wirts-Namen und schickte das montierte `related_notes` in einen Pfad, der ohne vault-rag-API ins Leere lief; der Unit-Test sah es nicht, weil er nur fremde Namen montierte.
+- **`list_notes` hat einen Parameter `depth` statt eines Werkzeugs `list_directory_structure`.** Anlass: Koda selbst bat um eine „Landkarte“ des Vaults. Jedes weitere Werkzeug macht lokale Modelle bei der Auswahl unsicherer. Der Baum wird nach ganzen Ebenen gekappt: ein halber Ast sähe aus wie ein fehlender Ordner.
+- **Ein Ergebnis, das unvollständig aussieht wie vollständig, ist der Fehlertyp, gegen den `list_notes` antritt:** Kappungswarnung in Zeile 1, nicht als Fußnote; „fehlt“ und „leer“ werden getrennt gemeldet.
+
+## Prompt und Modell-Steuerung
+
+- **Der Regelblock ist ersetzbar, gespeichert wird nur die Abweichung.** Ein leeres Feld heißt „die ausgelieferte Fassung gilt“, nie „leer“, damit eine spätere Verbesserung auch Nutzer erreicht, die das Feld schon einmal geöffnet haben. Ein geladener und unverändert gelassener oder zurückgeschriebener Auslieferungstext zählt als leer. Warnungen nennen Probleme, sie verbieten nichts.
+- **Jeder Wert mit Einfluss auf Koda ist einstellbar** (Grundsatz Johannes, 2026-09-02), auch Kappungen, die sich melden. Eine Ausnahme braucht einen benannten Grund.
+- **Das Datum steht als Anhang `## Now` außerhalb des Regelblocks** (wegen `promptTemplateHash`); `get_datetime` ist für lange Gespräche; `today` der Memory-Zeile ist lokal, nicht UTC.
+- **Skills laden zweistufig:** `pinned: true` lädt voll, der Rest nur mit Beschreibung, `load_skill` holt den Text (Verhaltenswechsel seit 0.20.0: ohne Pin lädt kein Skill mehr voll). Ein Skill-Text, den `load_skill` geholt hat, wird in der Projektion durch einen Hinweis ersetzt, sobald der Skill im Prompt steht (Einstellung; kein zweiter Skill-Text).
+- **Claude (Anthropic API) über den LLM Endpoint Manager ist Opt-in** (`useEndpointManager`, Default aus, keine Migration). Der Transport lässt `temperature` weg (Claude 4.7 und neuer lehnen es ab); der Denk-Schalter setzt den Aufwand, weil sich das Denken dort nicht abschalten lässt, und der Knopf sagt das.
+- **Koda benennt den Widerspruch „Probe grün, Chat rot“ selbst** (fehlendes CORS am lokalen Server, siehe `AGENTS.md`): die Testen-Probe läuft über `requestUrl`, der Chat streamt als XHR.
+- **Die Sprache wird einmal beim `onload` ermittelt** (Auto-Sprache, wie der Kit-Vertrag es verlangt); ein verschluckter Fehler gilt nicht stillschweigend als „Englisch“, und System-Prompt und Oberfläche ziehen aus derselben Quelle. Anlass: Koda antwortete bei deutschem Obsidian englisch (0.9.0). Kommentar in `src/core/lang.ts`.
+- **Die Kontextfenster-Warnung schreibt nie selbst:** `contextHintFromModelName` liest `-ctxNNNk` aus dem Modellnamen, eine Notice bietet „Übernehmen“ an, und wer bewusst kleiner eingestellt hat, wird nicht überschrieben.
+- **Der Denktext einer Antwort ist ein Anzeige-Feld** (`ChatMessage.thinking`): gespeichert mit der Sitzung (Einstellung `saveThinking`), nie am Draht, nie im Export.
+
+## Arbeitskontext
+
+- **Modi:** Aus, Arbeitsplatz (nur Zeiger, keine Inhalte), Notiz, Alle Tabs, Vault (Volltext). Der Block hängt als Feld `context` an der Nutzer-Nachricht, wird persistiert und nur in der Projektion eingewoben (Verdichtung Stufe 1 stubbt ihn wie Tool-Ergebnisse).
+- **Abgewählt wird der Snapshot vor dem Rendern, nicht der gerenderte Block.** Sonst müssten Text und `items` dieselbe Regel zweimal treffen, und „was im Block steht, steht in `items`“ wäre eine Behauptung statt einer Folge.
+- **Das Budget wird per Wasserfüllung verteilt, nicht gleichverteilt** (`allocateBudget`): wer unter seinen Anteil passt, bekommt seinen vollen Text, der Rest wird neu verteilt. Bewusste Abweichung von vault-rag, dessen Gleichverteilung Budget verschenkt, sobald Einträge unterschiedlich groß sind. Eine Kürzung nennt sich im Block, mit beiden Zahlen.
+- **Kandidaten-Sammlung: „gesehen“ sammelt, „expandiert“ steuert die Suche.** Wurden beide vermischt (die manuellen Pfade standen vor der Breitensuche in „gesehen“), verschwand `C.md` aus `A→B→C`, sobald man `B.md` von Hand hinzufügte — bei Tiefe 1, dem Default, ist die Wirkung null, weshalb weder Test noch Prüfpunkt es fing. Wer die Sammlung ändert, prüft zuerst, ob er die Mengen wieder vermischt.
+- **Der Schlüssel eines Chips ist der Schlüssel seines Kandidaten, nicht seiner Platzierung.** Sonst reißt die Verbindung zwischen Schalter und Wirkung („man wählt ab, und nichts passiert“). Das × eines manuellen Eintrags entfernt ihn, statt ihn abzuwählen: ein abgewählter bliebe als Chip ohne Zweck stehen.
+- **Manuelle Ordner werden sofort zu Einzelpfaden aufgelöst**, nicht als Ordner gemerkt: ein gemerkter Ordner änderte seinen Inhalt zwischen zwei Nachrichten, ohne dass der Nutzer etwas tut, und die Chips zeigten etwas anderes als der Block.
+- **Der Kontext-Tab misst den gesendeten Block** (dieselbe Render-Funktion wie `currentContext()`), statt ihn nachzurechnen.
+
+## Bases
+
+- **Schnappschuss statt Live-Abo:** eine Base im Hintergrund liefert keine Updates; der Zeitstempel sagt, welchen Stand der Block zeigt. Übernommen werden Pfade und Anzeigetexte, nie ein `BasesEntry` (Obsidian ersetzt Daten und Einträge bei jedem Update).
+- **Ein fehlender Wert ist ein `NullValue`, dessen `toString()` „null“ ergibt;** eine unbekannte Formel liefert echtes `null`. Beides kommt leer an, das Wort „null“ steht nie in einem Block. Der Default der Übergabeform steht im Lesecode (`normalizeForm`), weil `config.get` den Default nicht einsetzt. Eine eingebettete Base bekommt von Obsidian keine Daten.
+- **Die Ansicht wird ohne Feature-Check registriert:** `minAppVersion` ist 1.11.4, die Bases-API gibt es ab 1.10 (Entscheidung Johannes, 2026-10-17).
+- **Eine Arbeit mit `base:` schließt den Tab, den Koda beim letzten Mal selbst geöffnet hat, und öffnet frisch:** ein schon offener Tab schickt kein `onDataUpdated`, die Übernahme bliebe aus (gemessen in Welle 25). Ein Tab, den der Nutzer selbst geöffnet hat, wird nie angefasst. `openLinkText("<Pfad>#<Ansicht>")` wählt die genannte Ansicht (gemessen, Obsidian 1.14.5); übernommen wird nur, wenn Pfad UND Ansichtsname passen.
+- **Der Kit-Mock kennt `BasesView` nicht.** Leere Hüllen in `tests/__mocks__/obsidian.ts` genügen, weil `main.ts` die Ansicht importiert; was die Ansicht mit Obsidians Daten tut, belegt nur der GUI-Smoke (Punkte 86–88).
+
+## Fähigkeiten und Arbeiten
+
+- **Drei Ebenen:** Grundeinstellung (Frontmatter der Skills, Einstellungen), Arbeit (eine Notiz unter `<Koda>/Arbeiten/`, nur Abweichungen), Overlay (dieses Gespräch). Vorrang Overlay → Arbeit → Grundeinstellung.
+- **Der Sitzungszustand liegt an einer Stelle** (`plugin.session`) und wird mit dem Gespräch gespeichert. Die Regler „Tiefe“ und „Nachbarn“ schreiben ins Overlay, nicht mehr in die Einstellungen; der Wert in den Einstellungen ist der Default.
+- **Der Text einer Arbeit unter dem Frontmatter ist für den Nutzer** und geht nie ans Modell; Anweisungen für das Modell gehören in Skills. Fehlerhafte Einträge einer von Hand geschriebenen Arbeit werden übersprungen und im Tab genannt, nicht still verworfen.
+- **Das „/“-Menü zeigt Skills und Arbeiten, keine Werkzeuge.** Ein Skill wird dort für das Gespräch auf „ganz“ gestellt.
+
+## Sidebar
+
+- **Aktionen im View-Kopf (`addAction()`) sind in Seitenleisten unsichtbar:** Obsidian blendet den Kopf dort aus. 0.10.1 war ein Pflicht-Fix: „Neues Gespräch“ war seit 0.9.0 für niemanden sichtbar, und der Prüfpunkt war grün, weil er Existenz zählte statt Größe. Seitdem steht die Kopfzeile im View-Inhalt, jede Aktion hat einen Befehl, und Prüfpunkte messen `getBoundingClientRect()`.
+- **UI-Abweichung `thinking-control`:** Koda schaltet das Denken nur an oder aus; der Kit-Baustein führt Denkstufen und ließe sich nur mit einer neuen Einstellung einsetzen (Entscheidung Master, Welle 22).

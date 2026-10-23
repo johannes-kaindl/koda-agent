@@ -52,7 +52,7 @@
  * Punkt; es gibt keinen Quit und keinen Neustart einer fremden Instanz.
  *
  * Bilanz in vier Zustaenden (CORE-TEST-19, `createBilanz`): gruen · rot · uebersprungen · nichts gemessen.
- * Nenner ist `PUNKTE` (96 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
+ * Nenner ist `PUNKTE` (101 Punkte); ein nie aufgezeichneter Punkt zaehlt als „nichts gemessen“ (Exit 1),
  * ein Abbruch ist Exit 2. „Uebersprungen“ heisst nur „in dieser Lage nicht anwendbar“ (Punkt 1b ohne
  * vault-rag); ein Punkt, dessen Gegenstand nicht erreicht wurde (fremder Eintrag im Weg, Einstellungsfenster
  * nicht gefunden, Ausnahme im Messpfad), ist „nichts gemessen“, nie gruen.

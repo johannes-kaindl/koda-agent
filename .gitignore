@@ -6,3 +6,6 @@ coverage/
 .gui-ask.mjs
 .superpowers/
 .shots.mjs
+
+.claude/*
+!.claude/rules/

@@ -80,7 +80,7 @@ Die Nutzer-Dokumentation ist auf Englisch.
 
 ## Mitmachen
 
-Das kanonische Repository ist [git.jkaindl.de/jkaindl/koda-agent](https://git.jkaindl.de/jkaindl/koda-agent); GitHub ist sein Spiegel. Issues gern auf [GitHub](https://github.com/johannes-kaindl/koda-agent/issues). Entwicklungsnotizen (Befehle, Struktur, Smoke-Checkliste) stehen in `CLAUDE.md` im Repository.
+Das kanonische Repository ist [git.jkaindl.de/jkaindl/koda-agent](https://git.jkaindl.de/jkaindl/koda-agent); GitHub ist sein Spiegel. Issues gern auf [GitHub](https://github.com/johannes-kaindl/koda-agent/issues). Entwicklungsnotizen (Befehle, Konventionen) stehen in `AGENTS.md` im Repository, der Aufbau und seine Gründe unter `docs/internal/`, die Smoke-Checkliste in `docs/SMOKE.md`.
 
 ## Lizenz
 
