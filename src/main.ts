@@ -885,9 +885,7 @@ export default class KodaPlugin extends Plugin {
    *  wenn image-to-markdown aktiv ist. Das Modell ist das gesendete (`sentModel()`) — dasselbe
    *  wie beim Thinking-Schalter. */
   imageMode(): ImageMode {
-    // Jedes Claude-Modell der Messages-API liest Bilder; der Namensrater kennt „claude“ nicht und sagte „nein“.
-    const vision = this.resolver.peekTransport().transport === "anthropic" ? "confirmed" : guessFromName(this.sentModel()).vision;
-    return chooseImageMode(vision, readOcrApi(this.app) !== null);
+    return chooseImageMode(guessFromName(this.sentModel()).vision, readOcrApi(this.app) !== null);
   }
 
   /** Nur die Namen — was der GUI-Smoke braucht (Pruefpunkt 17). */

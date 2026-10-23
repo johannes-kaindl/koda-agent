@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The write boundary for `Skills/` and `Arbeiten/` comes from the kit (code-kit 0.33.0):** a path that the strictest file system would put into one of the two folders still asks first — `Skills `, `Skills.`, `Skills:x`, a long s or a Kelvin sign in the name — and so does a name made only of dots or blanks in between (`Koda/.../Skills`). The free zone `<Koda folder>/` is still read the way the path is written, the narrower reading.
+- **Claude is recognised as a model that reads images by the kit's name guess (code-kit 0.33.0),** not by a special case for the Anthropic transport; local models that only carry the word "claude" in their name (a distill, a fork) keep no image reading. The thinking button on Claude Sonnet 5, Opus 4.7 and newer, Haiku 5 and Fable says up front that turning it off will likely do nothing (the kit's guess, since thinking cannot be switched off there).
+- Kit: code-kit 0.31.0 → 0.34.0 (also brings `chat-history`, `crop`, the Diachronic modules and `markdown-table`, none of which Koda uses yet).
+
 ## [0.28.0] — 2026-10-21
 
 ### Added

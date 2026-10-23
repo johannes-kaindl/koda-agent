@@ -17,37 +17,18 @@ export const SKILLS_SUBFOLDER = "Skills";
  *
  *  Vergleich case-insensitiv und segment-genau: "Koda-Archiv" matcht "Koda" nicht,
  *  "Skillset.md" matcht "Skills/" nicht. */
-/** Die Lesarten der strengsten Dateisysteme, in einer: Windows streicht Leerraum und Punkte am Ende eines Ordnernamens (`Skills ` und
- *  `Skills.` sind dort `Skills`) und liest alles ab einem `:` als Datenstrom-Suffix des Namens davor (`Skills:x`); ein geschuetztes
- *  Leerzeichen (U+00A0, U+202F) ist ein Leerzeichen. Case-insensitive Volumes (APFS, NTFS) falten nach Unicode, nicht nach ASCII:
- *  das lange s (U+017F) ist dort ein `s`, das Kelvin-Zeichen (U+212A) ein `k` — NFKC und Hoch-/Kleinschreibung nacheinander bilden das nach.
- *  Segmente, die nur aus Punkten und Leerraum bestehen (`.`, `..`), bleiben stehen: sie sind Sache von `rel-path`/`folder-scope`. */
-function strictReading(path: string): string {
-  return path.split(/[\\/]/).map((seg) => {
-    const spaced = seg.replace(/[\u00a0\u202f]/g, " ");
-    const cut = spaced.split(":")[0] ?? "";
-    const stripped = cut.replace(/[ .]+$/, "");
-    return stripped === "" ? seg : stripped.normalize("NFKC").toUpperCase().toLowerCase();
-  }).join("/");
-}
-
-/** Ob `path` in `folder` liegt — in BEIDEN Lesarten (wie geschrieben und wie Windows es liest) ist es nur dann „in“, wenn es in beiden
- *  drin ist; fuer einen geschuetzten Unterordner genuegt EINE. Ein Pfad `Koda/Skills /x.md` landet auf Windows in `Skills`, auf macOS
- *  in einem anderen Ordner: fuer die Rueckfrage zaehlt die vorsichtigere Antwort. */
-const inBoth = (path: string, folder: string, opts: { self: true; ignoreCase: true }): boolean =>
-  isInFolder(path, folder, opts) && isInFolder(strictReading(path), strictReading(folder), opts);
-const inEither = (path: string, folder: string, opts: { self: true; ignoreCase: true }): boolean =>
-  isInFolder(path, folder, opts) || isInFolder(strictReading(path), strictReading(folder), opts);
-
 export function writePolicy(path: string, kodaFolder: string): WriteDecision {
   // Ordnerzugehoerigkeit aus code-kit `folder-scope`: der Ordner selbst zaehlt mit (`self`), Gross/klein egal (`ignoreCase`), ganze
   // Segmente. Ein leerer Koda-Ordner enthaelt NICHTS (kein `root`) — also Rueckfrage; ein Pfad mit `..` liegt in keinem Ordner.
-  const opts = { self: true, ignoreCase: true } as const;
-  if (!inBoth(path, kodaFolder, opts)) return "confirm";
+  // Die Freizone ist eine Zone, in die ohne Rueckfrage geschrieben wird: sie liest den Pfad, wie er dasteht (`Koda /x.md` liegt
+  // nicht in `Koda`, auch wenn Windows ihn dorthin legte) — die engere Lesart.
+  if (!isInFolder(path, kodaFolder, { self: true, ignoreCase: true })) return "confirm";
   // Eine Arbeit bestimmt wie ein Skill, was Koda darf (Spec Faehigkeiten § 13). Das Schreiben aus dem Tab
-  // („Speichern“) ist eine Nutzerhandlung und laeuft nicht durch diese Policy.
+  // („Speichern“) ist eine Nutzerhandlung und laeuft nicht durch diese Policy. Die geschuetzten Unterordner liest `reading:
+  // "filesystem"` wie das strengste Dateisystem (`Skills `, `Skills.`, `Skills:x`, `Skillſ` sind dort `Skills`): ein Pfad, den EINE
+  // Lesart hineinlegt, fragt.
   for (const sub of [SKILLS_SUBFOLDER, ARBEITEN_SUBFOLDER]) {
-    if (inEither(path, `${kodaFolder}/${sub}`, opts)) return "confirm";
+    if (isInFolder(path, `${kodaFolder}/${sub}`, { self: true, reading: "filesystem" })) return "confirm";
   }
   return "free";
 }

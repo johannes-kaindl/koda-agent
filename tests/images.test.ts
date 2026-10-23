@@ -4,6 +4,7 @@ import {
   IMAGE_EST_CHARS, ocrResult, visionResult,
 } from "../src/core/tools/images";
 import { binaryToDataUrl } from "../src/vendor/kit/data-url";
+import { guessFromName } from "../src/vendor/kit/capabilities";
 
 describe("isImagePath / imageExtension", () => {
   it("erkennt Bildformate, die Vision-Modelle lesen, unabhaengig von der Schreibweise", () => {
@@ -36,6 +37,18 @@ describe("chooseImageMode", () => {
   it("kein Vision -> OCR, wenn ein Anbieter da ist, sonst none", () => {
     expect(chooseImageMode("no", true)).toBe("ocr");
     expect(chooseImageMode("no", false)).toBe("none");
+  });
+});
+
+describe("chooseImageMode mit dem Namensrater des Kits (code-kit 0.33.0 kennt Claude)", () => {
+  // Kodas eigener Sonderfall fuer den Anthropic-Transport ist weg (Welle 25): imageMode() fragt nur noch den Rater.
+  it("ein Claude-Modell der Messages-API liest Bilder, auch ohne OCR-Anbieter", () => {
+    for (const m of ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5", "anthropic/claude-3-5-sonnet-20241022"]) {
+      expect(chooseImageMode(guessFromName(m).vision, false)).toBe("vision");
+    }
+  });
+  it("ein lokales Modell, das nur das Wort traegt, bleibt ohne Vision", () => {
+    expect(chooseImageMode(guessFromName("qwen3.6-claude-opus-distill").vision, false)).toBe("none");
   });
 });
 
