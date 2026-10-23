@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Bases view "Koda context".** A base can show a view of the type *Koda context*: **Use as context** stores a snapshot of its rows with the time it was taken, handed over as a **table**, as **notes** (in full text) or **both** (option *Hand over as*). The table goes along in every mode except Off, the notes in the modes that send full text; both share the context budget and a table is cut by whole rows. The Context tab has a **Bases** section with one chip per snapshot (the × removes it), and snapshots are kept with the conversation. Missing values arrive empty, never as the word "null".
+- **A task can take a base along:** `base: "<path>.base#<view>"` in the task. Picking the task (and **New chat** with the task picked) checks the file and the view, opens the base and takes the rows over by itself; a missing file or view, or a view of another type, is named in the Abilities tab and nothing is opened. Koda never writes to a base file.
 - **Settings → Model control → Instructions for Koda: edit and copy.** **Edit the shipped version** puts the shipped rule block into the empty field so you change it instead of writing a new one; the copy button copies the instructions that apply (to keep your version before overwriting it); the dialog **Show active instructions** has a **Copy** button for the whole prompt. A text you load and leave unchanged, or type back unchanged, is still stored as "the shipped version applies", so later improvements reach you.
 
 ### Changed

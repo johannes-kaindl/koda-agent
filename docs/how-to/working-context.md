@@ -18,6 +18,16 @@ The mode Koda starts with after Obsidian starts is the setting **Context mode on
 
 To ask about a passage directly: select it, right-click, and choose **Ask Koda** (or run **Koda: Ask Koda about the selection**). The sidebar opens with the cursor in the input field; if the mode was **Off**, it switches to **Workspace**, so the selection goes along.
 
+## Take rows from a base along
+
+A base is a table of your notes with filters and properties. Koda can take over what a base shows right now:
+
+1. Open the base and pick (or add) a view of the type **Koda context**. Its option **Hand over as** chooses **Table**, **Notes** (the notes behind the rows, in full text) or **Table and notes**.
+2. Press **Use as context** at the top of the view. Koda stores a snapshot with the time it was taken: later changes to the vault do not alter it, press the button again to refresh it.
+3. The table goes along in every mode except **Off**; the notes only in the modes that send full text (**Note**, **All tabs**, **Vault**). Tables and notes share the context budget. A table that does not fit is cut by whole rows and says how many it shows.
+
+The **Bases** section of the Context tab lists the snapshots, one per view; the **×** removes one. A task can take a base along on its own, see [Work in tasks](tasks.md#take-a-base-along). An embedded base gets no data from Obsidian: open the `.base` file itself.
+
 ## Check what goes along: the Context tab
 
 Open the **Context** tab at the top of the sidebar (or run **Koda: Show Context tab**). It shows the next question's context as chips, grouped in collapsible sections, with a summary line saying how much of the model's context window it fills.
