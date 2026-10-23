@@ -211,23 +211,6 @@ export function toWireTools(defs: ToolDef[]): unknown[] {
   return defs.map((d) => ({ type: "function", function: d }));
 }
 
-/** Nur verfuegbar, wenn vault-rag einen Index bereitstellt — deshalb kein Teil von
- *  TOOL_DEFS. Ein Werkzeug im Prompt, das nicht laufen kann, kostet Kontext und
- *  provoziert Fehlversuche; bei lokalen Modellen ist die Werkzeugzahl ein
- *  Zuverlaessigkeitsfaktor (Messgrundlage: Vault-Cockpit `_Intern/LAB.md`). */
-const RELATED_DEF: ToolDef = {
-  name: "related_notes",
-  description:
-    "Find notes semantically related to a given note, using the vault's embedding index. Use it to explore the context around a note: it surfaces connections that share no literal wording, which search_notes cannot find.",
-  parameters: {
-    type: "object",
-    properties: {
-      path: { type: "string", description: "Vault-relative path of the note to start from" },
-    },
-    required: ["path"],
-  },
-};
-
 /** Bild ansehen — nur angeboten, wenn Koda ein Bild auch lesen KANN: das Modell sieht Bilder
  *  wahrscheinlich selbst, oder ein OCR-Anbieter (image-to-markdown) ist aktiv. Eigener Name
  *  statt `read_note` zu erweitern: `read_note` hat einen klaren Vertrag (Text), ein Bild ist
@@ -270,7 +253,6 @@ export function toolDefs(opts: ToolSetOptions): ToolDef[] {
 }
 
 export interface ToolSetOptions {
-  related: boolean;
   /** `read_image` anbieten: Vision wahrscheinlich ODER ein OCR-Anbieter da. */
   readImage?: boolean;
   /** `generate_image` anbieten: der Bildgenerierungs-Anbieter erfuellt seinen Vertrag. */
@@ -292,16 +274,14 @@ export interface ToolSet extends MountedTools {
  *  Draht, Routen fuer den Runner, Schreibkennzeichen fuer die Bestaetigung. Abschaltung und
  *  eigene Beschreibung des Nutzers gelten fuer beide Sorten gleich — der Schalter je
  *  Werkzeug ist die Feinsteuerung, mit der ein Anbieter mit vielen Werkzeugen ertraeglich
- *  bleibt. **Montiert statt handgeschrieben:** bietet ein Anbieter `related_notes` an,
- *  entfaellt Kodas eigene RELATED_DEF; sie bleibt nur fuer ein vault-rag ohne Vertrag. Die
+ *  bleibt. **Montiert statt handgeschrieben:** `related_notes` traegt Koda nicht mehr selbst,
+ *  es kommt von vault-rag ueber den Anbieter-Vertrag (Faehigkeiten wandern zur Quelle). Die
  *  Route eines abgeschalteten Werkzeugs bleibt bekannt, damit ein halluzinierter Aufruf als
  *  „abgeschaltet" abgelehnt wird und nicht als „unbekannt". */
 export function toolSet(opts: ToolSetOptions): ToolSet {
   const providers = opts.providers ?? [];
-  const angeboten = new Set(providers.flatMap((p) => p.tools.map((t) => t.name)));
   const eigene = [
     ...TOOL_DEFS,
-    ...(opts.related && !angeboten.has(RELATED_DEF.name) ? [RELATED_DEF] : []),
     ...(opts.readImage === true ? [READ_IMAGE_DEF] : []),
     ...(opts.generateImage === true ? [GENERATE_IMAGE_DEF] : []),
   ];
@@ -319,4 +299,4 @@ export function toolSet(opts: ToolSetOptions): ToolSet {
 
 /** Alle Werkzeuge, die Koda selbst ausfuehrt — unabhaengig davon, ob sie gerade gesendet
  *  werden. Ein Name ausserhalb dieser Menge ist ein Anbieter-Werkzeug oder unbekannt. */
-export const HOST_TOOL_NAMES: ReadonlySet<string> = new Set([...TOOL_DEFS, RELATED_DEF, READ_IMAGE_DEF, GENERATE_IMAGE_DEF].map((d) => d.name));
+export const HOST_TOOL_NAMES: ReadonlySet<string> = new Set([...TOOL_DEFS, READ_IMAGE_DEF, GENERATE_IMAGE_DEF].map((d) => d.name));

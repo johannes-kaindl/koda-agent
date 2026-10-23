@@ -367,18 +367,20 @@ export class KodaSettingsTab extends PluginSettingTab {
   }
 
   /** Kontext fuer die Modell-Steuerung (`renderPromptRow`/`renderToolList`). Eine
-   *  Hilfsmethode statt eines Feldes: `relatedAvailable` haengt an `readRetrievalApi`,
-   *  das bei JEDEM Aufruf frisch prueft, weil vault-rag zur Laufzeit an- und ausgehen
+   *  Hilfsmethode statt eines Feldes: `relatedAvailable` haengt an den Anbietern,
+   *  die bei JEDEM Aufruf frisch gelesen werden, weil vault-rag zur Laufzeit an- und ausgehen
    *  kann — ein einmal gebauter Kontext wuerde das nicht mehr sehen. */
   private modelCtx(): ModelControlCtx {
+    const offers = readProviderOffers(this.app, this.plugin.promptLang());
     return {
       settings: this.plugin.settings,
       save: () => this.plugin.saveSettings(),
       refresh: () => this.refreshUi(),
-      relatedAvailable: readRetrievalApi(this.app)?.status().indexed === true,
+      // `related_notes` gehoert vault-rag: ob das Lesewerkzeug da ist, sagt der Anbieter, nicht Kodas Liste.
+      relatedAvailable: offers.some((o) => o.tools.some((tool) => tool.name === "related_notes")),
       imagesAvailable: { read: this.plugin.imageMode() !== "none", generate: readImageGenApi(this.app) !== null },
       providers: {
-        offers: readProviderOffers(this.app, this.plugin.promptLang()),
+        offers,
         rejections: readToolProviderRejections(this.app),
       },
       openPreview: () => { new PromptPreviewModal(this.app, this.plugin).open(); },

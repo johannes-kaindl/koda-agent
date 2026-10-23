@@ -28,7 +28,7 @@ Under **Tools**, every tool has its own switch and its own description field. A 
 
 Fewer tools usually means a weaker model picks the right one more often. A sensible reduced set for a small model is `search_notes`, `read_note`, `list_notes` and `write_note`. If you switch off reading tools, keep in mind that Koda is not told about it: it may keep trying the others until it runs out of tool rounds.
 
-`related_notes` stays in the list without Vault Retrieval, greyed out with *"needs the vault-rag plugin"*, so no switch ever silently disappears.
+`related_notes` is not Koda's own tool: Vault Retrieval offers it, and it appears in that plugin's group with its own switch. Without Vault Retrieval there is no such tool; a switch you set earlier stays under *"Settings for tools of plugins that are not loaded"*, so it never silently disappears.
 
 ## Other settings that help a weak model
 

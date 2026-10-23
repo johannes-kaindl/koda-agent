@@ -6,7 +6,6 @@ const KEYS = [
   "settings.modelControl", "settings.prompt", "settings.prompt.desc", "settings.prompt.reset",
   "settings.prompt.show", "settings.warn.noTools", "settings.warn.missingPlaceholder",
   "settings.warn.noReadingTool", "settings.tools", "settings.tools.desc",
-  "settings.tools.needsRag",
   "prompt.modal.title", "prompt.modal.subtitle",
 ];
 

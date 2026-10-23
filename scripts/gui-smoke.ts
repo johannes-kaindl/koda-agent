@@ -316,7 +316,7 @@ const PUNKTE = [
   "96. Gegenprobe Erreichbarkeit: ohne Rollbalken am Verlauf wird ein Bedienelement unerreichbar",
   "97. Werkzeugliste: jedes Beschreibungsfeld zeigt seinen Inhalt in ganzen Zeilen, keine halb abgeschnittene Zeile am unteren Rand, mindestens drei Zeilen hoch",
   "98. Handpunkt 17 an der Naht: ist der Embedding-Endpunkt nicht erreichbar, stehen die Volltext-Treffer UND die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)“ im Ergebnis; erreichbar fehlt die Zeile",
-  "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung und kein related_notes; mit dem Stub ist beides da",
+  "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung; mit dem Stub ist sie da, und Koda traegt related_notes nie selbst (es kommt nur ueber einen Anbieter, Punkt 78)",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -560,8 +560,8 @@ async function main(): Promise<void> {
 
     // --- 1b. Retrieval-Andockung an vault-rag -------------------------------
     // Geprueft wird die NAHT, nicht die Suche: liegt vault-rags Vertrag in der Form vor,
-    // gegen die Koda gebaut ist? Das entscheidet, ob `related_notes` ueberhaupt in die
-    // Werkzeugliste kommt (`status().indexed`) — und es ist der Teil, der ohne eine echte
+    // gegen die Koda gebaut ist? Das entscheidet, ob die semantische Suche und die Nachbarn im
+    // Kontext moeglich sind (`status().indexed`) — und es ist der Teil, der ohne eine echte
     // Modell-Antwort pruefbar ist. Der Aufruf laeuft ueber CDP im Renderer, also exakt auf
     // dem Weg, den Kodas `readRetrievalApi` nimmt.
     //
@@ -2869,7 +2869,7 @@ async function main(): Promise<void> {
               tools: (opts) => [
                 { name: "smoke_echo", description: "Smoke: " + String(opts && opts.lang), parameters: { type: "object", properties: { text: { type: "string", description: "x" } }, required: ["text"] }, writes: false },
                 { name: "read_note", description: "Kollision mit dem Wirt — darf NICHT montiert werden", parameters: { type: "object", properties: {}, required: [] }, writes: false },
-                { name: "related_notes", description: "Anbieter-Fassung — ersetzt Kodas eigene", parameters: { type: "object", properties: { path: { type: "string", description: "p" } }, required: ["path"] }, writes: false },
+                { name: "related_notes", description: "Anbieter-Fassung", parameters: { type: "object", properties: { path: { type: "string", description: "p" } }, required: ["path"] }, writes: false },
               ],
               executeTool: async (name, args, opts) => {
                 window.__kodaProvCalls.push({ name, args, lang: opts && opts.lang, hatConfirm: typeof (opts && opts.confirm) === "function" });
@@ -4509,7 +4509,7 @@ async function main(): Promise<void> {
       {
         const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
         const P98 = "98. Handpunkt 17 an der Naht: ist der Embedding-Endpunkt nicht erreichbar, stehen die Volltext-Treffer UND die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)“ im Ergebnis; erreichbar fehlt die Zeile";
-        const P99 = "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung und kein related_notes; mit dem Stub ist beides da";
+        const P99 = "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung; mit dem Stub ist sie da, und Koda traegt related_notes nie selbst (es kommt nur ueber einen Anbieter, Punkt 78)";
         const vorhanden = await cdp.evaluate<boolean>(`return !!app.plugins.plugins["vault-retrieval"];`);
         if (vorhanden) {
           const grund = "uebersprungen — ein vault-retrieval-Eintrag existiert bereits (echtes Plugin oder Rest eines abgebrochenen Laufs); Stub wuerde ihn ueberschreiben";
@@ -4547,8 +4547,8 @@ async function main(): Promise<void> {
               offText.includes("Compaction") && offText.includes("(semantisch: Embedding-Endpunkt nicht erreichbar") && !anText.includes("Embedding-Endpunkt nicht erreichbar"),
               `offline: Volltext-Treffer ${offText.includes("Compaction")} · Hinweiszeile ${offText.includes("(semantisch: Embedding-Endpunkt nicht erreichbar")} · erreichbar: Zeile weg ${!anText.includes("Embedding-Endpunkt nicht erreichbar")}, semantischer Teil ${semantisch(anText)}`);
             record(P99,
-              !semantisch(ohneText) && !ohneNamen.includes("related_notes") && mitNamen.includes("related_notes") && semantisch(anText),
-              `ohne vault-rag: semantischer Teil ${semantisch(ohneText)} (soll nein) · related_notes ${ohneNamen.includes("related_notes")} (soll nein) · mit Stub: related_notes ${mitNamen.includes("related_notes")}, semantischer Teil ${semantisch(anText)} (soll ja)`);
+              !semantisch(ohneText) && !ohneNamen.includes("related_notes") && !mitNamen.includes("related_notes") && semantisch(anText),
+              `ohne vault-rag: semantischer Teil ${semantisch(ohneText)} (soll nein) · related_notes ${ohneNamen.includes("related_notes")} (soll nein) · mit Stub (nur die Retrieval-API, kein Werkzeug-Vertrag): related_notes ${mitNamen.includes("related_notes")} (soll nein), semantischer Teil ${semantisch(anText)} (soll ja)`);
           } catch (error) {
             for (const n of [P98, P99] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
           } finally {

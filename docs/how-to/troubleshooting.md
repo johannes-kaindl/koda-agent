@@ -301,11 +301,11 @@ A task is a note in `<Koda folder>/Arbeiten/`; see [Work in tasks](tasks.md). A 
 
 **Fix:** Start the server and press **Fetch models** again.
 
-### `related_notes` is greyed out with "needs the vault-rag plugin"
+### `related_notes` is missing from the tool list, or greyed out with "plugin not loaded"
 
-**Cause:** The tool exists only while Vault Retrieval is installed and has an index. It stays in the list so that a switch never silently disappears.
+**Cause:** `related_notes` belongs to Vault Retrieval and reaches Koda as a tool of that plugin. Without Vault Retrieval (or while it is switched off) Koda has no such tool; a switch you set for it earlier stays in the list, greyed out with "plugin not loaded", so you can take it back.
 
-**Fix:** Install Vault Retrieval, or ignore it.
+**Fix:** Install or enable Vault Retrieval, or ignore it.
 
 ### The tools of another plugin are missing from the tool list
 

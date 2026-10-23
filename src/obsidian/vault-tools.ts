@@ -13,7 +13,7 @@ import { SKILLS_SUBFOLDER } from "../core/tools/write-policy";
 import { isInFolder } from "../vendor/kit/folder-scope";
 import type { SkillMode } from "../core/abilities/types";
 import {
-  formatSearchResult, formatRelatedResult, hasIndexableText,
+  formatSearchResult,
   type RetrievalApi, type TextHit,
 } from "../core/tools/retrieval";
 import {
@@ -180,7 +180,7 @@ export class VaultTools implements ToolRunner {
   ) {}
 
   /** Ein montiertes Werkzeug geht an seinen Anbieter — auch wenn es einen Wirts-Namen traegt
-   *  (`related_notes` aus vault-rag ersetzt Kodas eigene Fassung, s. `toolSet`). Gemessen am
+   *  (`related_notes` kommt von vault-rag, s. `toolSet`). Gemessen am
    *  2026-09-25 im Praxistest: die erste Fassung routete nach HOST_TOOL_NAMES und schickte das
    *  montierte `related_notes` in Kodas eigenen Pfad, der ohne vault-rag-API ins Leere lief;
    *  der Unit-Test sah es nicht, weil er nur fremde Namen montierte. */
@@ -237,7 +237,6 @@ export class VaultTools implements ToolRunner {
       switch (name) {
         case "search_notes": return await this.search(str(a.query), num(a.max_results, SEARCH_CAP));
         case "read_note": return await this.read(str(a.path));
-        case "related_notes": return await this.relatedNotes(str(a.path));
         case "write_note": return await this.write(str(a.path), str(a.content), str(a.mode));
         case "move_note": return await this.moveNote(str(a.source_path), str(a.destination_path));
         case "delete_note": return await this.deleteNote(str(a.path));
@@ -281,20 +280,20 @@ export class VaultTools implements ToolRunner {
   /** Fehlt der Name aus einem Grund, den der Guard NICHT kennt? Dann schweigt er und laesst
    *  durch — die Meldung soll von der Stelle kommen, die den Grund wirklich kennt.
    *
-   *  Der Fall ist heute genau einer: `related_notes` fehlt in der angebotenen Liste aus
-   *  ZWEI Gruenden — der Nutzer hat es abgeschaltet, ODER vault-rag liefert keinen Index.
-   *  Der Guard sieht nur die Liste und kann die beiden nicht auseinanderhalten; `relatedNotes()`
-   *  fragt die Nachbar-API selbst und meldet Klartext. Ohne diese Ausnahme beschuldigte die
-   *  Antwort ans Modell den falschen Verursacher („der Nutzer hat es deaktiviert"), obwohl nur
-   *  das Nachbarplugin aus ist — genau die plausible, aber falsche Ursachenmeldung, die in
-   *  diesem Repo schon einmal teuer war.
+   *  `read_image` und `generate_image` fehlen in der angebotenen Liste aus ZWEI Gruenden — der
+   *  Nutzer hat sie abgeschaltet, ODER das Modell sieht keine Bilder bzw. das Nachbarplugin ist
+   *  aus. Der Guard sieht nur die Liste und kann die beiden nicht auseinanderhalten; `readImage()`
+   *  und `generateImage()` fragen die Lage selbst und melden Klartext. Ohne diese Ausnahme
+   *  beschuldigte die Antwort ans Modell den falschen Verursacher („der Nutzer hat es
+   *  deaktiviert"), obwohl nur das Nachbarplugin aus ist — genau die plausible, aber falsche
+   *  Ursachenmeldung, die in diesem Repo schon einmal teuer war. (`related_notes` gehoerte bis
+   *  Welle 25 dazu; es kommt jetzt von vault-rag und geht den Anbieter-Weg.)
    *
-   *  Die bewusste Abschaltung durch den Nutzer bleibt gedeckt: laeuft vault-rag, ist der
-   *  fremde Grund nicht gegeben und der Guard greift wie fuer jedes andere Werkzeug. */
+   *  Die bewusste Abschaltung durch den Nutzer bleibt gedeckt: ist der fremde Grund nicht
+   *  gegeben, greift der Guard wie fuer jedes andere Werkzeug. */
   private fehltAusFremdemGrund(name: string): boolean {
     if (name === "read_image") return (this.opts.imageMode?.() ?? "none") === "none";
-    if (name === "generate_image") return (this.opts.imageGen?.() ?? null) === null;
-    return name === "related_notes" && (this.opts.retrieval?.() ?? null) === null;
+    return name === "generate_image" && (this.opts.imageGen?.() ?? null) === null;
   }
 
   /** Ein Bild ansehen. Vision: das Bild haengt als Pfad am Ergebnis (nie als Base64 — das
@@ -375,28 +374,6 @@ export class VaultTools implements ToolRunner {
     const semantic = api === null ? null : await api.search(query, { k: cap }).catch(() => null);
 
     return { ok: true, content: formatSearchResult(hits, semantic) };
-  }
-
-  /** Verwandte Notizen aus vault-rags Index. Nutzt denselben Pfad-Guard wie read_note —
-   *  ein ungueltiger Pfad wird oben in run() zu einem Fehler-Result. */
-  private async relatedNotes(path: string): Promise<ToolOutcome> {
-    const api = this.opts.retrieval?.() ?? null;
-    if (api === null) {
-      return { ok: false, error: 'Semantischer Index nicht verfügbar — das Plugin "Vault Retrieval" ist nicht aktiv.' };
-    }
-    const norm = resolveNotePath(path);
-    const r = await api.related(norm).catch(() => null);
-    if (r === null) return { ok: false, error: "Semantischer Index nicht verfügbar — Abfrage fehlgeschlagen." };
-
-    // Nur im not-indexed-Fall lesen: sonst kostet jede related-Abfrage einen Dateizugriff
-    // fuer eine Auskunft, die niemand braucht. `null` heisst „nicht lesbar" — dann bleibt
-    // die Meldung unbestimmt, statt eine Ursache zu behaupten.
-    let hasText: boolean | null = null;
-    if (!r.ok && r.reason === "not-indexed") {
-      const raw = await this.vault.read(norm).catch(() => null);
-      hasText = raw === null ? null : hasIndexableText(raw);
-    }
-    return { ok: true, content: formatRelatedResult(r, norm, hasText) };
   }
 
   /** Die einzige Stelle mit erweiterter Erlaubnis. Schreiben, Verschieben und Loeschen

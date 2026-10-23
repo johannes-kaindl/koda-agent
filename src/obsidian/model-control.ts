@@ -112,7 +112,7 @@ export interface ToolRowHandle {
 }
 
 /** Eine Zeile je Werkzeug: Name, eigene Beschreibung, Schalter. Die volle Liste — auch
- *  related_notes ohne vault-rag, dann ausgegraut. Ein Werkzeug, das spurlos verschwindet,
+ *  read_image ohne Bildsicht, dann ausgegraut. Ein Werkzeug, das spurlos verschwindet,
  *  schickt den Nutzer auf die Suche nach einem Schalter, den es nie gab (Spec E3).
  *
  *  Gibt die Zeilen-Handles zurueck, statt sie in `setting.components` zu schreiben:
@@ -146,8 +146,7 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
       text: t(
         row_.needs === "image-read" ? "settings.tools.needsImageRead"
           : row_.needs === "image-gen" ? "settings.tools.needsImageGen"
-            : row_.needs === "plugin-missing" ? "settings.tools.pluginMissing"
-              : "settings.tools.needsRag",
+            : "settings.tools.pluginMissing",
       ),
     });
 
@@ -181,7 +180,7 @@ export function renderToolList(setting: Setting, ctx: ModelControlCtx): ToolRowH
     handles.push({ name: row_.name, textarea: textarea!, toggle: toggle! });
   };
 
-  for (const row_ of toolRows(ctx.settings, ctx.relatedAvailable, ctx.imagesAvailable)) zeile(host, row_);
+  for (const row_ of toolRows(ctx.settings, ctx.imagesAvailable)) zeile(host, row_);
 
   // Werkzeuge anderer Plugins: eine Gruppe je Anbieter, dieselbe Zeile. Der Grund, aus dem ein
   // Anbieter NICHT montiert wird, steht daneben (sonst fehlt er still, Welle 22).

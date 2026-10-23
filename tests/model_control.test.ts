@@ -162,25 +162,17 @@ describe("renderToolList", () => {
     renderToolList(s, ctx());
     renderToolList(s, ctx());
     expect(s.settingEl.querySelectorAll(".koda-tool-list")).toHaveLength(1);
-    expect(zeilen(s)).toHaveLength(16);
+    expect(zeilen(s)).toHaveLength(15);
   });
   it("fuehrt jedes Werkzeug mit einer eigenen Zeile", () => {
     const s = new Setting(makeFakeEl());
     renderToolList(s, ctx());
-    expect(zeilen(s)).toHaveLength(16); // dreizehn feste plus related_notes plus read_image und generate_image
+    expect(zeilen(s)).toHaveLength(15); // dreizehn feste plus read_image und generate_image; related_notes steht in der Gruppe von vault-rag
   });
-  it("zeigt related_notes ausgegraut statt es zu verschweigen, wenn vault-rag fehlt", () => {
+  it("fuehrt related_notes nicht als eigenes Werkzeug — es steht in der Gruppe von vault-rag", () => {
     const s = new Setting(makeFakeEl());
     renderToolList(s, ctx());
-    const r = zeile(s, "related_notes");
-    expect(r.hasClass("is-unavailable")).toBe(true);
-    expect(r.textContent).toContain("vault-rag");
-  });
-  it("graut nichts aus, wenn ein Index da ist", () => {
-    const c = { ...ctx(), relatedAvailable: true };
-    const s = new Setting(makeFakeEl());
-    renderToolList(s, c);
-    expect(zeile(s, "related_notes").hasClass("is-unavailable")).toBe(false);
+    expect(zeilen(s).some((z: { textContent?: string | null }) => (z.textContent ?? "").includes("related_notes"))).toBe(false);
   });
   it("schaltet ein Werkzeug ab und schreibt das in die Einstellungen", () => {
     const c = ctx();

@@ -34,7 +34,7 @@ export function promptRow(
   };
 }
 
-/** Eine Zeile je Werkzeug — die volle Liste, auch related_notes ohne Index (dann
+/** Eine Zeile je Werkzeug — die volle Liste, auch `read_image` ohne Bildsicht (dann
  *  `unavailable`). Ein Werkzeug, das spurlos verschwindet, schickt den Nutzer auf die
  *  Suche nach einem Schalter, den es nie gab (Spec E3). */
 export interface ToolRowModel {
@@ -46,26 +46,24 @@ export interface ToolRowModel {
   enabled: boolean;
   unavailable: boolean;
   /** Was fehlt, wenn `unavailable`: benennt den Hinweis neben dem Namen. */
-  needs: "vault-rag" | "image-read" | "image-gen" | "plugin-missing" | null;
+  needs: "image-read" | "image-gen" | "plugin-missing" | null;
 }
 
 export function toolRows(
   s: { toolsDisabled: string[]; toolDescriptions: Record<string, string> },
-  related: boolean,
   // Standard: verfuegbar — nur ein Aufrufer, der es anders weiss (Settings-Tab), graut aus.
   images: { read: boolean; generate: boolean } = { read: true, generate: true },
 ): ToolRowModel[] {
   const aus = new Set(s.toolsDisabled);
-  // `related: true` liefert die ganze Liste; die Verfuegbarkeit entscheidet nur ueber die
-  // Ausgrauung, nicht ueber die Sichtbarkeit. Ohne `descriptions` — der Platzhalter MUSS
+  // Die ganze Liste; die Verfuegbarkeit entscheidet nur ueber die Ausgrauung, nicht ueber die
+  // Sichtbarkeit. `related_notes` gehoert nicht dazu: es kommt von vault-rag und steht in dessen Gruppe. Ohne `descriptions` — der Platzhalter MUSS
   // der Auslieferungsstand bleiben, sonst ist er nach einer eigenen Beschreibung
   // unwiederbringlich weg.
-  return toolDefs({ related: true, readImage: true, generateImage: true }).map((d) => {
+  return toolDefs({ readImage: true, generateImage: true }).map((d) => {
     const needs: ToolRowModel["needs"] =
-      d.name === "related_notes" && !related ? "vault-rag"
-        : d.name === "read_image" && !images.read ? "image-read"
-          : d.name === "generate_image" && !images.generate ? "image-gen"
-            : null;
+      d.name === "read_image" && !images.read ? "image-read"
+        : d.name === "generate_image" && !images.generate ? "image-gen"
+          : null;
     return {
       name: d.name,
       placeholder: d.description,

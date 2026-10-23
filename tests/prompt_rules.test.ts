@@ -28,7 +28,9 @@ describe("DEFAULT_RULES", () => {
  *  `no-reading-tool` schlaegt dauerhaft an, `no-tools` prueft auf einen Satz, der ein
  *  Werkzeug nennt, das es nicht mehr gibt — und kein Test braeche. */
 describe("Kopplung an die echten Werkzeugnamen", () => {
-  const vorhanden = new Set(toolDefs({ related: true }).map((d) => d.name));
+  // `related_notes` kommt von vault-rag (Anbieter-Vertrag), nicht aus Kodas Liste: es wird so montiert, wie der Anbieter es bietet.
+  const related = { name: "related_notes", description: "x", parameters: { type: "object" as const, properties: {}, required: [] as string[] }, writes: false };
+  const vorhanden = new Set(toolDefs({ providers: [{ id: "vault-retrieval", tools: [related] }] }).map((d) => d.name));
 
   it("kennt jedes lesende Werkzeug aus READING_TOOLS auch als echtes Werkzeug", () => {
     for (const n of READING_TOOLS) expect(vorhanden).toContain(n);

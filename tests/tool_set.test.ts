@@ -8,19 +8,19 @@ const pdef = (name: string, writes = false): ProviderToolDef => ({
 
 describe("toolSet — Wirts-Werkzeuge plus montierte Anbieter, eine Quelle fuer Liste und Route", () => {
   it("ohne Anbieter ist toolSet().defs dasselbe wie toolDefs()", () => {
-    const opts = { related: true };
+    const opts = {};
     expect(toolSet(opts).defs).toEqual(toolDefs(opts));
     expect(toolSet(opts).routes.size).toBe(0);
   });
 
   it("haengt Anbieter-Werkzeuge hinter die Wirts-Werkzeuge und routet sie", () => {
-    const s = toolSet({ related: false, providers: [{ id: "vault-retrieval", tools: [pdef("semantic_search")] }] });
+    const s = toolSet({ providers: [{ id: "vault-retrieval", tools: [pdef("semantic_search")] }] });
     expect(s.defs.map((d) => d.name)).toEqual([...TOOL_DEFS.map((d) => d.name), "semantic_search"]);
     expect(s.routes.get("semantic_search")).toBe("vault-retrieval");
   });
 
-  it("montiert statt handgeschrieben: bietet ein Anbieter related_notes an, entfaellt Kodas eigene Definition", () => {
-    const s = toolSet({ related: true, providers: [{ id: "vault-retrieval", tools: [pdef("related_notes")] }] });
+  it("montiert statt handgeschrieben: related_notes kommt vom Anbieter und wird genau einmal gesendet", () => {
+    const s = toolSet({ providers: [{ id: "vault-retrieval", tools: [pdef("related_notes")] }] });
     const related = s.defs.filter((d) => d.name === "related_notes");
     expect(related).toHaveLength(1);
     expect(related[0].description).toBe("Anbieter: related_notes");
@@ -28,15 +28,15 @@ describe("toolSet — Wirts-Werkzeuge plus montierte Anbieter, eine Quelle fuer 
     expect(s.skipped).toEqual([]);
   });
 
-  it("ohne Anbieter-related_notes bleibt Kodas eigene Definition, solange ein Index da ist", () => {
-    const s = toolSet({ related: true, providers: [{ id: "vault-retrieval", tools: [pdef("semantic_search")] }] });
-    expect(s.defs.some((d) => d.name === "related_notes")).toBe(true);
-    expect(s.routes.has("related_notes")).toBe(false);
+  it("Koda traegt related_notes nicht selbst: ohne Anbieter gibt es das Werkzeug nicht, auch nicht mit semantic_search allein", () => {
+    expect(toolSet({}).defs.some((d) => d.name === "related_notes")).toBe(false);
+    const s = toolSet({ providers: [{ id: "vault-retrieval", tools: [pdef("semantic_search")] }] });
+    expect(s.defs.some((d) => d.name === "related_notes")).toBe(false);
+    expect(s.hostNames.has("related_notes")).toBe(false);
   });
 
   it("Abschaltung und eigene Beschreibung des Nutzers gelten auch fuer montierte Werkzeuge", () => {
     const s = toolSet({
-      related: false,
       providers: [{ id: "p", tools: [pdef("list_events"), pdef("create_event", true)] }],
       disabled: ["create_event"],
       descriptions: { list_events: "Meine Beschreibung" },
@@ -50,7 +50,7 @@ describe("toolSet — Wirts-Werkzeuge plus montierte Anbieter, eine Quelle fuer 
   });
 
   it("meldet eine Kollision mit einem Wirts-Werkzeug, statt sie zu montieren", () => {
-    const s = toolSet({ related: false, providers: [{ id: "p", tools: [pdef("read_note")] }] });
+    const s = toolSet({ providers: [{ id: "p", tools: [pdef("read_note")] }] });
     expect(s.defs.filter((d) => d.name === "read_note")).toHaveLength(1);
     expect(s.defs.find((d) => d.name === "read_note")?.description).not.toBe("Anbieter: read_note");
     expect(s.skipped).toEqual([{ name: "read_note", providerId: "p", reason: "collision-host" }]);
@@ -60,23 +60,23 @@ describe("toolSet — Wirts-Werkzeuge plus montierte Anbieter, eine Quelle fuer 
 describe("toolSet — Bild-Werkzeuge sind bedingt", () => {
   const names = (o: Parameters<typeof toolSet>[0]) => toolSet(o).defs.map((d) => d.name);
   it("ohne Bedingung fehlen read_image und generate_image", () => {
-    expect(names({ related: false })).not.toContain("read_image");
-    expect(names({ related: false })).not.toContain("generate_image");
+    expect(names({})).not.toContain("read_image");
+    expect(names({})).not.toContain("generate_image");
   });
   it("readImage und generateImage schalten je eines zu, keins zieht das andere mit", () => {
-    expect(names({ related: false, readImage: true })).toContain("read_image");
-    expect(names({ related: false, readImage: true })).not.toContain("generate_image");
-    expect(names({ related: false, generateImage: true })).toContain("generate_image");
-    expect(names({ related: false, generateImage: true })).not.toContain("read_image");
+    expect(names({ readImage: true })).toContain("read_image");
+    expect(names({ readImage: true })).not.toContain("generate_image");
+    expect(names({ generateImage: true })).toContain("generate_image");
+    expect(names({ generateImage: true })).not.toContain("read_image");
   });
   it("der Nutzerschalter nimmt sie aus der Liste, die Route des Wirts bleibt bekannt", () => {
-    const s = toolSet({ related: false, readImage: true, generateImage: true, disabled: ["read_image"] });
+    const s = toolSet({ readImage: true, generateImage: true, disabled: ["read_image"] });
     expect(s.defs.map((d) => d.name)).not.toContain("read_image");
     expect(s.hostNames.has("read_image")).toBe(true);
     expect(s.hostNames.has("generate_image")).toBe(true);
   });
   it("ein Anbieter mit gleichem Namen verdraengt den Wirt nicht (Wirt gewinnt)", () => {
-    const s = toolSet({ related: false, readImage: true, providers: [{ id: "x", tools: [pdef("read_image")] }] });
+    const s = toolSet({ readImage: true, providers: [{ id: "x", tools: [pdef("read_image")] }] });
     expect(s.defs.filter((d) => d.name === "read_image")).toHaveLength(1);
     expect(s.routes.has("read_image")).toBe(false);
     expect(s.skipped.length).toBe(1);

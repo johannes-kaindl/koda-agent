@@ -94,11 +94,11 @@ describe("VaultTools.run — Route zu einem Anbieter-Werkzeug", () => {
     expect(spy).toHaveBeenCalledWith("related_notes", { path: "a.md" }, expect.anything());
   });
 
-  it("ohne Route bleibt related_notes Kodas eigener Pfad (vault-rag ohne Vertrag)", async () => {
+  it("ohne Route gibt es related_notes nicht (Koda traegt es seit Welle 25 nicht mehr selbst)", async () => {
     const t = tools({ provider: () => null });
     const r = await t.run("related_notes", { path: "a.md" });
     expect(r.ok).toBe(false);
-    expect((r as { error: string }).error).not.toMatch(/nicht mehr verf/);
+    expect((r as { error: string }).error).toMatch(/nicht mehr verf/);
   });
 
   it("faengt eine werfende executeTool() und meldet sie als Fehler", async () => {

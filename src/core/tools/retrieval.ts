@@ -4,7 +4,6 @@
 // steigt dort `apiVersion` — `readRetrievalApi` (src/obsidian/retrieval.ts) prueft sie
 // und liefert lieber `null` als zu raten.
 
-import { parseFrontmatter } from "../../vendor/kit/frontmatter";
 
 export interface ApiHit {
   path: string;
@@ -108,47 +107,4 @@ export function formatSearchResult(text: TextHit[], semantic: ApiResult | null):
   );
   if (note !== null) blocks.push(note);
   return blocks.join("\n");
-}
-
-/** Hat die Notiz ueberhaupt Text, den ein Index erfassen koennte — also etwas ausser
- *  Frontmatter? Notizen ohne solchen Text landen **nie** im Index (vault-rag erzeugt
- *  fuer sie null Chunks), `not-indexed` ist dort also endgueltig statt voruebergehend.
- *  Das trifft ausgerechnet Kodas eigene Schreibfaelle: eine frische `write_skill`-Notiz
- *  besteht anfangs nur aus Frontmatter, `Memory.md` vor dem ersten Eintrag auch.
- *
- *  Bewusst eine eigene Pruefung statt eines zusaetzlichen API-Grundes: die Frage laesst
- *  sich hier billig beantworten, und die fremde Vertragsflaeche schmal zu halten ist mehr
- *  wert. Der Preis ist, dass diese Heuristik vault-rags Chunk-Regel nur annaehert —
- *  deshalb formuliert die Meldung unten eine Feststellung ueber den INHALT, keine
- *  Vorhersage ueber den Index. */
-export function hasIndexableText(raw: string): boolean {
-  return parseFrontmatter(raw).body.trim() !== "";
-}
-
-/** `hasText`: `true`/`false` aus `hasIndexableText`, `null` wenn die Notiz nicht gelesen
- *  werden konnte — dann bleibt die Meldung bewusst unbestimmt statt falsch zuversichtlich. */
-export function formatRelatedResult(r: ApiResult, path: string, hasText: boolean | null = null): string {
-  if (!r.ok) {
-    switch (r.reason) {
-      case "no-index":
-        return "Semantischer Index: kein Index vorhanden — vault-rag hat den Vault noch nicht indexiert.";
-      case "offline":
-        return "Semantischer Index: Endpunkt nicht erreichbar.";
-      case "paused":
-        return "Die semantische Suche ist pausiert — verwandte Notizen lassen sich solange nicht bestimmen.";
-      case "not-indexed":
-        if (hasText === false) {
-          // Bedingt formuliert, nicht endgueltig: die Notiz ist nicht dauerhaft
-          // ausgeschlossen, sie hat nur JETZT nichts zu indexieren. Sobald Text darin
-          // steht, greift der Live-Indexer normal.
-          return `"${r.path}" hat derzeit keinen indexierbaren Inhalt (nur Frontmatter oder leer) — solange das so bleibt, erscheint die Notiz nicht im Index. Ein erneuter Versuch ändert daran nichts; erst Inhalt schreiben, dann greift der Indexer von selbst.`;
-        }
-        if (hasText === true) {
-          return `"${r.path}" ist noch nicht im Index — der Indexer zieht kurz nach dem Speichern nach. Gleich noch einmal versuchen.`;
-        }
-        return `"${r.path}" ist nicht im Index — verwandte Notizen lassen sich dafür nicht bestimmen.`;
-    }
-  }
-  if (r.hits.length === 0) return `Zu ${path} wurde nichts inhaltlich Verwandtes gefunden.`;
-  return `Verwandt zu ${path}:\n${r.hits.map((h) => `${h.path} (${score(h.score)})`).join("\n")}`;
 }

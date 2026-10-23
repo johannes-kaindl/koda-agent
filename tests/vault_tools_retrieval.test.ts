@@ -100,118 +100,15 @@ describe("search_notes — hybrid", () => {
   });
 });
 
-describe("related_notes", () => {
-  it("liefert verwandte Notizen", async () => {
-    const t = new VaultTools(vault({ "a.md": "x" }), async () => true, opts(() => api()));
-    const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok && r.content).toContain("r.md (0.70)");
-  });
-
-  it("meldet klar, wenn die API zwischenzeitlich verschwunden ist", async () => {
-    const t = new VaultTools(vault({ "a.md": "x" }), async () => true, opts(() => null));
-    const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok).toBe(false);
-    expect(!r.ok && r.error).toContain("nicht verfügbar");
-  });
-
-  it("nutzt denselben Pfad-Guard wie read_note — Traversal wird geblockt", async () => {
+/** `related_notes` gehoert vault-rag (Welle 25): Koda traegt es nicht mehr selbst. Ohne Route zu einem Anbieter gibt es
+ *  das Werkzeug nicht — auch dann nicht, wenn die Retrieval-API da ist; es laeuft nie an der Anbieter-Schnittstelle vorbei. */
+describe("related_notes — kein eigener Pfad mehr", () => {
+  it("antwortet ohne Anbieter-Route mit „nicht mehr verfuegbar“ und fragt die Retrieval-API nicht", async () => {
     const related = vi.fn();
-    const t = new VaultTools(vault({}), async () => true, opts(() => api({ related })));
-    const r = await t.run("related_notes", { path: "../geheim.md" });
+    const t = new VaultTools(vault({ "a.md": "x" }), async () => true, opts(() => api({ related })));
+    const r = await t.run("related_notes", { path: "a.md" });
     expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toMatch(/nicht mehr verf/);
     expect(related).not.toHaveBeenCalled();
-  });
-
-  it("reicht den normalisierten Pfad an die API", async () => {
-    const related = vi.fn(async () => ({ ok: true as const, hits: [] }));
-    const t = new VaultTools(vault({}), async () => true, opts(() => api({ related })));
-    await t.run("related_notes", { path: "Ordner//Notiz.md" });
-    expect(related).toHaveBeenCalledWith("Ordner/Notiz.md");
-  });
-
-  it("meldet eine nicht indexierte Notiz mit Klartext", async () => {
-    const t = new VaultTools(vault({}), async () => true, opts(() => api({
-      related: async () => ({ ok: false, reason: "not-indexed", path: "a.md" }),
-    })));
-    const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok && r.content).toContain("nicht im Index");
-  });
-});
-
-describe("related_notes — not-indexed ist nicht immer voruebergehend", () => {
-  const notIndexed = api({ related: async () => ({ ok: false, reason: "not-indexed", path: "a.md" }) });
-
-  it("raet bei einer Notiz aus reinem Frontmatter vom Wiederholen AB", async () => {
-    const t = new VaultTools(
-      vault({ "a.md": "---\ndescription: x\n---\n" }), async () => true, opts(() => notIndexed),
-    );
-    const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok && r.content).toContain("derzeit keinen indexierbaren Inhalt");
-    // Bedingt, nicht endgueltig: die Notiz ist nicht dauerhaft ausgeschlossen.
-    expect(r.ok && r.content).toContain("solange das so bleibt");
-    expect(r.ok && r.content).toContain("erst Inhalt schreiben");
-  });
-
-  it("raet bei einer Notiz mit Text ZUM Wiederholen", async () => {
-    const t = new VaultTools(
-      vault({ "a.md": "---\ndescription: x\n---\nEin echter Satz." }), async () => true, opts(() => notIndexed),
-    );
-    const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok && r.content).toContain("Gleich noch einmal versuchen");
-  });
-
-  it("bleibt unbestimmt, wenn die Notiz nicht lesbar ist", async () => {
-    const t = new VaultTools(vault({}), async () => true, opts(() => notIndexed));
-    const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok && r.content).toContain("nicht im Index");
-    expect(r.ok && r.content).not.toContain("derzeit keinen indexierbaren");
-  });
-
-  it("liest die Notiz NICHT, wenn die Abfrage normal gelingt", async () => {
-    let reads = 0;
-    const v = vault({ "a.md": "x" });
-    const counting = { ...v, read: async (p: string) => { reads++; return v.read(p); } };
-    const t = new VaultTools(counting, async () => true, opts(() => api()));
-    await t.run("related_notes", { path: "a.md" });
-    expect(reads).toBe(0);
-  });
-});
-
-/** Der Guard aus der Werkzeug-Sperre und die Auskunft ueber das Nachbarplugin greifen
- *  beide bei `related_notes` — der Test klemmt fest, WELCHE Meldung bei welcher Ursache
- *  kommt. Eine plausible, aber falsche Ursachenmeldung schickt den naechsten Leser (hier:
- *  das Modell) in die falsche Richtung. */
-describe("related_notes — wer die Ablehnung begruendet", () => {
-  it("meldet das fehlende Nachbarplugin, nicht eine Abschaltung durch den Nutzer", async () => {
-    // vault-rag ist aus, deshalb steht related_notes nicht in der angebotenen Liste. Der
-    // Guard kennt den Grund nicht und laesst durch; `relatedNotes()` kennt ihn.
-    const t = new VaultTools(vault({}), async () => true, {
-      ...opts(() => null),
-      allowed: () => new Set(["search_notes", "read_note"]),
-    });
-    const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok).toBe(false);
-    expect(r.ok === false && r.error).toContain("Vault Retrieval");
-    expect(r.ok === false && r.error).not.toContain("abgeschaltet");
-  });
-
-  it("meldet die Abschaltung, wenn der Nutzer es bei LAUFENDEM vault-rag ausschaltet", async () => {
-    // Die Haelfte, die die Ausnahme nicht verschlucken darf: hier ist der Nutzer der Grund.
-    const t = new VaultTools(vault({}), async () => true, {
-      ...opts(() => api()),
-      allowed: () => new Set(["search_notes", "read_note"]),
-    });
-    const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok).toBe(false);
-    expect(r.ok === false && r.error).toContain("abgeschaltet");
-  });
-
-  it("laeuft normal, solange related_notes angeboten wird", async () => {
-    const t = new VaultTools(vault({}), async () => true, {
-      ...opts(() => api()),
-      allowed: () => new Set(["related_notes"]),
-    });
-    const r = await t.run("related_notes", { path: "a.md" });
-    expect(r.ok).toBe(true);
   });
 });

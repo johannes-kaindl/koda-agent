@@ -486,7 +486,6 @@ export default class KodaPlugin extends Plugin {
     const offers = readProviderOffers(this.app, this.promptLang());
     const eigene = toolRows(
       this.settings,
-      readRetrievalApi(this.app)?.status().indexed === true,
       { read: this.imageMode() !== "none", generate: readImageGenApi(this.app) !== null },
     ).filter((r) => !r.unavailable).map((r) => r.name);
     return abilitiesViewModel({
@@ -851,7 +850,6 @@ export default class KodaPlugin extends Plugin {
     const lang = this.promptLang();
     const providers = readProviderOffers(this.app, lang);
     const opts = {
-      related: readRetrievalApi(this.app)?.status().indexed === true,
       readImage: this.imageMode() !== "none",
       generateImage: readImageGenApi(this.app) !== null,
       descriptions: this.settings.toolDescriptions,
@@ -1172,13 +1170,9 @@ export default class KodaPlugin extends Plugin {
       // Nur im Speicher — er traegt Memory-Zeilen und gehoert nicht auf Platte (Spec E6).
       this.lastSystemPrompt = system.content;
 
-      // Werkzeugliste je Lauf: related_notes gibt es nur, wenn vault-rag einen Index
-      // bereitstellt, dazu Abschaltung und eigene Beschreibungen aus den Einstellungen.
-      // `status()` ist synchron und netzfrei — deshalb darf die Pruefung hier stehen, wo
-      // ein Netzaufruf nicht vertretbar waere. Achtung: `indexed` sagt NICHTS ueber die
-      // Erreichbarkeit des Embedding-Endpunkts; ein `search` kann trotzdem jederzeit
-      // `offline` liefern (Spec E3/E6). Dieselbe Methode, die auch der GUI-Smoke misst —
-      // kein zweiter Weg zur gesendeten Liste.
+      // Werkzeugliste je Lauf: Wirts-Werkzeuge plus die montierten Anbieter-Werkzeuge (`related_notes`
+      // kommt von vault-rag), dazu Abschaltung und eigene Beschreibungen aus den Einstellungen.
+      // Dieselbe Methode, die auch der GUI-Smoke misst — kein zweiter Weg zur gesendeten Liste.
       const defs = this.currentToolDefs();
 
       // Client pro Lauf: der Idle-Timeout ist eine Einstellung und darf ohne
