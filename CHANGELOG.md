@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Settings → Model control → Instructions for Koda: edit and copy.** **Edit the shipped version** puts the shipped rule block into the empty field so you change it instead of writing a new one; the copy button copies the instructions that apply (to keep your version before overwriting it); the dialog **Show active instructions** has a **Copy** button for the whole prompt. A text you load and leave unchanged, or type back unchanged, is still stored as "the shipped version applies", so later improvements reach you.
+
 ### Changed
 
 - **`related_notes` now comes from Vault Retrieval only.** Koda no longer carries its own copy of the tool: it is offered by the plugin that owns the index, shows up in that plugin's group in **Settings → Model control → Tools** and no longer produces the warning "its tool “related_notes” is not offered to Koda — Koda has a tool with that name itself". Without Vault Retrieval there is no `related_notes` (as before), and the greyed-out "needs the vault-rag plugin" row is gone. Vault Retrieval offers the tool while it is active, also before the index is built (the tool then answers "no index available"). One message is less specific than Koda's own was: for a note in the index that is not indexed yet, Vault Retrieval does not tell "only front matter, nothing to index" from "the indexer will catch up, try again".

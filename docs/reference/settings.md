@@ -52,7 +52,7 @@ See [Tune Koda for a smaller model](../how-to/model-control.md).
 
 | Setting | Default | What it does |
 |---|---|---|
-| Instructions for Koda | *(empty = shipped version)* | Replaces Koda's rule block. **Restore the shipped version** empties it, **Show active instructions** shows the full prompt. |
+| Instructions for Koda | *(empty = shipped version)* | Replaces Koda's rule block. **Edit the shipped version** puts the shipped text into an empty field, the copy button copies the instructions that apply, **Restore the shipped version** empties the field, **Show active instructions** shows the full prompt (with a copy button). |
 | Tools | all on | A switch and a description field for each of Koda's own tools. |
 
 ## Other

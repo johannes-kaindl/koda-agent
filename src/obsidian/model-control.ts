@@ -1,6 +1,7 @@
-import { Setting, setIcon, type TextAreaComponent, type ToggleComponent } from "obsidian";
+import { Setting, setIcon, type ButtonComponent, type TextAreaComponent, type ToggleComponent } from "obsidian";
 import { t } from "../vendor/kit/i18n";
-import { type RuleWarning } from "../core/prompt/rules";
+import { DEFAULT_RULES, effectiveRules, type RuleWarning } from "../core/prompt/rules";
+import { copyToClipboard } from "../vendor/kit-obsidian/clipboard";
 import { promptRow, providerToolGroups, toolRows, type ToolRowModel } from "../core/prompt/view-model";
 import { HOST_TOOL_NAMES } from "../core/tools/defs";
 import type { ProviderOffer, ToolProviderRejection } from "../vendor/kit/tool-provider";
@@ -65,8 +66,19 @@ export function renderPromptRow(setting: Setting, ctx: ModelControlCtx): void {
     }
   };
 
+  // Das Feld, wie es gerade steht — nicht `ctx.settings`: ein geladener Auslieferungstext ist noch keine Abweichung und wird erst
+  // mit der ersten Aenderung gespeichert.
+  let feld: TextAreaComponent | null = null;
+  let ladeKnopf: ButtonComponent | null = null;
+  const aktuellerText = (): string => effectiveRules(feld === null ? ctx.settings.systemPromptOverride : feld.getValue());
+  /** „Ausgelieferte Fassung bearbeiten“ gibt es nur bei leerem Feld: sonst ueberschriebe der Knopf den Text des Nutzers. */
+  const ladeKnopfPruefen = (): void => {
+    ladeKnopf?.setDisabled(feld !== null && feld.getValue().trim() !== "");
+  };
+
   setting
     .addTextArea((ta) => {
+      feld = ta;
       ta.setPlaceholder(model.placeholder).setValue(model.value);
       ta.inputEl.rows = 8;
       ta.inputEl.addClass("koda-prompt-textarea");
@@ -85,11 +97,32 @@ export function renderPromptRow(setting: Setting, ctx: ModelControlCtx): void {
       //    nicht: das Neuzeichnen zerstoert den Cursor. Der Grund fuer `blur` war also
       //    immer das Re-Render, nie das Speichern.
       ta.onChange((v) => {
-        ctx.settings.systemPromptOverride = v;
+        // Gespeichert wird nur die Abweichung (Spec E2): wer den geladenen Auslieferungstext unveraendert laesst oder zurueckschreibt,
+        // behaelt „die ausgelieferte Fassung gilt“ — sonst fror eine spaetere Verbesserung fuer ihn ein.
+        ctx.settings.systemPromptOverride = v.trim() === DEFAULT_RULES.trim() ? "" : v;
         void ctx.save();
+        ladeKnopfPruefen();
       });
       ta.inputEl.addEventListener("blur", () => { zeichneWarnungen(); });
     })
+    .addButton((b) => {
+      ladeKnopf = b;
+      b.setButtonText(t("settings.prompt.load")).setTooltip(t("settings.prompt.load.tip")).onClick(() => {
+        if (feld === null || feld.getValue().trim() !== "") return;
+        // Nur ins Feld, nicht in die Einstellungen: ein Text, den der Nutzer nie anruehrt, ist keine Abweichung.
+        feld.setValue(DEFAULT_RULES);
+        feld.inputEl.focus();
+        ladeKnopfPruefen();
+        zeichneWarnungen();
+      });
+      ladeKnopfPruefen();
+    })
+    .addExtraButton((b) =>
+      b.setIcon("copy").setTooltip(t("settings.prompt.copy")).onClick(() => {
+        // Der Text, der im naechsten Gespraech gilt (Platzhalter unaufgeloest) — zum Archivieren vor dem Ueberschreiben.
+        void copyToClipboard(aktuellerText(), { copiedMessage: t("settings.prompt.copied") });
+      }),
+    )
     .addExtraButton((b) =>
       b.setIcon("rotate-ccw").setTooltip(t("settings.prompt.reset")).onClick(() => {
         ctx.settings.systemPromptOverride = "";

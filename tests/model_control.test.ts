@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { copyToClipboard } from "../src/vendor/kit-obsidian/clipboard";
 // `Setting` bleibt vom REALEN "obsidian" importiert: `renderPromptRow`/`renderToolList` in
 // src/obsidian/model-control.ts sind gegen den echten Typ signiert (src/ typprueft immer
 // gegen die echte Obsidian-API, nie gegen den Mock). Zur Laufzeit ist es via vitest-Alias
@@ -14,6 +15,8 @@ import { renderPromptRow, renderToolList, type ModelControlCtx } from "../src/ob
 import { DEFAULT_SETTINGS, type KodaSettings } from "../src/core/settings-types";
 import { DEFAULT_RULES } from "../src/core/prompt/rules";
 import "../src/i18n/strings";
+
+vi.mock("../src/vendor/kit-obsidian/clipboard", () => ({ copyToClipboard: vi.fn(async () => true) }));
 
 function ctx(over: Partial<KodaSettings> = {}): ModelControlCtx & { save: ReturnType<typeof vi.fn<[], Promise<void>>> } {
   return {
@@ -34,6 +37,11 @@ function ctx(over: Partial<KodaSettings> = {}): ModelControlCtx & { save: Return
  *  Platzhalters haengt am puren `promptRow` und ist dort geprueft. */
 const textarea = (s: Setting): TextAreaComponent =>
   s.components.find((c) => c instanceof TextAreaComponent) as TextAreaComponent;
+const ladeKnopf = (s: Setting): { clickCB?: () => void } =>
+  s.components.find((c) => !(c instanceof ExtraButtonComponent) && typeof (c as { clickCB?: unknown }).clickCB !== "undefined"
+    && (c as { textValue?: string }).textValue === "Edit the shipped version") as { clickCB?: () => void };
+const kopierKnopf = (s: Setting): ExtraButtonComponent =>
+  s.components.find((c) => c instanceof ExtraButtonComponent && c.iconName === "copy") as unknown as ExtraButtonComponent;
 const resetKnopf = (s: Setting): ExtraButtonComponent =>
   s.components.find((c) => c instanceof ExtraButtonComponent && c.iconName === "rotate-ccw") as unknown as ExtraButtonComponent;
 
@@ -119,6 +127,44 @@ describe("renderPromptRow", () => {
     await Promise.resolve();
     expect(c.refresh).toHaveBeenCalled();
   });
+  it("legt die ausgelieferte Fassung auf Wunsch ins Feld, ohne etwas zu speichern", () => {
+    const c = ctx();
+    const s = new Setting(makeFakeEl());
+    renderPromptRow(s, c);
+    ladeKnopf(s).clickCB?.();
+    expect(textarea(s).getValue()).toBe(DEFAULT_RULES);
+    // Ein Text, den der Nutzer nie anruehrt, ist keine Abweichung (Spec E2).
+    expect(c.settings.systemPromptOverride).toBe("");
+    expect(c.save).not.toHaveBeenCalled();
+  });
+  it("ueberschreibt mit dem Laden nie einen eigenen Text", () => {
+    const s = new Setting(makeFakeEl());
+    renderPromptRow(s, ctx({ systemPromptOverride: "Sei knapp." }));
+    ladeKnopf(s).clickCB?.();
+    expect(textarea(s).getValue()).toBe("Sei knapp.");
+  });
+  it("speichert die Abweichung, sobald der geladene Text geaendert wird — und nur dann", () => {
+    const c = ctx();
+    const s = new Setting(makeFakeEl());
+    renderPromptRow(s, c);
+    ladeKnopf(s).clickCB?.();
+    textarea(s).onChangeCB?.(`${DEFAULT_RULES}\n\nSei knapp.`);
+    expect(c.settings.systemPromptOverride).toBe(`${DEFAULT_RULES}\n\nSei knapp.`);
+    // Zurueckgeschrieben auf den Auslieferungstext: wieder „die ausgelieferte Fassung gilt“, keine eingefrorene Kopie.
+    textarea(s).onChangeCB?.(DEFAULT_RULES);
+    expect(c.settings.systemPromptOverride).toBe("");
+  });
+  it("kopiert bei leerem Feld die ausgelieferte Fassung, sonst den Text im Feld", () => {
+    const kopiert = vi.mocked(copyToClipboard);
+    kopiert.mockClear();
+    const s = new Setting(makeFakeEl());
+    renderPromptRow(s, ctx());
+    kopierKnopf(s).clickCB?.();
+    expect(kopiert).toHaveBeenLastCalledWith(DEFAULT_RULES, expect.objectContaining({ copiedMessage: expect.any(String) }));
+    textarea(s).setValue("Eigene Regeln.");
+    kopierKnopf(s).clickCB?.();
+    expect(kopiert).toHaveBeenLastCalledWith("Eigene Regeln.", expect.anything());
+  });
   it("warnt nicht beim Auslieferungsstand", () => {
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, ctx());
@@ -142,8 +188,8 @@ describe("renderPromptRow", () => {
     const c = ctx();
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);
-    const btn = s.components.find((x) => typeof (x as { clickCB?: unknown }).clickCB !== "undefined"
-      && !(x instanceof ExtraButtonComponent)) as { clickCB?: () => void };
+    const btn = s.components.find((x) => !(x instanceof ExtraButtonComponent)
+      && (x as { textValue?: string }).textValue === "Show active instructions") as { clickCB?: () => void };
     btn.clickCB?.();
     expect(c.openPreview).toHaveBeenCalled();
   });

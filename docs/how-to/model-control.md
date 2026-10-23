@@ -4,17 +4,17 @@ A small local model often handles fewer tools and more explicit instructions bet
 
 ## See the active instructions
 
-Select **Show active instructions**. The dialog shows the exact prompt the next conversation starts with: Koda's rules, your memory note and the active skills.
+Select **Show active instructions**. The dialog shows the exact prompt the next conversation starts with: Koda's rules, your memory note and the active skills. **Copy** in the dialog puts that whole text on the clipboard, for example to file it away before you change anything.
 
 ## Replace the instructions
 
 The field **Instructions for Koda** starts empty, with the shipped version greyed out as a placeholder.
 
-1. Copy the placeholder text into the field (or write your own) and change what you need.
+1. Press **Edit the shipped version**: the shipped text goes into the field and you change what you need. (The button works only while the field is empty, so it never overwrites your own text. The copy button next to the field copies the instructions that apply, so you can keep your version before you overwrite it.) You can also write your own from scratch.
 2. Keep the two placeholders `{{sprache}}` and `{{ordner}}`. Koda fills in your language and Koda folder on every run; without them, a later change of either setting would not reach the instructions.
 3. Click outside the field to save.
 
-**An empty field means "the shipped version applies"**, never "no instructions". As long as you leave it empty, improvements to the shipped instructions in later Koda versions reach you. The button **Restore the shipped version** (↺) empties the field again.
+**An empty field means "the shipped version applies"**, never "no instructions". If you load the shipped text and change nothing, or type it back unchanged, the field still counts as empty. As long as you leave it empty, improvements to the shipped instructions in later Koda versions reach you. The button **Restore the shipped version** (↺) empties the field again.
 
 Below the field, a warning appears (it blocks nothing) when:
 
