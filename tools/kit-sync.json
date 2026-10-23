@@ -1,6 +1,6 @@
 {
   "sources": {
-    "obsidian-kit": { "ref": "0.63.0" },
+    "obsidian-kit": { "ref": "0.66.1" },
     "code-kit": { "ref": "0.34.0" }
   },
   "targets": [
@@ -20,7 +20,7 @@
       "modules": [
         "clock", "confirm", "folder-suggest", "settings_walker", "model-picker", "hub", "collapsible", "stable-writer", "dom-guard",
         "help-setting", "chat-client", "chat-transport", "lab-client", "endpoint-list", "stream-area",
-        "endpoint-secrets", "secrets", "endpoint-source", "anthropic-transport", "shortcuts-bridge", "tool-providers", "plugin-api", "capability-apis", "textarea-suggest", "clipboard"
+        "endpoint-secrets", "secrets", "endpoint-source", "anthropic-transport", "shortcuts-bridge", "tool-providers", "plugin-api", "capability-apis", "textarea-suggest", "clipboard", "segmented-control", "redline"
       ],
       "rewrite": [["../pure/", "../kit/"], ["../vendor/code-kit/pure/", "../kit/"], ["../vendor/code-kit/web/", "../kit/"]]
     },

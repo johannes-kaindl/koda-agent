@@ -1,7 +1,7 @@
 {
   "source": "obsidian-kit",
-  "version": "0.63.0",
-  "sha": "9209efa",
+  "version": "0.66.1",
+  "sha": "e88734e",
   "code_kit_version": "0.34.0",
   "vendored": "frontmatter.ts, explain-texts.ts, ocr-provider.ts, image-gen-provider.ts, endpoint-source.ts, anthropic-wire.ts, endpoint-secret-hook.ts, tool-provider.ts, provider-error-texts.ts, audio-provider.ts",
   "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). Never hand-edit. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; explain-texts.ts und sse.ts tragen ihren eigenen Pin im \"vendored\"-Text und im Header. kit-obsidian/ siehe dortige VENDOR.json.",
