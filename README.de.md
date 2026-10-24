@@ -15,7 +15,7 @@ Koda arbeitet mit einem OpenAI-kompatiblen Modell deiner Wahl, typischerweise ei
 ## Features
 
 - **Mit dem Vault sprechen.** Koda schlägt selbst nach: Volltextsuche, Notizen lesen (auch Bases- und Canvas-Dateien), Ordner auflisten, mit Frontmatter oder als Ordnerbaum. Jeder Werkzeugaufruf erscheint im Chat, du siehst also, auf welchen Notizen eine Antwort beruht.
-- **Schreibt mit deiner Zustimmung.** Frei schreibt Koda nur in seinem eigenen Ordner. Alles andere — schreiben, verschieben, die gerade offene Notiz bearbeiten — öffnet zuerst einen Dialog mit dem Text oder einem Zeilen-Diff. Löschen und Skills schreiben fragen immer.
+- **Schreibt mit deiner Zustimmung.** Frei schreibt Koda nur in seinem eigenen Ordner. Alles andere — schreiben, verschieben, die gerade offene Notiz bearbeiten — öffnet zuerst einen Dialog mit dem Text oder einem Zeilen-Diff. Löschen und Skills schreiben fragen immer, ebenso das Ersetzen von Text in der Memory-Notiz (eine Zeile anhängen nicht).
 - **Arbeitskontext.** Jede Frage kann mitnehmen, was du gerade vor dir hast: Zeiger auf die offene Notiz und die Markierung, oder ganze Notizen samt verlinkter Nachbarn, alle offenen Tabs oder die Notizen, die inhaltlich zu deiner Frage passen. Der Tab **Kontext** zeigt, was mitgeht, und du kannst jedes Stück herausnehmen.
 - **Sieht Bilder und erzeugt welche.** `read_image` öffnet ein Bild aus deinem Vault: ein Modell, das Bilder sieht, bekommt das Bild selbst, jedes andere den Text, den [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown) erkennt. `generate_image` bittet [Local Image Generator](https://github.com/johannes-kaindl/local-image-generator) um ein Bild und zeigt es im Chat, außerhalb des Koda-Ordners nach deiner Bestätigung.
 - **Arbeiten für ein Gespräch.** Wähle vor dem Start, welche Skills, Werkzeuge und welchen Kontext eine Aufgabe braucht: Eine Arbeit ist eine Notiz, der Tab „Fähigkeiten“ und `/` im Eingabefeld schalten nur für dieses Gespräch.
@@ -67,7 +67,7 @@ Alles liegt unter **Einstellungen → Koda**: Endpunkte (jeder mit seinem Modell
 
 ## Funktionsweise
 
-Eine Frage startet eine Agenten-Schleife: das Modell antwortet oder ruft ein Werkzeug auf, Koda führt es gegen den Vault aus und gibt das Ergebnis zurück, bis zu einer Grenze, die du einstellst. Geschrieben wird über eine einzige Regel — frei im Koda-Ordner, überall sonst ein Dialog —, die kein Werkzeug umgehen kann. Die Anweisung an das Modell entsteht für jedes Gespräch neu aus Kodas Regeln, deiner Memory-Notiz und deinen Skills. Mehr in [How Koda works](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/explanation/how-koda-works.md).
+Eine Frage startet eine Agenten-Schleife: das Modell antwortet oder ruft ein Werkzeug auf, Koda führt es gegen den Vault aus und gibt das Ergebnis zurück, bis zu einer Grenze, die du einstellst. Geschrieben wird über eine einzige Regel — frei im Koda-Ordner (Skills, Löschen und das Ersetzen der Memory-Notiz ausgenommen), überall sonst ein Dialog —, die kein Werkzeug umgehen kann. Die Anweisung an das Modell entsteht für jedes Gespräch neu aus Kodas Regeln, deiner Memory-Notiz und deinen Skills. Mehr in [How Koda works](https://github.com/johannes-kaindl/koda-agent/blob/main/docs/explanation/how-koda-works.md).
 
 ## Dokumentation
 

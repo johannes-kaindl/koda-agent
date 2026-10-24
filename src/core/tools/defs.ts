@@ -102,7 +102,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "edit_active_note",
     description:
-      "Edit the note the user is working in: replace the current selection or insert at the cursor. Always shows the change and asks the user first. Pass the path of the active note exactly as given in the working context; the call fails if another note became active or the selection changed since.",
+      "Edit the note the user is working in: replace the current selection or insert at the cursor. Asks the user first outside the Koda folder, and always before replacing text in the memory note (Memory.md). Pass the path of the active note exactly as given in the working context; the call fails if another note became active or the selection changed since.",
     parameters: {
       type: "object",
       properties: {
@@ -121,7 +121,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "write_note",
     description:
-      "Create, append to, or replace a Markdown note. Writing outside the Koda folder requires the user's approval; a rejected write is reported back to you.",
+      "Create, append to, or replace a Markdown note. Writing outside the Koda folder requires the user's approval, and so does replacing the memory note (Koda/Memory.md) - appending to it does not; a rejected write is reported back to you.",
     parameters: {
       type: "object",
       properties: {

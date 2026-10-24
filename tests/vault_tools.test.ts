@@ -434,3 +434,52 @@ describe("write_note create: Unicode-Normalisierung des Namens", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe("Memory.md: Ersetzen fragt nach, Anhaengen bleibt frei (Entscheidung 2026-10-23)", () => {
+  const VOR = "# Memory\n- 2026-08-01: Jay mag kurze Antworten\n";
+
+  it("write_note replace auf Koda/Memory.md fragt und zeigt alt gegen neu", async () => {
+    const vault = fakeVault({ "Koda/Memory.md": VOR });
+    const cap = capturingConfirm();
+    const tools = new VaultTools(vault, cap.confirm, opts);
+    const r = await tools.run("write_note", { path: "Koda/Memory.md", content: "# Memory\n", mode: "replace" });
+    expect(r.ok).toBe(true);
+    expect(cap.calls).toHaveLength(1);
+    const req = erwarteWrite(cap.calls[0]);
+    expect(req.mode).toBe("replace");
+    expect(req.oldText).toBe(VOR);
+    expect(vault.files["Koda/Memory.md"]).toBe(req.newText);
+  });
+  it("bei Abweisung bleibt die Memory.md unveraendert", async () => {
+    const vault = fakeVault({ "Koda/Memory.md": VOR });
+    const tools = new VaultTools(vault, no, opts);
+    expect(await tools.run("write_note", { path: "Koda/Memory.md", content: "weg", mode: "replace" })).toEqual({ ok: false, error: "vom Nutzer abgelehnt" });
+    expect(vault.files["Koda/Memory.md"]).toBe(VOR);
+  });
+  it("write_note append auf Koda/Memory.md fragt nicht", async () => {
+    const vault = fakeVault({ "Koda/Memory.md": VOR });
+    let asked = 0;
+    const tools = new VaultTools(vault, async () => { asked++; return true; }, opts);
+    const r = await tools.run("write_note", { path: "Koda/Memory.md", content: "- neu", mode: "append" });
+    expect(r.ok).toBe(true);
+    expect(asked).toBe(0);
+    expect(vault.files["Koda/Memory.md"]).toBe(`${VOR}\n- neu`);
+  });
+  it("replace auf eine andere Notiz im Koda-Ordner bleibt frei", async () => {
+    const vault = fakeVault({ "Koda/Entwürfe/x.md": "alt" });
+    let asked = 0;
+    const tools = new VaultTools(vault, async () => { asked++; return true; }, opts);
+    expect((await tools.run("write_note", { path: "Koda/Entwürfe/x.md", content: "neu", mode: "replace" })).ok).toBe(true);
+    expect(asked).toBe(0);
+  });
+  it("save_memory bleibt frei, auch wenn es die Datei zurueckschreibt (wirkt wie Anhaengen)", async () => {
+    const vault = fakeVault({ "Koda/Memory.md": VOR });
+    let asked = 0;
+    const tools = new VaultTools(vault, async () => { asked++; return true; }, opts);
+    const r = await tools.run("save_memory", { text: "Jay trinkt Tee" });
+    expect(r.ok).toBe(true);
+    expect(asked).toBe(0);
+    expect(vault.files["Koda/Memory.md"]).toContain("Jay mag kurze Antworten");
+    expect(vault.files["Koda/Memory.md"]).toContain("Jay trinkt Tee");
+  });
+});

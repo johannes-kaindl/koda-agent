@@ -162,6 +162,27 @@ describe("edit_active_note", () => {
     expect(asked).toBe(0);
     expect(state.doc).toBe("Hallo Welt");
   });
+  // Gleiche Entscheidung wie bei write_note (2026-10-23): replace_selection ersetzt Text der Memory.md und braucht dieselbe Rueckfrage,
+  // sonst waere die Schranke ueber die aktive Notiz zu umgehen. insert_at_cursor ist append-artig und bleibt frei.
+  it("replace_selection auf Koda/Memory.md fragt, insert_at_cursor nicht", async () => {
+    const state = { path: "Koda/Memory.md", selection: "kurze Antworten", doc: "Jay mag kurze Antworten" };
+    const calls: WriteRequest[] = [];
+    const tools = new VaultTools(fakeVault({}), async (req) => { calls.push(req); return true; }, { ...base, editor: fakeEditor(state) });
+    const r = await tools.run("edit_active_note", { path: "Koda/Memory.md", mode: "replace_selection", text: "lange Antworten" });
+    expect(r.ok).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(erwarteWrite(calls[0]).mode).toBe("replace");
+    expect(state.doc).toBe("Jay mag lange Antworten");
+    const r2 = await tools.run("edit_active_note", { path: "Koda/Memory.md", mode: "insert_at_cursor", text: " Tee" });
+    expect(r2.ok).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+  it("Abweisung bei replace_selection auf Memory.md laesst die Notiz unveraendert", async () => {
+    const state = { path: "Koda/Memory.md", selection: "a", doc: "a" };
+    const tools = new VaultTools(fakeVault({}), async () => false, { ...base, editor: fakeEditor(state) });
+    expect(await tools.run("edit_active_note", { path: "Koda/Memory.md", mode: "replace_selection", text: "b" })).toEqual({ ok: false, error: "vom Nutzer abgelehnt" });
+    expect(state.doc).toBe("a");
+  });
   it("Ablehnung im Modal ist ein Fehler-Result, nichts geschrieben", async () => {
     const state = { path: "Notes/Plan.md", selection: "a", doc: "a" };
     const tools = new VaultTools(fakeVault({}), async () => false, { ...base, editor: fakeEditor(state) });

@@ -89,3 +89,38 @@ describe("writePolicy — Skills sind trotz Lage bestaetigungspflichtig", () => 
     }
   });
 });
+
+// Entscheidung Johannes 2026-10-23: Ersetzen von <Koda>/Memory.md fragt, Anhaengen bleibt frei. Der Modus ist der dritte Parameter;
+// ohne ihn bleibt jede Antwort wie vorher (Verschieben, Bildordner).
+describe("writePolicy: Memory.md", () => {
+  it("replace fragt, append und create bleiben frei", () => {
+    expect(writePolicy("Koda/Memory.md", "Koda", "replace")).toBe("confirm");
+    expect(writePolicy("Koda/Memory.md", "Koda", "append")).toBe("free");
+    expect(writePolicy("Koda/Memory.md", "Koda", "create")).toBe("free");
+  });
+  it("ohne Modus bleibt es bei der alten Antwort (movePolicy, generateImage fragen den Modus nicht)", () => {
+    expect(writePolicy("Koda/Memory.md", "Koda")).toBe("free");
+  });
+  it("liest den Pfad wie die geschuetzten Unterordner: Gross/klein, Leerraum und Punkt am Ende", () => {
+    for (const p of ["koda/memory.md", "Koda/MEMORY.MD", "Koda/Memory.md ", "Koda/Memory.md.", "Koda/Memory.md\u00a0", "Koda/memory.md . "]) {
+      expect(writePolicy(p, "Koda", "replace")).toBe("confirm");
+    }
+  });
+  it("Praefix-Kollision und andere Dateien sind KEINE Memory.md", () => {
+    for (const p of ["Koda/Memory.md.bak", "Koda/Memory.mdx", "Koda/Mémory.md", "Koda/Memory2.md", "Koda/Sub/Memory.md", "Koda/Entwürfe/idee.md"]) {
+      expect(writePolicy(p, "Koda", "replace")).toBe("free");
+    }
+  });
+  it("eine Memory.md ausserhalb des Koda-Ordners fragt ohnehin", () => {
+    expect(writePolicy("Memory.md", "Koda", "append")).toBe("confirm");
+    expect(writePolicy("Andere/Memory.md", "Koda", "replace")).toBe("confirm");
+  });
+  it("ein Koda-Ordner mit Schraegstrich am Ende aendert nichts", () => {
+    expect(writePolicy("Koda/Memory.md", "Koda/", "replace")).toBe("confirm");
+    expect(writePolicy("Koda/Memory.md", "Koda/", "append")).toBe("free");
+  });
+  it("Skills/ und Arbeiten/ fragen weiter in jedem Modus", () => {
+    expect(writePolicy("Koda/Skills/a.md", "Koda", "append")).toBe("confirm");
+    expect(writePolicy("Koda/Arbeiten/a.md", "Koda", "create")).toBe("confirm");
+  });
+});

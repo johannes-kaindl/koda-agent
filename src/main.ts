@@ -40,7 +40,7 @@ import { HOST_TOOL_NAMES, toolSet, toWireTools, type ToolDef, type ToolSet } fro
 import { findToolProvider, readProviderOffers } from "./vendor/kit-obsidian/tool-providers";
 import type { ProviderOffer } from "./vendor/kit/tool-provider";
 import { confirmAction } from "./vendor/kit-obsidian/confirm";
-import { SKILLS_SUBFOLDER } from "./core/tools/write-policy";
+import { MEMORY_FILE, SKILLS_SUBFOLDER } from "./core/tools/write-policy";
 import { buildSystemPrompt } from "./core/prompt/build";
 import { renderLocalDate } from "./core/prompt/now";
 import { contextHintFromModelName, lowerContextHint } from "./vendor/kit/model-context";
@@ -1453,7 +1453,7 @@ export default class KodaPlugin extends Plugin {
   }
 
   private async readMemory(): Promise<string> {
-    const path = `${this.settings.kodaFolder.replace(/\/+$/, "")}/Memory.md`;
+    const path = `${this.settings.kodaFolder.replace(/\/+$/, "")}/${MEMORY_FILE}`;
     const f = this.app.vault.getFileByPath(path);
     return f === null ? "" : this.app.vault.cachedRead(f);
   }

@@ -12,7 +12,7 @@ The system prompt is rebuilt for every conversation from three parts: Koda's rul
 
 Koda writes freely in one place: the **Koda folder**. That is where its memory and its drafts live, so writing there cannot change anything you wrote. Everything outside asks first: a dialog shows the new text (create, append) or a line diff (replace), and only the confirming button lets it through. If you cancel, the file stays untouched and Koda is told the write was declined, so it does not pretend otherwise.
 
-Two things ask first even inside the Koda folder. Deleting a note, because it breaks links. And writing a skill, because a skill is not a draft: it changes what Koda does from then on. That check sits in the write rule itself, not in the skill tool, so it cannot be sidestepped by writing a skill file with the ordinary write tool.
+Three things ask first even inside the Koda folder. Deleting a note, because it breaks links. Writing a skill, because a skill is not a draft: it changes what Koda does from then on. And replacing the text of your memory note `Memory.md`, because that throws away what Koda has learned about you; adding a line to it stays free, which is how Koda remembers. That check sits in the write rule itself, not in the skill tool, so it cannot be sidestepped by writing a skill file with the ordinary write tool.
 
 What Koda will never do: run programs or touch anything outside your vault. There is no terminal access and no background work; Koda acts only when you ask.
 

@@ -2,7 +2,7 @@ import type { ToolOutcome, ToolRunner } from "../core/agent/types";
 import { HOST_TOOL_NAMES } from "../core/tools/defs";
 import { callProviderTool, outcomeFromProvider, type ProviderConfirmPreview, type ToolProviderApi } from "../vendor/kit/tool-provider";
 import { resolveFolderPath, resolveNotePath, READ_EXTENSIONS } from "../core/tools/path-guard";
-import { writePolicy } from "../core/tools/write-policy";
+import { MEMORY_FILE, writePolicy } from "../core/tools/write-policy";
 import { movePolicy, planMove } from "../core/tools/move";
 import { appendMemoryLine } from "../core/memory/memory";
 import { serializeFrontmatter } from "../vendor/kit/frontmatter";
@@ -426,7 +426,7 @@ export class VaultTools implements ToolRunner {
     // etwas anderes an, als am Ende landet (Spec-Invariante: approved == written).
     const effective = mode === "append" && !content.startsWith("\n") ? `\n${content}` : content;
 
-    if (writePolicy(norm, this.opts.kodaFolder()) === "confirm") {
+    if (writePolicy(norm, this.opts.kodaFolder(), mode) === "confirm") {
       const oldText = exists ? await this.vault.read(norm) : "";
       const approved = await this.confirm({ kind: "write", path: norm, mode, oldText, newText: effective });
       if (!approved) return { ok: false, error: "vom Nutzer abgelehnt" };
@@ -578,7 +578,7 @@ export class VaultTools implements ToolRunner {
     // landen. Daher innere Zeilenumbrueche (+ das sie umgebende Whitespace) auf
     // ein Leerzeichen kollabieren.
     const clean = text.trim().replace(/\s*\n\s*/g, " ");
-    const path = `${this.opts.kodaFolder().replace(/\/+$/, "")}/Memory.md`;
+    const path = `${this.opts.kodaFolder().replace(/\/+$/, "")}/${MEMORY_FILE}`;
     const existing = (await this.vault.exists(path)) ? await this.vault.read(path) : "";
     await this.vault.overwrite(path, appendMemoryLine(existing, clean, this.opts.today()));
     return { ok: true, content: `gemerkt: ${clean}` };
@@ -650,7 +650,7 @@ export class VaultTools implements ToolRunner {
     if (mode === "replace_selection" && old === "") {
       return { ok: false, error: "Keine Markierung im Editor — für replace_selection muss Text markiert sein." };
     }
-    if (writePolicy(target, this.opts.kodaFolder()) === "confirm") {
+    if (writePolicy(target, this.opts.kodaFolder(), mode === "replace_selection" ? "replace" : "append") === "confirm") {
       const req: WriteFileRequest = { kind: "write", path: target, mode: mode === "replace_selection" ? "replace" : "append", oldText: old, newText: text };
       // Additiv, nur bei insert_at_cursor: WriteRequest.mode bleibt "append" (Wortlaut fuer
       // append-artiges Verhalten), aber das Modal zeigte dafuer "append" an — irrefuehrend fuer
