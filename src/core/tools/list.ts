@@ -13,7 +13,7 @@
  *  leerer Ordner, also wieder ein Befund, der wie eine Tatsache aussieht.
  *  Nur fuer den VERGLEICH: ausgegeben wird immer der Originalpfad, denn mit dem muss
  *  `read_note` anschliessend die Datei finden. */
-import { pathsInFolder } from "../../vendor/kit/folder-scope";
+import { countInFolders, pathsInFolder } from "../../vendor/kit/folder-scope";
 import type { TreeBlock } from "./tree";
 
 export const nf = (s: string): string => s.normalize("NFC");
@@ -157,18 +157,23 @@ export function collectSubfolders(
   allPaths: string[], folderPaths: string[], folder: string, recursive: boolean, otherPaths: string[] = [],
 ): Subfolder[] {
   const prefix = folder === "" ? "" : `${nf(folder)}/`;
-  const notesPaths = allPaths.map(nf);
-  const otherNorm = otherPaths.map(nf);
-  const out: Subfolder[] = [];
+  const candidates: [string, string][] = [];
   for (const [n, original] of knownFolders(allPaths, folderPaths)) {
     if (!n.startsWith(prefix)) continue;
     const rest = n.slice(prefix.length);
     if (rest === "" || (!recursive && rest.includes("/"))) continue;
-    const notes = notesPaths.filter((p) => p.startsWith(`${n}/`)).length;
-    if (recursive && notes > 0) continue;
-    const others = otherNorm.filter((p) => p.startsWith(`${n}/`)).length;
-    out.push(others === 0 ? { path: original, notes } : { path: original, notes, others });
+    candidates.push([n, original]);
   }
+  // Zaehlung aus code-kit `folder-scope` (`countInFolders`, seit 0.36.0): ein Durchlauf ueber die Pfade statt einer je Ordner. Ganze
+  // Segmente, Gross/klein unterschieden (kein `ignoreCase`), der Ordner zaehlt sich nicht selbst; ein Pfad mit `..` oder NUL zaehlt in keinem.
+  const notesIn = countInFolders(allPaths.map(nf), candidates.map(([n]) => n));
+  const kept = candidates.filter(([n]) => !recursive || (notesIn.get(n) ?? 0) === 0);
+  const othersIn = countInFolders(otherPaths.map(nf), kept.map(([n]) => n));
+  const out: Subfolder[] = kept.map(([n, original]) => {
+    const notes = notesIn.get(n) ?? 0;
+    const others = othersIn.get(n) ?? 0;
+    return others === 0 ? { path: original, notes } : { path: original, notes, others };
+  });
   // Standard-Ordnung wie `collectFolderNotes` — deterministisch ueber ICU-Versionen.
   return out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }

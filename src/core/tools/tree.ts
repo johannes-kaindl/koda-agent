@@ -11,6 +11,7 @@
 // des Vaults, keine Eigenschaft der Struktur — strukturelle Aussagen gehoeren ins Werkzeug,
 // das Urteil gegen einen Soll-Stand ins Gespraech (oder in einen Skill, der ihn beschreibt).
 
+import { countInFolders } from "../../vendor/kit/folder-scope";
 import { cell, countLabel, knownFolders, nf } from "./list";
 
 export interface TreeNode { path: string; level: number; notes: number }
@@ -31,17 +32,21 @@ export function collectFolderTree(
   allPaths: string[], folderPaths: string[], folder: string, depth: number, max: number,
 ): FolderTree {
   const prefix = folder === "" ? "" : `${nf(folder)}/`;
-  const notesPaths = allPaths.map(nf);
-  const all: (TreeNode & { key: string[] })[] = [];
+  const candidates: { path: string; n: string; key: string[] }[] = [];
   for (const [n, original] of knownFolders(allPaths, folderPaths)) {
     if (!n.startsWith(prefix)) continue;
     const rest = n.slice(prefix.length);
     if (rest === "") continue;
     const key = rest.split("/");
     if (key.length > depth) continue;
-    const notes = notesPaths.filter((p) => p.startsWith(`${n}/`)).length;
-    all.push({ path: original, level: key.length, notes, key });
+    candidates.push({ path: original, n, key });
   }
+  // Zaehlung aus code-kit `folder-scope` (`countInFolders`, seit 0.36.0): ein Durchlauf ueber die Pfade statt einer je Ordner (bei
+  // 1 500 Ordnern ueber 5 000 Notizen rund 4 s). Gleiche Lesart wie die Unterordner-Zeile in `list.ts`.
+  const notesIn = countInFolders(allPaths.map(nf), candidates.map((c) => c.n));
+  const all: (TreeNode & { key: string[] })[] = candidates.map(({ path, n, key }) => ({
+    path, level: key.length, notes: notesIn.get(n) ?? 0, key,
+  }));
 
   const perLevel: number[] = [];
   for (const node of all) perLevel[node.level] = (perLevel[node.level] ?? 0) + 1;
