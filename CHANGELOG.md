@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.30.0] — 2026-10-24
+
 ### Changed
 
 - **The write boundary also holds for paths it cannot read (code-kit 0.36.0):** a path with a `..` segment or a NUL byte now counts as inside every folder when Koda decides whether `Skills/` and `Arbeiten/` ask first (`Koda/Skills/../x.md` asks from that side as well). Nothing changes for you: such a path already asked, because it never lay in the free zone `<Koda folder>/`; the two checks now agree.
