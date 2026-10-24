@@ -14,7 +14,7 @@ export const TOOL_DEFS: ToolDef[] = [
     parameters: {
       type: "object",
       properties: {
-        query: { type: "string", description: "Search term (case-insensitive substring)" },
+        query: { type: "string", description: "One or two keywords, not a sentence (case-insensitive substring; the whole text must occur literally, so a question finds nothing)" },
         max_results: { type: "integer", description: "Maximum results, default 10" },
       },
       required: ["query"],

@@ -44,7 +44,7 @@ describe("formatSearchResult", () => {
 
   it("nennt die Pause auch bei null Volltext-Treffern", () => {
     const out = formatSearchResult([], { ok: false, reason: "paused" });
-    expect(out).toContain("Keine Treffer");
+    expect(out).toContain("Keine Volltext-Treffer");
     expect(out).toContain("Die semantische Suche ist pausiert");
   });
 
@@ -55,7 +55,39 @@ describe("formatSearchResult", () => {
 
   it("meldet den Ausfall auch dann, wenn die Volltextsuche selbst leer blieb", () => {
     const out = formatSearchResult([], { ok: false, reason: "offline" });
-    expect(out).toContain("Keine Treffer");
+    expect(out).toContain("Keine Volltext-Treffer");
     expect(out).toContain("Embedding-Endpunkt nicht erreichbar");
+  });
+
+  // Der leere Fall bekommt je Grund einen eigenen Satz: „Keine Treffer. (semantisch: …)“ las sich, als sei die GANZE Suche leer.
+  it("im leeren Fall sagt jeder Grund: keine Volltext-Treffer, und warum die semantische Suche fehlt", () => {
+    const gruende: [Parameters<typeof formatSearchResult>[1], string][] = [
+      [{ ok: false, reason: "no-index" }, "kein Index vorhanden"],
+      [{ ok: false, reason: "offline" }, "Embedding-Endpunkt nicht erreichbar"],
+      [{ ok: false, reason: "paused" }, "Die semantische Suche ist pausiert"],
+      [{ ok: false, reason: "not-indexed", path: "x.md" }, '"x.md" nicht im Index'],
+    ];
+    const texte = gruende.map(([r, teil]) => {
+      const out = formatSearchResult([], r);
+      expect(out).toMatch(/^Keine Volltext-Treffer\. /);
+      expect(out).toContain(teil);
+      expect(out).not.toContain("Keine Treffer");
+      expect(out).not.toMatch(/^\(/m);
+      return out;
+    });
+    expect(new Set(texte).size).toBe(4);
+  });
+
+  it("Gegenprobe: mit Volltext-Treffer bleibt die Ausfallnotiz die Klammer unter der Liste", () => {
+    for (const reason of ["no-index", "offline", "paused"] as const) {
+      const out = formatSearchResult(t, { ok: false, reason });
+      expect(out.startsWith("a.md: …Plan…\n(")).toBe(true);
+      expect(out).not.toContain("Keine Volltext-Treffer");
+    }
+  });
+
+  it("ohne Ausfall und ohne Treffer bleibt es bei „Keine Treffer.“", () => {
+    expect(formatSearchResult([], null)).toBe("Keine Treffer.");
+    expect(formatSearchResult([], { ok: true, hits: [] })).toBe("Keine Treffer.");
   });
 });

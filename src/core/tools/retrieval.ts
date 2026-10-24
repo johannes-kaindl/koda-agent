@@ -77,6 +77,24 @@ function outageNote(r: ApiResult | null): string | null {
   }
 }
 
+/** Die Ausfallnotiz fuer den Fall OHNE jeden Treffer. „Keine Treffer. (semantisch: …)“ las sich schief: die Klammer wirkt wie eine
+ *  Randbemerkung zu einer leeren Suche, obwohl nur der Volltext leer blieb und die semantische Seite gar nicht lief. Hier steht
+ *  deshalb beides als Satz: was leer war und warum der Rest fehlt. */
+function outageNoteWhenEmpty(r: ApiResult | null): string | null {
+  if (r === null || r.ok) return null;
+  const head = "Keine Volltext-Treffer. ";
+  switch (r.reason) {
+    case "no-index":
+      return `${head}Die semantische Suche lief nicht: kein Index vorhanden — vault-rag hat den Vault noch nicht indexiert.`;
+    case "offline":
+      return `${head}Die semantische Suche lief nicht: Embedding-Endpunkt nicht erreichbar.`;
+    case "paused":
+      return `${head}Die semantische Suche ist pausiert — Treffer stammen nur aus dem Volltext.`;
+    case "not-indexed":
+      return `${head}Die semantische Suche lief nicht: "${r.path}" nicht im Index.`;
+  }
+}
+
 /** Warum Bloecke statt einer gemischten Rangfolge: Volltext hat keinen Score,
  *  semantische Treffer haben keinen Snippet — eine gemeinsame Sortierung waere
  *  erfunden. Und ein Volltext-Treffer BELEGT ein woertliches Vorkommen, ein
@@ -94,7 +112,7 @@ export function formatSearchResult(text: TextHit[], semantic: ApiResult | null):
   const onlySemantic = semHits.filter((h) => !text.some((t) => t.path === h.path));
 
   if (textLines.length === 0 && onlySemantic.length === 0) {
-    return ["Keine Treffer.", note].filter((x) => x !== null).join("\n");
+    return outageNoteWhenEmpty(semantic) ?? "Keine Treffer.";
   }
   if (onlySemantic.length === 0) {
     return [textLines.join("\n"), note].filter((x) => x !== null).join("\n");
