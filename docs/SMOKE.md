@@ -1376,6 +1376,16 @@ Neu: **86** Übernahme als Tabelle (vier Zeilen, Form `table` aus dem Default im
 - Der Plan erwartete drei Zeilen für `status != ""`; gemessen waren es 13, weil der Filter auch Notizen ohne die Eigenschaft trifft. Die Fixture-Bases filtern jetzt auf `status == "active"` (vier Notizen).
 - Der Kit-Mock kennt `BasesView`/`NullValue` nicht; `main.ts` importiert `bases-view.ts`, und zwei Tests laden `main.ts`. Leere Hüllen in `tests/__mocks__/obsidian.ts` genügen, die Ansicht selbst belegt nur dieser Smoke.
 
+## Belegter Lauf: 2026-10-25, Welle 26 — Kit 0.67.1/0.36.0, Zählung über `countInFolders`, Memory.md-Schranke, Punkt 16 repariert (101 Punkte)
+
+Zweitinstanz, Obsidian 1.14.5, `--exclusive all`, je Lauf ein frischer Prozess, Staging-Vault aus dem Fixture.
+
+- **Baseline vor dem Umbau (HEAD `1a11094`, Kit 0.66.1/0.34.0):** 99 grün · 0 rot · 2 übersprungen · 0 nichts gemessen (1b ohne vault-rag, 96 „in diesem Layout nicht anwendbar“), 117 s.
+- **Gegenprobe Punkt 16 (Mutation am Plugin-Build):** der `onClick` des `rotate-ccw`-Knopfs in `src/obsidian/model-control.ts` wirkungslos, gebaut, `--setup`, frischer Prozess → 98 grün · **1 rot** · 2 übersprungen · 0 nichts gemessen; rot ist genau Punkt 16 mit „geklickt: true · Override leer: null · danach: null“ (nicht „nichts gemessen“). Mutation zurückgenommen (`git status` zeigt `model-control.ts` unverändert).
+- **Reparatur von Punkt 16:** das Skript von `nachher` liefert `null`, solange die Textarea nicht leer ist (`if (!ta || ta.value !== "") return null;`). Vorher lieferte `pollUntil` beim ersten wahrheitsfähigen Wert, und ein Objekt ist immer wahr: der Poll maß einmal sofort und gab den Zwischenstand zurück (Override schon leer, Textarea noch nicht neu gezeichnet, weil der Reset-Knopf erst nach `save().then(refresh)` zeichnet). Das erklärt das einmalige Rot „danach: SMOKE-EIGENE-ANWEISUNG · Override leer: true“. Die Ursache ist am Code gelesen, nicht an einem Lauf reproduziert. Zusätzlich prüft die `record`-Bedingung `vorKlick.value === "SMOKE-EIGENE-ANWEISUNG"`. `tools/treiber_check.py` fängt die Falle nicht (`TREIBER-POLLWAHR` meldet nichts, solange der Ausdruck irgendwo `null` liefert); sie lässt sich nicht von einem Existenz-Poll unterscheiden, den Punkt 16 selbst für `vorKlick` richtig benutzt.
+- **Nach der Reparatur, zweimal grün (zwei frische Prozesse, nach dem Build des Endstands):** 99 grün · 0 rot · 2 übersprungen · 0 nichts gemessen, 116 s und 116 s; Punkt 16 beide Male „geklickt: true · Override leer: true · danach: {value: "", placeholder: …}“.
+- **Grenze:** die Punkte 1–101 messen weder die Memory.md-Schranke noch die Zählung noch den Suchhinweis; die tragen Unit-Tests mit Mutation (`tests/write_policy.test.ts`, `tests/vault_tools.test.ts`, `tests/vault_tools_workspace.test.ts`, `tests/list_count_scope.test.ts`, `tests/retrieval.test.ts`). Es kam kein neuer Smoke-Punkt hinzu, der Nenner bleibt 101.
+
 ## Anhang: Prüfpunkt-Katalog bis Punkt 48 (wörtlich aus der früheren CLAUDE.md, Stand 2026-09-26)
 
 Die Chronik der Prüfpunkte 9–48, nach Datum und Anlass gruppiert; die Punkte seit 49 stehen in den Läufen oben und in `scripts/gui-smoke.ts` (die Liste `PUNKTE`). Der Text steht unverändert hier, damit nichts davon verloren geht.

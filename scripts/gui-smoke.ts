@@ -1282,17 +1282,21 @@ async function main(): Promise<void> {
                   4000,
                 )
               : null;
+            // `pollUntil` bricht beim ersten wahrheitsfaehigen Wert ab, und ein Objekt ist immer wahr: ohne die Bedingung `value === ""`
+            // lieferte der Poll sofort den Zwischenstand (Override schon leer, Textarea noch nicht neu gezeichnet — der Reset-Knopf zeichnet
+            // erst nach `save().then(refresh)`). Gemessen als einmaliges Rot („danach: SMOKE-EIGENE-ANWEISUNG“, Override leer: true).
             const nachher = await pollUntil<{ value: string; placeholder: string }>(
               settings16,
               `
                 const ta = document.querySelector("textarea.koda-prompt-textarea");
-                return ta ? { value: ta.value, placeholder: ta.placeholder } : null;
+                if (!ta || ta.value !== "") return null;
+                return { value: ta.value, placeholder: ta.placeholder };
               `,
               4000,
             );
             record(
               "16. Zuruecksetzen stellt den Auslieferungsstand her",
-              geklickt === true && leer === true && nachher !== null && nachher.value === "" && nachher.placeholder !== "",
+              vorKlick.value === "SMOKE-EIGENE-ANWEISUNG" && geklickt === true && leer === true && nachher !== null && nachher.value === "" && nachher.placeholder !== "",
               `vorher: „${vorKlick.value}" · geklickt: ${String(geklickt)} · Override leer: ${String(leer)} · danach: ${JSON.stringify(nachher)}`,
             );
           }
