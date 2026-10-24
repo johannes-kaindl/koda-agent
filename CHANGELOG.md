@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The write boundary also holds for paths it cannot read (code-kit 0.36.0):** a path with a `..` segment or a NUL byte now counts as inside every folder when Koda decides whether `Skills/` and `Arbeiten/` ask first (`Koda/Skills/../x.md` asks from that side as well). Nothing changes for you: such a path already asked, because it never lay in the free zone `<Koda folder>/`; the two checks now agree.
+- **The endpoint list knows the role "used for search — does not write"** (obsidian-kit 0.67.0, code-kit 0.36.0): the settings list has a text for it in English and German. Koda marks no row as search-only (it has no search of its own), so you will not see it; it is there so that a re-vendored kit cannot show "Standby — position undefined".
+- Kit: obsidian-kit 0.66.1 → 0.67.1 (also brings the model bar, the `image-crop` module, a darker backdrop for `CropModal`, `critic-editor` fixes and a store-CSS lint in the kit's gate, none of which Koda uses yet) and code-kit 0.34.0 → 0.36.0 (also brings `parseNumeric` and `countInFolders`).
+
 ## [0.29.0] — 2026-10-23
 
 ### Added

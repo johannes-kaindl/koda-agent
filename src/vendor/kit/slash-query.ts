@@ -1,4 +1,4 @@
-// vendored from code-kit@0.34.0, src/ts/pure/slash-query.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.36.0, src/ts/pure/slash-query.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** A `/`-command being typed in a plain text field (no editor): where it starts and what was typed after the slash, which
  *  entries match it, and the text without it once one is chosen. Pure — the popover that shows the matches lives in
  *  obsidian-kit (`textarea-suggest`).

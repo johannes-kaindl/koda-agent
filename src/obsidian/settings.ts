@@ -556,7 +556,9 @@ export class KodaSettingsTab extends PluginSettingTab {
             ? t("settings.endpoints.role.unreachable")
             : role.kind === "skipped-model"
               ? t("settings.endpoints.role.modelMismatch")
-              : t("settings.endpoints.role.standby", String(role.position)),
+              : role.kind === "search-only"
+                ? t("settings.endpoints.role.searchOnly")
+                : t("settings.endpoints.role.standby", String(role.position)),
       warnings: (ws) => ws.map((w) => t(`settings.endpoints.warn.${w.rule}`)).join(" · "),
       presetTooltip: (preset) => t("settings.endpoints.preset", preset.label),
       presetLabel: (preset) => t("settings.endpoints.presetAdd", preset.label),

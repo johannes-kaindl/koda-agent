@@ -51,6 +51,15 @@ describe("writePolicy — Skills sind trotz Lage bestaetigungspflichtig", () => 
     expect(writePolicy("Koda/../Projekte/x.md", "Koda")).toBe("confirm");
     expect(writePolicy("Koda/Entwürfe/../x.md", "Koda")).toBe("confirm");
   });
+  // code-kit 0.36.0: unter `reading: "filesystem"` liegt ein Pfad mit `..` oder NUL in jedem Ordner (fail-closed). Fuer die Skills-/
+  // Arbeiten-Zweige heisst das: er fragt dort jetzt auch von dieser Seite. Doppelt abgesichert, nicht neu: die Freizone-Pruefung
+  // (engere Lesart) weist ihn schon vorher ab, deshalb macht eine Mutation, die nur sie entfernt, hier keinen Test rot. Rot wird erst,
+  // wer BEIDE Pruefungen entfernt (dann waere "free" die Antwort).
+  it("ein Pfad mit .. oder NUL unter Skills/ und Arbeiten/ fragt (Freizone und Schutzzweig weisen ihn beide ab)", () => {
+    for (const p of ["Koda/Skills/../x.md", "Koda/Arbeiten/../x.md", "Koda/../x.md", "Koda/Skills/x\u0000.md"]) {
+      expect(writePolicy(p, "Koda")).toBe("confirm");
+    }
+  });
   it("ein leerer Koda-Ordner enthaelt nichts: alles fragt", () => {
     expect(writePolicy("x.md", "")).toBe("confirm");
     expect(writePolicy("Koda/x.md", "/")).toBe("confirm");

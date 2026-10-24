@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Setting } from "obsidian";
 import "../src/i18n/strings";
 import { KodaSettingsTab } from "../src/obsidian/settings";
+import type { EndpointListStrings } from "../src/vendor/kit-obsidian/endpoint-list";
 import { setLang, t } from "../src/vendor/kit/i18n";
 
 /** UI-STANDARD §8: die Hilfe-Zeile ist das ERSTE Element der Settings, vor jeder Zeile. */
@@ -45,5 +46,43 @@ describe("Hilfe-Zeile in den Settings", () => {
       "https://github.com/johannes-kaindl/koda-agent/blob/main/docs/README.md",
       "https://github.com/johannes-kaindl/koda-agent/issues",
     ]);
+  });
+});
+
+/** Rollen-Kette der Endpunkt-Liste: jede der fünf Rollen hat einen eigenen, echten Text. */
+describe("Rollen der Endpunkt-Liste", () => {
+  afterEach(() => setLang("en"));
+
+  const rollen = [
+    { kind: "active" },
+    { kind: "unreachable" },
+    { kind: "skipped-model" },
+    { kind: "search-only" },
+    { kind: "standby", position: 2 },
+  ] as const;
+
+  function texte(lang: "en" | "de"): string[] {
+    setLang(lang);
+    const strings = (tab() as unknown as { endpointStrings(): EndpointListStrings }).endpointStrings();
+    return rollen.map((r) => strings.role(r as never));
+  }
+
+  it("search-only trägt einen eigenen Text, nicht den der Bereitschaft", () => {
+    for (const lang of ["en", "de"] as const) {
+      setLang(lang);
+      const strings = (tab() as unknown as { endpointStrings(): EndpointListStrings }).endpointStrings();
+      const text = strings.role({ kind: "search-only" } as never);
+      expect(text).not.toBe(strings.role({ kind: "standby", position: 1 } as never));
+      expect(text).not.toContain("undefined");
+      expect(text).not.toBe("settings.endpoints.role.searchOnly");
+    }
+  });
+
+  it("alle fünf Rollen tragen in EN und DE verschiedene Texte, und DE ist nicht EN", () => {
+    const en = texte("en");
+    const de = texte("de");
+    expect(new Set(en).size).toBe(5);
+    expect(new Set(de).size).toBe(5);
+    en.forEach((text, i) => expect(de[i]).not.toBe(text));
   });
 });
