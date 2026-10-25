@@ -14,6 +14,8 @@ Koda writes freely in one place: the **Koda folder**. That is where its memory a
 
 Three things ask first even inside the Koda folder. Deleting a note, because it breaks links. Writing a skill, because a skill is not a draft: it changes what Koda does from then on. And replacing the text of your memory note `Memory.md`, or moving or renaming it, because that throws away what Koda has learned about you (a note that has left its place is no longer read into the prompt); adding a line to it stays free, which is how Koda remembers. That check sits in the write rule itself, not in the skill tool, so it cannot be sidestepped by writing a skill file with the ordinary write tool.
 
+One limit to know: a symlink inside the Koda folder that points out of the vault counts as part of the Koda folder. Koda writes through it without asking, because the rule reads the path as it stands, and Koda cannot create such a link itself, only you can.
+
 What Koda will never do: run programs or touch anything outside your vault. There is no terminal access and no background work; Koda acts only when you ask.
 
 ## Compaction: shortening without forgetting what you said
