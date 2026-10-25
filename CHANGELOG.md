@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.31.0] — 2026-10-25
+
 ### Added
 
 - **A model row above the conversation** (obsidian-kit 0.70.0): the model of the active endpoint in a dropdown, *Automatic* (the endpoint's default or the row's own model), and a reload button for the list. A choice goes where the settings put it: into the row of the endpoint that is being used, with the Endpoint Manager into its choice, so the dropdown and the settings show the same thing (a change in either is picked up by the other). The row is locked while an answer is being written. The thinking button stays in the header: the kit's thinking control has no state for models that always think (gpt-oss), where Koda's button is locked.

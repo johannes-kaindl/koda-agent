@@ -1,7 +1,7 @@
 {
   "id": "koda-agent",
   "name": "Koda",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "minAppVersion": "1.11.4",
   "description": "Agentic vault companion: chat with an assistant that searches and reads your notes, writes only with your approval, and learns through a transparent memory note.",
   "author": "Johannes Kaindl",
