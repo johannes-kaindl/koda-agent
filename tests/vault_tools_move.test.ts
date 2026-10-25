@@ -60,6 +60,20 @@ describe("move_note", () => {
     expect(c.calls).toHaveLength(0);
     expect((v as never as { files: Record<string, string> }).files).toEqual({ "Koda/b.md": "x" });
   });
+  it("Memory.md umbenennen oder verschieben fragt, auch innerhalb des Koda-Ordners", async () => {
+    const c = capturing();
+    const v = fakeVault({ "Koda/Memory.md": "Gedaechtnis" });
+    const r = await new VaultTools(v, c.confirm, opts).run("move_note", { source_path: "Koda/Memory.md", destination_path: "Koda/Archiv/Memory.md" });
+    expect(r.ok).toBe(true);
+    expect(c.calls).toHaveLength(1);
+    expect(c.calls[0]).toMatchObject({ kind: "move", path: "Koda/Memory.md", destination: "Koda/Archiv/Memory.md" });
+  });
+  it("Memory.md: eine abgelehnte Rueckfrage laesst das Gedaechtnis liegen", async () => {
+    const v = fakeVault({ "Koda/Memory.md": "Gedaechtnis" });
+    const r = await new VaultTools(v, no, opts).run("move_note", { source_path: "Koda/Memory.md", destination_path: "Koda/weg.md" });
+    expect(r.ok).toBe(false);
+    expect((v as never as { files: Record<string, string> }).files).toEqual({ "Koda/Memory.md": "Gedaechtnis" });
+  });
   it("aus dem Koda-Ordner heraus mit Rueckfrage, und die nennt die Backlink-Zahl", async () => {
     const c = capturing();
     await new VaultTools(fakeVault({ "Koda/a.md": "x" }, { "Koda/a.md": 3 }), c.confirm, opts)

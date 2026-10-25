@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Moving or renaming the memory note `Memory.md` now asks first.** Before, `move_note` was free when both ends were inside the Koda folder, so Koda could move its own memory out of the place the prompt reads it from without anyone being asked. Replacing its text asked already (0.30.0); adding a line still does not. A move *to* `Koda/Memory.md` onto a free place stays free, and so does a file called `Memory.md` in a subfolder (it is not read).
+
 ## [0.30.0] — 2026-10-24
 
 ### Changed

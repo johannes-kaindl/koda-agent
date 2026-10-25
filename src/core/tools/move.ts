@@ -17,7 +17,11 @@ export type MoveDecision = "free" | "confirm";
  *  schon entschieden und getestet. Eine zweite Fassung derselben Regel liefe
  *  auseinander, sobald jemand nur eine von beiden anfasst. */
 export function movePolicy(source: string, destination: string, kodaFolder: string): MoveDecision {
-  const beide = writePolicy(source, kodaFolder) === "free"
+  // Die Quelle wird als `replace` gefragt: ein Move nimmt der Quelle ihren Platz, und `<Koda>/Memory.md` ist die eine Datei, die der
+  // Prompt unter genau diesem Namen liest — verschoben oder umbenannt verschwindet das Gedaechtnis daraus (Entscheidung Johannes
+  // 2026-10-25). Das Ziel bleibt `create`-artig: ein Move nach `Koda/Memory.md` landet auf freiem Platz (ein belegtes Ziel lehnt
+  // `move_note` ab), das ist der Fall, in dem eine Datei zum Gedaechtnis wird, ohne dass eines verloren geht.
+  const beide = writePolicy(source, kodaFolder, "replace") === "free"
     && writePolicy(destination, kodaFolder) === "free";
   return beide ? "free" : "confirm";
 }

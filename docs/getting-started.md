@@ -43,7 +43,7 @@ Under your message, a collapsible line **Context: …** shows what went along wi
 2. Because `Summaries/` is outside the Koda folder, a dialog opens first: **Koda wants to create: Summaries/Project plan.md**, with the text it is about to write.
 3. Select **Write** to let it through, or **Cancel**. After **Cancel**, the file is not touched, and Koda is told that you declined.
 
-Inside the Koda folder, Koda writes and moves notes without asking. Two things always ask first, wherever they happen: deleting a note (it goes to the vault's trash) and writing a skill. Replacing the text of your memory note `Koda/Memory.md` asks as well; adding a line to it does not.
+Inside the Koda folder, Koda writes and moves notes without asking. Two things always ask first, wherever they happen: deleting a note (it goes to the vault's trash) and writing a skill. Replacing the text of your memory note `Koda/Memory.md`, or moving or renaming it, asks as well; adding a line to it does not.
 
 ## 6. Let Koda remember something
 

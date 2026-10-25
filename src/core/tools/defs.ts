@@ -142,8 +142,8 @@ export const TOOL_DEFS: ToolDef[] = [
     name: "move_note",
     description:
       "Move or rename a Markdown note. Obsidian updates the wikilinks in every note that "
-      + "links to it, so links stay intact. Moving within the Koda folder is free; anything "
-      + "else requires the user's approval. Fails if the source is missing or the target "
+      + "links to it, so links stay intact. Moving within the Koda folder is free, except moving or "
+      + "renaming the memory note (Memory.md); anything else requires the user's approval. Fails if the source is missing or the target "
       + "path is already taken — it never overwrites.",
     parameters: {
       type: "object",
