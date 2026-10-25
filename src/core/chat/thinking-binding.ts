@@ -30,6 +30,8 @@ export interface ThinkingBinding {
   levelPicker: () => boolean;
   /** Das Modell denkt immer (gpt-oss): der Knopf ist gesperrt (Kit `locked`), der Request unterdrueckt nie. Der Text kommt vom View (Sprache). */
   alwaysOn: () => boolean;
+  /** Die Namens-Heuristik des Kits rät „denkt vermutlich immer“ (deepseek-r1, qwq …), das Modell ist aber nicht gesperrt: der Knopf bleibt bedienbar und trägt den Hinweis (Kit `hint`). Der Text kommt vom View (Sprache). */
+  guessAlways: () => boolean;
   /** Der Befehl „Thinking umschalten“ (ein Zugang ohne den Knopf, Lehre 0.10.1): kippt an/aus, bei einem gesperrten Modell tut er nichts. */
   toggle: () => Promise<void>;
 }
@@ -45,6 +47,7 @@ export function createThinkingBinding(d: ThinkingBindingDeps): ThinkingBinding {
     setLevel: (level) => d.setSuppress(level === "off"),
     levelPicker: () => false,
     alwaysOn,
+    guessAlways: () => thinkToggleState(d.model(), d.suppress()).hint === "alwaysGuess",
     // Wie der Klick auf den Kit-Knopf, plus die Sperre: ein gerade gesperrter Zustand darf nicht durchschlagen (Muster canActivatePack).
     toggle: () => (alwaysOn() ? Promise.resolve() : d.setSuppress(!d.suppress())),
   };

@@ -237,6 +237,7 @@ const PUNKTE = [
   "11. Denk-Knopf der Modellzeile schaltet, ueberlebt den Neuaufbau, und der Befehl „Thinking umschalten“ schaltet denselben Wert",
   "12. „Neues Gespraech“ fragt nach, Abbruch laesst den Verlauf stehen",
   "13. Denk-Knopf der Modellzeile ist bei einem Modell, das sich nicht abschalten laesst, gesperrt (Kit-Feld locked), Klick und Befehl bleiben folgenlos",
+  "108. Denk-Knopf der Modellzeile: bei einem Modell, das die Namens-Heuristik als „denkt vermutlich immer“ rät, steht der Hinweis im Namen des Knopfs (an wie aus), der Knopf bleibt bedienbar; ohne Verdacht fehlt er, bei gpt-oss (gesperrt) auch",
   "16. Zuruecksetzen stellt den Auslieferungsstand her",
   "17. Abgeschaltetes Werkzeug wird nicht gesendet",
   "18. „Aktive Anweisung ansehen“ zeigt Memory und Skills",
@@ -1234,6 +1235,34 @@ async function main(): Promise<void> {
         dritte.gesperrt.disabled && dritte.gesperrt.pressed === "true" && /always on|immer an/.test(dritte.gesperrt.text) &&
         dritte.vorKlick === dritte.nachKlick && dritte.vorKlick === dritte.nachBefehl,
       `normal: „${dritte.normalAn.text}" / „${dritte.normalAus.text}" · gesperrt: „${dritte.gesperrt.text}" (disabled ${String(dritte.gesperrt.disabled)}, aria-pressed ${dritte.gesperrt.pressed}) · Klick folgenlos: ${String(dritte.vorKlick === dritte.nachKlick)} · Befehl folgenlos: ${String(dritte.vorKlick === dritte.nachBefehl)}`,
+    );
+
+    // --- 108. Der Hinweis „denkt vermutlich immer“ am bedienbaren Knopf (Kit `hint`, seit obsidian-kit 0.71.0) ----
+    // Die Entscheidung („rät der Name, dass das Modell immer denkt?“) trifft das Kit (`thinkToggleState`), der Text kommt aus dem Kit; Koda verdrahtet nur `hint`. Gemessen wird der Name des Knopfs
+    // (Tooltip und aria-label): der Hinweis steht dort bei einem geratenen Modell in beiden Zuständen, der Knopf bleibt bedienbar und schreibt; bei einem Modell ohne Verdacht und bei gpt-oss fehlt er.
+    const P108 = PUNKTE.find((n) => n.startsWith("108. "))!;
+    const hinweis = await cdp.evaluate<{ an: string; aus: string; ohne: string; gesperrt: string; bedienbar: boolean; klick: boolean }>(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      const v = p.views()[0];
+      const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+      const knopf = () => document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle");
+      const name = () => knopf()?.getAttribute("aria-label") ?? "";
+      const url0 = p.settings.endpoints[0].url;
+      const sende = async (m, suppress) => { p.settings.endpoints = [{ url: url0, model: m }]; p.settings.suppressThinking = suppress; p.resolver.invalidate(); v.syncModelBar(); await warte(400); };
+      await sende("deepseek-r1:8b", false); const an = name(); const bedienbar = knopf()?.disabled !== true;
+      await sende("deepseek-r1:8b", true);  const aus = name();
+      await sende("qwen3:8b", false);       const ohne = name();
+      await sende("gpt-oss:20b", false);    const gesperrt = name();
+      await sende("deepseek-r1:8b", false);
+      knopf()?.click(); await warte(600);
+      const klick = p.settings.suppressThinking === true;
+      return { an, aus, ohne, gesperrt, bedienbar, klick };
+    `);
+    const HINT = /probably always thinks|denkt vermutlich immer/;
+    record(
+      P108,
+      HINT.test(hinweis.an) && HINT.test(hinweis.aus) && hinweis.bedienbar && hinweis.klick && !HINT.test(hinweis.ohne) && hinweis.ohne === "" && !HINT.test(hinweis.gesperrt) && /always on|immer an/.test(hinweis.gesperrt),
+      `deepseek-r1 an: „${hinweis.an}“ · aus: „${hinweis.aus}“ · bedienbar: ${String(hinweis.bedienbar)}, Klick schreibt: ${String(hinweis.klick)} · qwen3 (ohne Verdacht): „${hinweis.ohne}“ · gpt-oss: „${hinweis.gesperrt}“`,
     );
 
     // --- 16. Reset stellt den Auslieferungsstand her -------------------------

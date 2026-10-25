@@ -12,7 +12,7 @@ import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obs
 import { renderMarkdownGuarded, type DomGuardOptions } from "../vendor/kit-obsidian/dom-guard";
 import { isSafeHref } from "../vendor/kit/link-guard";
 import { neutralizeModelMarkdown } from "../vendor/kit/safe-markdown";
-import { thinkingLockedTexts, thinkingOffTexts } from "../vendor/kit-obsidian/thinking-control";
+import { thinkingAlwaysGuessHint, thinkingLockedTexts, thinkingOffTexts } from "../vendor/kit-obsidian/thinking-control";
 import { isContextMode, type ContextAttachment } from "../core/context/types";
 import { contextSummary, sourceChips } from "../core/context/labels";
 import { fillModeSelect } from "./mode-select";
@@ -230,6 +230,8 @@ export class KodaView extends ItemView {
         // „aus“ ist bei Claude (und gemma 4 auf LM Studio) nicht möglich, die niedrigste Stufe geht raus: der Text des Kits sagt das, wo Kodas Knopf „aus“ zeigte.
         strings: { button: (level) => (level === "off" ? t("view.thinkingOff") : t("view.thinkingOn")), level: (l) => l, pickerLabel: t("view.thinkingDone"), offNotPossible: thinkingOffTexts(lang) },
         locked: () => (think.alwaysOn() ? thinkingLockedTexts(lang) : undefined),
+        // „denkt vermutlich immer“: die Entscheidung trifft das Kit (`thinkToggleState`), der Text kommt aus dem Kit; im gesperrten Zustand entfällt der Hinweis dort von selbst.
+        hint: () => (think.guessAlways() ? thinkingAlwaysGuessHint(lang) : undefined),
       },
     });
     this.logEl = container.createDiv({ cls: "koda-log" });

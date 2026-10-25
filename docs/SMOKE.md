@@ -1376,6 +1376,17 @@ Neu: **86** Übernahme als Tabelle (vier Zeilen, Form `table` aus dem Default im
 - Der Plan erwartete drei Zeilen für `status != ""`; gemessen waren es 13, weil der Filter auch Notizen ohne die Eigenschaft trifft. Die Fixture-Bases filtern jetzt auf `status == "active"` (vier Notizen).
 - Der Kit-Mock kennt `BasesView`/`NullValue` nicht; `main.ts` importiert `bases-view.ts`, und zwei Tests laden `main.ts`. Leere Hüllen in `tests/__mocks__/obsidian.ts` genügen, die Ansicht selbst belegt nur dieser Smoke.
 
+## Belegter Lauf: 2026-10-25, Kit 0.71.0 — der Hinweis „denkt vermutlich immer“ und der lesbare gesperrte Knopf (108 Punkte)
+
+Zweitinstanz :9562, Obsidian 1.14.5, `--exclusive all`, je Lauf ein frischer Prozess, Staging-Vault aus dem Fixture.
+
+- **Stand davor (HEAD `3d39722`, Kit 0.70.1, 0.32.0 im Store):** Gate 1180/1180, Smoke 105 grün · 0 rot · 2 übersprungen · 0 nichts gemessen (von 107).
+- **Endstand (Kit 0.71.0):** Gate 1185/1185 (Lint 0/0), Smoke **106 grün · 0 rot · 2 übersprungen** (1b ohne vault-rag, 96 „in diesem Layout nicht anwendbar“) · 0 nichts gemessen, von **108** (136 s). Neu ist **Punkt 108**: bei deepseek-r1 steht der Hinweis im Namen des Knopfs (an wie aus), der Knopf bleibt bedienbar und ein Klick schreibt; bei qwen3 (ohne Verdacht) fehlt der Name ganz, bei gpt-oss steht nur der Kit-Text „always on“ ohne das „probably“.
+- **Gegenprobe (Mutation am Plugin-Build, frischer Prozess):** `hint` aus der Verdrahtung in `view.ts` entfernt → 105 grün · **1 rot** · 2 übersprungen; rot ist genau Punkt 108 („deepseek-r1 an: „“ · aus: „“ …“). Danach zurückgenommen und neu gebaut. Dazu `tests/thinking_control_bindung.test.ts` (23 Tests): drei Mutationen an `guessAlways` (immer falsch, immer wahr, liest den Suppress-Wunsch) rot.
+- **Der gesperrte Knopf (am Bild und am DOM, hell und dunkel, Seitenleiste 470 und 300 px):** `is-locked` mit `opacity: 0.85` ergibt in Kodas Seitenleiste **4,38 : 1 hell und 5,51 : 1 dunkel** (vorher 1,83 und 2,33; der Kit nennt 4,39 und 5,50); er ist im Bild als „an“ lesbar und bleibt erkennbar nicht bedienbar. `hero.png` ändert sich nicht (das Modell der Aufnahme löst keinen Hinweis aus, der Knopf ist nicht gesperrt).
+- **Befund (Kit):** dieselbe Namens-Heuristik stuft auch Claude als „denkt vermutlich immer“ ein; im Zustand aus trägt der Name des Knopfs dann zwei Gründe, und der Kit setzt sie mit „. “ zusammen, obwohl der erste schon auf einen Punkt endet („…is sent.. This model…“). Task im Kit-Cockpit; der Test hält die Reihenfolge und beide Texte fest, nicht die Zeichensetzung.
+- **Grenzen:** wie im Lauf davor: die Request-Seite mit einem echten Modell, die deutschen Texte im GUI (der Treiber läuft mit `--lang=en-US`) und ein Manager mit Claude liegen nicht im Smoke; der Hinweis für Claude und das gemma-4-Label tragen nur die Unit-Tests mit dem echten Kit-Knopf.
+
 ## Belegter Lauf: 2026-10-25, nach Welle 27 — Kit 0.70.1, der Denk-Knopf in der Modellzeile (107 Punkte)
 
 Zweitinstanz :9562, Obsidian 1.14.5, `--exclusive all` (Aufnahmen `focus`), je Lauf ein frischer Prozess, Staging-Vault aus dem Fixture.

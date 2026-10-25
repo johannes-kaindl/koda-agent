@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The hint "this model probably always thinks — turning it off likely has no effect" is back** (obsidian-kit 0.71.0; 0.32.0 dropped it when the button moved into the model row). It stands in the tooltip and the spoken name of the button, with the button on or off, for the models that the name guess of the kit flags (deepseek-r1, qwq, magistral, glm-z1 and, by the same guess, Claude). The button stays operable and switches as before; for a model that really always thinks (gpt-oss) the button is locked and says *always on* without the "probably". For Claude and gemma 4 on LM Studio in the *off* state the name carries both reasons: *lowest level* and the hint.
+- **The locked thinking button (*Thinking: always on*) is easier to read:** its text had a contrast of 1.8 : 1 on a light and 2.3 : 1 on a dark theme (opacity 0.4) and looked like "not available"; now 4.4 : 1 and 5.5 : 1 (kit 0.71.0, measured by Koda in 0.32.0). It is still clearly not operable (no pointer, no hover effect).
+
+### Changed
+
+- Kit: obsidian-kit 0.70.1 → 0.71.0 (code-kit stays 0.37.5). What reaches you: the hint and the locked button above (the kit's `THINKING_CONTROL_CSS` is copied again into `styles.css`). New in the kit and not used by Koda: `onRefreshed` on the model row and `listStyle: "block"` in `patchFrontmatter`.
+
 ## [0.32.0] — 2026-10-25
 
 ### Changed

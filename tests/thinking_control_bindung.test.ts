@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { thinkingLockedTexts, thinkingOffTexts } from "../src/vendor/kit-obsidian/thinking-control";
+import { thinkingAlwaysGuessHint, thinkingLockedTexts, thinkingOffTexts } from "../src/vendor/kit-obsidian/thinking-control";
 import { buildModelBar } from "../src/vendor/kit-obsidian/model-bar";
 import { createThinkingBinding, effectiveSuppress } from "../src/core/chat/thinking-binding";
 import { makeFakeEl } from "./vendor/kit/obsidian-mock";
 
-// Welle 27 (K3), nachgeführt mit obsidian-kit 0.70.1: Kodas Denk-Steuerung ist der Knopf des Kits in der Modellzeile (`buildModelBar({ thinking })`), der dritte Zustand „immer an“ (gpt-oss)
+// Welle 27 (K3), nachgeführt mit obsidian-kit 0.70.1 (locked) und 0.71.0 (hint): Kodas Denk-Steuerung ist der Knopf des Kits in der Modellzeile (`buildModelBar({ thinking })`), der dritte Zustand „immer an“ (gpt-oss)
 // läuft über das Kit-Feld `locked`. Gemessen wird der ECHTE Kit-Knopf mit Kodas Anbindung (`createThinkingBinding`), nicht ein Nachbau: je Zustand die ANZEIGE (bedienbar? Beschriftung? aria-pressed?),
 // der SCHREIBWEG (ändert ein Klick `suppressThinking`?) und der REQUEST (`effectiveSuppress`). Der Request ist unverändert gegenüber der Kopf-Aktion, die dieser Knopf ablöst.
 
@@ -28,6 +28,7 @@ function zeile(model: string, backend: string, state: Zustand, lang: "en" | "de"
       family: think.family, backend: think.backend, current: think.current, onLevel: think.onLevel, setLevel: think.setLevel, levelPicker: think.levelPicker,
       strings: { button: (level) => (level === "off" ? "Thinking: off" : "Thinking: on"), level: (l) => l, pickerLabel: "Thinking", offNotPossible: thinkingOffTexts(lang) },
       locked: () => (think.alwaysOn() ? thinkingLockedTexts(lang) : undefined),
+      hint: () => (think.guessAlways() ? thinkingAlwaysGuessHint(lang) : undefined),
     },
   });
   const btn: any = (el as any).querySelector(".okit-thinking-toggle")  // der Mock kennt keine Nachfahren-Selektoren; die Zeile hat genau einen Knopf;
@@ -90,6 +91,43 @@ describe("Denk-Knopf der Modellzeile: der Kit-Knopf mit Kodas Anbindung (Messung
     expect(lms.btn.disabled ?? false).toBe(false);   // kein „immer an“: der Request unterdrückt weiter (effectiveSuppress), der Kit-Text sagt nur, was auf diesem Backend ankommt
   });
 
+  it("„denkt vermutlich immer“ (deepseek-r1): der Hinweis steht im bedienbaren Knopf, an wie aus; der Knopf schaltet weiter und der Request unterdrückt", () => {
+    const an = zeile("deepseek-r1:8b", "ollama", { suppress: false, schreibt: 0 });
+    const aus = zeile("deepseek-r1:8b", "ollama", { suppress: true, schreibt: 0 });
+    expect(an.aria).toBe("Thinking: on. This model probably always thinks — turning it off likely has no effect");
+    expect(aus.aria).toBe("Thinking: off. This model probably always thinks — turning it off likely has no effect");
+    expect(an.text).toBe("Thinking: on");              // die sichtbare Beschriftung bleibt, der Hinweis steht im Namen des Knopfs (Tooltip)
+    expect(an.btn.disabled ?? false).toBe(false);
+    an.btn.click();
+    expect(an.state).toEqual({ suppress: true, schreibt: 1 });
+    expect(effectiveSuppress("deepseek-r1:8b", true)).toBe(true);
+  });
+
+  it("der Hinweis auf Deutsch, und ein Modell ohne Verdacht (qwen3) trägt keinen aria-label", () => {
+    const de = zeile("qwq:32b", "lmstudio", { suppress: false, schreibt: 0 }, "de");
+    expect(de.aria).toBe("Thinking: on. Dieses Modell denkt vermutlich immer — Abschalten wirkt wahrscheinlich nicht");
+    const ohne = zeile("qwen3:8b", "lmstudio", { suppress: false, schreibt: 0 });
+    expect(ohne.aria).toBeNull();
+  });
+
+  it("Claude: die Namens-Heuristik des Kits rät „denkt vermutlich immer“ — der Hinweis steht im Knopf, im Zustand aus zusätzlich der Grund „niedrigste Stufe“ (Entscheidung bleibt im Kit, Koda macht keine Ausnahme)", () => {
+    expect(createThinkingBinding({ model: () => "claude-sonnet-5-5", backend: () => "anthropic", suppress: () => false, setSuppress: async () => {} }).guessAlways()).toBe(true);
+    const an = zeile("claude-sonnet-5-5", "anthropic", { suppress: false, schreibt: 0 });
+    const aus = zeile("claude-sonnet-5-5", "anthropic", { suppress: true, schreibt: 0 });
+    expect(an.aria).toBe("Thinking: on. This model probably always thinks — turning it off likely has no effect");
+    // Beide Gründe stehen im Namen des Knopfs (Reihenfolge: Beschriftung, „niedrigste Stufe“, Verdacht); die genaue Zeichensetzung dazwischen ist Sache des Kits (Task „Denk-Knopf: doppelter Punkt im aria-label …“ im Kit-Cockpit).
+    expect(aus.aria!.startsWith("Thinking: lowest level. Thinking can't be fully turned off here")).toBe(true);
+    expect(aus.aria).toContain("This model probably always thinks — turning it off likely has no effect");
+    expect(aus.aria!.indexOf("lowest available level")).toBeLessThan(aus.aria!.indexOf("probably always thinks"));
+    expect(aus.btn.disabled ?? false).toBe(false);
+  });
+
+  it("gpt-oss: gesperrt, und der Hinweis „vermutlich“ entfällt (das Modell denkt sicher)", () => {
+    const k = zeile("gpt-oss-20b", "lmstudio", { suppress: false, schreibt: 0 });
+    expect(k.aria).toBe("Thinking: always on. This model always thinks; thinking can't be turned off here.");
+    expect(k.aria).not.toContain("probably");
+  });
+
   it("Claude, an: „Thinking: on“, nicht gesperrt (Claude ist kein immer-denkendes Modell im Sinn von gpt-oss)", () => {
     const k = zeile("claude-sonnet-5-5", "anthropic", { suppress: false, schreibt: 0 });
     expect(k.text).toBe("Thinking: on");
@@ -122,6 +160,11 @@ describe("Denk-Knopf der Modellzeile: der Kit-Knopf mit Kodas Anbindung (Messung
 
 describe("Anbindung: alwaysOn, Befehl und Request-Seite", () => {
   const binding = (model: string, suppress = false) => createThinkingBinding({ model: () => model, backend: () => "unknown", suppress: () => suppress, setSuppress: vi.fn(async () => {}) });
+
+  it("guessAlways nur für den Namens-Verdacht, nie für gpt-oss (gesperrt) und nie ohne Modell", () => {
+    for (const m of ["deepseek-r1:8b", "qwq:32b", "magistral-small", "glm-z1:9b"]) expect(binding(m).guessAlways()).toBe(true);
+    for (const m of ["qwen3:8b", "gpt-oss:20b", ""]) expect(binding(m).guessAlways()).toBe(false);
+  });
 
   it("alwaysOn nur für Modelle, die sich nicht abschalten lassen (gpt-oss/harmony)", () => {
     expect(binding("gpt-oss:20b").alwaysOn()).toBe(true);
