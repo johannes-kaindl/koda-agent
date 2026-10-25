@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.70.1, src/pure/explain-texts.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.71.0, src/pure/explain-texts.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Erklärtexte für acht wiederkehrende LLM-Endpunkt-Sachverhalte — obsidian-frei, in Node
  *  testbar (PROF-OBS-03/04). Bauart wie `code-kit/pure/endpoint_diagnostics.ts`s `KLARTEXT`:
  *  Schlüssel + Text, hier zusätzlich je Sprache (EN kanonisch, DE daneben) — der Konsument

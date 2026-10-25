@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.70.1, src/obsidian/tool-providers.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.71.0, src/obsidian/tool-providers.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import {
   isToolProviderApi, toolProviderRejection, type ProviderOffer, type ToolLang, type ToolProviderApi, type ToolProviderRejection,
 } from "../kit/tool-provider";
