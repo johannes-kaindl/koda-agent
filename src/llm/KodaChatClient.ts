@@ -11,7 +11,7 @@ import { resolveRequestParams, type FamilyId } from "../vendor/kit/sampling-prof
 import type { EndpointTransport } from "../vendor/kit/endpoint-source";
 // Anzeige- und Request-Seite treffen dieselbe Entscheidung — deshalb EINE Definition,
 // im uebernommenen Toggle-Modul (REGISTRY: „wer nur die Anzeige uebernimmt, hat die Haelfte").
-import { effectiveSuppress } from "../core/chat/reasoning-toggle";
+import { effectiveSuppress } from "../core/chat/thinking-binding";
 import { realClock, type ClockPort } from "../vendor/kit-obsidian/clock";
 import { toWireMessages, type ChatMessage, type ToolCall } from "../core/agent/types";
 import { toWireTools, type ToolDef } from "../core/tools/defs";

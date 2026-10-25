@@ -127,7 +127,7 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 
 **Cause:** The model produced reasoning but no answer text.
 
-**Fix:** Switch **Suppress thinking** on, or use the **Thinking** button in the sidebar's header row.
+**Fix:** Switch **Suppress thinking** on, or use the **Thinking** button in the model row above the conversation.
 
 ### The Thinking button says "Thinking: always on"
 

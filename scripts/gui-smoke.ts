@@ -224,7 +224,7 @@ const PUNKTE = [
   "1. Plugin ist aktiv",
   "1b. Retrieval-Andockung",
   "1c. Frontmatter-Naht",
-  "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen und zwei SICHTBAREN Kopfzeilen-Aktionen",
+  "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen, der SICHTBAREN Kopfzeilen-Aktion „Neues Gespraech“ und dem sichtbaren Denk-Knopf in der Modellzeile",
   "3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein",
   "4. Toter Endpunkt wird als nicht erreichbar angezeigt",
   "8. Settings-Gruppe „Verlauf kürzen“ mit Fenster-Feld",
@@ -234,9 +234,9 @@ const PUNKTE = [
   "7. Verdichtungs-Marken (Stufe 1 + Stufe 2, erzwungen) werden gerendert",
   "9. Statuszeile nennt die Taetigkeit und dreht sich dabei",
   "10. Statuszeile zeigt die Belegung des Kontextfensters",
-  "11. Thinking-Schalter im Kopf schaltet und ueberlebt den Neuaufbau",
+  "11. Denk-Knopf der Modellzeile schaltet, ueberlebt den Neuaufbau, und der Befehl „Thinking umschalten“ schaltet denselben Wert",
   "12. „Neues Gespraech“ fragt nach, Abbruch laesst den Verlauf stehen",
-  "13. Thinking-Schalter sperrt bei einem Modell, das sich nicht abschalten laesst",
+  "13. Denk-Knopf der Modellzeile ist bei einem Modell, das sich nicht abschalten laesst, gesperrt (Kit-Feld locked), Klick und Befehl bleiben folgenlos",
   "16. Zuruecksetzen stellt den Auslieferungsstand her",
   "17. Abgeschaltetes Werkzeug wird nicht gesendet",
   "18. „Aktive Anweisung ansehen“ zeigt Memory und Skills",
@@ -319,10 +319,10 @@ const PUNKTE = [
   "96. Gegenprobe Erreichbarkeit: ohne Rollbalken am Verlauf wird ein Bedienelement unerreichbar",
   "97. Werkzeugliste: jedes Beschreibungsfeld zeigt seinen Inhalt in ganzen Zeilen, keine halb abgeschnittene Zeile am unteren Rand, mindestens drei Zeilen hoch",
   "98. Handpunkt 17 an der Naht: ist der Embedding-Endpunkt nicht erreichbar, stehen die Volltext-Treffer UND die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)“ im Ergebnis; erreichbar fehlt die Zeile",
-  "102. Modellzeile: der Chat-Tab trägt genau eine Zeile des Kits („Koda“) mit Dropdown, aria-label und Neu-laden-Knopf; der Denk-Knopf bleibt im Kopf",
+  "102. Modellzeile: der Chat-Tab trägt genau eine Zeile des Kits („Koda“) mit Dropdown, aria-label, Neu-laden-Knopf und dem Denk-Knopf des Kits; im Kopf bleibt nur „Neues Gespräch“",
   "103. Modellzeile: ein Wechsel im Dropdown ändert das gesendete Modell und das Modell der Zeile in den Einstellungen, „Automatisch“ stellt es zurück",
   "104. Modellzeile: ein Wechsel des Modells in den Einstellungen zeichnet das Dropdown nach",
-  "105. Modellzeile: im Lauf gesperrt, danach frei",
+  "105. Modellzeile: im Lauf gesperrt (Dropdown UND Denk-Knopf), danach frei",
   "106. Linkschutz: im Strom und im Verlauf hat keiner der Links mit javascript:, data:, file:, obsidian: oder app: ein Ziel, ein [[javascript:…]]-Klick öffnet nichts und ein gewöhnlicher innerer Link schon",
   "107. Einstellungen: die Gruppe „Links and images in answers“ hat zwei Schalter, beide aus, und ein Umlegen schreibt die Einstellung (und zurück)",
   "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung; mit dem Stub ist sie da, und Koda traegt related_notes nie selbst (es kommt nur ueber einen Anbieter, Punkt 78)",
@@ -694,8 +694,9 @@ async function main(): Promise<void> {
           const r = a.getBoundingClientRect();
           return { label: a.getAttribute("aria-label") ?? "", sichtbar: r.width > 0 && r.height > 0, hoehe: Math.round(r.height) };
         });
-        const think = view0.thinkActionEl;
-        const hasThink = !!think && el.contains(think) && think.getBoundingClientRect().height > 0;
+        // Der Denk-Knopf steht seit obsidian-kit 0.70.1 in der Modellzeile (Kit-Klasse), nicht mehr im Kopf; sichtbar heisst: eine Hoehe.
+        const think = el.querySelector(".okit-model-bar .okit-thinking-toggle");
+        const hasThink = !!think && think.getBoundingClientRect().height > 0;
         const neu = actions.find((a) => /Neues Gespräch|New chat/.test(a.label));
         const hasNewChat = !!neu && neu.sichtbar;
         return {
@@ -713,11 +714,11 @@ async function main(): Promise<void> {
       8000,
     );
     record(
-      "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen und zwei SICHTBAREN Kopfzeilen-Aktionen",
+      "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen, der SICHTBAREN Kopfzeilen-Aktion „Neues Gespraech“ und dem sichtbaren Denk-Knopf in der Modellzeile",
       view !== null && view.input && view.buttons.length === 2 && view.cta &&
-        view.inSidebar && view.hasThink && view.hasNewChat && view.status,
+        view.inSidebar && view.hasThink && view.hasNewChat && view.actions.length === 1 && view.status,
       view
-        ? `${view.leaves} Leaf · in Seitenleiste: ${String(view.inSidebar)} · Knoepfe: ${view.buttons.join(", ")} · Kopfzeile: ${view.actions.map((a) => `${a.label}[${a.hoehe}px]`).join(" | ")} · Thinking sichtbar: ${view.hasThink} · Statuszeile: ${view.status}`
+        ? `${view.leaves} Leaf · in Seitenleiste: ${String(view.inSidebar)} · Knoepfe: ${view.buttons.join(", ")} · Kopfzeile: ${view.actions.map((a) => `${a.label}[${a.hoehe}px]`).join(" | ")} · Denk-Knopf in der Zeile sichtbar: ${view.hasThink} · Statuszeile: ${view.status}`
         : "keine View entstanden",
     );
 
@@ -1119,28 +1120,37 @@ async function main(): Promise<void> {
       `${usage.normal} → bei 1024 Token: ${usage.tiny} (${usage.warnCls.includes("is-warning") ? "gewarnt" : "keine Warnung"})`,
     );
 
-    // --- 11. Thinking-Schalter im Kopf --------------------------------------
-    // Beide Richtungen, und das Ueberleben eines Neuaufbaus: der Zustand kommt aus den
-    // Einstellungen, nicht aus dem DOM — sonst faellt er beim naechsten Redraw zurueck.
-    const think = await cdp.evaluate<{ start: boolean; after: boolean; label: string; survives: boolean }>(`
+    // --- 11. Denk-Knopf der Modellzeile --------------------------------------
+    // Beide Richtungen, das Ueberleben eines Neuaufbaus und der zweite Zugang (der Befehl): der Zustand kommt aus den
+    // Einstellungen, nicht aus dem DOM — sonst faellt er beim naechsten Redraw zurueck. Geklickt wird der ECHTE Knopf des
+    // Kits in der Modellzeile (seit obsidian-kit 0.70.1; vorher ein Knopf im Kopf, den `toggleThinking()` direkt rief).
+    const think = await cdp.evaluate<{ knopfDa: boolean; start: boolean; nachKlick: boolean; label: string; pressed: string | null; survives: boolean; nachBefehl: boolean }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-      const v = p.views()[0];
+      const knopf = () => document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle");
+      const warte = async (f) => { for (let i = 0; i < 80; i++) { if (f()) return true; await new Promise((r) => setTimeout(r, 100)); } return false; };
       const start = p.settings.suppressThinking;
-      await v.toggleThinking();
-      const after = p.settings.suppressThinking;
-      // NICHT querySelector(".view-action") — das ist Obsidians erste Aktion (Lesezeichen).
-      // Genau so war dieser Punkt am 2026-08-30 gruen, ohne den Schalter je anzusehen.
-      const label = v.thinkActionEl?.getAttribute("aria-label") ?? "";
-      v.syncThinkAction();
-      const survives = v.thinkActionEl?.getAttribute("aria-label") === label;
+      const knopfDa = !!knopf();
+      knopf()?.click();
+      await warte(() => p.settings.suppressThinking !== start);
+      const nachKlick = p.settings.suppressThinking;
+      // Der Knopf zeichnet sich nach dem Schreiben neu: Beschriftung und aria-pressed gehoeren zum NEUEN Zustand (gedrueckt = es wird gedacht).
+      await warte(() => knopf()?.getAttribute("aria-pressed") === String(!nachKlick));
+      const label = knopf()?.textContent ?? "";
+      const pressed = knopf()?.getAttribute("aria-pressed") ?? null;
+      p.views()[0].syncModelBar();
+      const survives = knopf()?.textContent === label && knopf()?.getAttribute("aria-pressed") === pressed;
+      // Der Befehl ist ein zweiter Zugang ohne den Knopf und schaltet denselben Wert zurueck.
+      await app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":toggle-thinking")});
+      await warte(() => p.settings.suppressThinking === start);
+      const nachBefehl = p.settings.suppressThinking;
       p.settings.suppressThinking = start;
       await p.saveSettings();
-      return { start, after, label, survives };
+      return { knopfDa, start, nachKlick, label, pressed, survives, nachBefehl };
     `);
     record(
-      "11. Thinking-Schalter im Kopf schaltet und ueberlebt den Neuaufbau",
-      think.start !== think.after && /Thinking/.test(think.label) && think.survives,
-      `${String(think.start)} → ${String(think.after)} · Beschriftung „${think.label}"`,
+      "11. Denk-Knopf der Modellzeile schaltet, ueberlebt den Neuaufbau, und der Befehl „Thinking umschalten“ schaltet denselben Wert",
+      think.knopfDa && think.start !== think.nachKlick && /Thinking: (on|off)/.test(think.label) && think.pressed === String(!think.nachKlick) && think.survives && think.nachBefehl === think.start,
+      `Knopf da: ${String(think.knopfDa)} · ${String(think.start)} → ${String(think.nachKlick)} · Beschriftung „${think.label}" (aria-pressed ${String(think.pressed)}) · Neuaufbau: ${String(think.survives)} · Befehl zurueck: ${String(think.nachBefehl === think.start)}`,
     );
 
     // --- 12. Verwerfen fragt nach ------------------------------------------
@@ -1182,56 +1192,48 @@ async function main(): Promise<void> {
         : `Modal „${discard.titel}" · Verlauf ${discard.before} → ${discard.kept} Eintraege`,
     );
 
-    // --- 13. Der dritte Zustand des Thinking-Schalters -----------------------
-    // Punkt 11 prueft das Umschalten; die inhaltlich interessante Zusicherung ist aber die
-    // SPERRE: Modelle wie gpt-oss/harmony lehnen `reasoning_effort:"none"` ab, deshalb darf
-    // der Schalter dort kein Abschalten versprechen. Das ist ueber den Modell-NAMEN pruefbar,
-    // weil `isAlwaysOnThinker` eine Namensheuristik ist — es braucht also kein solches Modell,
-    // und genau deshalb gehoert der Punkt in den Automaten statt in die Handliste.
+    // --- 13. Der dritte Zustand des Denk-Knopfs: gesperrt --------------------
+    // Punkt 11 prueft das Umschalten; die inhaltlich interessante Zusicherung ist die SPERRE: Modelle wie gpt-oss/harmony lehnen
+    // `reasoning_effort:"none"` ab, deshalb darf der Knopf dort kein Abschalten versprechen. Das ist ueber den Modell-NAMEN pruefbar,
+    // weil `isAlwaysOnThinker` eine Namensheuristik ist — es braucht also kein solches Modell. Seit obsidian-kit 0.70.1 traegt der
+    // Kit-Knopf den Zustand selbst (`locked`): `disabled`, aria-pressed „true“, Kit-Text „immer an“, und ein Klick ruft `setLevel` nie.
     //
-    // ⚠️ Was er belegt: die Anzeige-Seite und dass ein Klick folgenlos bleibt (der Handler
-    // prueft die Sperre erneut — ein veralteter DOM-Klick darf nie durchschlagen). NICHT
-    // belegt ist die Request-Seite (dass gpt-oss die Parameter wirklich ablehnt); die ist per
-    // Unit-Test fixiert und braucht ein echtes Modell.
-    const dritte = await cdp.evaluate<{
-      normalAus: { label: string; disabled: string; klassen: string[] };
-      normalAn: { label: string; disabled: string; klassen: string[] };
-      gesperrt: { label: string; disabled: string; klassen: string[] };
-      vorKlick: boolean;
-      nachKlick: boolean;
-    }>(`
+    // ⚠️ Was er belegt: die Anzeige-Seite und dass Klick UND Befehl folgenlos bleiben. NICHT belegt ist die Request-Seite (dass gpt-oss
+    // die Parameter wirklich ablehnt); die ist per Unit-Test fixiert (`effectiveSuppress`) und braucht ein echtes Modell.
+    type KnopfLage = { text: string; aria: string; pressed: string; disabled: boolean };
+    const dritte = await cdp.evaluate<{ normalAus: KnopfLage; normalAn: KnopfLage; gesperrt: KnopfLage; vorKlick: boolean; nachKlick: boolean; nachBefehl: boolean }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       const v = p.views()[0];
+      const warte = (ms) => new Promise((r) => setTimeout(r, ms));
       const lies = () => {
-        const el = v.thinkActionEl;
-        return {
-          label: el?.getAttribute("aria-label") ?? "",
-          disabled: el?.getAttribute("aria-disabled") ?? "",
-          klassen: el ? [...el.classList].filter((c) => c.startsWith("is-")) : [],
-        };
+        const el = document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle");
+        return { text: el?.textContent ?? "", aria: el?.getAttribute("aria-label") ?? "", pressed: el?.getAttribute("aria-pressed") ?? "", disabled: !!el?.disabled };
       };
-      // Das Modell steht in der Zeile; der Schalter liest das gesendete (resolver.peek).
+      // Das Modell steht in der Zeile; der Knopf liest das gesendete (resolver.peek).
       const url0 = p.settings.endpoints[0].url;
-      const sende = (m) => { p.settings.endpoints = [{ url: url0, model: m }]; p.resolver.invalidate(); };
-      sende("qwen3:8b");
-      p.settings.suppressThinking = true;  v.syncThinkAction(); const normalAus = lies();
-      p.settings.suppressThinking = false; v.syncThinkAction(); const normalAn = lies();
+      const sende = async (m) => { p.settings.endpoints = [{ url: url0, model: m }]; p.resolver.invalidate(); v.syncModelBar(); await warte(300); };
+      await sende("qwen3:8b");
+      p.settings.suppressThinking = true;  v.syncModelBar(); await warte(200); const normalAus = lies();
+      p.settings.suppressThinking = false; v.syncModelBar(); await warte(200); const normalAn = lies();
       // Ein Name, den isAlwaysOnThinker erkennt — das Modell muss nicht existieren.
-      sende("gpt-oss:20b");                v.syncThinkAction(); const gesperrt = lies();
+      await sende("gpt-oss:20b");
+      const gesperrt = lies();
       const vorKlick = p.settings.suppressThinking;
-      await v.toggleThinking();
+      document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle")?.click();
+      await warte(500);
       const nachKlick = p.settings.suppressThinking;
-      return { normalAus, normalAn, gesperrt, vorKlick, nachKlick };
+      await app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":toggle-thinking")});
+      await warte(500);
+      const nachBefehl = p.settings.suppressThinking;
+      return { normalAus, normalAn, gesperrt, vorKlick, nachKlick, nachBefehl };
     `);
     record(
-      "13. Thinking-Schalter sperrt bei einem Modell, das sich nicht abschalten laesst",
-      dritte.normalAus.disabled === "false" &&
-        dritte.normalAn.disabled === "false" &&
-        dritte.normalAus.klassen.includes("is-off") &&
-        dritte.gesperrt.disabled === "true" &&
-        dritte.gesperrt.klassen.includes("is-disabled") &&
-        dritte.vorKlick === dritte.nachKlick,
-      `normal: „${dritte.normalAn.label}" / „${dritte.normalAus.label}" · gesperrt: „${dritte.gesperrt.label}" · Klick folgenlos: ${String(dritte.vorKlick === dritte.nachKlick)}`,
+      "13. Denk-Knopf der Modellzeile ist bei einem Modell, das sich nicht abschalten laesst, gesperrt (Kit-Feld locked), Klick und Befehl bleiben folgenlos",
+      !dritte.normalAus.disabled && !dritte.normalAn.disabled &&
+        dritte.normalAus.pressed === "false" && dritte.normalAn.pressed === "true" &&
+        dritte.gesperrt.disabled && dritte.gesperrt.pressed === "true" && /always on|immer an/.test(dritte.gesperrt.text) &&
+        dritte.vorKlick === dritte.nachKlick && dritte.vorKlick === dritte.nachBefehl,
+      `normal: „${dritte.normalAn.text}" / „${dritte.normalAus.text}" · gesperrt: „${dritte.gesperrt.text}" (disabled ${String(dritte.gesperrt.disabled)}, aria-pressed ${dritte.gesperrt.pressed}) · Klick folgenlos: ${String(dritte.vorKlick === dritte.nachKlick)} · Befehl folgenlos: ${String(dritte.vorKlick === dritte.nachBefehl)}`,
     );
 
     // --- 16. Reset stellt den Auslieferungsstand her -------------------------
@@ -4082,16 +4084,16 @@ async function main(): Promise<void> {
         try {
           await setzeModell("smoke-model", stubM.url);
           await chatZeigen();
-          const zeile = await pollUntil<{ zeilen: number; label: string; aria: string | null; neuLaden: boolean; denkInZeile: number; denkKopf: boolean; optionen: string[]; wert: string }>(cdp, `
+          const zeile = await pollUntil<{ zeilen: number; label: string; aria: string | null; neuLaden: boolean; denkInZeile: number; kopfAktionen: number; optionen: string[]; wert: string }>(cdp, `
             const s = document.querySelector(".koda-root .okit-model-bar-select");
             // Auf die Liste DIESES Stubs warten: nach einem Endpunktwechsel zeigt die Zeile kurz die Liste des vorigen (der Abruf läuft noch).
             if (!s || ![...s.options].some((o) => o.value === "smoke-model-2")) return null;
             return { zeilen: document.querySelectorAll(".koda-root .okit-model-bar").length, label: document.querySelector(".koda-root .okit-model-bar-label")?.textContent ?? "",
               aria: s.getAttribute("aria-label"), neuLaden: !!document.querySelector(".koda-root .okit-model-bar button"), denkInZeile: document.querySelectorAll(".koda-root .okit-model-bar .okit-thinking-control").length,
-              denkKopf: !!document.querySelector(".koda-header .koda-header-action"), optionen: [...s.options].map((o) => o.value), wert: s.value };`, 15_000, 250).catch(() => null);
+              kopfAktionen: document.querySelectorAll(".koda-header .koda-header-action").length, optionen: [...s.options].map((o) => o.value), wert: s.value };`, 15_000, 250).catch(() => null);
           if (zeile === null) unmeasured(P100, "keine Modellzeile mit Liste im Chat-Tab gefunden");
-          else record(P100, zeile.zeilen === 1 && zeile.label === "Koda" && !!zeile.aria && zeile.neuLaden && zeile.denkInZeile === 0 && zeile.denkKopf && zeile.optionen.join("|") === "|smoke-model|smoke-model-2" && zeile.wert === "smoke-model",
-            `Zeilen ${zeile.zeilen} · Name „${zeile.label}“ · aria „${String(zeile.aria)}“ · Neu-laden ${zeile.neuLaden} · Denk-Steuerung in der Zeile ${zeile.denkInZeile} (soll 0) · Kopf-Knopf ${zeile.denkKopf} · Optionen ${zeile.optionen.join(",")} · Wert ${zeile.wert}`);
+          else record(P100, zeile.zeilen === 1 && zeile.label === "Koda" && !!zeile.aria && zeile.neuLaden && zeile.denkInZeile === 1 && zeile.kopfAktionen === 1 && zeile.optionen.join("|") === "|smoke-model|smoke-model-2" && zeile.wert === "smoke-model",
+            `Zeilen ${zeile.zeilen} · Name „${zeile.label}“ · aria „${String(zeile.aria)}“ · Neu-laden ${zeile.neuLaden} · Denk-Steuerung in der Zeile ${zeile.denkInZeile} (soll 1) · Kopf-Aktionen ${zeile.kopfAktionen} (soll 1) · Optionen ${zeile.optionen.join(",")} · Wert ${zeile.wert}`);
 
           const waehle = (v: string): Promise<unknown> => cdp.evaluate(`
             const s = document.querySelector(".koda-root .okit-model-bar-select");
@@ -4116,10 +4118,15 @@ async function main(): Promise<void> {
           record(P102, tab.dropdown === "smoke-model-2" && tab.gesendet === "smoke-model-2", `Einstellung auf smoke-model-2: Dropdown „${tab.dropdown}“ · gesendet „${tab.gesendet}“`);
 
           await cdp.evaluate(`void ${PL}.ask("Smoke 103: Lauf"); return true;`);
-          const imLauf = await pollUntil<boolean>(cdp, `return document.querySelector(".koda-root .okit-model-bar-select")?.disabled === true ? true : null;`, 15_000, 100).catch(() => null);
+          const imLauf = await pollUntil<{ dropdown: boolean; denk: boolean }>(cdp, `
+            const d = document.querySelector(".koda-root .okit-model-bar-select")?.disabled === true;
+            const k = document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle")?.disabled === true;
+            return d ? { dropdown: d, denk: k } : null;`, 15_000, 100).catch(() => null);
           await pollUntil<boolean>(cdp, `return ${PL}.busy ? null : true;`, 30_000);
-          const danach = await cdp.evaluate<boolean>(`return document.querySelector(".koda-root .okit-model-bar-select")?.disabled === true;`);
-          record(P103, imLauf === true && !danach, `im Lauf gesperrt: ${imLauf === true} · danach gesperrt: ${danach}`);
+          const danach = await cdp.evaluate<{ dropdown: boolean; denk: boolean }>(`
+            return { dropdown: document.querySelector(".koda-root .okit-model-bar-select")?.disabled === true, denk: document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle")?.disabled === true };`);
+          record(P103, imLauf !== null && imLauf.dropdown && imLauf.denk && !danach.dropdown && !danach.denk,
+            `im Lauf gesperrt: Dropdown ${String(imLauf?.dropdown)}, Denk-Knopf ${String(imLauf?.denk)} · danach gesperrt: Dropdown ${String(danach.dropdown)}, Denk-Knopf ${String(danach.denk)}`);
         } catch (error) {
           for (const n of [P100, P101, P102, P103]) if (!bilanz.eintraege().some((x) => x.name === n)) abbruch22(n, error);
         } finally { await stubM.stop(); }

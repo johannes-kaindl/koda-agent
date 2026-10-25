@@ -37,6 +37,8 @@ The scenery is `docs/images/fixture/` (shared with the GUI smoke; its `README.md
 
 **2026-10-25 (wave 27): `hero.png` captured again** (Obsidian 1.14.5, second instance, Koda 0.30.0 + model row): the sidebar now shows the model row above the conversation. `context-tab.png`, `confirm-write.png` and `settings.png` do not show it and stay. Needs a fresh profile prepared first (trust dialog, plugin enabled) — `shots.ts` does not do that itself.
 
+**2026-10-25 (wave 27, kit 0.70.1): `hero.png` captured again** (Obsidian 1.14.5, second instance, Koda 0.31.0 + the thinking button in the model row): the row above the conversation now also carries the thinking button ("Thinking: off"), which wraps to a second line in this narrow sidebar. The other three images do not show it and stay.
+
 Findings from the capture, kept here because they will bite again:
 
 - **`newChat()` does nothing while Koda is busy.** A confirmation dialog left open by the previous scene keeps the run alive, and the next scene showed the old conversation and the dialog. The driver now cancels dialogs by their **Cancel** button (the close ✕ via `click()` left Koda's dialog standing), calls `stopRun()` and waits for idle before every scene.

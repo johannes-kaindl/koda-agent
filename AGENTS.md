@@ -79,5 +79,4 @@ Keine dokumentiert.
 
 ## UI-Abweichungen
 
-- **thinking-control** — Grund: Koda schaltet das Denken nur an oder aus (`suppressThinking`, Zustands-Knopf nur mit Icon im Kopf der Sidebar), der Kit-Baustein führt Denkstufen über `family()`/`current()`/`setLevel()`; **nachgeprüft 2026-10-25 (Welle 27): der alte Grund trägt nicht mehr** (eine An/Aus-Anbindung ohne neue Einstellung ist möglich, der Request bleibt gleich), die Abweichung bleibt aus einem anderen: der Kit-Knopf kennt den gesperrten Zustand „immer an“ nicht (gpt-oss: Kodas Knopf ist gesperrt, der Kit-Knopf bedienbar und ein Klick schriebe `suppressThinking` um) und beschriftet Claude „aus“ anders (Messung `tests/thinking_control_bindung.test.ts`, Task „Denk-Steuerung in Kodas Modellzeile“)
-  — gilt-solange: `src/obsidian/view.ts` enthaelt-nicht `buildThinkingControl`
+Keine. (Die Abweichung „thinking-control“ ist mit obsidian-kit 0.70.1 entfallen: der Kit-Knopf sitzt in der Modellzeile, der gesperrte Zustand „immer an“ läuft über sein Feld `locked`; das Warum und die Nachprüfung stehen in `docs/internal/decisions.md`.)

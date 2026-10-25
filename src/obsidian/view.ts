@@ -12,7 +12,7 @@ import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obs
 import { renderMarkdownGuarded, type DomGuardOptions } from "../vendor/kit-obsidian/dom-guard";
 import { isSafeHref } from "../vendor/kit/link-guard";
 import { neutralizeModelMarkdown } from "../vendor/kit/safe-markdown";
-import { thinkToggleView } from "../core/chat/reasoning-toggle";
+import { thinkingLockedTexts, thinkingOffTexts } from "../vendor/kit-obsidian/thinking-control";
 import { isContextMode, type ContextAttachment } from "../core/context/types";
 import { contextSummary, sourceChips } from "../core/context/labels";
 import { fillModeSelect } from "./mode-select";
@@ -59,9 +59,7 @@ export class KodaView extends ItemView {
   private streamArea: StreamArea | null = null;
   private streamWriter: StableMarkdownWriter | null = null;
 
-  /** Kopf-Aktion des Thinking-Schalters — Zustand kommt aus thinkToggleView. */
-  private thinkActionEl: HTMLElement | null = null;
-  /** Die Modellzeile des Chats (Kit `buildModelBar`, Welle 27). */
+  /** Die Modellzeile des Chats mit der Denk-Steuerung (Kit `buildModelBar`, Welle 27; `thinking` seit obsidian-kit 0.70.1). */
   private bar: ModelBar | null = null;
   /** Modus-Dropdown in der Knopfzeile — null vor onOpen. */
   private modeEl: HTMLSelectElement | null = null;
@@ -97,9 +95,6 @@ export class KodaView extends ItemView {
     // und kein Nachbar-Plugin benutzt es. Ein Pruefpunkt, der nur DOM-Existenz misst, sieht
     // den Defekt nicht: darum misst Pruefpunkt 2 seit heute die Groesse.
     const header = root.createDiv({ cls: "koda-header" });
-    this.thinkActionEl = header.createEl("button", { cls: "clickable-icon koda-header-action" });
-    setIcon(this.thinkActionEl, "brain");
-    this.thinkActionEl.addEventListener("click", () => void this.toggleThinking());
     const newChatEl = header.createEl("button", { cls: "clickable-icon koda-header-action" });
     setIcon(newChatEl, "plus");
     newChatEl.setAttribute("aria-label", t("view.newChat"));
@@ -150,8 +145,6 @@ export class KodaView extends ItemView {
     this.registerEvent(
       this.app.workspace.on("file-open", (f) => { this.hub?.notifyFileOpen(f?.path ?? null); }),
     );
-
-    this.syncThinkAction();
 
     this.renderLog();
     this.paintStatus();
@@ -214,17 +207,30 @@ export class KodaView extends ItemView {
    *  Aufgeteilt fuer den Hub: bis Etappe 2 baute `onOpen` direkt in `contentEl`. Der Baum ist
    *  derselbe geblieben — wer hier etwas aendert, aendert den Chat, nicht den Umbau. */
   private mountChat(container: HTMLElement): void {
-    // Modell in einer Zeile über dem Verlauf (Kit `buildModelBar`): Dropdown mit „Automatisch“, Neu-laden-Knopf. Gesperrt, solange ein Lauf läuft.
-    // Die Denk-Steuerung bleibt der Knopf im Kopf (`thinking-control`-Abweichung, `docs/internal/decisions.md`: der Kit-Knopf kennt „immer an“ nicht).
+    // Modell und Denk-Steuerung in einer Zeile über dem Verlauf (Kit `buildModelBar`): Dropdown mit „Automatisch“, Neu-laden-Knopf, Denk-Knopf. Gesperrt, solange ein Lauf läuft.
+    // Der Denk-Knopf ist der des Kits (`thinking-control`, seit obsidian-kit 0.70.1 mit `locked` für „immer an“); Kodas Zustand liefert `thinkingBinding()`.
     // Das Kit gibt eine alte Zeile nicht frei: vor jedem neuen Aufbau abmelden.
     this.bar?.destroy();
+    const think = this.plugin.thinkingBinding();
+    const lang = this.lang();
     this.bar = buildModelBar({
       app: this.app,
       containerEl: container,
       llm: this.plugin.modelBar(),
       label: t("view.modelLabel"),
-      strings: { lang: this.lang() },
+      strings: { lang },
       disabled: () => this.plugin.busy,
+      thinking: {
+        family: think.family,
+        backend: think.backend,
+        current: think.current,
+        onLevel: think.onLevel,
+        setLevel: think.setLevel,
+        levelPicker: think.levelPicker,
+        // „aus“ ist bei Claude (und gemma 4 auf LM Studio) nicht möglich, die niedrigste Stufe geht raus: der Text des Kits sagt das, wo Kodas Knopf „aus“ zeigte.
+        strings: { button: (level) => (level === "off" ? t("view.thinkingOff") : t("view.thinkingOn")), level: (l) => l, pickerLabel: t("view.thinkingDone"), offNotPossible: thinkingOffTexts(lang) },
+        locked: () => (think.alwaysOn() ? thinkingLockedTexts(lang) : undefined),
+      },
     });
     this.logEl = container.createDiv({ cls: "koda-log" });
     // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
@@ -307,37 +313,6 @@ export class KodaView extends ItemView {
       cancelLabel: t("confirm.cancel"),
     });
     if (ok) await this.plugin.newChat();
-  }
-
-  async toggleThinking(): Promise<void> {
-    // Bei einem Modell, das sich nicht abschalten laesst, tut der Schalter nichts — die
-    // Sperre steht im Zustand, und der Handler prueft sie erneut: ein veralteter Klick auf
-    // einen gerade gesperrten Knopf darf nicht durchschlagen (Muster canActivatePack).
-    const s = this.plugin.settings;
-    if (thinkToggleView(this.plugin.sentModel(), s.suppressThinking, this.plugin.sentBackend()).disabled) return;
-    s.suppressThinking = !s.suppressThinking;
-    await this.plugin.saveSettings();
-  }
-
-  /** Beschriftung, Klasse und Sperre des Thinking-Schalters aus dem puren Zustand ziehen.
-   *  Wird auch von saveSettings gerufen: der Settings-Tab schaltet denselben Wert. */
-  syncThinkAction(): void {
-    const el = this.thinkActionEl;
-    if (el === null) return;
-    const s = this.plugin.settings;
-    const v = thinkToggleView(this.plugin.sentModel(), s.suppressThinking, this.plugin.sentBackend());
-    const parts = [t(v.labelKey)];
-    if (v.hintKey !== null) parts.push(t(v.hintKey));
-    if (v.actionKey !== null) parts.push(t(v.actionKey));
-    const label = parts.join(" — ");
-    el.setAttribute("aria-label", label);
-    el.setAttribute("aria-disabled", String(v.disabled));
-    el.setAttribute("aria-pressed", String(v.pressed));
-    el.toggleAttribute("disabled", v.disabled);
-    el.removeClass("is-off");
-    el.removeClass("is-disabled");
-    if (v.cls !== "") el.addClass(v.cls);
-    setIcon(el, v.icon);
   }
 
   // — Statuszeile —

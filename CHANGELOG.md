@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The thinking button moves into the model row** (obsidian-kit 0.70.1). It is the kit's button now and sits next to the model dropdown; the header of the sidebar keeps only *New chat*. It switches the same setting as before (*Suppress thinking*), and the command *Toggle thinking* is still there. What you will notice:
+  - For a model that always thinks (gpt-oss) the button is locked and reads *Thinking: always on* (in German *Denken: immer an*); a click or the command changes nothing, as before.
+  - Where *off* cannot be reached (Claude, gemma 4 on LM Studio) the button reads *Thinking: lowest level* instead of *Thinking: off*: that is what arrives there (Claude lowers the effort, gemma 4 on LM Studio thinks at the level *low*, measured by the kit).
+  - The button is locked while an answer is running, like the dropdown (the old button in the header was not).
+  - German labels now read *Denken: an* and *Denken: aus* (before *Thinking: an/aus*), so that they match the kit's text for the locked state.
+  - The hint "this model probably always thinks — turning it off likely has no effect" (a guess from the model name, for example deepseek-r1 and qwq) is gone: the kit's button has no place for a hint on the *on* state. The button is not wrong without it; it still switches the setting.
+- Kit: obsidian-kit 0.70.0 → 0.70.1 (code-kit stays 0.37.5). What reaches you: the `locked` field of the thinking button (above). Besides that the kit's lint now checks the vendored copy of code-kit, and a `resolve()` called from `onResolved` no longer loops when it runs synchronously; Koda does neither.
+
 ## [0.31.0] — 2026-10-25
 
 ### Added

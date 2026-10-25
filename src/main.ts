@@ -31,6 +31,7 @@ import { providerToolGroups, toolRows } from "./core/prompt/view-model";
 import { arbeitenDir, arbeitName, isArbeitPath, readArbeiten, writeArbeitFrontmatter } from "./obsidian/arbeiten";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
 import { createModelBarLlm, type ModelBarLlm } from "./core/llm/model-bar-llm";
+import { createThinkingBinding, type ThinkingBinding } from "./core/chat/thinking-binding";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { requestUrlTransport, xhrSseTransport } from "./vendor/kit-obsidian/chat-transport";
 import { createAnthropicChatTransport, createAnthropicState } from "./vendor/kit-obsidian/anthropic-transport";
@@ -671,8 +672,8 @@ export default class KodaPlugin extends Plugin {
       },
     }),
     async (ep) => (await this.probe(ep)).reachable,
-    // Der gemerkte Endpunkt hat sich geändert: der Thinking-Schalter liest sein Modell.
-    () => { for (const v of this.views()) { v.syncThinkAction(); v.syncModelBar(); } },
+    // Der gemerkte Endpunkt hat sich geändert: die Modellzeile samt Denk-Knopf liest sein Modell.
+    () => { for (const v of this.views()) v.syncModelBar(); },
     () => this.endpointSource(),
   );
 
@@ -694,6 +695,18 @@ export default class KodaPlugin extends Plugin {
 
   /** Für die Ansicht: die Verbindung der Modellzeile. */
   modelBar(): ModelBarLlm { return this.modelBarLlm; }
+
+  /** Für die Ansicht: der Zustand der Denk-Steuerung in der Modellzeile (`core/chat/thinking-binding.ts`). Ein Klick schreibt `suppressThinking`, `saveSettings()` zeichnet die Zeile neu;
+   *  der Einstellungs-Tab schaltet denselben Wert und läuft über denselben Weg. */
+  thinkingBinding(): ThinkingBinding {
+    return createThinkingBinding({
+      model: () => this.sentModel(),
+      backend: () => this.sentBackend(),
+      suppress: () => this.settings.suppressThinking,
+      // `saveSettings()` verwirft den Zwischenstand des Resolvers (Modell der ersten Zeile, Backend unbekannt): wieder auflösen, sonst liest der Knopf bis zur nächsten Frage das falsche Modell (Muster `setModel` in `model-bar-llm.ts`).
+      setSuppress: async (suppress) => { this.settings.suppressThinking = suppress; await this.saveSettings(); await this.resolver.resolve(); },
+    });
+  }
 
   /** Die Zeile mit `apiKey` aus dem Schlüsselbund. Die Listen-Zeilen der Settings tragen nur
    *  die Schlüssel-ID; ohne diesen Schritt ginge die Probe ohne Authorization-Header raus. */
@@ -774,7 +787,7 @@ export default class KodaPlugin extends Plugin {
     // Der Manager kann jederzeit installiert, an- oder ausgeschaltet oder umkonfiguriert werden: dann neu aufloesen.
     this.register(onEndpointManagerChanged(this.app, () => {
       this.resolver.invalidate();
-      for (const v of this.views()) v.syncThinkAction();
+      for (const v of this.views()) v.syncModelBar();
     }));
     // Ein gespeicherter Default aus einer spaeteren Etappe ist hier noch nicht angeboten — dann faellt der Start
     // auf Arbeitsplatz zurueck, statt den Chat in einem Modus zu starten, den er gar nicht anbietet.
@@ -824,7 +837,7 @@ export default class KodaPlugin extends Plugin {
     // und damit war die Aktion fuer niemanden erreichbar. Ein Befehl ist von der Darstellung
     // unabhaengig — er ueberlebt jede kuenftige Umgestaltung der Oberflaeche.
     this.addCommand({ id: "new-chat", name: t("cmd.newChat"), callback: () => void this.runInView((v) => v.askNewChat()) });
-    this.addCommand({ id: "toggle-thinking", name: t("cmd.toggleThinking"), callback: () => void this.runInView((v) => v.toggleThinking()) });
+    this.addCommand({ id: "toggle-thinking", name: t("cmd.toggleThinking"), callback: () => void this.runInView(() => this.thinkingBinding().toggle()) });
     for (const mode of AVAILABLE_MODES) {
       this.addCommand({
         id: `context-mode-${mode}`,
@@ -896,10 +909,7 @@ export default class KodaPlugin extends Plugin {
     this.applyLanguage();
     // Eine geaenderte Liste macht den gemerkten Endpunkt zu einer Aussage ueber die alte.
     this.resolver.invalidate();
-    // Der Settings-Tab schaltet denselben suppressThinking-Wert wie die Kopf-Aktion —
-    // ein Zustand, zwei Zugaenge, also muss der zweite mitziehen.
-    for (const v of this.views()) v.syncThinkAction();
-    // Die Modellzeile folgt den Einstellungen; die Liste wird nur bei einem anderen Endpunkt neu geholt (der Abruf löst selbst auf, jede Auflösung ruft `update` zurück).
+    // Die Modellzeile samt Denk-Knopf folgt den Einstellungen (der Einstellungs-Tab schaltet denselben suppressThinking-Wert wie der Knopf); die Liste wird nur bei einem anderen Endpunkt neu geholt (der Abruf löst selbst auf, jede Auflösung ruft `update` zurück).
     const key = this.settings.endpoints.map((e) => e.url).join("\n") + `|${String(this.settings.useEndpointManager)}|${this.settings.choice.endpointId ?? ""}`;
     const endpointChanged = key !== this.modelBarKey;
     this.modelBarKey = key;
