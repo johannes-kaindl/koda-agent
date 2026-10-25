@@ -1,7 +1,7 @@
 {
   "sources": {
-    "obsidian-kit": { "ref": "0.67.1" },
-    "code-kit": { "ref": "0.36.0" }
+    "obsidian-kit": { "ref": "0.70.0" },
+    "code-kit": { "ref": "0.37.5" }
   },
   "targets": [
     { "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["frontmatter", "explain-texts", "ocr-provider", "image-gen-provider", "endpoint-source", "anthropic-wire", "endpoint-secret-hook", "tool-provider", "provider-error-texts", "audio-provider"], "rewrite": [["../vendor/code-kit/pure/", "./"]] },
@@ -14,13 +14,13 @@
         "model-list-cache", "stream-blocks", "sse", "redact", "secrets", "safe-markdown", "sampling-profiles", "llm-json", "data-url", "think-toggle", "byte-tokens", "validate-input", "slash-query", "rel-path", "folder-scope", "local-stamp"
       ]
     },
-    { "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/web", "modules": ["remote-resources", "clipboard"], "rewrite": [["../pure/", "./"]] },
+    { "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/web", "modules": ["remote-resources", "clipboard", "link-guard"], "rewrite": [["../pure/", "./"]] },
     {
       "dir": "src/vendor/kit-obsidian", "source": "obsidian-kit", "from": "src/obsidian",
       "modules": [
         "clock", "confirm", "folder-suggest", "settings_walker", "model-picker", "hub", "collapsible", "stable-writer", "dom-guard",
         "help-setting", "chat-client", "chat-transport", "lab-client", "endpoint-list", "stream-area",
-        "endpoint-secrets", "secrets", "endpoint-source", "anthropic-transport", "shortcuts-bridge", "tool-providers", "plugin-api", "capability-apis", "textarea-suggest", "clipboard", "segmented-control", "redline"
+        "endpoint-secrets", "secrets", "endpoint-source", "anthropic-transport", "shortcuts-bridge", "tool-providers", "plugin-api", "capability-apis", "textarea-suggest", "clipboard", "segmented-control", "redline", "model-bar", "model-bar-strings", "thinking-control", "link-settings"
       ],
       "rewrite": [["../pure/", "../kit/"], ["../vendor/code-kit/pure/", "../kit/"], ["../vendor/code-kit/web/", "../kit/"]]
     },
