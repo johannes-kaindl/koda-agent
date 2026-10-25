@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-10-25
+
 ### Changed
 
 - **The thinking button moves into the model row** (obsidian-kit 0.70.1). It is the kit's button now and sits next to the model dropdown; the header of the sidebar keeps only *New chat*. It switches the same setting as before (*Suppress thinking*), and the command *Toggle thinking* is still there. What you will notice:
