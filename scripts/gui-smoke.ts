@@ -87,9 +87,9 @@
  * lsof -nP -iTCP:<PORT> -sTCP:LISTEN && echo "Port belegt — anderen waehlen (Port laut Auftrag bzw. frei, nie aus diesem Kommentar)"
  * pgrep -f "user-data-dir=$UD" && echo "Profil belegt — $UD-wNN nehmen, nie beenden"
  * cp ~/Library/Application\ Support/obsidian/obsidian-*.asar "$UD"/   # aktuelle Version statt gebuendelter
- * node -e 'const p=process.env.STAGING_VAULTS_DIR+"/koda-agent";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{"koda-agent":{path:p,ts:Date.now(),open:true}},language:"en"}))' "$UD"
- * /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=<PORT> &   # je Messlauf frischer Prozess, PID merken
- * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label koda-agent --intent "Smoke :<PORT>" --exclusive focus --port <PORT> --ttl 900
+ * node -e 'const p=process.env.STAGING_VAULTS_DIR+"/koda-agent";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{"koda-agent":{path:p,ts:Date.now(),open:true}}}))' "$UD"
+ * /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=<PORT> --lang=en-US &   # je Messlauf frischer Prozess, PID merken
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label koda-agent --intent "Smoke :<PORT>" --exclusive all --port <PORT> --ttl 900
  * npm run smoke:gui -- --port <PORT> --vault koda-agent
  * python3 ~/.claude/hooks/obsidian-cdp-lock.py release           # danach nur die eigene PID beenden
  * ```
