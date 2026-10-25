@@ -35,6 +35,8 @@ The scenery is `docs/images/fixture/` (shared with the GUI smoke; its `README.md
 
 **2026-09-26: all four images captured** (Obsidian 1.14.2, second instance, Koda 0.17.0 + docs commit). Every image was looked at, not just measured.
 
+**2026-10-25 (wave 27): `hero.png` captured again** (Obsidian 1.14.5, second instance, Koda 0.30.0 + model row): the sidebar now shows the model row above the conversation. `context-tab.png`, `confirm-write.png` and `settings.png` do not show it and stay. Needs a fresh profile prepared first (trust dialog, plugin enabled) — `shots.ts` does not do that itself.
+
 Findings from the capture, kept here because they will bite again:
 
 - **`newChat()` does nothing while Koda is busy.** A confirmation dialog left open by the previous scene keeps the run alive, and the next scene showed the old conversation and the dialog. The driver now cancels dialogs by their **Cancel** button (the close ✕ via `click()` left Koda's dialog standing), calls `stopRun()` and waits for idle before every scene.
