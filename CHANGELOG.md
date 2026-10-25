@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.32.1] — 2026-10-25
+
 ### Fixed
 
 - **The hint "this model probably always thinks — turning it off likely has no effect" is back** (obsidian-kit 0.71.0; 0.32.0 dropped it when the button moved into the model row). It stands in the tooltip and the spoken name of the button, with the button on or off, for the models that the name guess of the kit flags (deepseek-r1, qwq, magistral, glm-z1 and, by the same guess, Claude). The button stays operable and switches as before; for a model that really always thinks (gpt-oss) the button is locked and says *always on* without the "probably". For Claude and gemma 4 on LM Studio in the *off* state the name carries both reasons: *lowest level* and the hint.
