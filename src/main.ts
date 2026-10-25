@@ -30,6 +30,7 @@ import { expandPathEntries, isInFolder, pathsInFolder } from "./vendor/kit/folde
 import { providerToolGroups, toolRows } from "./core/prompt/view-model";
 import { arbeitenDir, arbeitName, isArbeitPath, readArbeiten, writeArbeitFrontmatter } from "./obsidian/arbeiten";
 import { EndpointResolver, withFailover } from "./core/llm/failover";
+import { createModelBarLlm, type ModelBarLlm } from "./core/llm/model-bar-llm";
 import { requestUrlProbe } from "./obsidian/http-probe";
 import { requestUrlTransport, xhrSseTransport } from "./vendor/kit-obsidian/chat-transport";
 import { createAnthropicChatTransport, createAnthropicState } from "./vendor/kit-obsidian/anthropic-transport";
@@ -671,9 +672,28 @@ export default class KodaPlugin extends Plugin {
     }),
     async (ep) => (await this.probe(ep)).reachable,
     // Der gemerkte Endpunkt hat sich geändert: der Thinking-Schalter liest sein Modell.
-    () => { for (const v of this.views()) v.syncThinkAction(); },
+    () => { for (const v of this.views()) { v.syncThinkAction(); v.syncModelBar(); } },
     () => this.endpointSource(),
   );
+
+  /** Die Verbindung der Modellzeile (Kit `buildModelBar`, Welle 27): ein Adapter über Resolver und Einstellungen (`core/llm/model-bar-llm.ts`). Eine Wahl schreibt in dieselbe
+   *  Stelle wie der Einstellungs-Tab (Zeile des gesendeten Endpunkts, mit Manager `choice.model`), `saveSettings()` verwirft danach den Zwischenstand des Resolvers. */
+  private readonly modelBarLlm: ModelBarLlm = createModelBarLlm({
+    resolver: this.resolver,
+    settings: {
+      getEndpoints: () => this.settings.endpoints,
+      getChoice: () => this.settings.choice,
+      update: async (patch) => {
+        if (patch.endpoints !== undefined) this.settings.endpoints = patch.endpoints;
+        if (patch.choice !== undefined) this.settings.choice = patch.choice;
+        await this.saveSettings();
+      },
+    },
+    listModels: async (ep) => { const r = await this.probeModels(ep); return { models: r.models, reachable: r.status.reachable }; },
+  });
+
+  /** Für die Ansicht: die Verbindung der Modellzeile. */
+  modelBar(): ModelBarLlm { return this.modelBarLlm; }
 
   /** Die Zeile mit `apiKey` aus dem Schlüsselbund. Die Listen-Zeilen der Settings tragen nur
    *  die Schlüssel-ID; ohne diesen Schritt ginge die Probe ohne Authorization-Header raus. */
@@ -879,7 +899,15 @@ export default class KodaPlugin extends Plugin {
     // Der Settings-Tab schaltet denselben suppressThinking-Wert wie die Kopf-Aktion —
     // ein Zustand, zwei Zugaenge, also muss der zweite mitziehen.
     for (const v of this.views()) v.syncThinkAction();
+    // Die Modellzeile folgt den Einstellungen; die Liste wird nur bei einem anderen Endpunkt neu geholt (der Abruf löst selbst auf, jede Auflösung ruft `update` zurück).
+    const key = this.settings.endpoints.map((e) => e.url).join("\n") + `|${String(this.settings.useEndpointManager)}|${this.settings.choice.endpointId ?? ""}`;
+    const endpointChanged = key !== this.modelBarKey;
+    this.modelBarKey = key;
+    for (const v of this.views()) v.syncModelBar(endpointChanged ? { models: true } : {});
   }
+
+  /** Schlüssel der Endpunkt-Wahl beim letzten Speichern (`saveSettings`): ändert er sich, lädt die Modellzeile ihre Liste neu. */
+  private modelBarKey = "";
 
   /** Eine Kopfzeilen-Aktion aus der Befehlspalette ausfuehren. Ist die Sidebar zu, wird sie
    *  erst geoeffnet: ein Befehl, der stillschweigend nichts tut, weil gerade keine View

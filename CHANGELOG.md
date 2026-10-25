@@ -6,8 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A model row above the conversation** (obsidian-kit 0.70.0): the model of the active endpoint in a dropdown, *Automatic* (the endpoint's default or the row's own model), and a reload button for the list. A choice goes where the settings put it: into the row of the endpoint that is being used, with the Endpoint Manager into its choice, so the dropdown and the settings show the same thing (a change in either is picked up by the other). The row is locked while an answer is being written. The thinking button stays in the header: the kit's thinking control has no state for models that always think (gpt-oss), where Koda's button is locked.
+- **A settings group "Links and images in answers" with two switches, both off:** "Allow obsidian:// links" and "Show local images from the vault".
+
+### Fixed
+
+- **Links in a finished answer are guarded like those in a streaming one.** The history is redrawn when an answer ends, and that drawing bypassed the guard: a link to a `file:`, `app:` or `obsidian://` target was clickable there although the stream had already cut it. All four dangerous schemes (`javascript:`, `data:`, `file:`, `app:`) are now cut in both places, `obsidian://` unless you allow it. A wikilink like `[[javascript:alert(1)]]` no longer opens anything when clicked; an ordinary internal link does as before.
+
 ### Changed
 
+- Kit: obsidian-kit 0.67.1 → 0.70.0 and code-kit 0.36.0 → 0.37.5. What reaches you: the link guard above (a cut link still looks like a link but does nothing; the icon of a callout and the copy button of a code block stay); the model row (it needs `model-bar`, `model-bar-strings` and `link-guard`, and its CSS in `styles.css`); the thinking control of the kit and its CSS are vendored but not used yet. Not used by Koda and without effect: the Anthropic branch of `model-context` (Koda has its own check since 0.28.0), `fetchEndpointContext` with a provider, `withThinkingLevel`, the chat window and its names, `restoreContent: "json"`, `installTabRefreshOnOpen`, `summarizeList`, `stampsSnapshot`.
 - **Moving or renaming the memory note `Memory.md` now asks first.** Before, `move_note` was free when both ends were inside the Koda folder, so Koda could move its own memory out of the place the prompt reads it from without anyone being asked. Replacing its text asked already (0.30.0); adding a line still does not. A move *to* `Koda/Memory.md` onto a free place stays free, and so does a file called `Memory.md` in a subfolder (it is not read).
 
 ## [0.30.0] — 2026-10-24

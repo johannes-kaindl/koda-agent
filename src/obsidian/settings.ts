@@ -30,6 +30,7 @@ import {
 } from "obsidian";
 import { t, getLang } from "../vendor/kit/i18n";
 import { githubHelpUrls, helpSettingDefinition } from "../vendor/kit-obsidian/help-setting";
+import { linkSettingDefinitions, resolveLinkSettingsStrings, type LinkSettingKey } from "../vendor/kit-obsidian/link-settings";
 import { modeLabel } from "../core/context/labels";
 import { AVAILABLE_MODES } from "../core/context/types";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
@@ -301,6 +302,17 @@ export class KodaSettingsTab extends PluginSettingTab {
           // der Aufrufer hier braucht sie nicht und darf den Rueckgabewert ignorieren.
           { name: t("settings.tools"), render: (setting) => { renderToolList(setting, this.modelCtx()); } },
         ],
+      },
+      // „Links und Bilder in Antworten“ (Kit `link-settings`, UI-STANDARD §8): zwei Schalter, beide aus. Die Ansicht liest sie je Antwort (`view.ts`, `guardOptions`).
+      {
+        type: "group",
+        heading: resolveLinkSettingsStrings({ lang: getLang() }).heading,
+        items: linkSettingDefinitions({
+          allowObsidianLinks: this.plugin.settings.allowObsidianLinks,
+          allowLocalImages: this.plugin.settings.allowLocalImages,
+          strings: { lang: getLang() },
+          onChange: async (key: LinkSettingKey, value: boolean) => { this.plugin.settings[key] = value; await this.plugin.saveSettings(); },
+        }),
       },
       {
         name: t("settings.fallback"),

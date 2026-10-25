@@ -1376,6 +1376,16 @@ Neu: **86** Übernahme als Tabelle (vier Zeilen, Form `table` aus dem Default im
 - Der Plan erwartete drei Zeilen für `status != ""`; gemessen waren es 13, weil der Filter auch Notizen ohne die Eigenschaft trifft. Die Fixture-Bases filtern jetzt auf `status == "active"` (vier Notizen).
 - Der Kit-Mock kennt `BasesView`/`NullValue` nicht; `main.ts` importiert `bases-view.ts`, und zwei Tests laden `main.ts`. Leere Hüllen in `tests/__mocks__/obsidian.ts` genügen, die Ansicht selbst belegt nur dieser Smoke.
 
+## Belegter Lauf: 2026-10-25, Welle 27 — Kit 0.70.0/0.37.5, Modellzeile, Linkschutz, Memory.md verschieben fragt (107 Punkte)
+
+Zweitinstanz :9562, Obsidian 1.14.5, `--exclusive all`, je Lauf ein frischer Prozess, Staging-Vault aus dem Fixture; Brücke `7467bd0`.
+
+- **Baseline vor dem Umbau (HEAD `8834b75`, Kit 0.67.1/0.36.0):** Gate 1157/1157, Smoke 99 grün · 0 rot · 2 übersprungen · 0 nichts gemessen (von 101, 117 s).
+- **Endstand (zwei frische Prozesse):** Gate 1183/1183, Smoke 105 grün · 0 rot · 2 übersprungen · 0 nichts gemessen (von 107, 132 s und 133 s). Neu sind sechs Punkte: **102 bis 105** die Modellzeile (eine Zeile des Kits „Koda“ über dem Verlauf mit Dropdown, aria-label und Neu-laden-Knopf, der Denk-Knopf bleibt im Kopf; ein Wechsel im Dropdown ändert das gesendete Modell und das Modell der Zeile in den Einstellungen, „Automatisch“ stellt es zurück; ein Wechsel in den Einstellungen zeichnet das Dropdown nach; im Lauf gesperrt, danach frei), **106** der Linkschutz (im Strom und im Verlauf hat keiner der Links mit `javascript:`, `data:`, `file:`, `obsidian:` oder `app:` ein Ziel, ein `[[javascript:alert(1)]]`-Klick öffnet nichts, ein gewöhnlicher innerer Link schon) und **107** die Einstellungsgruppe „Links and images in answers“ (zwei Schalter, beide aus, ein Klick schreibt die Einstellung und zurück).
+- **Befund vor dem Bau des Linkschutzes (am Renderer gemessen):** im Strom kappte der Wächter des Kits alle fünf Schemata, im Verlauf (`renderLog`, nach dem Ende der Antwort) blieben `file:`, `obsidian:` und `app:` klickbar, weil `renderMarkdownInto` am Wächter vorbeilief; `[[javascript:alert(1)]]` wird ein innerer Link mit diesem Ziel, den `onLogClick` über `openLinkText` geöffnet hätte.
+- **Gegenproben (Mutation am Plugin-Build, je ein frischer Prozess):** (A) der Verlauf wieder ohne Wächter: Punkt 106 rot („Verlauf: file 1, obsidian 1, app 1“), 104 grün; (B) die Prüfung im Klick-Handler entfernt: Punkt 106 rot („1× geöffnet, soll 0“); danach zurückgenommen und neu gebaut. ⚠️ Im Lauf B waren zusätzlich 102 und 103 rot: der Poll sah die Liste des vorigen Stubs, weil der Abruf nach dem Endpunktwechsel noch lief; er wartet jetzt auf das Modell dieses Stubs.
+- **Grenze:** die Modellzeile mit einem Manager (Claude) und die Anzeige nach einem Wechsel bei zwei Zeilen, deren erste nicht antwortet, trägt `tests/model_bar_llm.test.ts` (Fake-Manager, Mutation: kein neues Auflösen und immer die erste Zeile schreiben, je drei Tests rot); der Smoke hat eine Zeile am Stub.
+
 ## Belegter Lauf: 2026-10-25, Welle 26 — Kit 0.67.1/0.36.0, Zählung über `countInFolders`, Memory.md-Schranke, Punkt 16 repariert (101 Punkte)
 
 Zweitinstanz, Obsidian 1.14.5, `--exclusive all`, je Lauf ein frischer Prozess, Staging-Vault aus dem Fixture.

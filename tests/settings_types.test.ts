@@ -254,3 +254,12 @@ describe("Endpunkt-Quelle (LLM Endpoint Manager, Opt-in)", () => {
     expect(validateKodaSettings({ useEndpointManager: "ja" }).useEndpointManager).toBe(false);
   });
 });
+
+describe("Linkschutz der Antworten (Welle 27, Kit 0.70.0): beide Schalter aus", () => {
+  it("Defaults aus; ein Wert wird übernommen, Müll fällt auf den Default zurück", () => {
+    expect(DEFAULT_SETTINGS.allowObsidianLinks).toBe(false);
+    expect(DEFAULT_SETTINGS.allowLocalImages).toBe(false);
+    expect(validateKodaSettings({ allowObsidianLinks: true }).allowObsidianLinks).toBe(true);
+    expect(validateKodaSettings({ allowLocalImages: "ja" }).allowLocalImages).toBe(false);
+  });
+});

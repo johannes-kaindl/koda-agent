@@ -319,6 +319,12 @@ const PUNKTE = [
   "96. Gegenprobe Erreichbarkeit: ohne Rollbalken am Verlauf wird ein Bedienelement unerreichbar",
   "97. Werkzeugliste: jedes Beschreibungsfeld zeigt seinen Inhalt in ganzen Zeilen, keine halb abgeschnittene Zeile am unteren Rand, mindestens drei Zeilen hoch",
   "98. Handpunkt 17 an der Naht: ist der Embedding-Endpunkt nicht erreichbar, stehen die Volltext-Treffer UND die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)“ im Ergebnis; erreichbar fehlt die Zeile",
+  "102. Modellzeile: der Chat-Tab trägt genau eine Zeile des Kits („Koda“) mit Dropdown, aria-label und Neu-laden-Knopf; der Denk-Knopf bleibt im Kopf",
+  "103. Modellzeile: ein Wechsel im Dropdown ändert das gesendete Modell und das Modell der Zeile in den Einstellungen, „Automatisch“ stellt es zurück",
+  "104. Modellzeile: ein Wechsel des Modells in den Einstellungen zeichnet das Dropdown nach",
+  "105. Modellzeile: im Lauf gesperrt, danach frei",
+  "106. Linkschutz: im Strom und im Verlauf hat keiner der Links mit javascript:, data:, file:, obsidian: oder app: ein Ziel, ein [[javascript:…]]-Klick öffnet nichts und ein gewöhnlicher innerer Link schon",
+  "107. Einstellungen: die Gruppe „Links and images in answers“ hat zwei Schalter, beide aus, und ein Umlegen schreibt die Einstellung (und zurück)",
   "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung; mit dem Stub ist sie da, und Koda traegt related_notes nie selbst (es kommt nur ueber einen Anbieter, Punkt 78)",
   "100. Gegenprobe Denkblock kopierbar nach der Antwort: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht",
   "101. Gegenprobe Denkblock kopierbar während des Stroms: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht",
@@ -4062,6 +4068,123 @@ async function main(): Promise<void> {
               ? `kein laufender Strom mit „fertige“ gesehen · Verlauf „${letzte.slice(0, 80)}“`
               : `Strom-Anzeige „${live.body.slice(0, 60)}“ · Denkblock da: ${live.hasBlock} (${live.thought.slice(0, 30)}…) · Verlauf „${letzte.slice(0, 60)}“`);
         } catch (error) { abbruch22(P77, error); } finally { await stub77.stop(); }
+
+        // 100–103. Modellzeile (Welle 27, K3): ein Stub mit zwei Modellen. Die Zeile steht über dem Verlauf; ihr Wechsel schreibt in dieselbe Stelle wie der Tab (die Zeile des
+        // gesendeten Endpunkts), und `saveSettings()` (verwirft den Zwischenstand des Resolvers) darf die Anzeige nicht auf die erste Zeile zurückspringen lassen.
+        const P100 = PUNKTE.find((n) => n.startsWith("102. "))!;
+        const P101 = PUNKTE.find((n) => n.startsWith("103. "))!;
+        const P102 = PUNKTE.find((n) => n.startsWith("104. "))!;
+        const P103 = PUNKTE.find((n) => n.startsWith("105. "))!;
+        const stubM = await startLlmStub({
+          models: ["smoke-model", "smoke-model-2"],
+          antwort: () => ({ stuecke: Array.from({ length: 10 }, (_, i) => `Absatz ${i}.\n\n`), takt: 400 }),
+        });
+        try {
+          await setzeModell("smoke-model", stubM.url);
+          await chatZeigen();
+          const zeile = await pollUntil<{ zeilen: number; label: string; aria: string | null; neuLaden: boolean; denkInZeile: number; denkKopf: boolean; optionen: string[]; wert: string }>(cdp, `
+            const s = document.querySelector(".koda-root .okit-model-bar-select");
+            // Auf die Liste DIESES Stubs warten: nach einem Endpunktwechsel zeigt die Zeile kurz die Liste des vorigen (der Abruf läuft noch).
+            if (!s || ![...s.options].some((o) => o.value === "smoke-model-2")) return null;
+            return { zeilen: document.querySelectorAll(".koda-root .okit-model-bar").length, label: document.querySelector(".koda-root .okit-model-bar-label")?.textContent ?? "",
+              aria: s.getAttribute("aria-label"), neuLaden: !!document.querySelector(".koda-root .okit-model-bar button"), denkInZeile: document.querySelectorAll(".koda-root .okit-model-bar .okit-thinking-control").length,
+              denkKopf: !!document.querySelector(".koda-header .koda-header-action"), optionen: [...s.options].map((o) => o.value), wert: s.value };`, 15_000, 250).catch(() => null);
+          if (zeile === null) unmeasured(P100, "keine Modellzeile mit Liste im Chat-Tab gefunden");
+          else record(P100, zeile.zeilen === 1 && zeile.label === "Koda" && !!zeile.aria && zeile.neuLaden && zeile.denkInZeile === 0 && zeile.denkKopf && zeile.optionen.join("|") === "|smoke-model|smoke-model-2" && zeile.wert === "smoke-model",
+            `Zeilen ${zeile.zeilen} · Name „${zeile.label}“ · aria „${String(zeile.aria)}“ · Neu-laden ${zeile.neuLaden} · Denk-Steuerung in der Zeile ${zeile.denkInZeile} (soll 0) · Kopf-Knopf ${zeile.denkKopf} · Optionen ${zeile.optionen.join(",")} · Wert ${zeile.wert}`);
+
+          const waehle = (v: string): Promise<unknown> => cdp.evaluate(`
+            const s = document.querySelector(".koda-root .okit-model-bar-select");
+            s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event("change", { bubbles: true }));
+            await new Promise((r) => setTimeout(r, 1200)); return true;`);
+          const lies = (): Promise<{ gesendet: string; zeile: string; dropdown: string }> => cdp.evaluate(`
+            const p = ${PL};
+            return { gesendet: p.sentModel(), zeile: p.settings.endpoints[0]?.model ?? "", dropdown: document.querySelector(".koda-root .okit-model-bar-select")?.value ?? null };`);
+          await waehle("smoke-model-2");
+          const zwei = await lies();
+          await waehle("");
+          const auto = await lies();
+          record(P101, zwei.gesendet === "smoke-model-2" && zwei.zeile === "smoke-model-2" && zwei.dropdown === "smoke-model-2" && auto.zeile === "" && auto.dropdown === "",
+            `gewählt: gesendet „${zwei.gesendet}“ · Zeile „${zwei.zeile}“ · Dropdown „${zwei.dropdown}“ · Automatisch: Zeile „${auto.zeile}“ · Dropdown „${auto.dropdown}“`);
+
+          await cdp.evaluate(`
+            const p = ${PL};
+            p.settings.endpoints = [{ url: ${JSON.stringify(stubM.url)}, model: "smoke-model-2" }];
+            await p.saveSettings();
+            await new Promise((r) => setTimeout(r, 1200)); return true;`);
+          const tab = await lies();
+          record(P102, tab.dropdown === "smoke-model-2" && tab.gesendet === "smoke-model-2", `Einstellung auf smoke-model-2: Dropdown „${tab.dropdown}“ · gesendet „${tab.gesendet}“`);
+
+          await cdp.evaluate(`void ${PL}.ask("Smoke 103: Lauf"); return true;`);
+          const imLauf = await pollUntil<boolean>(cdp, `return document.querySelector(".koda-root .okit-model-bar-select")?.disabled === true ? true : null;`, 15_000, 100).catch(() => null);
+          await pollUntil<boolean>(cdp, `return ${PL}.busy ? null : true;`, 30_000);
+          const danach = await cdp.evaluate<boolean>(`return document.querySelector(".koda-root .okit-model-bar-select")?.disabled === true;`);
+          record(P103, imLauf === true && !danach, `im Lauf gesperrt: ${imLauf === true} · danach gesperrt: ${danach}`);
+        } catch (error) {
+          for (const n of [P100, P101, P102, P103]) if (!bilanz.eintraege().some((x) => x.name === n)) abbruch22(n, error);
+        } finally { await stubM.stop(); }
+
+        // 104. Linkschutz (Welle 27, Kit 0.70.0): die Antwort trägt fünf Links mit gefährlichen Schemata, einen `[[javascript:…]]` und einen gewöhnlichen inneren Link. Gemessen wird der Strom UND der Verlauf
+        // nach dem Neuzeichnen (`renderLog` ging bis dahin am Wächter vorbei: `file:`, `obsidian:` und `app:` blieben dort klickbar).
+        const P104 = PUNKTE.find((n) => n.startsWith("106. "))!;
+        const MD104 = "[js](javascript:alert(1)) [data](data:text/html,x) [file](file:///etc/hosts) [obs](obsidian://open?vault=x) [app](app://local/x) [[javascript:alert(1)]] [rel](foo) [ok](https://example.com)";
+        const stub104 = await startLlmStub({ models: ["smoke-model"], antwort: () => ({ stuecke: [MD104 + "\n\n", "Zweiter Absatz.\n\n", "Dritter Absatz.\n\n"], takt: 900 }) });
+        try {
+          await setzeModell("smoke-model", stub104.url);
+          await chatZeigen();
+          await cdp.evaluate(`void ${PL}.ask("Smoke 104: Links"); return true;`);
+          const linkLage = (wurzel: string) => `
+            const a = [...document.querySelectorAll(${JSON.stringify(wurzel)} + " a")];
+            const schema = (s) => a.filter((x) => (x.getAttribute("href") || "").toLowerCase().startsWith(s)).length;
+            return { gesamt: a.length, js: schema("javascript:"), data: schema("data:"), file: schema("file:"), obs: schema("obsidian:"), app: schema("app:") };`;
+          const strom = await pollUntil<{ gesamt: number; js: number; data: number; file: number; obs: number; app: number }>(cdp, linkLage(".koda-streaming .okit-stream-body").replace("return {", "const r = {").replace(/;\s*$/, "; return r.gesamt >= 8 ? r : null;"), 20_000, 150).catch(() => null);
+          await pollUntil<boolean>(cdp, `return ${PL}.busy ? null : true;`, 30_000);
+          await new Promise((r) => setTimeout(r, 800));
+          const verlauf = await cdp.evaluate<{ gesamt: number; js: number; data: number; file: number; obs: number; app: number }>(linkLage(".koda-assistant:not(.koda-streaming) .markdown-rendered, .koda-assistant:not(.koda-streaming)"));
+          const klick = await cdp.evaluate<{ gefaehrlich: number; gewoehnlich: number; gefunden: [boolean, boolean] }>(`
+            const w = app.workspace; const orig = w.openLinkText; let n = 0;
+            w.openLinkText = () => { n++; return Promise.resolve(); };
+            try {
+              const finde = (h) => [...document.querySelectorAll(".koda-assistant a.internal-link")].find((x) => x.getAttribute("data-href") === h);
+              const gef = finde("javascript:alert(1)"); const gew = finde("foo");
+              gef?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+              const nachGef = n;
+              gew?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+              return { gefaehrlich: nachGef, gewoehnlich: n - nachGef, gefunden: [!!gef, !!gew] };
+            } finally { w.openLinkText = orig; }`);
+          const tot = (x: { js: number; data: number; file: number; obs: number; app: number } | null): boolean => x !== null && x.js + x.data + x.file + x.obs + x.app === 0;
+          record(P104, tot(strom) && strom!.gesamt >= 8 && tot(verlauf) && verlauf.gesamt >= 8 && klick.gefunden[0] && klick.gefunden[1] && klick.gefaehrlich === 0 && klick.gewoehnlich === 1,
+            `Strom: ${strom === null ? "kein Strom mit allen Links gesehen" : `${strom.gesamt} Links, mit Ziel: js ${strom.js}, data ${strom.data}, file ${strom.file}, obsidian ${strom.obs}, app ${strom.app}`} · Verlauf: ${verlauf.gesamt} Links, mit Ziel: js ${verlauf.js}, data ${verlauf.data}, file ${verlauf.file}, obsidian ${verlauf.obs}, app ${verlauf.app} · Klick auf [[javascript:…]]: ${klick.gefaehrlich}× geöffnet (soll 0) · auf einen gewöhnlichen inneren Link: ${klick.gewoehnlich}× (soll 1)`);
+        } catch (error) { abbruch22(P104, error); } finally { await stub104.stop(); }
+
+        // 105. Einstellungsgruppe „Links and images in answers“ (Kit `link-settings`): zwei Schalter, beide aus, ein Klick schreibt die Einstellung und zurück.
+        const P105 = PUNKTE.find((n) => n.startsWith("107. "))!;
+        try {
+          await cdp.evaluate(`app.setting.open(); app.setting.openTabById(${JSON.stringify(PLUGIN_ID)}); await new Promise((r) => setTimeout(r, 1500)); return true;`);
+          const sicht = await attachTo("settings", port, vault);
+          if (!sicht) unmeasured(P105, "Einstellungsfenster nicht gefunden");
+          else {
+            try {
+              const liesDom = `
+                const gruppe = [...document.querySelectorAll(".setting-item")].filter((e) => ["Allow obsidian:// links", "Show local images from the vault"].includes(e.querySelector(".setting-item-name")?.textContent ?? ""));
+                return { zeilen: gruppe.length, an: gruppe.map((e) => e.querySelector(".checkbox-container")?.classList.contains("is-enabled") ?? null) };`;
+              const liesWerte = (): Promise<{ links: boolean; bilder: boolean }> => cdp.evaluate(`
+                const p = ${PL}; return { links: p.settings.allowObsidianLinks, bilder: p.settings.allowLocalImages };`);
+              const klick = `
+                const z = [...document.querySelectorAll(".setting-item")].find((e) => e.querySelector(".setting-item-name")?.textContent === "Allow obsidian:// links");
+                z?.querySelector(".checkbox-container")?.click(); await new Promise((r) => setTimeout(r, 700)); return true;`;
+              const dom = await sicht.evaluate<{ zeilen: number; an: (boolean | null)[] }>(liesDom);
+              const vorher = await liesWerte();
+              await sicht.evaluate(klick);
+              const an = await liesWerte();
+              await sicht.evaluate(klick);
+              const zurueck = await liesWerte();
+              record(P105, dom.zeilen === 2 && dom.an.every((x) => x === false) && vorher.links === false && vorher.bilder === false && an.links === true && an.bilder === false && zurueck.links === false,
+                `Zeilen ${dom.zeilen} · vorher links ${String(vorher.links)}/Bilder ${String(vorher.bilder)} · nach dem Klick links ${String(an.links)} · zurück ${String(zurueck.links)}`);
+            } finally { sicht.close(); await schliesseEinstellungen(cdp).catch(() => undefined); }
+          }
+        } catch (error) { abbruch22(P105, error); }
+
 
         // 78. Argumente eines Anbieter-Werkzeugs werden VOR dem Aufruf gegen sein Schema geprueft (Vertrag tool-provider).
         const P78 = "78. Anbieter-Werkzeug: ein Aufruf gegen das Schema (Pflichtfeld fehlt, unmögliches Datum) erreicht den Anbieter nicht, ein gültiger schon";

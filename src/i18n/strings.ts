@@ -4,6 +4,7 @@ import { EXPLAIN_TEXTS } from "../vendor/kit/explain-texts";
 defineStrings({
   en: {
     "view.title": "Koda",
+    "view.modelLabel": "Koda",
     "view.placeholder": "Ask your vault…",
     "view.send": "Send",
     "view.stop": "Stop",
@@ -359,6 +360,7 @@ defineStrings({
   },
   de: {
     "view.title": "Koda",
+    "view.modelLabel": "Koda",
     "view.placeholder": "Frag deinen Vault…",
     "view.send": "Senden",
     "view.stop": "Stopp",

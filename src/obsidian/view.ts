@@ -2,12 +2,15 @@ import { Component, ItemView, MarkdownRenderer, setIcon, type WorkspaceLeaf } fr
 import { t, getLang } from "../vendor/kit/i18n";
 import { confirmAction } from "../vendor/kit-obsidian/confirm";
 import { buildHubInto, type HubController, type HubPanel } from "../vendor/kit-obsidian/hub";
+import { buildModelBar, type ModelBar } from "../vendor/kit-obsidian/model-bar";
 import type { SessionState } from "../core/abilities/types";
 import { describeStateChange } from "../core/abilities/session";
 import { isCompactionRecord, isErrorRecord, isSessionStateRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
 import { buildReasoningBlock, buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obsidian/stable-writer";
+import { renderMarkdownGuarded, type DomGuardOptions } from "../vendor/kit-obsidian/dom-guard";
+import { isSafeHref } from "../vendor/kit/link-guard";
 import { neutralizeModelMarkdown } from "../vendor/kit/safe-markdown";
 import { thinkToggleView } from "../core/chat/reasoning-toggle";
 import { isContextMode, type ContextAttachment } from "../core/context/types";
@@ -58,6 +61,8 @@ export class KodaView extends ItemView {
 
   /** Kopf-Aktion des Thinking-Schalters — Zustand kommt aus thinkToggleView. */
   private thinkActionEl: HTMLElement | null = null;
+  /** Die Modellzeile des Chats (Kit `buildModelBar`, Welle 27). */
+  private bar: ModelBar | null = null;
   /** Modus-Dropdown in der Knopfzeile — null vor onOpen. */
   private modeEl: HTMLSelectElement | null = null;
 
@@ -171,6 +176,8 @@ export class KodaView extends ItemView {
     this.suggest?.destroy();
     this.suggest = null;
     if (this.queryTimer !== null) { window.clearTimeout(this.queryTimer); this.queryTimer = null; }
+    this.bar?.destroy();
+    this.bar = null;
     this.hub?.destroy();
     this.hub = null;
     return Promise.resolve();
@@ -207,6 +214,18 @@ export class KodaView extends ItemView {
    *  Aufgeteilt fuer den Hub: bis Etappe 2 baute `onOpen` direkt in `contentEl`. Der Baum ist
    *  derselbe geblieben — wer hier etwas aendert, aendert den Chat, nicht den Umbau. */
   private mountChat(container: HTMLElement): void {
+    // Modell in einer Zeile über dem Verlauf (Kit `buildModelBar`): Dropdown mit „Automatisch“, Neu-laden-Knopf. Gesperrt, solange ein Lauf läuft.
+    // Die Denk-Steuerung bleibt der Knopf im Kopf (`thinking-control`-Abweichung, `docs/internal/decisions.md`: der Kit-Knopf kennt „immer an“ nicht).
+    // Das Kit gibt eine alte Zeile nicht frei: vor jedem neuen Aufbau abmelden.
+    this.bar?.destroy();
+    this.bar = buildModelBar({
+      app: this.app,
+      containerEl: container,
+      llm: this.plugin.modelBar(),
+      label: t("view.modelLabel"),
+      strings: { lang: this.lang() },
+      disabled: () => this.plugin.busy,
+    });
     this.logEl = container.createDiv({ cls: "koda-log" });
     // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
     // registriert, damit jeder spaetere Redraw automatisch mitgedeckt ist.
@@ -270,6 +289,8 @@ export class KodaView extends ItemView {
     const href = link.getAttribute("data-href") ?? link.getAttribute("href") ?? "";
     if (href === "") return;
     e.preventDefault();
+    // Ein `[[javascript:alert(1)]]` wird ein innerer Link mit diesem Ziel (gemessen): geöffnet wird nur, was der Linkschutz als Ziel einer Notiz gelten lässt.
+    if (!isSafeHref(href, { internal: true })) return;
     void this.app.workspace.openLinkText(href, "", e.ctrlKey || e.metaKey);
   }
 
@@ -325,6 +346,13 @@ export class KodaView extends ItemView {
   activity(e: ActivityEvent): void {
     this.act = nextActivity(this.act, e);
     this.paintStatus();
+    this.bar?.update();   // die Modellzeile sperrt sich während eines Laufs und gibt sich danach frei
+  }
+
+  /** Modell, Endpunkt oder Einstellung haben sich geändert (Einstellungs-Tab, Resolver): die Zeile zeichnet sich aus dem Zustand neu, `models` lädt die Liste neu. */
+  syncModelBar(opts: { models?: boolean } = {}): void {
+    this.bar?.update();
+    if (opts.models === true) void this.bar?.refresh();
   }
 
   private paintStatus(): void {
@@ -377,14 +405,24 @@ export class KodaView extends ItemView {
     });
   }
 
-  private renderMarkdownInto(el: HTMLElement, markdown: string): Promise<void> {
+  /** Die Schalter „Links und Bilder in Antworten“ (Kit `domGuard`), je Antwort frisch gelesen: ein Umlegen wirkt auf die nächste Antwort und den nächsten Neuzeichnen des Verlaufs. */
+  private guardOptions(): DomGuardOptions {
+    const s = this.plugin.settings;
+    return { allowObsidianLinks: s.allowObsidianLinks, allowLocalImages: s.allowLocalImages };
+  }
+
+  /** Der Verlauf-Neurender (`renderLog`) läuft am Writer des Kits vorbei und braucht den Linkschutz selbst: gemessen 2026-10-25 (Welle 27) blieben dort `file:`-, `obsidian:` und `app:`-Links
+   *  klickbar, die der Strom schon gekappt hatte (Obsidians Renderer lässt sie stehen). `guarded: false` nur für den Writer, der selbst bewacht. */
+  private renderMarkdownInto(el: HTMLElement, markdown: string, guarded = true): Promise<void> {
     const comp = this.mdComp;
     if (comp === null) return Promise.resolve();
     // Antworten des Modells tragen Originale (die Schwaerzung ist rueckgaengig gemacht) und
     // sind nicht vertrauenswuerdig: ein Platzhalter in einer Bild-URL oder ein ```dataviewjs
     // -Block wuerde sonst beim Rendern wirken. Idempotent, der Schreiber-Weg neutralisiert
     // ohnehin selbst — der Verlauf-Neurender (`renderLog`) laeuft aber an ihm vorbei.
-    return MarkdownRenderer.render(this.app, neutralizeModelMarkdown(markdown), el, "", comp);
+    return guarded
+      ? renderMarkdownGuarded(this.app, neutralizeModelMarkdown(markdown), el, "", comp, this.guardOptions())
+      : MarkdownRenderer.render(this.app, neutralizeModelMarkdown(markdown), el, "", comp);
   }
 
   private send(): void {
@@ -544,7 +582,8 @@ export class KodaView extends ItemView {
       area,
       // Ein kaputter Block kostet die Formatierung, nicht die Antwort (Idiom aus session.ts)
       // — `createStableWriter` faengt das selbst ab.
-      render: (el, md) => this.renderMarkdownInto(el, md),
+      render: (el, md) => this.renderMarkdownInto(el, md, false),
+      domGuard: this.guardOptions(),
     });
     return area;
   }

@@ -7,7 +7,7 @@ All settings are under **Settings → Koda**, in this order. Numbers outside the
 | Setting | Default | Range | What it does |
 |---|---|---|---|
 | Take endpoints from the LLM Endpoint Manager | off | | Only shown when the [LLM Endpoint Manager](https://github.com/johannes-kaindl/llm-endpoint-manager) plugin is installed. Off: Koda uses the **Endpoints** list below, as before. On: the endpoint, its API key and the model come from the manager, including **Claude** (Anthropic API); the list below is not used. Settings then show **Endpoint** (**Automatic** or one of the manager's) and **Model**, and **Add Koda's endpoints to the manager**. With Claude, **Suppress thinking** lowers the effort instead of switching thinking off (Claude cannot), and Koda sends no sampling values (the API refuses them). |
-| Endpoints | `http://127.0.0.1:1234` | | OpenAI-compatible servers, each with URL, optional API key and the model sent to that endpoint (**Fetch models** fills a list to pick from, with **— (server picks)** to clear the choice; a row without a model sends none). There is no global model setting. API keys are kept in Obsidian's secret storage, not in `data.json`: a saved key shows as **saved** with **Change key** and **Remove key**. A key from an older version moves there the first time Koda uses the endpoint. **The first reachable entry wins**: Koda tries them top to bottom once per session and remembers the winner; if a request fails, it looks again once. Reorder with **Move to top**. Every row is checked when the settings open: a check mark, or a cross whose tooltip names the cause; below the row its role (**Active**, **Unreachable**, **Standby — position N**) and, when the server reports it for the row's model, the context length (`Context: loaded 8,192 · max 32,768 tokens`; **Fetch models** asks again). **Test** checks all rows again; **+ LM Studio** and **+ Ollama** add their default addresses. |
+| Endpoints | `http://127.0.0.1:1234` | | OpenAI-compatible servers, each with URL, optional API key and the model sent to that endpoint (**Fetch models** fills a list to pick from, with **— (server picks)** to clear the choice; a row without a model sends none). There is no global model setting; the model row above the conversation switches the model of the endpoint in use and writes it here. API keys are kept in Obsidian's secret storage, not in `data.json`: a saved key shows as **saved** with **Change key** and **Remove key**. A key from an older version moves there the first time Koda uses the endpoint. **The first reachable entry wins**: Koda tries them top to bottom once per session and remembers the winner; if a request fails, it looks again once. Reorder with **Move to top**. Every row is checked when the settings open: a check mark, or a cross whose tooltip names the cause; below the row its role (**Active**, **Unreachable**, **Standby — position N**) and, when the server reports it for the row's model, the context length (`Context: loaded 8,192 · max 32,768 tokens`; **Fetch models** asks again). **Test** checks all rows again; **+ LM Studio** and **+ Ollama** add their default addresses. |
 | Suppress thinking | on | | Asks reasoning models not to think out loud, and hides the thinking block. On Claude it sets the effort to low (on: medium), because Claude cannot switch thinking off. |
 | Koda folder | `Koda` | | The folder Koda writes to without asking (memory, drafts). Skills in its `Skills/` subfolder still ask, and so does replacing the text of `Memory.md` or moving or renaming it (adding a line does not). |
 | Max tool calls per answer | 8 | 1–50 | How many tool calls Koda may chain for one question before it has to answer. |
@@ -54,6 +54,17 @@ See [Tune Koda for a smaller model](../how-to/model-control.md).
 |---|---|---|
 | Instructions for Koda | *(empty = shipped version)* | Replaces Koda's rule block. **Edit the shipped version** puts the shipped text into an empty field, the copy button copies the instructions that apply, **Restore the shipped version** empties the field, **Show active instructions** shows the full prompt (with a copy button). |
 | Tools | all on | A switch and a description field for each of Koda's own tools. |
+
+## Links and images in answers
+
+Koda always cuts dangerous link targets out of an answer (`javascript:`, `data:`, `file:`, `app:`), in the stream and in the finished conversation alike. Two kinds of target are off by default:
+
+| Setting | Default | What it does |
+|---|---|---|
+| Allow obsidian:// links | off | Answers can contain links that trigger Obsidian actions, such as opening another vault. Only turn this on if you trust the answers. |
+| Show local images from the vault | off | Show images from your vault in answers. Remote images always stay blocked. |
+
+A switch works on the next answer and when the conversation is redrawn. A cut link still looks like a link but does nothing.
 
 ## Other
 

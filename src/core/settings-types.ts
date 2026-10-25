@@ -132,6 +132,9 @@ export interface KodaSettings {
   textFallback: boolean;
   language: "auto" | "de" | "en";
   openOnStartup: boolean;
+  /** Linkschutz der Antworten (Kit `domGuard`, Default aus): `obsidian://`-Links behalten ihr Ziel, Bilder aus dem Vault werden gezeigt. */
+  allowObsidianLinks: boolean;
+  allowLocalImages: boolean;
   contextWindowTokens: number;
   compactAtPercent: number;
   keepToolResults: number;
@@ -182,6 +185,8 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   textFallback: false, // Default laut koda-lab-Befund setzen (Vault-Cockpit `_Intern/LAB.md`)
   language: "auto",
   openOnStartup: false,
+  allowObsidianLinks: false,
+  allowLocalImages: false,
   contextWindowTokens: 8192,
   compactAtPercent: 75,
   keepToolResults: 3,

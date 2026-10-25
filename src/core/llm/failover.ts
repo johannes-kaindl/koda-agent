@@ -12,7 +12,7 @@
 import { rowModel, type EndpointConfig } from "../../vendor/kit/endpoint_config";
 import {
   resolveEndpointSource,
-  type ApiErrorCode, type EndpointChoice, type EndpointTransport, type LlmEndpointManagerApi,
+  type ApiErrorCode, type ApiModelInfo, type EndpointChoice, type EndpointTransport, type LlmEndpointManagerApi,
 } from "../../vendor/kit/endpoint-source";
 import type { BackendId, FamilyId } from "../../vendor/kit/sampling-profiles";
 
@@ -27,6 +27,13 @@ export interface ResolvedEndpoint {
   transport: EndpointTransport;
   family: FamilyId | null;
   backend: BackendId;
+  /** Die Wahl hinter `model` (Welle 27, Modellzeile): `choice.model`, sonst das Standardmodell des Managers bzw. das Modell der lokalen Zeile (`""`: keines) —
+   *  vor einem Alias, den `model` schon aufgelöst trägt. Die Modellzeile zeigt dies, nicht das gesendete Modell. */
+  selected?: string;
+  /** Das Standardmodell des Endpunkts (nur Manager), für „Automatisch (…)“. */
+  defaultModel?: string;
+  /** Die Modelltabelle des Managers (nur Manager): daraus entsteht die Liste der Modellzeile, ohne einen Abruf mit Bearer an eine Messages-API. */
+  models?: ApiModelInfo[];
 }
 
 /** Die Quelle der Auflösung, frisch bei jedem Durchlauf gelesen: Manager (nur mit Opt-in und nur,
@@ -64,6 +71,17 @@ export class EndpointResolver {
     return first === undefined ? "" : rowModel(first);
   }
 
+  /** Die Wahl hinter dem gesendeten Modell (siehe `ResolvedEndpoint.selected`), synchron; davor wie `peek`. */
+  peekSelected(rows: readonly EndpointConfig[]): string {
+    if (this.cached !== null) return this.cached.selected ?? this.cached.model;
+    return this.peek(rows);
+  }
+
+  /** Das Standardmodell des gemerkten Endpunkts (nur Manager). */
+  peekDefault(): string | undefined {
+    return this.cached?.defaultModel;
+  }
+
   /** Transport und Backend des gemerkten Endpunkts, synchron; davor HTTP und unbekannt. */
   peekTransport(): { transport: EndpointTransport; backend: BackendId } {
     return this.cached === null ? { transport: "http", backend: "unknown" } : { transport: this.cached.transport, backend: this.cached.backend };
@@ -99,6 +117,9 @@ export class EndpointResolver {
         const ep: ResolvedEndpoint | null = r.config === null ? null : {
           config: r.config, model: r.sentModel || r.model, kind: r.kind,
           transport: r.transport ?? "http", family: r.family, backend: r.backend,
+          selected: r.model,
+          ...(r.defaultModel ? { defaultModel: r.defaultModel } : {}),
+          ...(r.models ? { models: r.models } : {}),
         };
         this.reason = r.config === null && r.kind === "manager" ? (r.reason ?? "no-endpoint") : null;
         this.cached = ep;
