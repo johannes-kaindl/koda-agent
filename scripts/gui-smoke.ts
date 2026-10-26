@@ -4258,6 +4258,13 @@ async function main(): Promise<void> {
           await pollUntil<boolean>(cdp, `return ${PL}.busy ? null : true;`, 30_000);
           await new Promise((r) => setTimeout(r, 800));
           const verlauf = await cdp.evaluate<{ gesamt: number; js: number; data: number; file: number; obs: number; app: number }>(linkLage(".koda-assistant:not(.koda-streaming) .markdown-rendered, .koda-assistant:not(.koda-streaming)"));
+          // Ein gekappter Link (ohne href) soll im fertigen Antworttext wie Text aussehen (obsidian-kit 0.72.0): keine Unterstreichung, kein Zeiger, die Farbe des
+          // Umfelds. Der Verlauf steht in `.koda-assistant`, nicht in `.okit-stream-body`: die Kit-Regeln `.okit-stream-body a:not([href])` greifen dort nicht.
+          const stil = await cdp.evaluate<{ gekappt: number; wieLink: number }>(`
+            const a = [...document.querySelectorAll(".koda-assistant:not(.koda-streaming) a")];
+            const gekappt = a.filter((x) => !x.hasAttribute("href"));
+            const wieLink = gekappt.filter((x) => { const c = getComputedStyle(x); return c.textDecorationLine !== "none" || c.cursor === "pointer" || c.color !== getComputedStyle(x.parentElement).color; }).length;
+            return { gekappt: gekappt.length, wieLink };`);
           const klick = await cdp.evaluate<{ gefaehrlich: number; gewoehnlich: number; gefunden: [boolean, boolean] }>(`
             const w = app.workspace; const orig = w.openLinkText; let n = 0;
             w.openLinkText = () => { n++; return Promise.resolve(); };
@@ -4270,8 +4277,8 @@ async function main(): Promise<void> {
               return { gefaehrlich: nachGef, gewoehnlich: n - nachGef, gefunden: [!!gef, !!gew] };
             } finally { w.openLinkText = orig; }`);
           const tot = (x: { js: number; data: number; file: number; obs: number; app: number } | null): boolean => x !== null && x.js + x.data + x.file + x.obs + x.app === 0;
-          record(P104, tot(strom) && strom!.gesamt >= 8 && tot(verlauf) && verlauf.gesamt >= 8 && klick.gefunden[0] && klick.gefunden[1] && klick.gefaehrlich === 0 && klick.gewoehnlich === 1,
-            `Strom: ${strom === null ? "kein Strom mit allen Links gesehen" : `${strom.gesamt} Links, mit Ziel: js ${strom.js}, data ${strom.data}, file ${strom.file}, obsidian ${strom.obs}, app ${strom.app}`} · Verlauf: ${verlauf.gesamt} Links, mit Ziel: js ${verlauf.js}, data ${verlauf.data}, file ${verlauf.file}, obsidian ${verlauf.obs}, app ${verlauf.app} · Klick auf [[javascript:…]]: ${klick.gefaehrlich}× geöffnet (soll 0) · auf einen gewöhnlichen inneren Link: ${klick.gewoehnlich}× (soll 1)`);
+          record(P104, stil.gekappt >= 5 && stil.wieLink === 0 && tot(strom) && strom!.gesamt >= 8 && tot(verlauf) && verlauf.gesamt >= 8 && klick.gefunden[0] && klick.gefunden[1] && klick.gefaehrlich === 0 && klick.gewoehnlich === 1,
+            `Strom: ${strom === null ? "kein Strom mit allen Links gesehen" : `${strom.gesamt} Links, mit Ziel: js ${strom.js}, data ${strom.data}, file ${strom.file}, obsidian ${strom.obs}, app ${strom.app}`} · Verlauf: ${verlauf.gesamt} Links, mit Ziel: js ${verlauf.js}, data ${verlauf.data}, file ${verlauf.file}, obsidian ${verlauf.obs}, app ${verlauf.app} · gekappte Links im Verlauf: ${stil.gekappt}, davon wie ein Link gezeichnet (Unterstreichung, Zeiger oder Linkfarbe): ${stil.wieLink} (soll 0) · Klick auf [[javascript:…]]: ${klick.gefaehrlich}× geöffnet (soll 0) · auf einen gewöhnlichen inneren Link: ${klick.gewoehnlich}× (soll 1)`);
         } catch (error) { abbruch22(P104, error); } finally { await stub104.stop(); }
 
         // 105. Einstellungsgruppe „Links and images in answers“ (Kit `link-settings`): zwei Schalter, beide aus, ein Klick schreibt die Einstellung und zurück.

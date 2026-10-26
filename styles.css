@@ -17,6 +17,10 @@
 .koda-assistant ul, .koda-assistant ol { margin: var(--size-4-1) 0; padding-inline-start: var(--size-4-4); }
 .koda-user { background: var(--background-secondary); }
 .koda-assistant { background: var(--background-primary-alt); }
+/* Ein gekappter Link (der Wächter hat das href entfernt, Klasse und Pfeil-Icon blieben) sieht auch im fertigen Antworttext wie Text aus. Das Kit (STREAM_AREA_CSS, 0.72.0) deckt nur
+   `.okit-stream-body` ab; der Verlauf (`renderLog`) steht in `.koda-assistant`. Dieselben zwei Regeln für ihn; ohne !important, nur gekappte Links (Punkt 106 misst es im Renderer). */
+.koda-assistant a:not([href]) { color: inherit; text-decoration: none; cursor: inherit; }
+.koda-assistant a.external-link:not([href]) { background-image: none; padding-right: 0; }
 .koda-error { color: var(--text-error); }
 .koda-notice { color: var(--text-muted); }
 .koda-skills { font-size: var(--font-ui-smaller); border-bottom: 1px solid var(--background-modifier-border); padding-bottom: var(--size-4-1); margin-bottom: var(--size-4-2); }
