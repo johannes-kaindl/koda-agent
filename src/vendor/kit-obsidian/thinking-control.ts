@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.71.0, src/obsidian/thinking-control.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.72.0, src/obsidian/thinking-control.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { DropdownComponent, setIcon } from "obsidian";
 import { THINKING_LEVELS, familyThinking, type BackendId, type FamilyId, type ThinkingLevel } from "../kit/sampling-profiles";
 
@@ -71,9 +71,10 @@ export interface ThinkingControlOptions {
    *  Modellwechsel). Der Wirt liefert den Grund (gpt-oss, anderes Backend); der Kit-Text ist `thinkingLockedTexts(lang)`. Ohne das Feld ändert sich nichts. */
   locked?(): ThinkingOffTexts | undefined;
   /** Seit 0.71.0, optional: ein Hinweis am **bedienbaren** Knopf, im Zustand an wie aus (Tooltip und `aria-label`, hinter der Beschriftung), zum Beispiel „Dieses Modell denkt vermutlich immer“
-   *  (`thinkingAlwaysGuessHint(lang)`, die Entscheidung trifft der Wirt mit `thinkToggleState` aus code-kit). Der Knopf bleibt bedienbar und schreibt wie bisher. Neben `strings.offNotPossible` stehen
-   *  beide Gründe im `aria-label` (erst der Text von „aus nicht möglich“, dann der Hinweis); mit `levelPicker()` steht er im `aria-label` des Dropdowns; im gesperrten Zustand (`locked`)
-   *  entfällt er (das Modell denkt sicher, nicht vermutlich). Leer oder `undefined`: kein Hinweis. Wird bei jedem Zeichnen gelesen. Ohne das Feld ändert sich nichts. */
+   *  (`thinkingAlwaysGuessHint(lang)`, die Entscheidung trifft der Wirt mit `thinkToggleState` aus code-kit). Der Knopf bleibt bedienbar und schreibt wie bisher. Der Name trägt höchstens einen
+   *  Grund (seit 0.72.0): trägt er schon einen (`locked`, oder „aus nicht möglich“ mit gesetztem `strings.offNotPossible`: Claude im Zustand aus), entfällt der Hinweis, denn das Modell denkt dann
+   *  sicher oder der Name sagt schon, warum „aus“ nichts bewirkt. Fehlt `strings.offNotPossible`, bleibt der Hinweis (sonst stünde gar kein Grund im Namen). Mit `levelPicker()` steht er im
+   *  `aria-label` des Dropdowns (es zeigt `offNotPossible` nicht). Leer oder `undefined`: kein Hinweis. Wird bei jedem Zeichnen gelesen. Ohne das Feld ändert sich nichts. */
   hint?(): string | undefined;
 }
 
@@ -85,7 +86,9 @@ export function buildThinkingControl(opts: ThinkingControlOptions): { refresh():
     const fam = opts.family();
     const offNotPossible = level === "off" && fam !== null && !familyThinking(fam, opts.backend?.()).canTurnOff;
     const locked = opts.locked?.();
-    const hintText = locked === undefined ? (opts.hint?.() ?? "") : "";
+    // Mit `levelPicker()` zeigt das Dropdown „aus nicht möglich“ nicht: der Hinweis ist dort der einzige Grund und bleibt. Am Knopf entfällt er, sobald der Name selbst einen Grund trägt.
+    const offText = locked ?? (offNotPossible && !opts.levelPicker() ? opts.strings.offNotPossible : undefined);
+    const hintText = offText === undefined ? (opts.hint?.() ?? "") : "";
     if (opts.levelPicker()) {
       const dd = new DropdownComponent(root);
       dd.selectEl.setAttribute("aria-label", locked !== undefined ? `${opts.strings.pickerLabel}. ${locked.label}. ${locked.hint}` : hintText !== "" ? `${opts.strings.pickerLabel}. ${hintText}` : opts.strings.pickerLabel);
@@ -101,12 +104,12 @@ export function buildThinkingControl(opts: ThinkingControlOptions): { refresh():
     btn.toggleClass("is-off", !on);
     const icon = btn.createSpan();
     setIcon(icon, on ? "brain-cog" : "brain");
-    const offText = locked ?? (offNotPossible ? opts.strings.offNotPossible : undefined);
     const label = offText !== undefined ? offText.label : opts.strings.button(level, offNotPossible);
     btn.createSpan({ text: label });
-    // Der Grund steht im Namen des Knopfs (Obsidian zeigt `aria-label` als Tooltip); die sichtbare Beschriftung bleibt sein Anfang.
-    const reasons = [offText?.hint ?? "", hintText].filter((r) => r !== "");
-    if (reasons.length > 0) btn.setAttribute("aria-label", [label, ...reasons].join(". "));
+    // Der Grund steht im Namen des Knopfs (Obsidian zeigt `aria-label` als Tooltip); die sichtbare Beschriftung bleibt sein Anfang. Es ist immer höchstens EIN Grund: der von
+    // `offText` (gesperrt, „aus nicht möglich“) oder der Hinweis des Wirts, nie beide (zwei Sätze, die dasselbe sagen, und ein doppelter Punkt am Ende des ersten).
+    const reason = offText?.hint ?? hintText;
+    if (reason !== "") btn.setAttribute("aria-label", `${label}. ${reason}`);
     if (locked === undefined) btn.addEventListener("click", () => { void opts.setLevel(on ? "off" : opts.onLevel()).then(render); });
   };
   render();

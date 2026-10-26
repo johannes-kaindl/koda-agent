@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The confirmation for moving or renaming `Memory.md` now says what follows:** the memory is no longer read into the prompt. Before, the dialog named the two paths and the number of notes that link there, and nothing about the file being special. The line "From now on:" (in German "Künftig:") stands below the paths; any other move or rename shows no such line.
+
+### Changed
+
+- Kit: obsidian-kit 0.71.0 → 0.72.0 and code-kit 0.37.5 → 0.38.0 (through 0.37.6). What reaches you:
+  - **The thinking button of a model where *off* cannot be reached (Claude) names one reason:** its spoken name and tooltip read *Thinking: lowest level. Thinking can't be fully turned off here …* and no longer add "this model probably always thinks" next to it (the sentence was doubled, with a double full stop). With the button on, and for models without that reason (deepseek-r1, qwq), the hint stays.
+  - **A cut link in a chat answer looks like text:** a link whose target was removed (`javascript:`, `data:`, `file:`, `app:`, `obsidian://` while it is off) kept the colour, underline, pointer and arrow of a link and did nothing; now it shows as plain text. Links with a target are unchanged (the kit's `STREAM_AREA_CSS` is copied again into `styles.css`).
+  - No effect for Koda: the cancel of a full re-index in code-kit's `live-indexer` (Koda has no index), `anthropic-wire` moving to code-kit (Koda keeps vendoring it from obsidian-kit), the new source texts in the `claude` sampling profile (no value changed), the comment in `link-guard`, the clearer border of the question in the kit's chat window (Koda has its own chat), `onRefreshed` and the steadier time-limit tests of the kit.
+
 ## [0.32.1] — 2026-10-25
 
 ### Fixed

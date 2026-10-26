@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.71.0, src/obsidian/textarea-suggest.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.72.0, src/obsidian/textarea-suggest.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { findSlashQuery, removeSlashQuery, type SlashQuery } from "../kit/slash-query";
 
 /** Das `/`-Menü eines einfachen Textfelds (`<textarea>`, kein Editor): tippt der Nutzer am Textanfang oder nach einem Leerzeichen ein `/`,

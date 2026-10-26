@@ -1,7 +1,7 @@
 {
   "sources": {
-    "obsidian-kit": { "ref": "0.71.0" },
-    "code-kit": { "ref": "0.37.5" }
+    "obsidian-kit": { "ref": "0.72.0" },
+    "code-kit": { "ref": "0.38.0" }
   },
   "targets": [
     { "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["frontmatter", "explain-texts", "ocr-provider", "image-gen-provider", "endpoint-source", "anthropic-wire", "endpoint-secret-hook", "tool-provider", "provider-error-texts", "audio-provider"], "rewrite": [["../vendor/code-kit/pure/", "./"]] },

@@ -110,15 +110,15 @@ describe("Denk-Knopf der Modellzeile: der Kit-Knopf mit Kodas Anbindung (Messung
     expect(ohne.aria).toBeNull();
   });
 
-  it("Claude: die Namens-Heuristik des Kits rät „denkt vermutlich immer“ — der Hinweis steht im Knopf, im Zustand aus zusätzlich der Grund „niedrigste Stufe“ (Entscheidung bleibt im Kit, Koda macht keine Ausnahme)", () => {
+  it("Claude: die Namens-Heuristik des Kits rät „denkt vermutlich immer“ — der Hinweis steht im Knopf; im Zustand aus nennt der Name nur den Grund „niedrigste Stufe“, der Hinweis entfällt dort (Entscheidung bleibt im Kit, Koda macht keine Ausnahme)", () => {
     expect(createThinkingBinding({ model: () => "claude-sonnet-5-5", backend: () => "anthropic", suppress: () => false, setSuppress: async () => {} }).guessAlways()).toBe(true);
     const an = zeile("claude-sonnet-5-5", "anthropic", { suppress: false, schreibt: 0 });
     const aus = zeile("claude-sonnet-5-5", "anthropic", { suppress: true, schreibt: 0 });
     expect(an.aria).toBe("Thinking: on. This model probably always thinks — turning it off likely has no effect");
-    // Beide Gründe stehen im Namen des Knopfs (Reihenfolge: Beschriftung, „niedrigste Stufe“, Verdacht); die genaue Zeichensetzung dazwischen ist Sache des Kits (Task „Denk-Knopf: doppelter Punkt im aria-label …“ im Kit-Cockpit).
+    // Der Name trägt höchstens EINEN Grund (obsidian-kit 0.72.0): im Zustand aus erklärt „niedrigste Stufe“ schon, warum der Knopf nicht abschaltet,
+    // der Verdacht „denkt vermutlich immer“ steht dort nicht noch einmal daneben. Im Zustand an (oben) bleibt er der einzige Grund.
     expect(aus.aria!.startsWith("Thinking: lowest level. Thinking can't be fully turned off here")).toBe(true);
-    expect(aus.aria).toContain("This model probably always thinks — turning it off likely has no effect");
-    expect(aus.aria!.indexOf("lowest available level")).toBeLessThan(aus.aria!.indexOf("probably always thinks"));
+    expect(aus.aria).not.toContain("probably always thinks");
     expect(aus.btn.disabled ?? false).toBe(false);
   });
 
