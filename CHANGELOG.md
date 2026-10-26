@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.33.0] — 2026-10-26
+
 ### Added
 
 - **The confirmation for moving or renaming `Memory.md` now says what follows:** the memory is no longer read into the prompt. Before, the dialog named the two paths and the number of notes that link there, and nothing about the file being special. The line "From now on:" (in German "Künftig:") stands below the paths; any other move or rename shows no such line.
