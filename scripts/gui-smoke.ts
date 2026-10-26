@@ -248,6 +248,7 @@ const PUNKTE = [
   "23. edit_active_note: veraltete Markierung schreibt nicht, gueltige schreibt (Invariante Vorschau == Inhalt)",
   "24. move_note verschiebt, die Verlinkung bleibt intakt und Obsidian passt den Text an, wo noetig",
   "25. Das Move-Modal nennt beide Pfade und die Zahl der verweisenden Notizen",
+  "109. Das Move-Modal nennt für Memory.md die Folge (Zeile „Künftig“ mit dem Satz); eine andere Koda-Datei, die aus dem Ordner hinaus soll, fragt ohne die Zeile",
   "26. delete_note fragt auch im Koda-Ordner nach und legt die Notiz in den Papierkorb",
   "27. Restaurierte, nicht besuchte Tabs (DeferredViews) stehen im Arbeitskontext",
   "28. Dieselbe Notiz in zwei Tabs steht einmal im Block, nicht zweimal",
@@ -1861,6 +1862,86 @@ async function main(): Promise<void> {
       await schliesseDialog(cdp).catch(() => undefined);
     }
     record("25. Das Move-Modal nennt beide Pfade und die Zahl der verweisenden Notizen", ok25, detail25);
+
+    // --- 109. Das Move-Modal nennt für Memory.md die Folge (Welle 28, K1) ---------------------------------------------------
+    // `<Koda>/Memory.md` ist die eine Datei, die der Prompt unter genau diesem Namen liest: verschoben oder umbenannt verschwindet das
+    // Gedächtnis daraus. Das Modal zeigt dafür zusätzlich zu den Pfaden die Zeile „Künftig: …“ (`koda-effect`). Gegenprobe: eine andere
+    // Koda-Datei, die aus dem Ordner hinaus soll, fragt ebenfalls, trägt aber keine Zeile. Beide Läufe brechen im Modal ab (nichts wird
+    // verschoben); das Bild des ersten Modals entsteht hell und dunkel in /tmp/w28-shots/.
+    const P109 = PUNKTE.find((n) => n.startsWith("109. "))!;
+    let detail109 = "nicht gelaufen";
+    let ok109 = false;
+    const MEMORY109 = "Koda/Memory.md";
+    const ANDERE109 = "Koda/wegwerf-smoke109.md";
+    let themaVorher109: unknown = null;
+    try {
+      themaVorher109 = await cdp.evaluate<unknown>(`return app.vault.getConfig ? app.vault.getConfig("theme") : null;`);
+      await cdp.evaluate(`
+        const alt = app.vault.getFileByPath(${JSON.stringify(ANDERE109)});
+        if (alt) await app.fileManager.trashFile(alt);
+        await app.vault.create(${JSON.stringify(ANDERE109)}, "wegwerf");
+        return true;
+      `);
+      const lies = `
+        const m = document.querySelector(".modal-container");
+        return {
+          pfade: m.querySelector(".koda-move-paths")?.innerText ?? "",
+          effekt: m.querySelector(".koda-effect")?.innerText ?? null,
+          hinweis: m.querySelector(".koda-move-note")?.innerText ?? "",
+          dunkel: document.body.classList.contains("theme-dark"),
+        };`;
+      type Modal109 = { pfade: string; effekt: string | null; hinweis: string; dunkel: boolean };
+      const frage = async (quelle: string, ziel: string): Promise<Modal109> => {
+        await cdp.evaluate(`
+          window.__koda109 = null;
+          app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].buildTools()
+            .run("move_note", { source_path: ${JSON.stringify(quelle)}, destination_path: ${JSON.stringify(ziel)} })
+            .then((r) => { window.__koda109 = r; });
+          return true;`);
+        const da = await pollUntil<boolean>(cdp, `return !!document.querySelector(".modal-container .koda-move-paths");`, 8000);
+        if (!da) throw new Error(`Move-Modal für ${quelle} erschien nicht`);
+        return cdp.evaluate<Modal109>(lies);
+      };
+      const abbrechen = async (): Promise<void> => {
+        await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:first-child") ?? null`);
+        await pollUntil<unknown>(cdp, `return window.__koda109;`, 8000);
+      };
+
+      // Fall 1: Memory.md → Umbenennen im Koda-Ordner
+      const memo = await frage(MEMORY109, "Koda/Gedaechtnis-smoke109.md");
+      mkdirSync("/tmp/w28-shots", { recursive: true });
+      const bilder: string[] = [];
+      for (const dunkel of [false, true]) {
+        await cdp.evaluate(`app.vault.setConfig("theme", ${dunkel ? '"obsidian"' : '"moonstone"'}); app.workspace.trigger("css-change"); return true;`);
+        await new Promise((r) => setTimeout(r, 400));
+        const jetzt = await cdp.evaluate<boolean>(`return document.body.classList.contains("theme-dark");`);
+        const box = await boxOf(cdp, ".modal-container .modal");
+        const png = await capture(cdp, box ?? undefined);
+        const datei = `/tmp/w28-shots/move-memory-${dunkel ? "dunkel" : "hell"}.png`;
+        writeFileSync(datei, png);
+        bilder.push(`${dunkel ? "dunkel" : "hell"}${jetzt === dunkel ? "" : " (Thema nicht erreicht)"}`);
+      }
+      await abbrechen();
+      // Fall 2: Gegenprobe, andere Koda-Datei aus dem Ordner hinaus: Modal ohne Zeile
+      const andere = await frage(ANDERE109, "Projekte-smoke109/wegwerf.md");
+      await abbrechen();
+      const nochDa = await cdp.evaluate<boolean>(`return app.vault.getFileByPath(${JSON.stringify(MEMORY109)}) !== null && app.vault.getFileByPath(${JSON.stringify(ANDERE109)}) !== null;`);
+      const satz = /no longer read into the prompt|nicht mehr in den Prompt/;
+      const memoOk = memo.effekt !== null && satz.test(memo.effekt) && /From now on|Künftig/.test(memo.effekt) && memo.pfade.includes(MEMORY109);
+      ok109 = memoOk && andere.effekt === null && nochDa;
+      detail109 = `Memory.md: Zeile ${memo.effekt === null ? "FEHLT" : `„${memo.effekt.replace(/\s+/g, " ")}“`} · Pfade genannt: ${memo.pfade.includes(MEMORY109)} · Gegenprobe (andere Koda-Datei, Modal erschien): Zeile ${andere.effekt === null ? "fehlt (richtig)" : `„${andere.effekt}“ (FALSCH)`} · nichts verschoben: ${nochDa} · Bilder ${bilder.join(", ")}`;
+    } catch (error) {
+      detail109 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await cdp.evaluate(`
+        ${themaVorher109 === null ? "" : `app.vault.setConfig("theme", ${JSON.stringify(themaVorher109)}); app.workspace.trigger("css-change");`}
+        const rest = app.vault.getFileByPath(${JSON.stringify(ANDERE109)});
+        if (rest) await app.fileManager.trashFile(rest);
+        return true;
+      `).catch(() => undefined);
+      await schliesseDialog(cdp).catch(() => undefined);
+    }
+    record(P109, ok109, detail109);
 
     // --- 26. delete_note fragt AUCH im Koda-Ordner ---------------------------------------
     // Die Regel „Wirkung schlaegt Ort" ist im Adapter getestet; hier wird sie am laufenden

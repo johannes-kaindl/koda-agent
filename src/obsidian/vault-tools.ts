@@ -11,6 +11,7 @@ import { cleanSkillRef } from "../core/skills/load";
 import { parseSkill } from "../core/skills/skill";
 import { SKILLS_SUBFOLDER } from "../core/tools/write-policy";
 import { isInFolder } from "../vendor/kit/folder-scope";
+import { t } from "../vendor/kit/i18n";
 import type { SkillMode } from "../core/abilities/types";
 import {
   formatSearchResult,
@@ -97,6 +98,9 @@ export interface MoveRequest {
    *  Vorgangs sichtbar macht: ohne sie sieht ein Move nach einer Datei aus, waehrend er
    *  N weitere anfasst. */
   backlinks: number;
+  /** Klartext, was sich kuenftig aendert — nur bei `<Koda>/Memory.md` gesetzt (der Prompt liest das Gedaechtnis unter genau diesem
+   *  Namen). Additiv: das Modal zeigt ihn ZUSAETZLICH zu den Pfaden, nie an ihrer Stelle. */
+  effect?: string;
 }
 
 export interface DeleteRequest {
@@ -456,13 +460,20 @@ export class VaultTools implements ToolRunner {
     }
 
     if (movePolicy(plan.source, plan.destination, this.opts.kodaFolder()) === "confirm") {
-      const approved = await this.confirm({
+      const req: MoveRequest = {
         kind: "move",
         path: plan.source,
         destination: plan.destination,
         rename: plan.kind === "rename",
         backlinks: this.vault.backlinkCount(plan.source),
-      });
+      };
+      // Die Quelle ist die Memory-Datei genau dann, wenn die Schreibregel sie frei schreiben laesst, aber das Ersetzen (`replace`) fragt:
+      // dieselbe Entscheidung wie in `movePolicy`, kein zweiter Pfadvergleich. Skills und Arbeiten fragen schon ohne Modus.
+      const kodaFolder = this.opts.kodaFolder();
+      if (writePolicy(plan.source, kodaFolder) === "free" && writePolicy(plan.source, kodaFolder, "replace") === "confirm") {
+        req.effect = t("confirm.move.memoryEffect");
+      }
+      const approved = await this.confirm(req);
       if (!approved) return { ok: false, error: "vom Nutzer abgelehnt" };
     }
 

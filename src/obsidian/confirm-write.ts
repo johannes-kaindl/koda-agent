@@ -89,6 +89,12 @@ export function confirmWrite(app: App, req: WriteRequest): Promise<boolean> {
       private renderMove(r: MoveRequest): () => void {
         this.titleEl.setText(t(r.rename ? "confirm.rename.title" : "confirm.move.title"));
         pathPair(this.contentEl, r.path, r.destination);
+        // Additiv, nach den Pfaden und vor der Zahl der Verweise: was sich kuenftig aendert (`<Koda>/Memory.md` verlaesst den Prompt).
+        if (r.effect !== undefined && r.effect !== "") {
+          const eff = this.contentEl.createDiv({ cls: "koda-effect" });
+          eff.createEl("strong", { text: t("confirm.effect") });
+          eff.createSpan({ text: ` ${r.effect}` });
+        }
         this.contentEl.createDiv({ cls: "koda-move-note", text: backlinkLine(r.backlinks, false) });
         // Ein Move ist nicht destruktiv: nichts geht verloren, und Obsidian zieht die Links nach.
         return this.buttons(t(r.rename ? "confirm.rename.ok" : "confirm.move.ok"), false);
