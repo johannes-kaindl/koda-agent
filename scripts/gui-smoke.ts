@@ -1926,7 +1926,7 @@ async function main(): Promise<void> {
       const andere = await frage(ANDERE109, "Projekte-smoke109/wegwerf.md");
       await abbrechen();
       const nochDa = await cdp.evaluate<boolean>(`return app.vault.getFileByPath(${JSON.stringify(MEMORY109)}) !== null && app.vault.getFileByPath(${JSON.stringify(ANDERE109)}) !== null;`);
-      const satz = /no longer read into the prompt|nicht mehr in den Prompt/;
+      const satz = /no longer be read into the prompt|nicht mehr in den Prompt/;
       const memoOk = memo.effekt !== null && satz.test(memo.effekt) && /From now on|Künftig/.test(memo.effekt) && memo.pfade.includes(MEMORY109);
       ok109 = memoOk && andere.effekt === null && nochDa;
       detail109 = `Memory.md: Zeile ${memo.effekt === null ? "FEHLT" : `„${memo.effekt.replace(/\s+/g, " ")}“`} · Pfade genannt: ${memo.pfade.includes(MEMORY109)} · Gegenprobe (andere Koda-Datei, Modal erschien): Zeile ${andere.effekt === null ? "fehlt (richtig)" : `„${andere.effekt}“ (FALSCH)`} · nichts verschoben: ${nochDa} · Bilder ${bilder.join(", ")}`;
