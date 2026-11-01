@@ -224,7 +224,7 @@ const PUNKTE = [
   "1. Plugin ist aktiv",
   "1b. Retrieval-Andockung",
   "1c. Frontmatter-Naht",
-  "2. Sidebar oeffnet mit Eingabefeld, Senden, dem SICHTBAREN Neu-Symbol im Composer (gesperrt bei leerem Gespraech) und der sichtbaren Denk-Steuerung in der Modellzeile",
+  "2. Sidebar oeffnet mit Eingabefeld, Senden, dem SICHTBAREN Neu-Symbol im Composer (gesperrt bei leerem Gespraech) und der sichtbaren Modellzeile",
   "3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein",
   "4. Toter Endpunkt wird als nicht erreichbar angezeigt",
   "8. Settings-Gruppe „Verlauf kürzen“ mit Fenster-Feld",
@@ -234,10 +234,10 @@ const PUNKTE = [
   "7. Verdichtungs-Marken (Stufe 1 + Stufe 2, erzwungen) werden gerendert",
   "9. Statuszeile nennt die Taetigkeit und dreht sich dabei",
   "10. Statuszeile zeigt die Belegung des Kontextfensters",
-  "11. Denk-Knopf der Modellzeile schaltet, ueberlebt den Neuaufbau, und der Befehl „Thinking umschalten“ schaltet denselben Wert",
+  "11. Denk-Dropdown der Modellzeile: eine gewaehlte Stufe wird geschrieben und bleibt stehen, „Aus“ laesst sie stehen, der Befehl „Thinking umschalten“ bringt sie zurueck",
   "12. „Neues Gespraech“ fragt nach, Abbruch laesst den Verlauf stehen",
-  "13. Denk-Knopf der Modellzeile ist bei einem Modell, das sich nicht abschalten laesst, gesperrt (Kit-Feld locked), Klick und Befehl bleiben folgenlos",
-  "108. Denk-Knopf der Modellzeile: bei einem Modell, das die Namens-Heuristik als „denkt vermutlich immer“ rät, steht der Hinweis im Namen des Knopfs (an wie aus), der Knopf bleibt bedienbar; ohne Verdacht fehlt er, bei gpt-oss (gesperrt) auch",
+  "13. Denk-Dropdown der Modellzeile ist bei einem Modell, das sich nicht abschalten laesst, gesperrt (Kit-Feld locked), und der Befehl bleibt folgenlos",
+  "108. Denk-Dropdown der Modellzeile: der Hinweis „denkt vermutlich immer“ fehlt bei einem Modell ohne Verdacht (qwen3.6) und bei gpt-oss (gesperrt); ohne Familie und ohne erkanntes Backend steht gar keine Steuerung",
   "16. Zuruecksetzen stellt den Auslieferungsstand her",
   "17. Abgeschaltetes Werkzeug wird nicht gesendet",
   "18. „Aktive Anweisung ansehen“ zeigt Memory und Skills",
@@ -248,6 +248,12 @@ const PUNKTE = [
   "23. edit_active_note: veraltete Markierung schreibt nicht, gueltige schreibt (Invariante Vorschau == Inhalt)",
   "24. move_note verschiebt, die Verlinkung bleibt intakt und Obsidian passt den Text an, wo noetig",
   "25. Das Move-Modal nennt beide Pfade und die Zahl der verweisenden Notizen",
+  "110. Verlauf: „Neues Gespräch“ legt das Gespräch bei eingeschaltetem Verlauf als Datei im Chat-Ordner ab (ohne Rückfrage), „Open past chats…“ listet es, und ein Klick stellt Gespräch und Arbeit wieder her",
+  "111. Gegenprobe Verlauf: bei Aufbewahrung 0 fragt „Neues Gespräch“ zurück und legt nichts ab, und der Befehl „Open past chats…“ ist nicht verfügbar",
+  "112. Composer: die Modellzeile steht als erstes Kind, dann Eingabe, Knopfreihe, Modus, Senden; Neu ist nach einer Frage frei, der Verlauf-Knopf steht bei Aufbewahrung über 0, Stopp ersetzt Senden im Lauf",
+  "113. Gegenprobe Composer: bei leerem Gespräch, Aufbewahrung 0 und ohne Lauf ist Neu gesperrt, der Verlauf-Knopf ausgeblendet und Stopp ausgeblendet",
+  "114. Kompakter Composer: unter 640 px Höhe und ab 20 em Breite stehen Senden neben der Eingabe und die Knopfreihe samt Modellzeile darunter, das Modus-Dropdown entfällt",
+  "115. Gegenprobe kompakter Composer: bei 800 px Höhe steht Senden nicht neben der Eingabe und das Modus-Dropdown ist da",
   "109. Das Move-Modal nennt für Memory.md die Folge (Zeile „Künftig“ mit dem Satz); eine andere Koda-Datei, die aus dem Ordner hinaus soll, fragt ohne die Zeile",
   "26. delete_note fragt auch im Koda-Ordner nach und legt die Notiz in den Papierkorb",
   "27. Restaurierte, nicht besuchte Tabs (DeferredViews) stehen im Arbeitskontext",
@@ -324,7 +330,7 @@ const PUNKTE = [
   "102. Modellzeile: der Chat-Tab trägt genau eine Zeile des Kits als direktes Kind des Composers, ohne sichtbare Beschriftung („Koda“ steht im aria-label), mit Dropdown, Neu-laden-Knopf und Denk-Steuerung; die Kopfzeile ist weg",
   "103. Modellzeile: ein Wechsel im Dropdown ändert das gesendete Modell und das Modell der Zeile in den Einstellungen, „Automatisch“ stellt es zurück",
   "104. Modellzeile: ein Wechsel des Modells in den Einstellungen zeichnet das Dropdown nach",
-  "105. Modellzeile: im Lauf gesperrt (Dropdown UND Denk-Knopf), danach frei",
+  "105. Modellzeile: im Lauf gesperrt (Modell-Dropdown UND Denk-Dropdown), danach frei",
   "106. Linkschutz: im Strom und im Verlauf hat keiner der Links mit javascript:, data:, file:, obsidian: oder app: ein Ziel, ein [[javascript:…]]-Klick öffnet nichts und ein gewöhnlicher innerer Link schon",
   "107. Einstellungen: die Gruppe „Links and images in answers“ hat zwei Schalter, beide aus, und ein Umlegen schreibt die Einstellung (und zurück)",
   "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung; mit dem Stub ist sie da, und Koda traegt related_notes nie selbst (es kommt nur ueber einen Anbieter, Punkt 78)",
@@ -700,7 +706,8 @@ async function main(): Promise<void> {
           return { label: a.getAttribute("aria-label") ?? "", sichtbar: r.width > 0 && r.height > 0, hoehe: Math.round(r.height), gesperrt: !!a.disabled };
         });
         // Der Denk-Knopf steht seit obsidian-kit 0.70.1 in der Modellzeile (Kit-Klasse), nicht mehr im Kopf; sichtbar heisst: eine Hoehe.
-        const think = el.querySelector(".okit-model-bar .okit-thinking-control");
+        // Die Denk-Steuerung steht seit obsidian-kit 0.73.0 nur, wo das Kit Stufen fuer das Modell kennt (Familie oder LM Studio/Open WebUI); die Modellzeile selbst steht immer. Die Steuerung misst Punkt 11.
+        const think = el.querySelector(".okit-model-bar");
         const hasThink = !!think && think.getBoundingClientRect().height > 0;
         const neu = actions.find((a) => /Neues Gespräch|New chat/.test(a.label));
         const hasNewChat = !!neu && neu.sichtbar;
@@ -719,11 +726,11 @@ async function main(): Promise<void> {
       8000,
     );
     record(
-      "2. Sidebar oeffnet mit Eingabefeld, Senden, dem SICHTBAREN Neu-Symbol im Composer (gesperrt bei leerem Gespraech) und der sichtbaren Denk-Steuerung in der Modellzeile",
+      "2. Sidebar oeffnet mit Eingabefeld, Senden, dem SICHTBAREN Neu-Symbol im Composer (gesperrt bei leerem Gespraech) und der sichtbaren Modellzeile",
       view !== null && view.input && view.buttons.length === 1 && view.cta &&
         view.inSidebar && view.hasThink && view.hasNewChat && view.actions.length === 1 && view.status,
       view
-        ? `${view.leaves} Leaf · in Seitenleiste: ${String(view.inSidebar)} · Knoepfe: ${view.buttons.join(", ")} · Neu: ${view.actions.map((a) => `${a.label}[${a.hoehe}px${a.gesperrt ? ", gesperrt" : ""}]`).join(" | ")} · Denk-Knopf in der Zeile sichtbar: ${view.hasThink} · Statuszeile: ${view.status}`
+        ? `${view.leaves} Leaf · in Seitenleiste: ${String(view.inSidebar)} · Knoepfe: ${view.buttons.join(", ")} · Neu: ${view.actions.map((a) => `${a.label}[${a.hoehe}px${a.gesperrt ? ", gesperrt" : ""}]`).join(" | ")} · Modellzeile sichtbar: ${view.hasThink} · Statuszeile: ${view.status}`
         : "keine View entstanden",
     );
 
@@ -1125,37 +1132,45 @@ async function main(): Promise<void> {
       `${usage.normal} → bei 1024 Token: ${usage.tiny} (${usage.warnCls.includes("is-warning") ? "gewarnt" : "keine Warnung"})`,
     );
 
-    // --- 11. Denk-Knopf der Modellzeile --------------------------------------
-    // Beide Richtungen, das Ueberleben eines Neuaufbaus und der zweite Zugang (der Befehl): der Zustand kommt aus den
-    // Einstellungen, nicht aus dem DOM — sonst faellt er beim naechsten Redraw zurueck. Geklickt wird der ECHTE Knopf des
-    // Kits in der Modellzeile (seit obsidian-kit 0.70.1; vorher ein Knopf im Kopf, den `toggleThinking()` direkt rief).
-    const think = await cdp.evaluate<{ knopfDa: boolean; start: boolean; nachKlick: boolean; label: string; pressed: string | null; survives: boolean; nachBefehl: boolean }>(`
+    // --- 11. Denk-Dropdown der Modellzeile -----------------------------------
+    // Seit obsidian-kit 0.73.0 ist die Denk-Steuerung der Modellzeile ein Dropdown mit den Stufen des Modells. Gemessen wird der ECHTE Kit-Baustein: eine Wahl schreibt die Stufe UND schaltet das Denken an,
+    // die Stufe bleibt nach dem Neuzeichnen stehen (kein Zurueckspringen auf „medium“), „aus“ laesst sie stehen, und der Befehl „Thinking umschalten“ kippt an/aus und bringt die Stufe zurueck. Der Zustand kommt
+    // aus den Einstellungen, nicht aus dem DOM. Das Modell ist ein Name mit bekannter Familie (qwen3.6): die Liste des Kits haengt an Familie und Backend, der Stub meldet kein erkennbares Backend.
+    const think = await cdp.evaluate<{ da: boolean; eintraege: string[]; start: string; nachWahl: { suppress: boolean; level: string | null }; angezeigt: string; nachNeuzeichnen: string; nachAus: { suppress: boolean; level: string | null }; nachBefehl: { suppress: boolean; level: string | null }; angezeigtZurueck: string }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-      const knopf = () => document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle");
+      const v = p.views()[0];
+      const dd = () => document.querySelector(".koda-root .okit-model-bar .okit-thinking-control select");
       const warte = async (f) => { for (let i = 0; i < 80; i++) { if (f()) return true; await new Promise((r) => setTimeout(r, 100)); } return false; };
-      const start = p.settings.suppressThinking;
-      const knopfDa = !!knopf();
-      knopf()?.click();
-      await warte(() => p.settings.suppressThinking !== start);
-      const nachKlick = p.settings.suppressThinking;
-      // Der Knopf zeichnet sich nach dem Schreiben neu: Beschriftung und aria-pressed gehoeren zum NEUEN Zustand (gedrueckt = es wird gedacht).
-      await warte(() => knopf()?.getAttribute("aria-pressed") === String(!nachKlick));
-      const label = knopf()?.textContent ?? "";
-      const pressed = knopf()?.getAttribute("aria-pressed") ?? null;
-      p.views()[0].syncModelBar();
-      const survives = knopf()?.textContent === label && knopf()?.getAttribute("aria-pressed") === pressed;
-      // Der Befehl ist ein zweiter Zugang ohne den Knopf und schaltet denselben Wert zurueck.
+      const spaeter = (ms) => new Promise((r) => setTimeout(r, ms));
+      const vorher = { endpoints: JSON.parse(JSON.stringify(p.settings.endpoints)), suppress: p.settings.suppressThinking, level: p.settings.thinkingLevel };
+      const url0 = p.settings.endpoints[0].url;
+      p.settings.endpoints = [{ url: url0, model: "qwen3.6-27b" }]; p.settings.suppressThinking = false; p.settings.thinkingLevel = null;
+      p.resolver.invalidate(); v.syncModelBar(); await warte(() => dd()); await spaeter(300);
+      const da = !!dd(); const eintraege = da ? [...dd().options].map((o) => o.value) : [];
+      const start = dd()?.value ?? "";
+      const waehle = async (x) => { const el = dd(); el.value = x; el.dispatchEvent(new Event("change", { bubbles: true })); await spaeter(500); };
+      await waehle("high");
+      const nachWahl = { suppress: p.settings.suppressThinking, level: p.settings.thinkingLevel };
+      const angezeigt = dd()?.value ?? "";
+      v.syncModelBar(); await spaeter(300);
+      const nachNeuzeichnen = dd()?.value ?? "";
+      await waehle("off");
+      const nachAus = { suppress: p.settings.suppressThinking, level: p.settings.thinkingLevel };
       await app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":toggle-thinking")});
-      await warte(() => p.settings.suppressThinking === start);
-      const nachBefehl = p.settings.suppressThinking;
-      p.settings.suppressThinking = start;
-      await p.saveSettings();
-      return { knopfDa, start, nachKlick, label, pressed, survives, nachBefehl };
+      await warte(() => p.settings.suppressThinking === false); await spaeter(300);
+      const nachBefehl = { suppress: p.settings.suppressThinking, level: p.settings.thinkingLevel };
+      const angezeigtZurueck = dd()?.value ?? "";
+      p.settings.endpoints = vorher.endpoints; p.settings.suppressThinking = vorher.suppress; p.settings.thinkingLevel = vorher.level;
+      p.resolver.invalidate(); await p.saveSettings(); v.syncModelBar();
+      return { da, eintraege, start, nachWahl, angezeigt, nachNeuzeichnen, nachAus, nachBefehl, angezeigtZurueck };
     `);
     record(
-      "11. Denk-Knopf der Modellzeile schaltet, ueberlebt den Neuaufbau, und der Befehl „Thinking umschalten“ schaltet denselben Wert",
-      think.knopfDa && think.start !== think.nachKlick && /Thinking: (on|off)/.test(think.label) && think.pressed === String(!think.nachKlick) && think.survives && think.nachBefehl === think.start,
-      `Knopf da: ${String(think.knopfDa)} · ${String(think.start)} → ${String(think.nachKlick)} · Beschriftung „${think.label}" (aria-pressed ${String(think.pressed)}) · Neuaufbau: ${String(think.survives)} · Befehl zurueck: ${String(think.nachBefehl === think.start)}`,
+      "11. Denk-Dropdown der Modellzeile: eine gewaehlte Stufe wird geschrieben und bleibt stehen, „Aus“ laesst sie stehen, der Befehl „Thinking umschalten“ bringt sie zurueck",
+      think.da && think.eintraege.includes("high") && think.eintraege.includes("off") && think.start === "medium" &&
+        think.nachWahl.suppress === false && think.nachWahl.level === "high" && think.angezeigt === "high" && think.nachNeuzeichnen === "high" &&
+        think.nachAus.suppress === true && think.nachAus.level === "high" &&
+        think.nachBefehl.suppress === false && think.nachBefehl.level === "high" && think.angezeigtZurueck === "high",
+      `Dropdown da: ${String(think.da)} (${think.eintraege.join("|")}) · Start „${think.start}“ · nach Wahl „hoch“: ${JSON.stringify(think.nachWahl)}, angezeigt „${think.angezeigt}“, nach Neuzeichnen „${think.nachNeuzeichnen}“ · nach „Aus“: ${JSON.stringify(think.nachAus)} · nach Befehl: ${JSON.stringify(think.nachBefehl)}, angezeigt „${think.angezeigtZurueck}“`,
     );
 
     // --- 12. Verwerfen fragt nach ------------------------------------------
@@ -1205,68 +1220,62 @@ async function main(): Promise<void> {
     //
     // ⚠️ Was er belegt: die Anzeige-Seite und dass Klick UND Befehl folgenlos bleiben. NICHT belegt ist die Request-Seite (dass gpt-oss
     // die Parameter wirklich ablehnt); die ist per Unit-Test fixiert (`effectiveSuppress`) und braucht ein echtes Modell.
-    type KnopfLage = { text: string; aria: string; pressed: string; disabled: boolean };
-    const dritte = await cdp.evaluate<{ normalAus: KnopfLage; normalAn: KnopfLage; gesperrt: KnopfLage; vorKlick: boolean; nachKlick: boolean; nachBefehl: boolean }>(`
+    type KnopfLage = { da: boolean; text: string; wert: string; aria: string; disabled: boolean };
+    const dritte = await cdp.evaluate<{ normalAus: KnopfLage; normalAn: KnopfLage; gesperrt: KnopfLage; vorBefehl: boolean; nachBefehl: boolean }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       const v = p.views()[0];
       const warte = (ms) => new Promise((r) => setTimeout(r, ms));
       const lies = () => {
-        const el = document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle");
-        return { text: el?.textContent ?? "", aria: el?.getAttribute("aria-label") ?? "", pressed: el?.getAttribute("aria-pressed") ?? "", disabled: !!el?.disabled };
+        const el = document.querySelector(".koda-root .okit-model-bar .okit-thinking-control select");
+        return { da: !!el, text: el ? (el.options[el.selectedIndex]?.textContent ?? "") : "", wert: el?.value ?? "", aria: el?.getAttribute("aria-label") ?? "", disabled: !!el?.disabled };
       };
-      // Das Modell steht in der Zeile; der Knopf liest das gesendete (resolver.peek).
+      // Das Modell steht in der Zeile; die Steuerung liest das gesendete (resolver.peek). Ein Name mit bekannter Familie, damit das Kit Stufen kennt.
       const url0 = p.settings.endpoints[0].url;
       const sende = async (m) => { p.settings.endpoints = [{ url: url0, model: m }]; p.resolver.invalidate(); v.syncModelBar(); await warte(300); };
-      await sende("qwen3:8b");
+      await sende("qwen3.6-27b");
       p.settings.suppressThinking = true;  v.syncModelBar(); await warte(200); const normalAus = lies();
       p.settings.suppressThinking = false; v.syncModelBar(); await warte(200); const normalAn = lies();
       // Ein Name, den isAlwaysOnThinker erkennt — das Modell muss nicht existieren.
       await sende("gpt-oss:20b");
       const gesperrt = lies();
-      const vorKlick = p.settings.suppressThinking;
-      document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle")?.click();
-      await warte(500);
-      const nachKlick = p.settings.suppressThinking;
+      const vorBefehl = p.settings.suppressThinking;
       await app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":toggle-thinking")});
       await warte(500);
       const nachBefehl = p.settings.suppressThinking;
-      return { normalAus, normalAn, gesperrt, vorKlick, nachKlick, nachBefehl };
+      return { normalAus, normalAn, gesperrt, vorBefehl, nachBefehl };
     `);
     record(
-      "13. Denk-Knopf der Modellzeile ist bei einem Modell, das sich nicht abschalten laesst, gesperrt (Kit-Feld locked), Klick und Befehl bleiben folgenlos",
-      !dritte.normalAus.disabled && !dritte.normalAn.disabled &&
-        dritte.normalAus.pressed === "false" && dritte.normalAn.pressed === "true" &&
-        dritte.gesperrt.disabled && dritte.gesperrt.pressed === "true" && /always on|immer an/.test(dritte.gesperrt.text) &&
-        dritte.vorKlick === dritte.nachKlick && dritte.vorKlick === dritte.nachBefehl,
-      `normal: „${dritte.normalAn.text}" / „${dritte.normalAus.text}" · gesperrt: „${dritte.gesperrt.text}" (disabled ${String(dritte.gesperrt.disabled)}, aria-pressed ${dritte.gesperrt.pressed}) · Klick folgenlos: ${String(dritte.vorKlick === dritte.nachKlick)} · Befehl folgenlos: ${String(dritte.vorKlick === dritte.nachBefehl)}`,
+      "13. Denk-Dropdown der Modellzeile ist bei einem Modell, das sich nicht abschalten laesst, gesperrt (Kit-Feld locked), und der Befehl bleibt folgenlos",
+      dritte.normalAus.da && !dritte.normalAus.disabled && !dritte.normalAn.disabled &&
+        dritte.normalAus.wert === "off" && dritte.normalAn.wert === "medium" &&
+        dritte.gesperrt.disabled && /Always on|Immer an/.test(dritte.gesperrt.text) &&
+        dritte.vorBefehl === dritte.nachBefehl,
+      `normal: „${dritte.normalAn.text}" / „${dritte.normalAus.text}" · gesperrt: „${dritte.gesperrt.text}" (disabled ${String(dritte.gesperrt.disabled)}) · Befehl folgenlos: ${String(dritte.vorBefehl === dritte.nachBefehl)}`,
     );
 
     // --- 108. Der Hinweis „denkt vermutlich immer“ am bedienbaren Knopf (Kit `hint`, seit obsidian-kit 0.71.0) ----
     // Die Entscheidung („rät der Name, dass das Modell immer denkt?“) trifft das Kit (`thinkToggleState`), der Text kommt aus dem Kit; Koda verdrahtet nur `hint`. Gemessen wird der Name des Knopfs
     // (Tooltip und aria-label): der Hinweis steht dort bei einem geratenen Modell in beiden Zuständen, der Knopf bleibt bedienbar und schreibt; bei einem Modell ohne Verdacht und bei gpt-oss fehlt er.
     const P108 = PUNKTE.find((n) => n.startsWith("108. "))!;
-    const hinweis = await cdp.evaluate<{ an: string; aus: string; ohne: string; gesperrt: string; bedienbar: boolean; klick: boolean }>(`
+    const hinweis = await cdp.evaluate<{ ohne: string; ohneDa: boolean; gesperrt: string; deepseekDa: boolean }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       const v = p.views()[0];
       const warte = (ms) => new Promise((r) => setTimeout(r, ms));
-      const knopf = () => document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle");
-      const name = () => knopf()?.getAttribute("aria-label") ?? "";
+      const dd = () => document.querySelector(".koda-root .okit-model-bar .okit-thinking-control select");
+      const name = () => dd()?.getAttribute("aria-label") ?? "";
       const url0 = p.settings.endpoints[0].url;
       const sende = async (m, suppress) => { p.settings.endpoints = [{ url: url0, model: m }]; p.settings.suppressThinking = suppress; p.resolver.invalidate(); v.syncModelBar(); await warte(400); };
-      await sende("deepseek-r1:8b", false); const an = name(); const bedienbar = knopf()?.disabled !== true;
-      await sende("deepseek-r1:8b", true);  const aus = name();
-      await sende("qwen3:8b", false);       const ohne = name();
+      await sende("qwen3.6-27b", false);    const ohne = name(); const ohneDa = !!dd();
       await sende("gpt-oss:20b", false);    const gesperrt = name();
-      await sende("deepseek-r1:8b", false);
-      knopf()?.click(); await warte(600);
-      const klick = p.settings.suppressThinking === true;
-      return { an, aus, ohne, gesperrt, bedienbar, klick };
+      // Ein Name ohne Familie auf einem Backend, das der Stub nicht erkennen laesst: das Kit kennt dort keine Stufen, also gibt es keine Denk-Steuerung (und keinen Hinweis).
+      await sende("deepseek-r1:8b", false); const deepseekDa = !!dd();
+      return { ohne, ohneDa, gesperrt, deepseekDa };
     `);
     const HINT = /probably always thinks|denkt vermutlich immer/;
     record(
       P108,
-      HINT.test(hinweis.an) && HINT.test(hinweis.aus) && hinweis.bedienbar && hinweis.klick && !HINT.test(hinweis.ohne) && hinweis.ohne === "" && !HINT.test(hinweis.gesperrt) && /always on|immer an/.test(hinweis.gesperrt),
-      `deepseek-r1 an: „${hinweis.an}“ · aus: „${hinweis.aus}“ · bedienbar: ${String(hinweis.bedienbar)}, Klick schreibt: ${String(hinweis.klick)} · qwen3 (ohne Verdacht): „${hinweis.ohne}“ · gpt-oss: „${hinweis.gesperrt}“`,
+      hinweis.ohneDa && !HINT.test(hinweis.ohne) && !HINT.test(hinweis.gesperrt) && /Always on|Immer an|always thinks|denkt immer/.test(hinweis.gesperrt) && !hinweis.deepseekDa,
+      `qwen3.6 (ohne Verdacht): Steuerung da ${String(hinweis.ohneDa)}, Hinweis „${hinweis.ohne.includes("probably") ? "ja" : "keiner"}“ · gpt-oss: „${hinweis.gesperrt}“ · deepseek-r1 ohne erkanntes Backend: Steuerung da ${String(hinweis.deepseekDa)} (soll nein; der Hinweis selbst steht im Unit-Test mit LM-Studio-Backend)`,
     );
 
     // --- 16. Reset stellt den Auslieferungsstand her -------------------------
@@ -1945,6 +1954,193 @@ async function main(): Promise<void> {
       await schliesseDialog(cdp).catch(() => undefined);
     }
     record(P109, ok109, detail109);
+
+    // --- 110/111. Verlauf vergangener Chats (Welle 29, Kit `chat-archive`, Payload koda-log/1) ------------------------------
+    // 110: bei Aufbewahrung über 0 legt „Neues Gespräch“ das Gespräch als `.json` im Chat-Ordner ab, ohne Rückfrage; der Befehl „Open past chats…“ öffnet den Dialog, der Eintrag
+    // steht darin, und ein Klick stellt das Gespräch wieder her — samt Arbeit aus der Sitzungs-Marke. 111 (Gegenprobe): bei Aufbewahrung 0 fragt Neu zurück, legt nichts ab, und
+    // der Befehl ist nicht verfügbar. Der Ordner liegt im Staging-Vault und wird danach entfernt.
+    const P110 = PUNKTE.find((n) => n.startsWith("110. "))!;
+    const P111 = PUNKTE.find((n) => n.startsWith("111. "))!;
+    const ORDNER110 = "Smoke110-Chats";
+    let detail110 = "nicht gelaufen";
+    let ok110 = false;
+    let detail111 = "nicht gelaufen";
+    let ok111 = false;
+    const einstellungen110 = await cdp.evaluate<{ keep: number; folder: string }>(`const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]; return { keep: p.settings.chatKeep, folder: p.settings.chatFolder };`);
+    const raeume110 = async (): Promise<void> => { await cdp.evaluate(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      p.settings.chatKeep = ${einstellungen110.keep}; p.settings.chatFolder = ${JSON.stringify(einstellungen110.folder)};
+      await p.saveSettings();
+      if (await app.vault.adapter.exists(${JSON.stringify(ORDNER110)})) await app.vault.adapter.rmdir(${JSON.stringify(ORDNER110)}, true);
+      await p.newChat();
+      return true;`).catch(() => undefined); };
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        if (await app.vault.adapter.exists(${JSON.stringify(ORDNER110)})) await app.vault.adapter.rmdir(${JSON.stringify(ORDNER110)}, true);
+        p.settings.chatFolder = ${JSON.stringify(ORDNER110)}; p.settings.chatKeep = 5;
+        await p.saveSettings();
+        await p.newChat();
+        const sitzung = JSON.parse(JSON.stringify(p.session)); sitzung.arbeit = "Smoke-Arbeit-110";
+        p.chatLog.push({ kind: "session", at: new Date().toISOString(), state: sitzung }, { role: "user", content: "SMOKE-110 Frage" }, { role: "assistant", content: "SMOKE-110 Antwort" });
+        await p.store.appendMessages(p.chatLog);
+        p.views()[0].renderLog();
+        return true;`);
+      const vor = await cdp.evaluate<{ neuFrei: boolean }>(`const b = document.querySelector(".koda-root .koda-new"); return { neuFrei: !!b && !b.disabled };`);
+      // Neu ueber die Ansicht (der Weg des Knopfes): kein Modal, das Gespraech ist abgelegt und geleert.
+      await cdp.evaluate(`window.__koda110 = false; app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].views()[0].askNewChat().then(() => { window.__koda110 = true; }); return true;`);
+      const fertig = await pollUntil<boolean>(cdp, `return window.__koda110 === true ? true : null;`, 8000).catch(() => null);
+      const modalOffen = await cdp.evaluate<boolean>(`return !!document.querySelector(".modal-container .modal-button-container");`);
+      const datei = await cdp.evaluate<{ n: number; inhalt: string; laenge: number }>(`
+        const l = await app.vault.adapter.list(${JSON.stringify(ORDNER110)}).catch(() => ({ files: [] }));
+        const f = l.files.filter((x) => x.endsWith(".json"));
+        const inhalt = f.length > 0 ? await app.vault.adapter.read(f[0]) : "";
+        return { n: f.length, inhalt, laenge: app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].chatLog.length };`);
+      const befehl = await cdp.evaluate<boolean>(`return app.commands.commands[${JSON.stringify(PLUGIN_ID + ":open-past-chats")}]?.checkCallback?.(true) === true;`);
+      await cdp.evaluate(`app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":open-past-chats")}); return true;`);
+      const eintrag = await pollUntil<string>(cdp, `const e = document.querySelector(".prompt .suggestion-item, .modal-container .suggestion-item"); return e ? e.innerText : null;`, 8000).catch(() => null);
+      if (eintrag !== null) await clickReal(cdp, `document.querySelector(".prompt .suggestion-item, .modal-container .suggestion-item") ?? null`);
+      const zurueck = await pollUntil<{ frage: boolean; arbeit: string | null; imChat: boolean }>(cdp, `
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const frage = p.chatLog.some((e) => e.role === "user" && e.content === "SMOKE-110 Frage");
+        return frage ? { frage, arbeit: p.session.arbeit, imChat: document.querySelector(".koda-root .koda-log")?.innerText.includes("SMOKE-110 Antwort") === true } : null;`, 8000).catch(() => null);
+      ok110 = vor.neuFrei && fertig === true && !modalOffen && datei.n === 1 && datei.inhalt.includes("SMOKE-110 Frage") && datei.inhalt.includes("koda-log/1") && datei.laenge === 0 &&
+        befehl && eintrag !== null && /SMOKE-110 Frage/.test(eintrag) && zurueck !== null && zurueck.arbeit === "Smoke-Arbeit-110" && zurueck.imChat;
+      detail110 = `Neu frei vor dem Klick: ${vor.neuFrei} · Modal bei Neu: ${modalOffen} (soll nein) · Dateien im Ordner: ${datei.n}, Payload koda-log/1 mit Frage: ${datei.inhalt.includes("koda-log/1") && datei.inhalt.includes("SMOKE-110 Frage")} · Gespraech danach: ${datei.laenge} Eintraege · Befehl verfuegbar: ${befehl} · Dialog-Eintrag „${(eintrag ?? "—").replace(/\s+/g, " ")}“ · wiederhergestellt: ${JSON.stringify(zurueck)}`;
+    } catch (error) {
+      detail110 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await schliesseDialog(cdp).catch(() => undefined);
+      await raeume110();
+    }
+    record(P110, ok110, detail110);
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.chatFolder = ${JSON.stringify(ORDNER110)}; p.settings.chatKeep = 0;
+        await p.saveSettings();
+        await p.newChat();
+        p.chatLog.push({ role: "user", content: "SMOKE-111 Frage" }, { role: "assistant", content: "SMOKE-111 Antwort" });
+        p.views()[0].renderLog();
+        window.__koda111 = false; p.views()[0].askNewChat().then(() => { window.__koda111 = true; });
+        return true;`);
+      const titel = await pollUntil<string>(cdp, `const t = document.querySelector(".modal-container .modal-title"); return t ? t.textContent : null;`, 8000).catch(() => null);
+      await clickReal(cdp, `document.querySelector(".modal-container .modal-button-container button:first-child") ?? null`);
+      await pollUntil<boolean>(cdp, `return window.__koda111 === true ? true : null;`, 8000).catch(() => null);
+      const lage = await cdp.evaluate<{ kept: number; ordner: boolean; befehl: boolean }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        return { kept: p.chatLog.length, ordner: await app.vault.adapter.exists(${JSON.stringify(ORDNER110)}), befehl: app.commands.commands[${JSON.stringify(PLUGIN_ID + ":open-past-chats")}]?.checkCallback?.(true) === true };`);
+      ok111 = titel !== null && /Gespräch verwerfen|Discard this conversation/.test(titel) && lage.kept === 2 && !lage.ordner && !lage.befehl;
+      detail111 = `Rueckfrage „${titel ?? "—"}“ · Abbruch laesst ${lage.kept} Eintraege stehen · Ordner angelegt: ${lage.ordner} (soll nein) · Befehl „Open past chats…“ verfuegbar: ${lage.befehl} (soll nein)`;
+    } catch (error) {
+      detail111 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await schliesseDialog(cdp).catch(() => undefined);
+      await raeume110();
+    }
+    record(P111, ok111, detail111);
+
+    // --- 112/113. Der Composer (Welle 29): Aufbau und Zustaende der Knopfreihe ----------------------------------------------
+    // 112 (Zustand mit Gespraech, Verlauf an, im Lauf): Modellzeile als ERSTES Kind des Composers, danach Eingabe, Knopfreihe (Neu, Verlauf), Modus, Senden; Neu frei, Verlauf sichtbar, Stopp ersetzt Senden.
+    // 113 (Gegenprobe, leer, Verlauf aus, kein Lauf): Neu gesperrt, Verlauf ausgeblendet, Stopp ausgeblendet. Gemessen wird sichtbar/gesperrt, nicht Existenz.
+    const P112 = PUNKTE.find((n) => n.startsWith("112. "))!;
+    const P113 = PUNKTE.find((n) => n.startsWith("113. "))!;
+    const lageJs = `
+      const sichtbar = (e) => { if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+      const c = document.querySelector(".koda-root .koda-input-bar");
+      // Das „/“-Menue (Kit textarea-suggest) haengt ein eigenes Element neben die Eingabe; es gehoert nicht zur Anordnung und bleibt draussen.
+      const kinder = c ? [...c.children].map((k) => k.className.split(" ").find((x) => /^(okit-model-bar|koda-input|koda-buttons-start|koda-mode|koda-send|koda-stop)$/.test(x)) ?? "").filter((x) => x !== "") : [];
+      const neu = c?.querySelector(".koda-new"), verlauf = c?.querySelector(".koda-archive"), senden = c?.querySelector(".koda-send"), stopp = c?.querySelector(".koda-stop");
+      return { kinder, neuSichtbar: sichtbar(neu), neuGesperrt: !!neu?.disabled, verlaufSichtbar: sichtbar(verlauf), sendenSichtbar: sichtbar(senden), stoppSichtbar: sichtbar(stopp), kopf: !!document.querySelector(".koda-root .koda-header") };`;
+    type Lage112 = { kinder: string[]; neuSichtbar: boolean; neuGesperrt: boolean; verlaufSichtbar: boolean; sendenSichtbar: boolean; stoppSichtbar: boolean; kopf: boolean };
+    let detail112 = "nicht gelaufen";
+    let ok112 = false;
+    let detail113 = "nicht gelaufen";
+    let ok113 = false;
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.chatFolder = ${JSON.stringify(ORDNER110)}; p.settings.chatKeep = 5;
+        await p.saveSettings(); p.syncChatArchive();
+        await p.newChat();
+        p.chatLog.push({ role: "user", content: "SMOKE-112 Frage" }, { role: "assistant", content: "SMOKE-112 Antwort" });
+        p.views()[0].renderLog();
+        return true;`);
+      await new Promise((r) => setTimeout(r, 300));
+      const ruhe = await cdp.evaluate<Lage112>(lageJs);
+      await cdp.evaluate(`app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].busy = true; app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].views()[0].activity({ kind: "ask" }); return true;`);
+      const imLauf = await cdp.evaluate<Lage112>(lageJs);
+      await cdp.evaluate(`const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]; p.busy = false; p.views()[0].activity({ kind: "done" }); return true;`);
+      const erwartet = ["okit-model-bar", "koda-input", "koda-buttons-start", "koda-mode", "koda-send", "koda-stop"];
+      ok112 = JSON.stringify(ruhe.kinder) === JSON.stringify(erwartet) && ruhe.neuSichtbar && !ruhe.neuGesperrt && ruhe.verlaufSichtbar && ruhe.sendenSichtbar && !ruhe.stoppSichtbar && !ruhe.kopf &&
+        imLauf.neuGesperrt && imLauf.stoppSichtbar && !imLauf.sendenSichtbar;
+      detail112 = `Kinder ${ruhe.kinder.join(" > ")} · Ruhe: Neu ${ruhe.neuSichtbar ? (ruhe.neuGesperrt ? "gesperrt" : "frei") : "unsichtbar"}, Verlauf ${ruhe.verlaufSichtbar}, Senden ${ruhe.sendenSichtbar}, Stopp ${ruhe.stoppSichtbar} · im Lauf: Neu ${imLauf.neuGesperrt ? "gesperrt" : "frei"}, Senden ${imLauf.sendenSichtbar}, Stopp ${imLauf.stoppSichtbar} · Kopfzeile ${ruhe.kopf}`;
+    } catch (error) {
+      detail112 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    record(P112, ok112, detail112);
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.chatKeep = 0; await p.saveSettings(); p.syncChatArchive();
+        await p.newChat();
+        return true;`);
+      await new Promise((r) => setTimeout(r, 300));
+      const leer = await cdp.evaluate<Lage112>(lageJs);
+      ok113 = leer.neuSichtbar && leer.neuGesperrt && !leer.verlaufSichtbar && leer.sendenSichtbar && !leer.stoppSichtbar;
+      detail113 = `leer, Verlauf aus, kein Lauf: Neu ${leer.neuSichtbar ? (leer.neuGesperrt ? "gesperrt" : "frei") : "unsichtbar"} · Verlauf-Knopf sichtbar ${leer.verlaufSichtbar} (soll nein) · Senden ${leer.sendenSichtbar} · Stopp ${leer.stoppSichtbar} (soll nein)`;
+    } catch (error) {
+      detail113 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      await raeume110();
+    }
+    record(P113, ok113, detail113);
+
+    // --- 114/115. Kompakter Composer (Welle 29, Kit 0.74.0 von Hand nachgebaut) ---------------------------------------------
+    // 114: unter 640 px Fensterhoehe und ab 20 em Breite des Chats steht Senden NEBEN der Eingabe, die Knopfreihe samt Modellzeile darunter, und das Modus-Dropdown entfaellt.
+    // 115 (Gegenprobe): bei 800 px Hoehe gilt das nicht. Die Seitenleiste wird auf 420 px gezogen (der Container braucht 20 em = 320 px; die Standardbreite reicht nicht). Gemessen mit der Emulation der
+    // Fenstergroesse; sie wird danach geloescht.
+    const P114 = PUNKTE.find((n) => n.startsWith("114. "))!;
+    const P115 = PUNKTE.find((n) => n.startsWith("115. "))!;
+    const geomJs = `
+      const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return b.width === 0 && b.height === 0 ? null : { y: b.y, h: b.height, x: b.x, w: b.width, bottom: b.bottom, right: b.right }; };
+      const eingabe = r(".koda-root .koda-input"), senden = r(".koda-root .koda-send"), neu = r(".koda-root .koda-new"), zeile = r(".koda-root .okit-model-bar"), modus = r(".koda-root .koda-mode");
+      const beside = !!eingabe && !!senden && senden.y < eingabe.bottom && senden.bottom > eingabe.y;
+      const neuUnter = !!eingabe && !!neu && neu.y >= eingabe.bottom - 1;
+      const zeileUnter = !!eingabe && !!zeile && zeile.y >= eingabe.bottom - 1;
+      const breite = document.querySelector(".koda-root")?.getBoundingClientRect().width ?? 0;
+      return { beside, neuUnter, zeileUnter, modusDa: !!modus, breite, hoehe: innerHeight };`;
+    type Geom = { beside: boolean; neuUnter: boolean; zeileUnter: boolean; modusDa: boolean; breite: number; hoehe: number };
+    let detail114 = "nicht gelaufen";
+    let ok114 = false;
+    let detail115 = "nicht gelaufen";
+    let ok115 = false;
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        if (p.views().length === 0) await p.activateView();
+        app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
+        const dock = document.querySelector(".workspace-split.mod-right-split"); if (dock) { window.__dock114 = dock.style.width; dock.style.width = "420px"; }
+        return true;`);
+      await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 600, deviceScaleFactor: 1, mobile: false });
+      await new Promise((r) => setTimeout(r, 800));
+      const klein = await cdp.evaluate<Geom>(geomJs);
+      await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+      await new Promise((r) => setTimeout(r, 800));
+      const gross = await cdp.evaluate<Geom>(geomJs);
+      ok114 = klein.beside && klein.neuUnter && klein.zeileUnter && !klein.modusDa && klein.breite >= 320;
+      detail114 = `Chat ${Math.round(klein.breite)} px breit, Fenster ${klein.hoehe} px hoch: Senden neben der Eingabe ${klein.beside} · Neu darunter ${klein.neuUnter} · Modellzeile darunter ${klein.zeileUnter} · Modus-Dropdown da ${klein.modusDa} (soll nein)`;
+      ok115 = !gross.beside && gross.neuUnter && gross.modusDa && gross.breite >= 320;
+      detail115 = `Chat ${Math.round(gross.breite)} px breit, Fenster ${gross.hoehe} px hoch: Senden neben der Eingabe ${gross.beside} (soll nein) · Modus-Dropdown da ${gross.modusDa} (soll ja)`;
+    } catch (error) {
+      detail114 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail115 = detail114;
+    } finally {
+      await cdp.send("Emulation.clearDeviceMetricsOverride").catch(() => undefined);
+      await cdp.evaluate(`const dock = document.querySelector(".workspace-split.mod-right-split"); if (dock) dock.style.width = window.__dock114 ?? ""; return true;`).catch(() => undefined);
+    }
+    record(P114, ok114, detail114);
+    record(P115, ok115, detail115);
 
     // --- 26. delete_note fragt AUCH im Koda-Ordner ---------------------------------------
     // Die Regel „Wirkung schlaegt Ort" ist im Adapter getestet; hier wird sie am laufenden
@@ -4231,16 +4427,22 @@ async function main(): Promise<void> {
           const tab = await lies();
           record(P102, tab.dropdown === "smoke-model-2" && tab.gesendet === "smoke-model-2", `Einstellung auf smoke-model-2: Dropdown „${tab.dropdown}“ · gesendet „${tab.gesendet}“`);
 
+          // Die Denk-Steuerung steht nur bei einem Modell mit bekannter Familie (obsidian-kit 0.73.0): fuer diesen Punkt heisst das gesendete Modell qwen3.6-smoke (der Stub antwortet auf jede Kennung).
+          await cdp.evaluate(`
+            const p = ${PL};
+            p.settings.endpoints = [{ url: ${JSON.stringify(stubM.url)}, model: "qwen3.6-smoke" }];
+            await p.saveSettings();
+            await new Promise((r) => setTimeout(r, 1000)); return true;`);
           await cdp.evaluate(`void ${PL}.ask("Smoke 103: Lauf"); return true;`);
           const imLauf = await pollUntil<{ dropdown: boolean; denk: boolean }>(cdp, `
             const d = document.querySelector(".koda-root .okit-model-bar-select")?.disabled === true;
-            const k = document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle")?.disabled === true;
+            const k = document.querySelector(".koda-root .okit-model-bar .okit-thinking-control select")?.disabled === true;
             return d ? { dropdown: d, denk: k } : null;`, 15_000, 100).catch(() => null);
           await pollUntil<boolean>(cdp, `return ${PL}.busy ? null : true;`, 30_000);
           const danach = await cdp.evaluate<{ dropdown: boolean; denk: boolean }>(`
-            return { dropdown: document.querySelector(".koda-root .okit-model-bar-select")?.disabled === true, denk: document.querySelector(".koda-root .okit-model-bar .okit-thinking-toggle")?.disabled === true };`);
+            return { dropdown: document.querySelector(".koda-root .okit-model-bar-select")?.disabled === true, denk: document.querySelector(".koda-root .okit-model-bar .okit-thinking-control select")?.disabled === true };`);
           record(P103, imLauf !== null && imLauf.dropdown && imLauf.denk && !danach.dropdown && !danach.denk,
-            `im Lauf gesperrt: Dropdown ${String(imLauf?.dropdown)}, Denk-Knopf ${String(imLauf?.denk)} · danach gesperrt: Dropdown ${String(danach.dropdown)}, Denk-Knopf ${String(danach.denk)}`);
+            `im Lauf gesperrt: Dropdown ${String(imLauf?.dropdown)}, Denk-Dropdown ${String(imLauf?.denk)} · danach gesperrt: Dropdown ${String(danach.dropdown)}, Denk-Dropdown ${String(danach.denk)}`);
         } catch (error) {
           for (const n of [P100, P101, P102, P103]) if (!bilanz.eintraege().some((x) => x.name === n)) abbruch22(n, error);
         } finally { await stubM.stop(); }
