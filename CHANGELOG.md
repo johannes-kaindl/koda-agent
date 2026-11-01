@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.34.0] — 2026-11-01
+
 ### Added
 
 - **Past chats.** Koda can keep finished conversations in the vault: one `.json` file per conversation in a folder of your choice (default `Koda/Chats`), listed by **Open past chats…** (command, and the clock icon next to *New chat*), searchable by title. A click restores the conversation, including its task and what you changed for it; **Shift+Enter** saves it as a note, **Alt+Enter** deletes it (final, no trash). **Settings → Past chats** has the folder and how many conversations to keep (0–500). **It is off by default (0):** with it off, *New chat* asks first and the discarded conversation is gone. With it on, *New chat* files the conversation, clears the window and says so, without asking; each answer (also a stopped one or an error) is filed as it ends. Lowering the number deletes the surplus at the next save; deleting in the dialog is final. Not measured: whether Obsidian Sync carries the `.json` files.
