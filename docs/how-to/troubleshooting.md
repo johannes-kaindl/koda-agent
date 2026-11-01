@@ -127,9 +127,9 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 
 **Cause:** The model produced reasoning but no answer text.
 
-**Fix:** Switch **Suppress thinking** on, or use the **Thinking** button in the model row above the conversation.
+**Fix:** Switch **Suppress thinking** on, or pick **Off** in the thinking dropdown of the model row under the conversation.
 
-### The Thinking button says "Thinking: always on"
+### The thinking dropdown says "Always on"
 
 **Cause:** Koda recognised a model that reasons regardless of what it is told.
 
@@ -146,6 +146,24 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 **Cause:** Any other error from the server, quoted as the server sent it.
 
 **Fix:** If the text mentions a model, check that the endpoint row's model matches a model the server has loaded.
+
+### There is no thinking dropdown in the model row
+
+**Cause:** The kit knows no thinking levels for this model: it is not a recognised model family, and the server is not LM Studio or Open WebUI. (Haiku 4.5 and a Claude model through another service have none either.)
+
+**Fix:** None needed. **Suppress thinking** in the settings still switches thinking on and off for that model.
+
+### "Conversation not saved" / "The conversation could not be saved to past chats. If you start a new chat now, it is gone."
+
+**Cause:** **Past chats** is on, but the file could not be written (folder invalid, vault read-only, disk full). The reason comes as a message of its own just before.
+
+**Fix:** Check **Settings → Past chats → Folder**. Choose **Cancel** to keep the conversation, or **Discard** to start a new one anyway.
+
+### "That chat could not be opened"
+
+**Cause:** The file in the chat folder is damaged, or the conversation that is open could not be filed first. A damaged file is counted as *N files not readable* in the list and never deleted.
+
+**Fix:** Open the other chat or the file in the folder by hand; if the open conversation is the problem, see the entry above.
 
 ## In the Context tab and the context modes
 

@@ -40,8 +40,9 @@ All commands appear in the command palette with the prefix **Koda:**. None has a
 | Command | What it does |
 |---|---|
 | Open Koda | Opens the sidebar (also the dog icon in the ribbon). |
-| New chat | Discards the conversation after a confirmation and starts a new one. |
-| Toggle thinking | Shows or hides the model's reasoning, like the **Thinking** button in the model row. |
+| Start new chat | Starts a new conversation. With **Past chats** off it asks first and the old conversation is gone; with it on it files the conversation and says so. Only while the sidebar is open. |
+| Open past chats… | Opens the list of filed conversations; a click restores one. Only while the sidebar is open and **Past chats** is on. |
+| Toggle thinking | Switches thinking on or off, like **Off** in the thinking dropdown of the model row; it comes back at the level you chose. Does nothing for a model that always thinks. |
 | Context mode: Off / Workspace / Note / All tabs / Vault | Sets the context mode for the next question. Vault needs Vault Retrieval. |
 | Ask Koda about the selection | Opens the sidebar with the cursor in the input; switches the mode from Off to Workspace so the selection goes along. Also in the editor's right-click menu as **Ask Koda**, when text is selected. |
 | Show Chat tab / Show Context tab / Show Abilities tab | Switches the sidebar tab. |

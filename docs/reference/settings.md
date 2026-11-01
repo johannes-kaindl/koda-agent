@@ -8,7 +8,7 @@ All settings are under **Settings → Koda**, in this order. Numbers outside the
 |---|---|---|---|
 | Take endpoints from the LLM Endpoint Manager | off | | Only shown when the [LLM Endpoint Manager](https://github.com/johannes-kaindl/llm-endpoint-manager) plugin is installed. Off: Koda uses the **Endpoints** list below, as before. On: the endpoint, its API key and the model come from the manager, including **Claude** (Anthropic API); the list below is not used. Settings then show **Endpoint** (**Automatic** or one of the manager's) and **Model**, and **Add Koda's endpoints to the manager**. With Claude, **Suppress thinking** lowers the effort instead of switching thinking off (Claude cannot), and Koda sends no sampling values (the API refuses them). |
 | Endpoints | `http://127.0.0.1:1234` | | OpenAI-compatible servers, each with URL, optional API key and the model sent to that endpoint (**Fetch models** fills a list to pick from, with **— (server picks)** to clear the choice; a row without a model sends none). There is no global model setting; the model row above the conversation switches the model of the endpoint in use and writes it here. API keys are kept in Obsidian's secret storage, not in `data.json`: a saved key shows as **saved** with **Change key** and **Remove key**. A key from an older version moves there the first time Koda uses the endpoint. **The first reachable entry wins**: Koda tries them top to bottom once per session and remembers the winner; if a request fails, it looks again once. Reorder with **Move to top**. Every row is checked when the settings open: a check mark, or a cross whose tooltip names the cause; below the row its role (**Active**, **Unreachable**, **Standby — position N**) and, when the server reports it for the row's model, the context length (`Context: loaded 8,192 · max 32,768 tokens`; **Fetch models** asks again). **Test** checks all rows again; **+ LM Studio** and **+ Ollama** add their default addresses. |
-| Suppress thinking | on | | Asks reasoning models not to think out loud, and hides the thinking block. On Claude it sets the effort to low (on: medium), because Claude cannot switch thinking off. |
+| Suppress thinking | on | | Asks reasoning models not to think out loud, and hides the thinking block. The thinking dropdown in the model row switches the same setting (*Off*) and also picks the level; a level you pick is sent as `reasoning_effort` to other endpoints and as the effort to Claude. On Claude *off* sends the model's default effort, because Claude cannot switch thinking off. |
 | Koda folder | `Koda` | | The folder Koda writes to without asking (memory, drafts). Skills in its `Skills/` subfolder still ask, and so does replacing the text of `Memory.md` or moving or renaming it (adding a line does not). |
 | Max tool calls per answer | 8 | 1–50 | How many tool calls Koda may chain for one question before it has to answer. |
 | Response timeout (seconds) | 300 | 30–900 | How long Koda waits for the endpoint to say anything once the answer has started. The clock restarts with every piece received, so only silence runs into it, not a long answer. Before the first piece arrives Koda waits at least 10 minutes (more if you set more), so a model that loads on demand has time to start. |
@@ -65,6 +65,15 @@ Koda always cuts dangerous link targets out of an answer (`javascript:`, `data:`
 | Show local images from the vault | off | Show images from your vault in answers. Remote images always stay blocked. |
 
 A switch works on the next answer and when the conversation is redrawn. A cut link still looks like a link but does nothing.
+
+## Past chats
+
+Koda can file finished conversations in the vault and open them again ([how-to](../how-to/past-chats.md)).
+
+| Setting | Default | Range | What it does |
+|---|---|---|---|
+| Folder | `Koda/Chats` | any folder in the vault | Where the conversations go, one `.json` file each. Empty means the default. An invalid folder (absolute, with `..`, hidden, the Obsidian config folder) is not saved and the row says so. |
+| Keep | 0 | 0–500 | How many conversations are kept. **0 turns the history off:** *New chat* then asks first and the discarded conversation is gone. Lowering the number deletes the surplus at the next save, without asking. |
 
 ## Other
 

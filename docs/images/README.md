@@ -37,6 +37,8 @@ The scenery is `docs/images/fixture/` (shared with the GUI smoke; its `README.md
 
 **2026-10-25 (wave 27): `hero.png` captured again** (Obsidian 1.14.5, second instance, Koda 0.30.0 + model row): the sidebar now shows the model row above the conversation. `context-tab.png`, `confirm-write.png` and `settings.png` do not show it and stay. Needs a fresh profile prepared first (trust dialog, plugin enabled) — `shots.ts` does not do that itself.
 
+**2026-11-01 (wave 29, kit 0.74.0): `hero.png` captured again** (Obsidian 1.15.0, second instance, Koda 0.33.0 + chat row): the header with the plus button is gone, the model row sits under the conversation in the input block, with the *New chat* icon, the mode dropdown and **Send** below the input. The first attempt stopped at *Seitenleiste erreicht die Zielbreite nicht* (a fresh profile's window was too small); a second fresh start with the same steps worked. The other three images do not show the chat row and stay.
+
 **2026-10-25 (wave 27, kit 0.70.1): `hero.png` captured again** (Obsidian 1.14.5, second instance, Koda 0.31.0 + the thinking button in the model row): the row above the conversation now also carries the thinking button ("Thinking: off"), which wraps to a second line in this narrow sidebar. The other three images do not show it and stay.
 
 Findings from the capture, kept here because they will bite again:

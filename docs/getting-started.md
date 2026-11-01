@@ -54,4 +54,4 @@ Ask: *"Remember that I prefer short answers."* Koda appends a dated line to `Kod
 - [Write a skill](how-to/skills.md): standing instructions as a Markdown note.
 - [Choose what goes along with a question](how-to/working-context.md): whole notes, linked neighbours, open tabs.
 - [Settings reference](reference/settings.md): every setting with its default.
-- **New chat** in the header row of the sidebar starts over (after a confirmation; discarding is final).
+- **New chat** (the pen icon under the input; also the command **Start new chat**) starts over. With **Past chats** off, which is the default, it asks first and the discarded conversation is gone. Switch **Settings → Past chats** on and it files the conversation instead, to be opened again with the clock icon or **Open past chats…** (see [Keep and reopen conversations](how-to/past-chats.md)).
