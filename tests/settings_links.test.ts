@@ -6,8 +6,8 @@ import { DEFAULT_SETTINGS } from "../src/core/settings-types";
 // Welle 27: die Gruppe „Links and images in answers“ (Kit `link-settings`): zwei Schalter, beide aus; ein Umlegen schreibt die Einstellung und speichert.
 describe("Einstellungsgruppe Links und Bilder in Antworten", () => {
   function setup() {
-    const plugin = { settings: structuredClone(DEFAULT_SETTINGS), saveSettings: vi.fn(async () => {}) };
-    const tab = new KodaSettingsTab({} as never, plugin as never);
+    const plugin = { settings: structuredClone(DEFAULT_SETTINGS), saveSettings: vi.fn(async () => {}), manifest: { name: "Koda" } };
+    const tab = new KodaSettingsTab({ vault: { configDir: ".obsidian" } } as never, plugin as never);
     return { tab, plugin };
   }
 

@@ -23,6 +23,7 @@
     "lab:tools": "esbuild scripts/koda-lab.ts --bundle --platform=node --format=esm --outfile=.lab-tools.mjs --log-level=warning && node .lab-tools.mjs",
     "smoke:gui": "esbuild scripts/gui-smoke.ts --bundle --platform=node --format=esm --outfile=.gui-smoke.mjs --log-level=warning && node .gui-smoke.mjs",
     "gui:ask": "esbuild scripts/gui-ask.ts --bundle --platform=node --format=esm --outfile=.gui-ask.mjs --log-level=warning && node .gui-ask.mjs",
+    "chat-layout": "esbuild scripts/chat-layout.ts --bundle --platform=node --format=esm --outfile=.chat-layout.mjs --log-level=warning && node .chat-layout.mjs",
     "shots": "esbuild scripts/shots.ts --bundle --platform=node --format=esm --outfile=.shots.mjs --log-level=warning && node .shots.mjs",
     "shots:check": "D=\"${DOCS_ROOT:-$HOME/Projects/jkaindl/workspace/_docs}\"; test -f \"$D/readme/readme_lint.py\" || D=../../workspace/_docs; if test -f \"$D/readme/readme_lint.py\"; then python3 \"$D/readme/readme_lint.py\" .; else echo 'shots:check uebersprungen: readme_lint.py weder unter DOCS_ROOT bzw. ~/Projects/jkaindl/workspace/_docs noch unter ../../workspace/_docs (maintainer-lokal)'; fi",
     "release": "test -f ../tools/release/release.mjs || { echo \"FEHLER: ../tools/release/ fehlt. Dieses Repo muss im Dach-Verzeichnis obsidian-plugins/ neben tools/ liegen — das Release-Tooling liegt dort zentral, nicht im Plugin. Ein Clone ohne Dach ist nicht release-faehig.\" >&2; exit 1; }; node ../tools/release/release.mjs",

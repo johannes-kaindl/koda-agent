@@ -1,10 +1,10 @@
 {
   "sources": {
     "obsidian-kit": {
-      "ref": "0.72.0"
+      "ref": "0.74.0"
     },
     "code-kit": {
-      "ref": "0.38.0"
+      "ref": "0.40.0"
     }
   },
   "targets": [
@@ -18,7 +18,6 @@
         "ocr-provider",
         "image-gen-provider",
         "endpoint-source",
-        "anthropic-wire",
         "endpoint-secret-hook",
         "tool-provider",
         "provider-error-texts",
@@ -73,7 +72,11 @@
           "name": "fold-case",
           "ref": "0.44.0"
         },
-        "local-stamp"
+        "local-stamp",
+        "anthropic-wire",
+        "chat-archive",
+        "filename-template",
+        "chat-history"
       ]
     },
     {
@@ -127,7 +130,13 @@
         "model-bar",
         "model-bar-strings",
         "thinking-control",
-        "link-settings"
+        "link-settings",
+        "chat-archive-dialog",
+        "chat-archive",
+        "chat-archive-strings",
+        "run-exclusive",
+        "chat-archive-settings",
+        "chat-archive-css"
       ],
       "rewrite": [
         [

@@ -6,8 +6,8 @@
    Vorlage dieser Extraktion (Welle 11: rueckgetauscht).
    Kein Obsidian-Import: der Transport wird injiziert (`chat-transport` liefert XHR). */
 import { createChatClient, JIT_FIRST_CHUNK_TIMEOUT_MS, type ChatResult, type ChatWireMessage, type SseTransport } from "../vendor/kit-obsidian/chat-client";
-import { suppressParams } from "../vendor/kit/reasoning";
-import { resolveRequestParams, type FamilyId } from "../vendor/kit/sampling-profiles";
+import { resolveRequestParams, type FamilyId, type ThinkingLevel } from "../vendor/kit/sampling-profiles";
+import { isAlwaysOnThinker, suppressParams } from "../vendor/kit/reasoning";
 import type { EndpointTransport } from "../vendor/kit/endpoint-source";
 // Anzeige- und Request-Seite treffen dieselbe Entscheidung — deshalb EINE Definition,
 // im uebernommenen Toggle-Modul (REGISTRY: „wer nur die Anzeige uebernimmt, hat die Haelfte").
@@ -24,6 +24,8 @@ export interface ChatConfig {
   apiKey: string;
   model: string;
   suppressThinking: boolean;
+  /** Die gewaehlte Denkstufe (`low` bis `max`) bei angeschaltetem Denken; fehlt sie oder ist sie `null`, gilt der Modellstandard (HTTP sendet nichts, Claude `medium`). */
+  thinkingLevel?: ThinkingLevel | null;
   /** Verbindungsart des aufgelösten Endpunkts; fehlt sie, gilt HTTP (lokale Zeile). */
   transport?: EndpointTransport;
   /** Familie des Modells (Manager-Tabelle oder Namensrater); nur für Anthropic gelesen. */
@@ -97,8 +99,9 @@ function toLlmResult(r: ChatResult): LlmResult {
  *  und kein festes `max_tokens` (es schließt das adaptive Denken ein; fehlt es, setzt der Transport die
  *  Grenze des Modells). */
 function paramsFor(cfg: ChatConfig, suppress: boolean): Record<string, unknown> {
+  const chosen = cfg.thinkingLevel ?? null;
   if (cfg.transport === "anthropic") {
-    return resolveRequestParams({ family: cfg.family ?? null, mode: "agent", backend: "anthropic", thinking: suppress ? "off" : "medium" }).params;
+    return resolveRequestParams({ family: cfg.family ?? null, mode: "agent", backend: "anthropic", thinking: suppress ? "off" : (chosen ?? "medium"), model: cfg.model }).params;
   }
   return {
     temperature: 0.2,
@@ -108,7 +111,16 @@ function paramsFor(cfg: ChatConfig, suppress: boolean): Record<string, unknown> 
     // "Tool-Use-Budget und Gemma-Schemas" 2026-09-23.
     max_tokens: 8192,
     ...suppressParams(suppress),
+    ...httpEffort(cfg.model, suppress, chosen),
   };
+}
+
+/** Eine gewaehlte Stufe geht an HTTP-Endpunkte als `reasoning_effort`, damit das Dropdown der Modellzeile nichts verspricht, was nicht ankommt. Ohne eigene Wahl und bei ausgeschaltetem Denken
+ *  ist es leer (der Draht bleibt wie vor der Chat-Zeile); ein Modell, das immer denkt (gpt-oss), bekommt nie eine Stufe von einem anderen Modell (der Knopf ist dort gesperrt). `xhigh` und `max` gibt es
+ *  nur bei Claude, ein gespeicherter Wert von dort wird fuer lokale Modelle `high` (die Liste eines lokalen Modells endet dort). */
+function httpEffort(model: string, suppress: boolean, chosen: ThinkingLevel | null): Record<string, unknown> {
+  if (suppress || chosen === null || chosen === "off" || isAlwaysOnThinker(model)) return {};
+  return { reasoning_effort: chosen === "xhigh" || chosen === "max" ? "high" : chosen };
 }
 
 export class KodaChatClient {

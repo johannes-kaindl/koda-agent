@@ -36,13 +36,27 @@ describe("SessionStore", () => {
     await store.appendMessages([msg, { role: "assistant", content: "Hi" }]);
     expect(await store.load()).toHaveLength(2);
   });
-  it("startNew archiviert current und leert es", async () => {
+  it("startNew leert current und legt nichts mehr nach archive.jsonl (das übernimmt der Verlauf im Vault)", async () => {
     const sink = memSink();
     const store = new SessionStore(sink, "sessions");
     await store.appendMessages([msg]);
     await store.startNew();
     expect(await store.load()).toEqual([]);
-    expect(sink.files.get("sessions/archive.jsonl")).toContain("Hallo");
+    expect(sink.files.has("sessions/archive.jsonl")).toBe(false);
+  });
+  it("startNew lässt eine vorhandene archive.jsonl aus älteren Versionen unangetastet", async () => {
+    const sink = memSink();
+    sink.files.set("sessions/archive.jsonl", "ALT\n");
+    const store = new SessionStore(sink, "sessions");
+    await store.appendMessages([msg]);
+    await store.startNew();
+    expect(sink.files.get("sessions/archive.jsonl")).toBe("ALT\n");
+  });
+  it("replace ersetzt das laufende Gespräch (ein geöffneter alter Chat überlebt einen Neustart)", async () => {
+    const store = new SessionStore(memSink(), "sessions");
+    await store.appendMessages([msg]);
+    await store.replace([{ role: "user", content: "alt" }, { role: "assistant", content: "antwort" }]);
+    expect(await store.load()).toEqual([{ role: "user", content: "alt" }, { role: "assistant", content: "antwort" }]);
   });
 });
 
@@ -80,16 +94,6 @@ describe("SessionStore Fehlerpfade (swallow vs. propagate)", () => {
     } finally {
       warnSpy.mockRestore();
     }
-  });
-
-  it("startNew wirft weiter, wenn das Archivieren fehlschlaegt (Datenverlust-Gefahr)", async () => {
-    const sink: SessionSink = {
-      read: async () => serializeLine(msg),
-      write: async () => {},
-      append: async () => { throw new Error("archive append failed"); },
-    };
-    const store = new SessionStore(sink, "sessions");
-    await expect(store.startNew()).rejects.toThrow("archive append failed");
   });
 
   it("startNew wirft weiter, wenn das Leeren von current fehlschlaegt", async () => {

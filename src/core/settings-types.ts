@@ -9,6 +9,7 @@ import {
 } from "../vendor/kit/settings_schema";
 import { migrateEndpointList, type EndpointConfig } from "../vendor/kit/endpoint_config";
 import { sanitizeChoice, type EndpointChoice } from "../vendor/kit/endpoint-source";
+import { THINKING_LEVELS, type ThinkingLevel } from "../vendor/kit/sampling-profiles";
 import { CONTEXT_MODES, type ContextMode } from "./context/types";
 
 /** Obergrenze für `maxRounds` — einzige Quelle, gegen die sowohl `validateKodaSettings`
@@ -118,6 +119,9 @@ export interface KodaSettings {
   /** Wahl am Manager (Endpunkt und Modell); ohne Manager ohne Wirkung. */
   choice: EndpointChoice;
   suppressThinking: boolean;
+  /** Die Denkstufe, die der Nutzer in der Modellzeile gewaehlt hat, solange das Denken an ist (`suppressThinking: false`): `low` bis `max`. `null`: keine eigene Wahl, es gilt wie bisher der
+   *  Modellstandard (HTTP sendet nichts, Claude `medium`). „aus“ ist `suppressThinking: true`, nie ein Wert hier; die Stufe bleibt beim Ausschalten stehen und kommt beim Einschalten zurueck. */
+  thinkingLevel: ThinkingLevel | null;
   kodaFolder: string;
   maxRounds: number;
   timeoutSec: number;
@@ -135,6 +139,9 @@ export interface KodaSettings {
   /** Linkschutz der Antworten (Kit `domGuard`, Default aus): `obsidian://`-Links behalten ihr Ziel, Bilder aus dem Vault werden gezeigt. */
   allowObsidianLinks: boolean;
   allowLocalImages: boolean;
+  /** Verlauf vergangener Chats (Kit `chat-archive`): Ordner im Vault (leer = `<Plugin-Name>/Chats`) und Aufbewahrung (0 bis 500, 0 = kein Verlauf). Vorgabe aus: ein Gespräch, das Neu verwirft, ist danach weg. */
+  chatFolder: string;
+  chatKeep: number;
   contextWindowTokens: number;
   compactAtPercent: number;
   keepToolResults: number;
@@ -174,6 +181,7 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   useEndpointManager: false,
   choice: {},
   suppressThinking: true,
+  thinkingLevel: null,
   kodaFolder: "Koda",
   maxRounds: 8,
   timeoutSec: 300,
@@ -187,6 +195,8 @@ export const DEFAULT_SETTINGS: KodaSettings = {
   openOnStartup: false,
   allowObsidianLinks: false,
   allowLocalImages: false,
+  chatFolder: "",
+  chatKeep: 0,
   contextWindowTokens: 8192,
   compactAtPercent: 75,
   keepToolResults: 3,
@@ -242,6 +252,8 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
   // Strings und werden umgeschrieben, nicht gefiltert.
   endpoints: arrayThen((items) => migrateEndpointList(undefined, items as (string | EndpointConfig)[])),
   choice: (raw) => sanitizeChoice(raw),
+  // `off` ist `suppressThinking`, kein Wert dieses Feldes; alles Unbekannte ist „keine eigene Wahl“, nie ein Wert, der an den Draht ginge.
+  thinkingLevel: (raw, fallback) => (typeof raw === "string" && raw !== "off" && (THINKING_LEVELS as readonly string[]).includes(raw) ? (raw as ThinkingLevel) : fallback),
   maxRounds: clampIntField(1, MAX_ROUNDS_LIMIT),
   timeoutSec: clampIntField(TIMEOUT_SEC_MIN, TIMEOUT_SEC_MAX),
   skillBudgetChars: clampIntField(SKILL_BUDGET_MIN, SKILL_BUDGET_MAX),
@@ -261,6 +273,8 @@ const SCHEMA: SettingsSchema<KodaSettings> = {
   contextBudgetChars: clampIntField(CONTEXT_BUDGET_MIN, CONTEXT_BUDGET_MAX),
   contextLinkDepth: clampIntField(CONTEXT_LINK_DEPTH_MIN, CONTEXT_LINK_DEPTH_MAX),
   contextAutoK: clampIntField(CONTEXT_AUTO_K_MIN, CONTEXT_AUTO_K_MAX),
+  // Die Grenze des Kits (`MAX_KEEP_CHATS`) steht in einem Modul mit Obsidian-Import-Nachbarn nicht im Kern; 500 ist dieselbe Zahl. Ein kaputter Wert wird die Vorgabe dieses Plugins (0, aus), nie die 50 des Kits.
+  chatKeep: clampIntField(0, 500),
   contextSections: boolRecord,
   toolsDisabled: stringArray,
   toolDescriptions: stringRecord,

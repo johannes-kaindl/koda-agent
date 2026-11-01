@@ -103,26 +103,39 @@
   .koda-status.is-checking .koda-status-icon svg { animation: none; }
 }
 
-/* Kopfzeile der Sidebar. Sie sitzt im View-INHALT, weil Obsidian den echten View-Kopf in
-   jeder Seitenleiste per app.css ausblendet (`display: none`) — ein `addAction` waere hier
-   unsichtbar. Rechtsbuendig wie Obsidians eigene Sidebar-Kopfzeilen. */
-.koda-header {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--size-4-1);
-  padding: var(--size-4-1) var(--size-4-2);
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-/* `clickable-icon` bringt Obsidians Icon-Optik mit; die drei Zeilen loeschen nur das
-   Knopf-Chrome, das ein <button> sonst von der globalen button-Regel erbt. Ein <button>
-   (statt eines <div>) ist es, damit die Aktion auch mit der Tastatur fokussierbar bleibt. */
-.koda-header-action { background: transparent; box-shadow: none; padding: var(--size-4-1); }
-
-.koda-input-bar { border-top: 1px solid var(--background-modifier-border); padding: var(--size-4-2); }
+/* Composer: Modellzeile, Eingabe, Knopfreihe. Die Anordnung des Kit-Chatfensters (obsidian-kit 0.74.0, `CHAT_WINDOW_CSS`), von Hand fuer Koda gebaut: ein Grid mit direkten Kindern, kein
+   `display: contents` (Store-Warnung „partially supported“), kein `:has()` (verbietet der Store-Lint). Standard: Modellzeile, Eingabe, darunter Neu/Verlauf links, Modus, Senden (im Lauf Stopp) rechts.
+   Wer dem Grid ein Kind zufuegt, gibt ihm hier eine Spalte und eine `order`. */
+.koda-input-bar { border-top: 1px solid var(--background-modifier-border); padding: var(--size-4-2); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--size-4-2); }
+.koda-input-bar > * { grid-column: 1 / -1; min-width: 0; order: 1; }
+.koda-input-bar > .okit-model-bar { order: -1; }
 .koda-input { width: 100%; resize: vertical; }
-.koda-buttons { display: flex; gap: var(--size-4-1); margin-top: var(--size-4-1); }
+.koda-buttons-start { grid-column: 1; order: 2; display: flex; align-items: center; gap: var(--size-2-2); }
 /* Modus-Dropdown: Obsidians `dropdown`-Optik, nimmt nur so viel Platz wie sein Label. */
-.koda-mode { flex: 0 1 auto; max-width: 45%; }
+.koda-mode { grid-column: 2; order: 2; justify-self: end; max-width: 100%; }
+.koda-send, .koda-stop { grid-column: 3; order: 2; }
+.koda-hidden { display: none; }
+.koda-new svg, .koda-archive svg { width: var(--icon-s); height: var(--icon-s); }
+.koda-new:disabled, .koda-archive:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Tippflaechen auf Mobil: 44 x 44 px, das Symbol bleibt gleich gross (wie `CHAT_WINDOW_CSS`). */
+.is-mobile button.clickable-icon.koda-new, .is-mobile button.clickable-icon.koda-archive { min-width: calc(var(--size-4-10) + var(--size-4-1)); min-height: calc(var(--size-4-10) + var(--size-4-1)); display: flex; align-items: center; justify-content: center; }
+/* Kompakter Composer (Kit 0.74.0): unter 640 px Fensterhoehe und ab 20 em Breite des Chats steht Zeile eins mit Eingabe und Senden (im Lauf Stopp), Zeile zwei mit Neu, Verlauf und der Modellzeile;
+   Senden steht nie neben Neu (Fehlklick). Die Hoehe fragt ein @media (ein Container braucht eine feste Hoehe, die der Chat nicht hat), die Breite ein benannter Container auf der Wurzel.
+   Das Modus-Dropdown findet dort keinen Platz (die Modellzeile braucht die ganze zweite Zeile, gemessen 2026-11-01: sonst Breite 0 und Ueberdeckung) und entfaellt in dieser Falte; der Modus bleibt
+   im Tab „Kontext“ und ueber die Befehle erreichbar (ein Zustand, zwei Bedienstellen). */
+@media (max-height: 640px) {
+  .koda-root { container-type: inline-size; container-name: koda-chat; }
+  @container koda-chat (min-width: 20em) {
+    .koda-input-bar > .koda-input { grid-column: 1 / 3; order: 1; }
+    .koda-input-bar > .koda-send, .koda-input-bar > .koda-stop { grid-column: 3; order: 2; align-self: end; }
+    .koda-input-bar > .koda-buttons-start { grid-column: 1; order: 3; }
+    .koda-input-bar > .okit-model-bar { grid-column: 2 / -1; order: 4; width: auto; }
+    .koda-input-bar > .koda-mode { display: none; }
+    .koda-input-bar > .okit-model-bar .okit-model-bar-row { flex-wrap: nowrap; }
+    .koda-input-bar > .okit-model-bar .okit-model-bar-select { min-width: 4em; }
+    .koda-input-bar > .okit-model-bar .okit-thinking-icon { display: none; }
+  }
+}
 /* Kontextzeile unter der Nutzer-Blase: leise wie die Marken, aufklappbar mit dem Block. */
 .koda-context { font-size: var(--font-ui-smaller); color: var(--text-muted); margin: calc(-1 * var(--size-4-1)) 0 var(--size-4-2) 0; }
 .koda-context summary { cursor: pointer; }
@@ -513,21 +526,26 @@
 .okit-redline-del[data-author="5"],
 .okit-redline-ins[data-author="5"] { color: var(--color-pink); }
 
-/* Modellzeile (obsidian-kit model-bar, MODEL_BAR_CSS) und Denk-Steuerung (thinking-control, THINKING_CONTROL_CSS): wortgleich aus dem Kit, nicht von Hand ändern. */
-.okit-model-bar { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--size-2-2) var(--size-4-1); min-width: 0; }
+/* Modellzeile (obsidian-kit model-bar, MODEL_BAR_CSS, 0.74.0) und Denk-Steuerung (thinking-control, THINKING_CONTROL_CSS): wortgleich aus dem Kit, nicht von Hand ändern. */
+.okit-model-bar { position: relative; width: 100%; min-width: 0; container-type: inline-size; container-name: okit-model-bar; }
+.okit-model-bar-row { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--size-2-2) var(--size-4-1); min-width: 0; }
 .okit-model-bar-label { flex: 0 0 auto; color: var(--text-muted); font-size: var(--font-ui-small); white-space: nowrap; }
-.okit-model-bar select { flex: 1 1 12em; min-width: 0; max-width: 100%; font-size: var(--font-ui-small); text-overflow: ellipsis; }
+.okit-model-bar-select { flex: 1 1 auto; min-width: 6em; max-width: 100%; font-size: var(--font-ui-small); text-overflow: ellipsis; }
 .okit-model-bar select:disabled { opacity: 0.6; cursor: not-allowed; }
 .okit-model-bar-warn { flex: 0 0 auto; display: inline-flex; color: var(--text-warning); }
 .okit-model-bar-warn.is-hidden { display: none; }
 .okit-model-bar-warn svg { width: var(--icon-xs); height: var(--icon-xs); }
 .okit-model-bar-refresh { flex: 0 0 auto; }
+/* Tippfläche auf Mobil (44 px, das Symbol bleibt klein): gemessen 30 × 26 ohne diese Regel. */
+.is-mobile button.clickable-icon.okit-model-bar-refresh { min-width: calc(var(--size-4-10) + var(--size-4-1)); min-height: calc(var(--size-4-10) + var(--size-4-1)); display: inline-flex; align-items: center; justify-content: center; }
 .okit-model-bar-refresh:disabled { opacity: 0.4; cursor: not-allowed; }
 .okit-model-bar-refresh svg { width: var(--icon-xs); height: var(--icon-xs); }
 .okit-model-bar-refresh.is-loading svg { animation: okit-model-bar-spin 1s linear infinite; }
 @keyframes okit-model-bar-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .okit-model-bar-refresh.is-loading svg { animation: none; } .okit-model-bar-refresh.is-loading { opacity: 0.5; } }
 .okit-model-bar .okit-thinking-control { flex: 0 0 auto; }
+@container okit-model-bar (width < 260px) { .okit-model-bar .okit-thinking-icon { display: none; } }
+@container okit-model-bar (width < 200px) { .okit-model-bar-row { flex-wrap: wrap; } }
 .okit-model-bar-status { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; white-space: nowrap; }
 
 .okit-thinking-control { display: inline-flex; align-items: center; }
@@ -541,3 +559,29 @@
 .okit-thinking-toggle.is-locked:disabled { opacity: 0.85; cursor: default; }
 .okit-thinking-toggle svg { width: var(--icon-xs); height: var(--icon-xs); }
 .okit-thinking-control select { font-size: var(--font-ui-small); }
+/* Das Symbol vor dem Dropdown in der Modellzeile (Option inModelBar): es zeigt den Zustand ein zweites Mal, der Name steht am Dropdown (das Symbol ist aria-hidden). */
+.okit-thinking-icon { display: inline-flex; align-items: center; margin-inline-end: var(--size-2-1); color: var(--icon-color); }
+.okit-thinking-icon svg { width: var(--icon-xs); height: var(--icon-xs); }
+
+/* Chat-Verlauf (obsidian-kit chat-archive-css, CHAT_ARCHIVE_CSS, 0.74.0): wortgleich aus dem Kit, nicht von Hand ändern. */
+.okit-chat-archive-invalid {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  margin-top: var(--size-4-1);
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+}
+.okit-chat-archive-invalid.is-hidden { display: none; }
+.okit-chat-archive-invalid svg { width: var(--icon-s); height: var(--icon-s); flex: none; }
+/* Dialog „Vergangene Chats“: die Zeile ist Obsidians Vorschlagszeile, die zwei Symbole stehen rechts und halten die Wahl der Zeile an (Klick und Tastatur laufen über den Dialog). */
+.okit-chat-archive-row { display: flex; align-items: center; justify-content: space-between; gap: var(--size-4-2); }
+.okit-chat-archive-text { display: flex; flex-direction: column; gap: var(--size-2-1); min-width: 0; flex: 1 1 auto; }
+.okit-chat-archive-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.okit-chat-archive-date { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.okit-chat-archive-actions { display: flex; align-items: center; gap: var(--size-2-2); flex: none; }
+.okit-chat-archive-actions svg { width: var(--icon-s); height: var(--icon-s); }
+.okit-chat-archive-delete { color: var(--text-muted); }
+.okit-chat-archive-unreadable { padding: var(--size-4-2) var(--size-4-3); color: var(--text-muted); font-size: var(--font-ui-smaller); border-top: var(--border-width) solid var(--background-modifier-border); }
+/* Auf Mobil sind die Symbole mindestens 44 px hoch und breit (Zielgröße): 4 × 12 = 48 px. Die Stufe --size-4-11 gibt es in Obsidian nicht (Pilot 2026-10-27: Zielgröße blieb bei 30 × 26 px); die Zeile wächst mit. */
+.is-mobile .okit-chat-archive-actions .clickable-icon { min-width: var(--size-4-12); min-height: var(--size-4-12); display: flex; align-items: center; justify-content: center; }

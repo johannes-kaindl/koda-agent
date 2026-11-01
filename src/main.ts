@@ -50,6 +50,10 @@ import { effectiveRules, renderRules } from "./core/prompt/rules";
 import { toLabMessages, describeLlmFailure, readNotePathOf } from "./core/agent/lab-trace";
 import { logToLab } from "./vendor/kit-obsidian/lab-client";
 import { SessionStore } from "./core/memory/session";
+import { ConvoArchive, KODA_LOG_PAYLOAD, fromPayload, renderKodaNote } from "./core/memory/koda-archive";
+import { createChatArchive, type ChatArchive, type ChatArchiveEntry } from "./vendor/kit-obsidian/chat-archive";
+import { openChatArchive } from "./vendor/kit-obsidian/chat-archive-dialog";
+import type { ChatRecord } from "./vendor/kit/chat-archive";
 import { parseSkill, type Skill } from "./core/skills/skill";
 import type { Selection } from "./core/skills/select";
 import { CONTEXT_AUTO_K_MAX, CONTEXT_AUTO_K_MIN, CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN, DEFAULT_SETTINGS, type KodaSettings } from "./core/settings-types";
@@ -696,15 +700,21 @@ export default class KodaPlugin extends Plugin {
   /** Für die Ansicht: die Verbindung der Modellzeile. */
   modelBar(): ModelBarLlm { return this.modelBarLlm; }
 
-  /** Für die Ansicht: der Zustand der Denk-Steuerung in der Modellzeile (`core/chat/thinking-binding.ts`). Ein Klick schreibt `suppressThinking`, `saveSettings()` zeichnet die Zeile neu;
+  /** Für die Ansicht: der Zustand der Denk-Steuerung in der Modellzeile (`core/chat/thinking-binding.ts`). Ein Klick schreibt `suppressThinking` und `thinkingLevel`, `saveSettings()` zeichnet die Zeile neu;
    *  der Einstellungs-Tab schaltet denselben Wert und läuft über denselben Weg. */
   thinkingBinding(): ThinkingBinding {
     return createThinkingBinding({
       model: () => this.sentModel(),
       backend: () => this.sentBackend(),
       suppress: () => this.settings.suppressThinking,
+      level: () => this.settings.thinkingLevel,
       // `saveSettings()` verwirft den Zwischenstand des Resolvers (Modell der ersten Zeile, Backend unbekannt): wieder auflösen, sonst liest der Knopf bis zur nächsten Frage das falsche Modell (Muster `setModel` in `model-bar-llm.ts`).
-      setSuppress: async (suppress) => { this.settings.suppressThinking = suppress; await this.saveSettings(); await this.resolver.resolve(); },
+      setThinking: async (patch) => {
+        if (patch.suppress !== undefined) this.settings.suppressThinking = patch.suppress;
+        if (patch.level !== undefined) this.settings.thinkingLevel = patch.level;
+        await this.saveSettings();
+        await this.resolver.resolve();
+      },
     });
   }
 
@@ -777,6 +787,10 @@ export default class KodaPlugin extends Plugin {
     return probeModelContextInfo(this.hydrated(ep), model, requestUrlProbe, realClock);
   }
   private store!: SessionStore;
+  /** Der Verlauf vergangener Chats (Kit `chat-archive`); Getter-Verdrahtung, damit eine geänderte Einstellung ohne Neuaufbau wirkt. Je Sprache neu gebaut (die Meldungen des Speichers). */
+  private archiveStore: ChatArchive | null = null;
+  private archiveLang = "";
+  private convo!: ConvoArchive;
 
   async onload(): Promise<void> {
     const loaded = loadKodaSettings(await this.loadData());
@@ -822,6 +836,7 @@ export default class KodaPlugin extends Plugin {
       },
       dir,
     );
+    this.convo = new ConvoArchive({ enabled: () => this.chatArchive().enabled(), save: (input) => this.chatArchive().save(input) });
     this.chatLog = await this.store.load();
     // Arbeit und Overlay gehoeren zum Gespraech (Spec § 3): die juengste Sitzungs-Marke stellt sie her. Eine
     // Marke aus einer Sitzung vor den Arbeiten gibt es nicht — dann beginnt der Zustand leer.
@@ -836,7 +851,24 @@ export default class KodaPlugin extends Plugin {
     // dem Befund vom 2026-09-01: „Neues Gespraech" hing bis dahin an EINEM unsichtbaren Knopf,
     // und damit war die Aktion fuer niemanden erreichbar. Ein Befehl ist von der Darstellung
     // unabhaengig — er ueberlebt jede kuenftige Umgestaltung der Oberflaeche.
-    this.addCommand({ id: "new-chat", name: t("cmd.newChat"), callback: () => void this.runInView((v) => v.askNewChat()) });
+    // UI-STANDARD § 11: Verb plus Gegenstand, nur bei offener Ansicht (`checkCallback`); „Vergangene Chats“ zusätzlich nur, solange der Verlauf an ist.
+    this.addCommand({
+      id: "new-chat", name: t("cmd.newChat"),
+      checkCallback: (checking) => {
+        const view = this.views()[0];
+        if (view === undefined) return false;
+        if (!checking) void view.askNewChat();
+        return true;
+      },
+    });
+    this.addCommand({
+      id: "open-past-chats", name: t("cmd.openPastChats"),
+      checkCallback: (checking) => {
+        if (this.views().length === 0 || !this.archiveOn()) return false;
+        if (!checking) this.openPastChats();
+        return true;
+      },
+    });
     this.addCommand({ id: "toggle-thinking", name: t("cmd.toggleThinking"), callback: () => void this.runInView(() => this.thinkingBinding().toggle()) });
     for (const mode of AVAILABLE_MODES) {
       this.addCommand({
@@ -1165,9 +1197,79 @@ export default class KodaPlugin extends Plugin {
     this.abort?.abort();
   }
 
+  /** Der Verlauf-Speicher des Kits mit den Einstellungen als Getter und den Meldungen in der Sprache der Oberfläche. */
+  private chatArchive(): ChatArchive {
+    const lang = getLang() === "de" ? "de" : "en";
+    if (this.archiveStore === null || this.archiveLang !== lang) {
+      this.archiveLang = lang;
+      this.archiveStore = createChatArchive({
+        adapter: this.app.vault.adapter,
+        folder: () => this.settings.chatFolder,
+        defaultFolder: `${this.manifest.name}/Chats`,
+        keep: () => this.settings.chatKeep,
+        plugin: this.manifest.id,
+        configDir: this.app.vault.configDir,
+        normalizePath,
+        strings: { lang },
+        onError: (message) => { new Notice(message); },
+      });
+    }
+    return this.archiveStore;
+  }
+
+  /** Ist der Verlauf an (Aufbewahrung über 0)? */
+  archiveOn(): boolean { return this.chatArchive().enabled(); }
+
+  /** Die Aufbewahrung hat sich geändert: der Verlauf-Knopf folgt (sichtbar nur bei eingeschaltetem Verlauf). */
+  syncChatArchive(): void { for (const v of this.views()) v.syncArchive(); }
+
+  /** Das Gespräch ablegen (oder in seine Datei zurückschreiben). Wirft nie; `false` bei Verlauf aus oder Fehler (die Meldung kam vom Speicher). */
+  persistConvo(): Promise<boolean> {
+    return this.convo.persist(this.chatLog, { model: this.sentModel() || null, thinking: null });
+  }
+
+  /** „Neues Gespräch“ bei eingeschaltetem Verlauf: ablegen, dann leeren. `false`, wenn das Ablegen nicht gelang (die Ansicht fragt dann, ob trotzdem neu begonnen werden soll). */
+  async archiveThenNew(): Promise<boolean> {
+    if (this.busy) return false;
+    if (!(await this.persistConvo())) return false;
+    await this.newChat();
+    new Notice(t("view.newChat.archived"));
+    return true;
+  }
+
+  /** Der Dialog „Vergangene Chats“; ein gewählter Chat ersetzt das laufende Gespräch (das wird vorher abgelegt). */
+  openPastChats(): void {
+    if (this.busy || !this.archiveOn()) return;
+    const texts = { question: t("archive.note.question"), answer: t("archive.note.answer"), thinking: t("archive.note.thinking") };
+    openChatArchive(this.app, this.chatArchive(), {
+      strings: { lang: getLang() === "de" ? "de" : "en" },
+      render: (record) => renderKodaNote(record, texts),
+      onPick: (record, entry) => { void this.loadArchived(record, entry); },
+    });
+  }
+
+  private async loadArchived(record: ChatRecord, entry: ChatArchiveEntry): Promise<void> {
+    if (this.busy) return;
+    const log = record.payloadType === KODA_LOG_PAYLOAD ? fromPayload(record.payload) : null;
+    if (log === null) { new Notice(t("view.archive.openFailed")); return; }
+    // Das laufende Gespräch wird gleich ersetzt: zuerst ablegen (die Kette im Speicher hält die Reihenfolge), gelingt es nicht, bleibt alles beim Alten.
+    if (this.convo.needsSave(this.chatLog) && !(await this.persistConvo())) { new Notice(t("view.archive.openFailed")); return; }
+    await this.store.replace(log);
+    this.chatLog = log;
+    this.convo.adopt({ name: entry.name, created: record.created }, log);
+    this.lastNotice = null;
+    this.skillNotice = null;
+    // Arbeit und Overlay gehören zum Gespräch (Spec § 3): die jüngste Sitzungs-Marke stellt sie her, wie beim Start.
+    this.session = latestSessionState(log) ?? sessionForNewChat(this.session);
+    this.resetContextSelection();
+    this.syncAll();
+    for (const v of this.views()) { v.renderLog(); v.focusInput(); }
+  }
+
   async newChat(): Promise<void> {
     if (this.busy) return;
     await this.store.startNew();
+    this.convo.reset();
     this.chatLog = [];
     this.lastNotice = null;
     this.skillNotice = null;
@@ -1327,6 +1429,7 @@ export default class KodaPlugin extends Plugin {
                 apiKey: ep.apiKey ?? "",
                 model: resolved.model,
                 suppressThinking: s.suppressThinking,
+                thinkingLevel: s.thinkingLevel,
                 transport: resolved.transport,
                 family: resolved.family,
               };
@@ -1468,6 +1571,8 @@ export default class KodaPlugin extends Plugin {
       this.busy = false;
       this.abort = null;
       for (const v of this.views()) { v.activity({ kind: "done" }); v.renderLog(); }
+      // Das Ende jeder Runde (auch Abbruch und Fehler) legt das Gespräch im Verlauf ab; der Lauf wartet nicht darauf und scheitert nie daran.
+      if (this.archiveOn()) void this.persistConvo();
     }
   }
 

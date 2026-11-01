@@ -5,14 +5,14 @@ import { buildHubInto, type HubController, type HubPanel } from "../vendor/kit-o
 import { buildModelBar, type ModelBar } from "../vendor/kit-obsidian/model-bar";
 import type { SessionState } from "../core/abilities/types";
 import { describeStateChange } from "../core/abilities/session";
-import { isCompactionRecord, isErrorRecord, isSessionStateRecord, type CompactionRecord } from "../core/agent/types";
+import { isChatMessage, isCompactionRecord, isErrorRecord, isSessionStateRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
 import { buildReasoningBlock, buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obsidian/stable-writer";
 import { renderMarkdownGuarded, type DomGuardOptions } from "../vendor/kit-obsidian/dom-guard";
 import { isSafeHref } from "../vendor/kit/link-guard";
 import { neutralizeModelMarkdown } from "../vendor/kit/safe-markdown";
-import { thinkingAlwaysGuessHint, thinkingLockedTexts, thinkingOffTexts } from "../vendor/kit-obsidian/thinking-control";
+import { thinkingAlwaysGuessHint, thinkingLevelTexts, thinkingLockedTexts, thinkingOffTexts } from "../vendor/kit-obsidian/thinking-control";
 import { isContextMode, type ContextAttachment } from "../core/context/types";
 import { contextSummary, sourceChips } from "../core/context/labels";
 import { fillModeSelect } from "./mode-select";
@@ -63,6 +63,11 @@ export class KodaView extends ItemView {
   private bar: ModelBar | null = null;
   /** Modus-Dropdown in der Knopfzeile — null vor onOpen. */
   private modeEl: HTMLSelectElement | null = null;
+  /** Knopfreihe des Composers (Kit-Aufbau, von Hand): Neu und Verlauf links, Senden/Stopp rechts. */
+  private newBtn: HTMLButtonElement | null = null;
+  private archiveBtn: HTMLButtonElement | null = null;
+  private sendBtn: HTMLButtonElement | null = null;
+  private stopBtn: HTMLButtonElement | null = null;
 
   // — Hub: Chat- und Kontext-Tab —
   private hub: HubController<KodaTab> | null = null;
@@ -85,20 +90,9 @@ export class KodaView extends ItemView {
     root.empty();
     root.addClass("koda-root");
 
-    // Kopfzeile IM INHALT, nicht ueber `addAction`. Obsidian blendet den View-Kopf in jeder
-    // Seitenleiste aus — `app.css`: `.workspace-split.mod-left-split .view-header,
-    // .workspace-split.mod-right-split .view-header { display: none }`. Eine Kopf-Aktion ist
-    // dort im DOM und trotzdem unsichtbar; bis 0.10.0 war „Neues Gespraech" deshalb fuer
-    // niemanden erreichbar (gemessen 2026-09-01: Hoehe 0 in der Sidebar, Gegenprobe im
-    // Hauptbereich 38 px). Das ist kein Theme- oder Einstellungsfall, sondern gilt immer.
-    // UI-STANDARD §4 verlangt den Kopf ohnehin im Inhalt — `addAction` war die Abweichung,
-    // und kein Nachbar-Plugin benutzt es. Ein Pruefpunkt, der nur DOM-Existenz misst, sieht
-    // den Defekt nicht: darum misst Pruefpunkt 2 seit heute die Groesse.
-    const header = root.createDiv({ cls: "koda-header" });
-    const newChatEl = header.createEl("button", { cls: "clickable-icon koda-header-action" });
-    setIcon(newChatEl, "plus");
-    newChatEl.setAttribute("aria-label", t("view.newChat"));
-    newChatEl.addEventListener("click", () => void this.askNewChat());
+    // Keine Kopfzeile mehr: „Neues Gespraech" und „Vergangene Chats" sitzen als Symbole in der Knopfreihe unter dem Eingabefeld (`mountChat`), die Modellzeile im selben Composer.
+    // Obsidian blendet den View-Kopf in jeder Seitenleiste aus (`app.css`: `.workspace-split.mod-left-split .view-header, .workspace-split.mod-right-split .view-header { display: none }`),
+    // darum gab es nie `addAction`; und jede Aktion hat einen Befehl (main.ts), der von der Darstellung unabhaengig ist (Lehre 0.10.1).
 
     const chatPanel: HubPanel<KodaTab> = {
       id: "chat",
@@ -207,15 +201,28 @@ export class KodaView extends ItemView {
    *  Aufgeteilt fuer den Hub: bis Etappe 2 baute `onOpen` direkt in `contentEl`. Der Baum ist
    *  derselbe geblieben — wer hier etwas aendert, aendert den Chat, nicht den Umbau. */
   private mountChat(container: HTMLElement): void {
-    // Modell und Denk-Steuerung in einer Zeile über dem Verlauf (Kit `buildModelBar`): Dropdown mit „Automatisch“, Neu-laden-Knopf, Denk-Knopf. Gesperrt, solange ein Lauf läuft.
-    // Der Denk-Knopf ist der des Kits (`thinking-control`, seit obsidian-kit 0.70.1 mit `locked` für „immer an“); Kodas Zustand liefert `thinkingBinding()`.
-    // Das Kit gibt eine alte Zeile nicht frei: vor jedem neuen Aufbau abmelden.
+    // Verlauf, Statuszeile, dann der Composer (Eingabe, Knopfreihe, Modellzeile): die Anordnung des Kit-Chatfensters (obsidian-kit 0.74.0), von Hand gebaut, weil Koda sein eigenes Gespraech zeichnet.
+    // Das Kit gibt eine alte Modellzeile nicht frei: vor jedem neuen Aufbau abmelden.
     this.bar?.destroy();
+    this.logEl = container.createDiv({ cls: "koda-log" });
+    // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
+    // registriert, damit jeder spaetere Redraw automatisch mitgedeckt ist.
+    this.logEl.addEventListener("click", (e) => this.onLogClick(e));
+
+    // Statuszeile zwischen Verlauf und Eingabe: waehrend eines Laufs die Taetigkeit, im
+    // Ruhezustand die Belegung des Kontextfensters. Ein Ort fuer „was ist gerade los".
+    this.statusEl = container.createDiv({ cls: "koda-status" });
+    this.statusIconEl = this.statusEl.createSpan({ cls: "koda-status-icon" });
+    this.statusLabelEl = this.statusEl.createSpan({ cls: "koda-status-label" });
+
+    const composer = container.createDiv({ cls: "koda-input-bar" });
+    // Modell und Denk-Steuerung in einer Zeile (Kit `buildModelBar`) als erstes Kind des Composers: ein DIREKTES Kind, sonst greift der kompakte Composer nicht (CSS `.koda-input-bar > .okit-model-bar`).
+    // Der Denk-Knopf ist der des Kits (`thinking-control`, seit obsidian-kit 0.70.1 mit `locked` fuer „immer an“); Kodas Zustand liefert `thinkingBinding()`.
     const think = this.plugin.thinkingBinding();
     const lang = this.lang();
     this.bar = buildModelBar({
       app: this.app,
-      containerEl: container,
+      containerEl: composer,
       llm: this.plugin.modelBar(),
       label: t("view.modelLabel"),
       strings: { lang },
@@ -228,25 +235,13 @@ export class KodaView extends ItemView {
         setLevel: think.setLevel,
         levelPicker: think.levelPicker,
         // „aus“ ist bei Claude (und gemma 4 auf LM Studio) nicht möglich, die niedrigste Stufe geht raus: der Text des Kits sagt das, wo Kodas Knopf „aus“ zeigte.
-        strings: { button: (level) => (level === "off" ? t("view.thinkingOff") : t("view.thinkingOn")), level: (l) => l, pickerLabel: t("view.thinkingDone"), offNotPossible: thinkingOffTexts(lang) },
+        strings: { button: (level) => (level === "off" ? t("view.thinkingOff") : t("view.thinkingOn")), pickerLabel: t("view.thinkingDone"), ...thinkingLevelTexts(lang), offNotPossible: thinkingOffTexts(lang) },
         locked: () => (think.alwaysOn() ? thinkingLockedTexts(lang) : undefined),
         // „denkt vermutlich immer“: die Entscheidung trifft das Kit (`thinkToggleState`), der Text kommt aus dem Kit; im gesperrten Zustand entfällt der Hinweis dort von selbst.
         hint: () => (think.guessAlways() ? thinkingAlwaysGuessHint(lang) : undefined),
       },
     });
-    this.logEl = container.createDiv({ cls: "koda-log" });
-    // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
-    // registriert, damit jeder spaetere Redraw automatisch mitgedeckt ist.
-    this.logEl.addEventListener("click", (e) => this.onLogClick(e));
-
-    // Statuszeile zwischen Verlauf und Eingabe: waehrend eines Laufs die Taetigkeit, im
-    // Ruhezustand die Belegung des Kontextfensters. Ein Ort fuer „was ist gerade los".
-    this.statusEl = container.createDiv({ cls: "koda-status" });
-    this.statusIconEl = this.statusEl.createSpan({ cls: "koda-status-icon" });
-    this.statusLabelEl = this.statusEl.createSpan({ cls: "koda-status-label" });
-
-    const bar = container.createDiv({ cls: "koda-input-bar" });
-    this.inputEl = bar.createEl("textarea", { cls: "koda-input", attr: { placeholder: t("view.placeholder"), rows: "2" } });
+    this.inputEl = composer.createEl("textarea", { cls: "koda-input", attr: { placeholder: t("view.placeholder"), rows: "2" } });
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
     });
@@ -270,20 +265,40 @@ export class KodaView extends ItemView {
         this.plugin.setContextQuery(this.inputEl.value);
       }, CONTEXT_QUERY_DEBOUNCE_MS);
     });
-    // Nur noch Senden und Stopp. „Neues Gespraech" sass hier daneben und wurde regelmaessig
-    // versehentlich getroffen — es steht jetzt in der Kopfzeile, hinter einer Bestaetigung.
-    const buttons = bar.createDiv({ cls: "koda-buttons" });
-    // Modus-Dropdown links vom Senden: fuenf Zustaende sind kein Schalter. Ein Zustand, zwei
-    // Bedienstellen (Befehle setzen denselben Wert) — syncContextMode zieht nach.
-    this.modeEl = buttons.createEl("select", { cls: "dropdown koda-mode", attr: { "aria-label": t("context.dropdownAria") } });
+    // Knopfreihe, direkte Kinder des Composers (wie im Kit: kein Wrapper, den die Anordnung mit `display: contents` aufloesen muesste):
+    // links Neu (Symbol, gesperrt bei leerem Gespraech und im Lauf) und Verlauf (nur bei eingeschaltetem Verlauf), dann das Modus-Dropdown, rechts Senden, im Lauf stattdessen Stopp.
+    const start = composer.createDiv({ cls: "koda-buttons-start" });
+    this.newBtn = start.createEl("button", { cls: "clickable-icon koda-new", attr: { type: "button", "aria-label": t("view.newChat") } });
+    setIcon(this.newBtn, "square-pen");
+    this.newBtn.addEventListener("click", () => void this.askNewChat());
+    this.archiveBtn = start.createEl("button", { cls: "clickable-icon koda-archive", attr: { type: "button", "aria-label": t("view.archive") } });
+    setIcon(this.archiveBtn, "history");
+    this.archiveBtn.addEventListener("click", () => { this.plugin.openPastChats(); });
+    // Modus-Dropdown: fuenf Zustaende sind kein Schalter. Ein Zustand, zwei Bedienstellen (Befehle setzen denselben Wert) — syncContextMode zieht nach.
+    this.modeEl = composer.createEl("select", { cls: "dropdown koda-mode", attr: { "aria-label": t("context.dropdownAria") } });
     this.modeEl.addEventListener("change", () => {
       const v = this.modeEl?.value;
       if (isContextMode(v)) this.plugin.setContextMode(v);
     });
     this.syncContextMode();
-    buttons.createEl("button", { text: t("view.send"), cls: "mod-cta" }).addEventListener("click", () => this.send());
-    buttons.createEl("button", { text: t("view.stop") }).addEventListener("click", () => this.plugin.stopRun());
+    this.sendBtn = composer.createEl("button", { text: t("view.send"), cls: "mod-cta koda-send", attr: { type: "button" } });
+    this.sendBtn.addEventListener("click", () => this.send());
+    this.stopBtn = composer.createEl("button", { text: t("view.stop"), cls: "koda-stop", attr: { type: "button" } });
+    this.stopBtn.addEventListener("click", () => this.plugin.stopRun());
+    this.syncComposer();
   }
+
+  /** Neu: gesperrt, solange das Gespraech leer ist und solange ein Lauf laeuft (wer laeuft, drueckt erst Stopp); Verlauf: nur sichtbar, solange der Verlauf an ist; Senden und Stopp teilen sich einen Platz. */
+  private syncComposer(): void {
+    const busy = this.plugin.busy;
+    if (this.newBtn !== null) this.newBtn.disabled = busy || !this.plugin.chatLog.some((e) => isChatMessage(e) && e.role === "user");
+    if (this.archiveBtn !== null) { this.archiveBtn.toggleClass("koda-hidden", !this.plugin.archiveOn()); this.archiveBtn.disabled = busy; }
+    if (this.sendBtn !== null) this.sendBtn.toggleClass("koda-hidden", busy);
+    if (this.stopBtn !== null) this.stopBtn.toggleClass("koda-hidden", !busy);
+  }
+
+  /** Aufbewahrung geaendert (Einstellungen): der Verlauf-Knopf folgt. */
+  syncArchive(): void { this.syncComposer(); }
 
   focusInput(): void {
     this.inputEl.focus();
@@ -302,15 +317,22 @@ export class KodaView extends ItemView {
     void this.app.workspace.openLinkText(href, "", e.ctrlKey || e.metaKey);
   }
 
-  // — Kopfzeile: Aktionen (auch ueber die Befehlspalette erreichbar, s. main.ts) —
+  // — Neues Gespraech (auch ueber die Befehlspalette erreichbar, s. main.ts) —
 
-  /** Verwerfen ist endgueltig: der Verlauf wandert nach archive.jsonl, aber ohne Trenner —
-   *  zurueckholen kann ihn heute niemand. Deshalb die Rueckfrage (Kit-confirmAction, §8). */
+  /** Bei eingeschaltetem Verlauf fragt Neu nicht: es legt das Gespraech ab, leert und sagt es (Kit-Verhalten seit 0.73.0). Gelingt das Ablegen nicht, fragt es, bevor etwas verloren geht.
+   *  Bei ausgeschaltetem Verlauf ist Verwerfen endgueltig und fragt immer (Kit-confirmAction, §8). */
   async askNewChat(): Promise<void> {
     if (this.plugin.busy) return;
+    const hasChat = this.plugin.chatLog.some((e) => isChatMessage(e) && e.role === "user");
+    if (!hasChat) return;
+    let unsaved = false;
+    if (this.plugin.archiveOn()) {
+      if (await this.plugin.archiveThenNew()) return;
+      unsaved = true;
+    }
     const ok = await confirmAction(this.app, {
-      title: t("view.newChat.confirm"),
-      message: t("view.newChat.confirm.body"),
+      title: unsaved ? t("view.newChat.unsaved") : t("view.newChat.confirm"),
+      message: unsaved ? t("view.newChat.unsaved.body") : t("view.newChat.confirm.body"),
       confirmLabel: t("view.newChat.confirm.ok"),
       cancelLabel: t("confirm.cancel"),
     });
@@ -324,6 +346,7 @@ export class KodaView extends ItemView {
     this.act = nextActivity(this.act, e);
     this.paintStatus();
     this.bar?.update();   // die Modellzeile sperrt sich während eines Laufs und gibt sich danach frei
+    this.syncComposer();  // Neu und Verlauf sperren sich im Lauf, Stopp ersetzt Senden
   }
 
   /** Modell, Endpunkt oder Einstellung haben sich geändert (Einstellungs-Tab, Resolver): die Zeile zeichnet sich aus dem Zustand neu, `models` lädt die Liste neu. */
@@ -439,6 +462,7 @@ export class KodaView extends ItemView {
 
   /** Voll-Redraw aus plugin.chatLog (Sessionstart, final, Fehler). */
   renderLog(): void {
+    this.syncComposer();   // Neu ist gesperrt, solange das Gespraech leer ist
     this.logEl.empty();
     this.endStream();
     this.streamArea = null;

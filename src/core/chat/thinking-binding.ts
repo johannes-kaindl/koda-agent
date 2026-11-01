@@ -1,8 +1,9 @@
 // Die Denk-Steuerung in der Modellzeile (Kit `thinking-control`, ueber `buildModelBar({ thinking })`): Kodas Zustand auf die Optionen des Kit-Knopfs abgebildet.
 // Obsidian-frei, in Node getestet (`tests/thinking_control_bindung.test.ts` misst den echten Kit-Knopf dagegen).
 //
-// Koda kennt zwei Zustaende des Nutzers (`suppressThinking` an/aus) und einen dritten des Modells (immer an: gpt-oss, harmony). Der Kit-Knopf schaltet zwischen `off` und `onLevel()`;
-// den dritten Zustand traegt `locked` (obsidian-kit 0.70.1). Zustand und Request-Seite kommen aus dem Kit (`think-toggle`, code-kit 0.27.0): `thinkToggleState` sagt, was der
+// Koda kennt zwei Zustaende des Nutzers (`suppressThinking` an/aus), dazu seit 0.34.0 die gewaehlte Stufe (`thinkingLevel`), und einen dritten des Modells (immer an: gpt-oss, harmony). Die Modellzeile des Kits
+// zeigt seit obsidian-kit 0.73.0 immer ein Dropdown mit den Stufen des Modells; eine Stufe, die nichts bewirkt, waere eine Luege, darum geht jede gewaehlte Stufe in den Request (`KodaChatClient`).
+// Den dritten Zustand traegt `locked` (obsidian-kit 0.70.1). Zustand und Request-Seite kommen aus dem Kit (`think-toggle`, code-kit 0.27.0): `thinkToggleState` sagt, was der
 // Schalter zeigt, `effectiveSuppress`, was der Request tut — beide Haelften in EINEM Modul, weil ein Schalter, der etwas anderes verspricht, als der Request liefert, luegt.
 import { describeModel } from "../../vendor/kit/endpoint-source";
 import type { BackendId, FamilyId, ThinkingLevel } from "../../vendor/kit/sampling-profiles";
@@ -16,8 +17,10 @@ export interface ThinkingBindingDeps {
   /** Backend des gemerkten Endpunkts (`KodaPlugin.sentBackend()`); vor der ersten Aufloesung `unknown`. */
   backend(): string;
   suppress(): boolean;
-  /** Schreibt `suppressThinking` und speichert (`saveSettings()` zeichnet die Zeile neu). */
-  setSuppress(suppress: boolean): Promise<void>;
+  /** Die gewaehlte Stufe (`thinkingLevel`), `null` ohne eigene Wahl. */
+  level(): ThinkingLevel | null;
+  /** Schreibt `suppressThinking` und/oder `thinkingLevel` in EINEM Speichern (`saveSettings()` zeichnet die Zeile neu). Ein fehlendes Feld bleibt, wie es ist. */
+  setThinking(patch: { suppress?: boolean; level?: ThinkingLevel }): Promise<void>;
 }
 
 export interface ThinkingBinding {
@@ -42,13 +45,15 @@ export function createThinkingBinding(d: ThinkingBindingDeps): ThinkingBinding {
     family: () => describeModel(d.model(), undefined).family,
     // `unknown` und jede unbekannte Kennung behandelt das Kit wie die Familie als solche.
     backend: () => d.backend() as BackendId,
-    current: () => (d.suppress() ? "off" : "medium"),
-    onLevel: () => "medium",
-    setLevel: (level) => d.setSuppress(level === "off"),
+    // Ohne eigene Wahl gilt wie bisher `medium` als Anzeige; das Kit legt sie auf die Liste des Modells (`resolveThinkingLevel`), geschrieben wird erst bei einer Wahl.
+    current: () => (d.suppress() ? "off" : (d.level() ?? "medium")),
+    onLevel: () => d.level() ?? "medium",
+    // „aus“ schaltet nur das Denken aus und laesst die gewaehlte Stufe stehen (sie kommt beim Einschalten zurueck); jede andere Stufe schaltet ein und merkt sich die Wahl.
+    setLevel: (level) => d.setThinking(level === "off" ? { suppress: true } : { suppress: false, level }),
     levelPicker: () => false,
     alwaysOn,
     guessAlways: () => thinkToggleState(d.model(), d.suppress()).hint === "alwaysGuess",
     // Wie der Klick auf den Kit-Knopf, plus die Sperre: ein gerade gesperrter Zustand darf nicht durchschlagen (Muster canActivatePack).
-    toggle: () => (alwaysOn() ? Promise.resolve() : d.setSuppress(!d.suppress())),
+    toggle: () => (alwaysOn() ? Promise.resolve() : d.setThinking({ suppress: !d.suppress() })),
   };
 }

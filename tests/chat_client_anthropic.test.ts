@@ -75,7 +75,7 @@ describe("KodaChatClient — Parameter je Verbindungsart", () => {
     expect(sent[0]?.body).toMatchObject({ temperature: 0.2, max_tokens: 8192, reasoning_effort: "none", reasoning_budget: 0 });
   });
 
-  it("Anthropic: Nachricht geht an /v1/messages, ohne temperature, mit effort low bei ausgeschaltetem Denken", async () => {
+  it("Anthropic: Nachricht geht an /v1/messages, ohne temperature, mit dem Modellstandard als effort bei ausgeschaltetem Denken (Claude lässt sich nicht abschalten; Entscheidung 2026-10-27, code-kit 0.39.0)", async () => {
     const sent: Sent[] = [];
     const r = await run(anthropicClient([textTurn("Hallo")], sent), { ...claude, suppressThinking: true });
     expect(r).toMatchObject({ ok: true, content: "Hallo" });
@@ -85,7 +85,7 @@ describe("KodaChatClient — Parameter je Verbindungsart", () => {
     expect(b.temperature).toBeUndefined();
     expect(b.chat_template_kwargs).toBeUndefined();
     expect(b.reasoning_effort).toBeUndefined();
-    expect(b.output_config).toEqual({ effort: "low" });
+    expect(b.output_config).toEqual({ effort: "high" });   // Sonnet 5.5: der Standard ist „hoch“, dieselbe Stufe, die die Modellzeile für „aus“ zeigt
     expect(b.thinking).toMatchObject({ type: "adaptive" });
   });
 
@@ -166,5 +166,71 @@ describe("KodaChatClient — Werkzeug-Runde mit Denken (Anthropic)", () => {
     await run(anthropicClient([textTurn("fertig")], sent), claude, history());
     const assistant = (sent[1]?.body.messages as { role: string; content: Record<string, unknown>[] }[]).find((m) => m.role === "assistant");
     expect(assistant?.content.map((b) => b.type)).toEqual(["tool_use"]);
+  });
+});
+
+// Welle 29: die Modellzeile des Kits bietet seit 0.73.0 die Stufen des Modells an; eine Stufe, die das Dropdown anbietet, muss ankommen (`thinkingLevel`, Anbindung in `thinking-binding.ts`).
+describe("KodaChatClient — gewählte Denkstufe", () => {
+  const http = (sent: Sent[]): SseTransport => ({
+    async postStream(url, body, headers, onChunk) {
+      sent.push({ url, body: body as Record<string, any>, headers });
+      onChunk('data: {"choices":[{"delta":{"content":"x"}}]}\ndata: [DONE]\n');
+      return 200;
+    },
+  });
+  const local = { endpoint: "http://127.0.0.1:1234", apiKey: "", model: "qwen3.6-27b" };
+
+  it("HTTP: eine gewählte Stufe geht als reasoning_effort an den Draht", async () => {
+    for (const level of ["low", "medium", "high"] as const) {
+      const sent: Sent[] = [];
+      await run(new KodaChatClient(http(sent), 1000, fakeClock), { ...local, suppressThinking: false, thinkingLevel: level });
+      expect(sent[0]?.body.reasoning_effort).toBe(level);
+      expect(sent[0]?.body).toMatchObject({ temperature: 0.2, max_tokens: 8192 });   // Kodas feste Werte bleiben
+      expect(sent[0]?.body.reasoning_budget).toBeUndefined();                          // nur die Stufe, nicht die Aus-Felder
+    }
+  });
+
+  it("HTTP ohne eigene Wahl: der Draht bleibt wie vor der Chat-Zeile (nichts gesendet)", async () => {
+    const sent: Sent[] = [];
+    await run(new KodaChatClient(http(sent), 1000, fakeClock), { ...local, suppressThinking: false, thinkingLevel: null });
+    expect(sent[0]?.body.reasoning_effort).toBeUndefined();
+    const ohneFeld: Sent[] = [];
+    await run(new KodaChatClient(http(ohneFeld), 1000, fakeClock), { ...local, suppressThinking: false });
+    expect(ohneFeld[0]?.body.reasoning_effort).toBeUndefined();
+  });
+
+  it("HTTP, Denken aus: die Aus-Felder gewinnen, die gemerkte Stufe geht nicht mit", async () => {
+    const sent: Sent[] = [];
+    await run(new KodaChatClient(http(sent), 1000, fakeClock), { ...local, suppressThinking: true, thinkingLevel: "high" });
+    expect(sent[0]?.body).toMatchObject({ reasoning_effort: "none", reasoning_budget: 0 });
+  });
+
+  it("HTTP: ein gespeichertes xhigh oder max (nur Claude hat sie) wird für ein lokales Modell hoch", async () => {
+    for (const level of ["xhigh", "max"] as const) {
+      const sent: Sent[] = [];
+      await run(new KodaChatClient(http(sent), 1000, fakeClock), { ...local, suppressThinking: false, thinkingLevel: level });
+      expect(sent[0]?.body.reasoning_effort).toBe("high");
+    }
+  });
+
+  it("HTTP, immer-an-Modell (gpt-oss): nie eine Stufe von einem anderen Modell, der Knopf ist dort gesperrt", async () => {
+    const sent: Sent[] = [];
+    await run(new KodaChatClient(http(sent), 1000, fakeClock), { ...local, model: "gpt-oss-20b", suppressThinking: false, thinkingLevel: "low" });
+    expect(sent[0]?.body.reasoning_effort).toBeUndefined();
+  });
+
+  it("Anthropic: die gewählte Stufe ist der effort, ohne Wahl bleibt es medium", async () => {
+    const hoch: Sent[] = [];
+    await run(anthropicClient([textTurn("a")], hoch), { ...claude, suppressThinking: false, thinkingLevel: "high" });
+    expect(hoch[0]?.body.output_config).toEqual({ effort: "high" });
+    const ohne: Sent[] = [];
+    await run(anthropicClient([textTurn("a")], ohne), { ...claude, suppressThinking: false, thinkingLevel: null });
+    expect(ohne[0]?.body.output_config).toEqual({ effort: "medium" });
+  });
+
+  it("Anthropic, Denken aus: der Modellstandard, die gemerkte Wahl geht nicht mit", async () => {
+    const sent: Sent[] = [];
+    await run(anthropicClient([textTurn("a")], sent), { ...claude, suppressThinking: true, thinkingLevel: "low" });
+    expect(sent[0]?.body.output_config).toEqual({ effort: "high" });
   });
 });

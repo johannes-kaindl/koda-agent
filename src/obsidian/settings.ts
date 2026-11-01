@@ -30,6 +30,8 @@ import {
 } from "obsidian";
 import { t, getLang } from "../vendor/kit/i18n";
 import { githubHelpUrls, helpSettingDefinition } from "../vendor/kit-obsidian/help-setting";
+import { chatArchiveSettingDefinitions, type ChatArchiveSettingKey } from "../vendor/kit-obsidian/chat-archive-settings";
+import { resolveChatArchiveStrings } from "../vendor/kit-obsidian/chat-archive-strings";
 import { linkSettingDefinitions, resolveLinkSettingsStrings, type LinkSettingKey } from "../vendor/kit-obsidian/link-settings";
 import { modeLabel } from "../core/context/labels";
 import { AVAILABLE_MODES } from "../core/context/types";
@@ -312,6 +314,25 @@ export class KodaSettingsTab extends PluginSettingTab {
           allowLocalImages: this.plugin.settings.allowLocalImages,
           strings: { lang: getLang() },
           onChange: async (key: LinkSettingKey, value: boolean) => { this.plugin.settings[key] = value; await this.plugin.saveSettings(); },
+        }),
+      },
+      // „Vergangene Chats“ (Kit `chat-archive`, UI-STANDARD §8): Ordner und Aufbewahrung. Vorgabe aus (0); eine Änderung der Aufbewahrung sagt es dem Plugin, damit der Verlauf-Knopf folgt.
+      {
+        type: "group",
+        heading: resolveChatArchiveStrings({ lang: getLang() }).settingsHeading,
+        items: chatArchiveSettingDefinitions({
+          app: this.app,
+          folder: this.plugin.settings.chatFolder,
+          keep: this.plugin.settings.chatKeep,
+          defaultFolder: `${this.plugin.manifest.name}/Chats`,
+          configDir: this.app.vault.configDir,
+          strings: { lang: getLang() },
+          onChange: async (key: ChatArchiveSettingKey, value: string | number) => {
+            if (key === "folder") this.plugin.settings.chatFolder = String(value);
+            else this.plugin.settings.chatKeep = Number(value);
+            await this.plugin.saveSettings();
+            this.plugin.syncChatArchive();
+          },
         }),
       },
       {

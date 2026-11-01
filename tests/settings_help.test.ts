@@ -9,7 +9,7 @@ import { setLang, t } from "../src/vendor/kit/i18n";
 type Hatch = { name?: string; desc?: string; render?: (s: Setting) => void };
 
 function tab(): KodaSettingsTab {
-  return new KodaSettingsTab({} as never, { settings: {} } as never);
+  return new KodaSettingsTab({ vault: { configDir: ".obsidian" } } as never, { settings: {}, manifest: { name: "Koda" } } as never);
 }
 
 const erste = (): Hatch => tab().getSettingDefinitions()[0] as unknown as Hatch;

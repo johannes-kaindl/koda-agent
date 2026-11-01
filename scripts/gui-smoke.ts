@@ -79,8 +79,8 @@
  * ein `obsidian://`-Aufruf an die regulaere Instanz ist unter Obsidian 1.14 wirkungslos.
  *
  * ⚠️ Der Lauf leert das laufende Koda-Gespraech im Zielvault (Punkt 5 braucht ein frisches).
- * Der bisherige Verlauf wandert nach `.obsidian/plugins/koda-agent/sessions/archive.jsonl` und ist nicht verloren, aber
- * aus der Sidebar weg. Wer gerade an einem Verlauf misst, faehrt den Smoke davor oder danach.
+ * Das Gespraech ist danach weg: `newChat()` leert `sessions/current.jsonl`, und der Verlauf vergangener Chats ist als Vorgabe aus
+ * (Aufbewahrung 0), legt es also nirgends ab. Wer gerade an einem Gespraech misst, faehrt den Smoke davor oder danach.
  *
  * ```bash
  * UD=/tmp/obs-test-koda-agent; mkdir -p "$UD"
@@ -224,7 +224,7 @@ const PUNKTE = [
   "1. Plugin ist aktiv",
   "1b. Retrieval-Andockung",
   "1c. Frontmatter-Naht",
-  "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen, der SICHTBAREN Kopfzeilen-Aktion „Neues Gespraech“ und dem sichtbaren Denk-Knopf in der Modellzeile",
+  "2. Sidebar oeffnet mit Eingabefeld, Senden, dem SICHTBAREN Neu-Symbol im Composer (gesperrt bei leerem Gespraech) und der sichtbaren Denk-Steuerung in der Modellzeile",
   "3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein",
   "4. Toter Endpunkt wird als nicht erreichbar angezeigt",
   "8. Settings-Gruppe „Verlauf kürzen“ mit Fenster-Feld",
@@ -321,7 +321,7 @@ const PUNKTE = [
   "96. Gegenprobe Erreichbarkeit: ohne Rollbalken am Verlauf wird ein Bedienelement unerreichbar",
   "97. Werkzeugliste: jedes Beschreibungsfeld zeigt seinen Inhalt in ganzen Zeilen, keine halb abgeschnittene Zeile am unteren Rand, mindestens drei Zeilen hoch",
   "98. Handpunkt 17 an der Naht: ist der Embedding-Endpunkt nicht erreichbar, stehen die Volltext-Treffer UND die Zeile „(semantisch: Embedding-Endpunkt nicht erreichbar …)“ im Ergebnis; erreichbar fehlt die Zeile",
-  "102. Modellzeile: der Chat-Tab trägt genau eine Zeile des Kits („Koda“) mit Dropdown, aria-label, Neu-laden-Knopf und dem Denk-Knopf des Kits; im Kopf bleibt nur „Neues Gespräch“",
+  "102. Modellzeile: der Chat-Tab trägt genau eine Zeile des Kits als direktes Kind des Composers, ohne sichtbare Beschriftung („Koda“ steht im aria-label), mit Dropdown, Neu-laden-Knopf und Denk-Steuerung; die Kopfzeile ist weg",
   "103. Modellzeile: ein Wechsel im Dropdown ändert das gesendete Modell und das Modell der Zeile in den Einstellungen, „Automatisch“ stellt es zurück",
   "104. Modellzeile: ein Wechsel des Modells in den Einstellungen zeichnet das Dropdown nach",
   "105. Modellzeile: im Lauf gesperrt (Dropdown UND Denk-Knopf), danach frei",
@@ -667,7 +667,7 @@ async function main(): Promise<void> {
     `);
     const view = await pollUntil<{
       leaves: number; input: boolean; buttons: string[]; cta: boolean;
-      actions: { label: string; sichtbar: boolean; hoehe: number }[];
+      actions: { label: string; sichtbar: boolean; hoehe: number; gesperrt: boolean }[];
       inSidebar: boolean; hasThink: boolean; hasNewChat: boolean; status: boolean;
     }>(
       cdp,
@@ -675,7 +675,9 @@ async function main(): Promise<void> {
         const leaves = app.workspace.getLeavesOfType(${JSON.stringify(VIEW_TYPE)});
         const el = leaves[0]?.view?.containerEl;
         if (!el) return null;
-        const buttons = [...el.querySelectorAll(".koda-buttons button")].map((b) => b.textContent.trim());
+        // Senden und Stopp teilen sich einen Platz: im Ruhezustand ist Senden sichtbar und Stopp ausgeblendet (display: none).
+        const sichtbar = (e) => { if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+        const buttons = [...el.querySelectorAll(".koda-input-bar > button.koda-send, .koda-input-bar > button.koda-stop")].filter(sichtbar).map((b) => b.textContent.trim());
         if (buttons.length === 0) return null;
         const view0 = leaves[0].view;
         // ⚠️ Gemessen wird die GROESSE, nicht die Existenz — und das ist der ganze Punkt.
@@ -692,12 +694,13 @@ async function main(): Promise<void> {
         // Nachbarfall (Lesson 2026-09-01, „Beleg-Test mit erfundenem Namen").
         const wurzel = leaves[0].getRoot();
         const inSidebar = wurzel === app.workspace.leftSplit || wurzel === app.workspace.rightSplit;
-        const actions = [...el.querySelectorAll(".koda-header-action")].map((a) => {
+        // Seit der Kit-Anordnung (0.74.0) steht Neu als Symbol in der Knopfreihe des Composers; es ist bei leerem Gespraech gesperrt, aber sichtbar.
+        const actions = [...el.querySelectorAll(".koda-input-bar .koda-new")].map((a) => {
           const r = a.getBoundingClientRect();
-          return { label: a.getAttribute("aria-label") ?? "", sichtbar: r.width > 0 && r.height > 0, hoehe: Math.round(r.height) };
+          return { label: a.getAttribute("aria-label") ?? "", sichtbar: r.width > 0 && r.height > 0, hoehe: Math.round(r.height), gesperrt: !!a.disabled };
         });
         // Der Denk-Knopf steht seit obsidian-kit 0.70.1 in der Modellzeile (Kit-Klasse), nicht mehr im Kopf; sichtbar heisst: eine Hoehe.
-        const think = el.querySelector(".okit-model-bar .okit-thinking-toggle");
+        const think = el.querySelector(".okit-model-bar .okit-thinking-control");
         const hasThink = !!think && think.getBoundingClientRect().height > 0;
         const neu = actions.find((a) => /Neues Gespräch|New chat/.test(a.label));
         const hasNewChat = !!neu && neu.sichtbar;
@@ -705,7 +708,7 @@ async function main(): Promise<void> {
           leaves: leaves.length,
           input: !!el.querySelector("textarea.koda-input"),
           buttons,
-          cta: !!el.querySelector(".koda-buttons button.mod-cta"),
+          cta: !!el.querySelector(".koda-input-bar > button.koda-send.mod-cta"),
           actions,
           inSidebar,
           hasThink,
@@ -716,11 +719,11 @@ async function main(): Promise<void> {
       8000,
     );
     record(
-      "2. Sidebar oeffnet mit Eingabefeld, zwei Knoepfen, der SICHTBAREN Kopfzeilen-Aktion „Neues Gespraech“ und dem sichtbaren Denk-Knopf in der Modellzeile",
-      view !== null && view.input && view.buttons.length === 2 && view.cta &&
+      "2. Sidebar oeffnet mit Eingabefeld, Senden, dem SICHTBAREN Neu-Symbol im Composer (gesperrt bei leerem Gespraech) und der sichtbaren Denk-Steuerung in der Modellzeile",
+      view !== null && view.input && view.buttons.length === 1 && view.cta &&
         view.inSidebar && view.hasThink && view.hasNewChat && view.actions.length === 1 && view.status,
       view
-        ? `${view.leaves} Leaf · in Seitenleiste: ${String(view.inSidebar)} · Knoepfe: ${view.buttons.join(", ")} · Kopfzeile: ${view.actions.map((a) => `${a.label}[${a.hoehe}px]`).join(" | ")} · Denk-Knopf in der Zeile sichtbar: ${view.hasThink} · Statuszeile: ${view.status}`
+        ? `${view.leaves} Leaf · in Seitenleiste: ${String(view.inSidebar)} · Knoepfe: ${view.buttons.join(", ")} · Neu: ${view.actions.map((a) => `${a.label}[${a.hoehe}px${a.gesperrt ? ", gesperrt" : ""}]`).join(" | ")} · Denk-Knopf in der Zeile sichtbar: ${view.hasThink} · Statuszeile: ${view.status}`
         : "keine View entstanden",
     );
 
@@ -4194,16 +4197,17 @@ async function main(): Promise<void> {
         try {
           await setzeModell("smoke-model", stubM.url);
           await chatZeigen();
-          const zeile = await pollUntil<{ zeilen: number; label: string; aria: string | null; neuLaden: boolean; denkInZeile: number; kopfAktionen: number; optionen: string[]; wert: string }>(cdp, `
+          const zeile = await pollUntil<{ zeilen: number; label: string; aria: string | null; neuLaden: boolean; denkInZeile: number; kopfZeilen: number; imComposer: number; optionen: string[]; wert: string }>(cdp, `
             const s = document.querySelector(".koda-root .okit-model-bar-select");
             // Auf die Liste DIESES Stubs warten: nach einem Endpunktwechsel zeigt die Zeile kurz die Liste des vorigen (der Abruf läuft noch).
             if (!s || ![...s.options].some((o) => o.value === "smoke-model-2")) return null;
             return { zeilen: document.querySelectorAll(".koda-root .okit-model-bar").length, label: document.querySelector(".koda-root .okit-model-bar-label")?.textContent ?? "",
+              imComposer: document.querySelectorAll(".koda-input-bar > .okit-model-bar").length,
               aria: s.getAttribute("aria-label"), neuLaden: !!document.querySelector(".koda-root .okit-model-bar button"), denkInZeile: document.querySelectorAll(".koda-root .okit-model-bar .okit-thinking-control").length,
-              kopfAktionen: document.querySelectorAll(".koda-header .koda-header-action").length, optionen: [...s.options].map((o) => o.value), wert: s.value };`, 15_000, 250).catch(() => null);
+              kopfZeilen: document.querySelectorAll(".koda-header").length, optionen: [...s.options].map((o) => o.value), wert: s.value };`, 15_000, 250).catch(() => null);
           if (zeile === null) unmeasured(P100, "keine Modellzeile mit Liste im Chat-Tab gefunden");
-          else record(P100, zeile.zeilen === 1 && zeile.label === "Koda" && !!zeile.aria && zeile.neuLaden && zeile.denkInZeile === 1 && zeile.kopfAktionen === 1 && zeile.optionen.join("|") === "|smoke-model|smoke-model-2" && zeile.wert === "smoke-model",
-            `Zeilen ${zeile.zeilen} · Name „${zeile.label}“ · aria „${String(zeile.aria)}“ · Neu-laden ${zeile.neuLaden} · Denk-Steuerung in der Zeile ${zeile.denkInZeile} (soll 1) · Kopf-Aktionen ${zeile.kopfAktionen} (soll 1) · Optionen ${zeile.optionen.join(",")} · Wert ${zeile.wert}`);
+          else record(P100, zeile.zeilen === 1 && zeile.imComposer === 1 && zeile.label === "" && /Koda/.test(zeile.aria ?? "") && zeile.neuLaden && zeile.denkInZeile === 1 && zeile.kopfZeilen === 0 && zeile.optionen.join("|") === "|smoke-model|smoke-model-2" && zeile.wert === "smoke-model",
+            `Zeilen ${zeile.zeilen} (direktes Kind des Composers: ${zeile.imComposer}) · sichtbare Beschriftung „${zeile.label}“ (soll leer) · aria „${String(zeile.aria)}“ · Neu-laden ${zeile.neuLaden} · Denk-Steuerung in der Zeile ${zeile.denkInZeile} (soll 1) · Kopfzeilen ${zeile.kopfZeilen} (soll 0) · Optionen ${zeile.optionen.join(",")} · Wert ${zeile.wert}`);
 
           const waehle = (v: string): Promise<unknown> => cdp.evaluate(`
             const s = document.querySelector(".koda-root .okit-model-bar-select");
@@ -4886,11 +4890,11 @@ async function main(): Promise<void> {
           const fokus = { selector: ".koda-input" };
           zeichnePflicht(bilanz, N92, await messeFokusErhalt(cdp, fokus));
           zeichnePflicht(bilanz, N93, await gegenprobeFokus(cdp, fokus));
-          // Die Bedienelemente des Chats. `.koda-header-action` und die Hub-Tabs liegen ueber dem Verlauf, Senden/Stopp/Modus darunter.
+          // Die Bedienelemente des Chats. Die Hub-Tabs liegen ueber dem Verlauf; Eingabe, Neu, Modus und Senden stehen im Composer darunter (Stopp und der Verlauf-Knopf sind im Ruhezustand ausgeblendet und zaehlen nicht).
           const erreichbar = {
-            selektoren: [".koda-input", ".koda-buttons button", ".koda-mode", ".koda-header-action", ".okit-hub-tab"],
+            selektoren: [".koda-input", ".koda-send", ".koda-mode", ".koda-new", ".okit-hub-tab"],
             nurErster: [".koda-mode"],
-            erforderlich: [".koda-input", ".koda-buttons button"],
+            erforderlich: [".koda-input", ".koda-send"],
             fuelle: { in: ".koda-log", zeilen: 120 },
             ueberlauf: ".koda-log",
           };
@@ -4976,8 +4980,8 @@ async function main(): Promise<void> {
     // Was hier NICHT wiederhergestellt wird, und das ist Absicht: das laufende Gespräch.
     // Punkt 5 braucht ein frisches (`newChat()` vor dem Failover-Versuch), und der Aufruf
     // hier räumt dessen Fehlermeldung wieder weg. Der vorherige Verlauf ist damit aus der
-    // Sidebar verschwunden — nicht verloren: `SessionStore.startNew()` hängt ihn an
-    // `sessions/archive.jsonl`, bevor es `current.jsonl` leert. Wer also mitten in einem Gespräch
+    // Sidebar verschwunden: `SessionStore.startNew()` leert `current.jsonl`, und der Verlauf vergangener Chats ist als Vorgabe aus
+    // (seit der Chat-Zeile 0.34.0 gibt es keine `archive.jsonl` mehr, die den Rest aufnimmt). Wer also mitten in einem Gespräch
     // den Smoke fährt, findet danach ein leeres. Gemessen am 2026-08-24: ein Smoke zwischen
     // zwei Messungen kostete den Verlauf, an dem gerade gemessen wurde.
     // Ein echtes Zurückschreiben wäre mehr Mechanik, als der Fall wert ist — die Warnung

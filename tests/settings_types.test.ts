@@ -233,6 +233,18 @@ describe("imageMaxKb", () => {
   });
 });
 
+describe("Denkstufe (thinkingLevel)", () => {
+  it("Vorgabe: keine eigene Wahl; eine data.json aus der Zeit davor behält ihr suppressThinking", () => {
+    expect(DEFAULT_SETTINGS.thinkingLevel).toBeNull();
+    expect(validateKodaSettings({ suppressThinking: false }).thinkingLevel).toBeNull();
+    expect(validateKodaSettings({ suppressThinking: false }).suppressThinking).toBe(false);
+  });
+  it("low bis max bleiben; „off“ ist suppressThinking und kein Wert dieses Feldes; Unbekanntes wird null", () => {
+    for (const l of ["low", "medium", "high", "xhigh", "max"]) expect(validateKodaSettings({ thinkingLevel: l }).thinkingLevel).toBe(l);
+    for (const bad of ["off", "extrem", 3, true, {}, [], undefined]) expect(validateKodaSettings({ thinkingLevel: bad }).thinkingLevel).toBeNull();
+  });
+});
+
 describe("Endpunkt-Quelle (LLM Endpoint Manager, Opt-in)", () => {
   it("Default: Manager aus, keine Wahl", () => {
     expect(DEFAULT_SETTINGS.useEndpointManager).toBe(false);

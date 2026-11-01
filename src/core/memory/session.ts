@@ -57,7 +57,6 @@ export class SessionStore {
   constructor(private readonly sink: SessionSink, private readonly dir: string) {}
 
   private get current(): string { return `${this.dir}/current.jsonl`; }
-  private get archive(): string { return `${this.dir}/archive.jsonl`; }
 
   async load(): Promise<LogEntry[]> {
     const text = await this.sink.read(this.current);
@@ -72,9 +71,13 @@ export class SessionStore {
     }
   }
 
+  /** Leert das laufende Gespräch. Abgelegt wird es vorher vom Verlauf (`ConvoArchive`, Kit-Speicher im Vault); eine `archive.jsonl` aus Versionen vor dem Verlauf bleibt unangetastet liegen und wird nicht mehr beschrieben. */
   async startNew(): Promise<void> {
-    const text = await this.sink.read(this.current);
-    if (text !== null && text.trim() !== "") await this.sink.append(this.archive, text);
     await this.sink.write(this.current, "");
+  }
+
+  /** Ersetzt das laufende Gespräch (ein aus dem Verlauf geöffneter Chat), damit ein Neustart ihn wiederfindet. */
+  async replace(msgs: LogEntry[]): Promise<void> {
+    await this.sink.write(this.current, msgs.map(serializeLine).join(""));
   }
 }

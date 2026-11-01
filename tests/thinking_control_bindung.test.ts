@@ -1,21 +1,28 @@
 import { describe, it, expect, vi } from "vitest";
-import { thinkingAlwaysGuessHint, thinkingLockedTexts, thinkingOffTexts } from "../src/vendor/kit-obsidian/thinking-control";
+import { thinkingAlwaysGuessHint, thinkingLevelTexts, thinkingLockedTexts, thinkingOffTexts } from "../src/vendor/kit-obsidian/thinking-control";
 import { buildModelBar } from "../src/vendor/kit-obsidian/model-bar";
 import { createThinkingBinding, effectiveSuppress } from "../src/core/chat/thinking-binding";
+import type { ThinkingLevel } from "../src/vendor/kit/sampling-profiles";
 import { makeFakeEl } from "./vendor/kit/obsidian-mock";
 
-// Welle 27 (K3), nachgeführt mit obsidian-kit 0.70.1 (locked) und 0.71.0 (hint): Kodas Denk-Steuerung ist der Knopf des Kits in der Modellzeile (`buildModelBar({ thinking })`), der dritte Zustand „immer an“ (gpt-oss)
-// läuft über das Kit-Feld `locked`. Gemessen wird der ECHTE Kit-Knopf mit Kodas Anbindung (`createThinkingBinding`), nicht ein Nachbau: je Zustand die ANZEIGE (bedienbar? Beschriftung? aria-pressed?),
-// der SCHREIBWEG (ändert ein Klick `suppressThinking`?) und der REQUEST (`effectiveSuppress`). Der Request ist unverändert gegenüber der Kopf-Aktion, die dieser Knopf ablöst.
+// Welle 27 (K3), nachgeführt mit obsidian-kit 0.70.1 (locked), 0.71.0 (hint) und 0.73.0 (Stufen-Dropdown): Kodas Denk-Steuerung ist die des Kits in der Modellzeile (`buildModelBar({ thinking })`), seit 0.73.0 immer
+// ein Dropdown mit den Stufen des Modells; der dritte Zustand „immer an“ (gpt-oss) läuft über das Kit-Feld `locked`. Gemessen wird die ECHTE Kit-Steuerung mit Kodas Anbindung (`createThinkingBinding`), nicht ein Nachbau:
+// je Zustand die ANZEIGE (Wert, Einträge, gesperrt?, Name), der SCHREIBWEG (was schreibt eine Wahl?) und der REQUEST (`effectiveSuppress`, `tests/chat_client.test.ts`).
+// Der Kernsatz: eine Stufe, die das Dropdown anbietet, muss ankommen. Wer „hoch“ wählt, sieht danach „hoch“ (kein Zurückspringen auf „mittel“), und die Stufe steht in den Einstellungen.
 
-interface Zustand { suppress: boolean; schreibt: number }
+interface Zustand { suppress: boolean; level: ThinkingLevel | null; schreibt: number }
 
 function zeile(model: string, backend: string, state: Zustand, lang: "en" | "de" = "en") {
   const think = createThinkingBinding({
     model: () => model,
     backend: () => backend,
     suppress: () => state.suppress,
-    setSuppress: async (s) => { state.suppress = s; state.schreibt += 1; },
+    level: () => state.level,
+    setThinking: async (patch) => {
+      if (patch.suppress !== undefined) state.suppress = patch.suppress;
+      if (patch.level !== undefined) state.level = patch.level;
+      state.schreibt += 1;
+    },
   });
   const el = makeFakeEl();
   const bar = buildModelBar({
@@ -26,140 +33,153 @@ function zeile(model: string, backend: string, state: Zustand, lang: "en" | "de"
     strings: { lang },
     thinking: {
       family: think.family, backend: think.backend, current: think.current, onLevel: think.onLevel, setLevel: think.setLevel, levelPicker: think.levelPicker,
-      strings: { button: (level) => (level === "off" ? "Thinking: off" : "Thinking: on"), level: (l) => l, pickerLabel: "Thinking", offNotPossible: thinkingOffTexts(lang) },
+      strings: { button: (level) => (level === "off" ? "Thinking: off" : "Thinking: on"), pickerLabel: "Thinking", ...thinkingLevelTexts(lang), offNotPossible: thinkingOffTexts(lang) },
       locked: () => (think.alwaysOn() ? thinkingLockedTexts(lang) : undefined),
       hint: () => (think.guessAlways() ? thinkingAlwaysGuessHint(lang) : undefined),
     },
   });
-  const btn: any = (el as any).querySelector(".okit-thinking-toggle")  // der Mock kennt keine Nachfahren-Selektoren; die Zeile hat genau einen Knopf;
-  return { bar, btn, state, text: (btn?.textContent ?? "") as string, aria: btn?.getAttribute("aria-label") as string | null, pressed: btn?.getAttribute("aria-pressed") as string | null };
+  // Das Fake-DOM kennt keine Tag-Selektoren: die Steuerung hat Symbol (children[0]) und Dropdown (children[1]), der Wert steht in der Komponente.
+  const dd = (): any => (el as any).querySelector(".okit-thinking-control")?.children[1]?.__component;
+  const wahl = async (v: string): Promise<void> => { await dd().onChangeCB(v); await Promise.resolve(); await Promise.resolve(); };
+  return {
+    bar, state, dd, wahl,
+    get wert(): string { return dd()?.getValue() ?? ""; },
+    get eintraege(): string[] { return Object.keys(dd()?.options ?? {}); },
+    get anzeige(): Record<string, string> { return dd()?.options ?? {}; },
+    get gesperrt(): boolean { return dd()?.selectEl.disabled === true; },
+    get aria(): string | null { return dd()?.selectEl.getAttribute("aria-label") ?? null; },
+  };
 }
 
-describe("Denk-Knopf der Modellzeile: der Kit-Knopf mit Kodas Anbindung (Messung)", () => {
-  it("an: bedienbar, gedrückt, Request unterdrückt nichts; ein Klick schaltet aus und schreibt die Einstellung", () => {
-    const k = zeile("qwen3.6-27b", "lmstudio", { suppress: false, schreibt: 0 });
-    expect(k.btn).toBeTruthy();                         // der Knopf steht in der Zeile (Klasse des Kits), nicht mehr im Kopf
-    expect(k.btn.disabled ?? false).toBe(false);
-    expect(k.pressed).toBe("true");
-    expect(k.text).toBe("Thinking: on");
+const neu = (over: Partial<Zustand> = {}): Zustand => ({ suppress: false, level: null, schreibt: 0, ...over });
+
+describe("Denk-Dropdown der Modellzeile: die Steuerung des Kits mit Kodas Anbindung (Messung)", () => {
+  it("an, ohne eigene Wahl: „Mittel“ aus der Liste des Modells, bedienbar, Request unterdrückt nichts", () => {
+    const k = zeile("qwen3.6-27b", "lmstudio", neu());
+    expect(k.dd()).toBeTruthy();                                  // die Steuerung steht in der Zeile (Klasse des Kits), nicht im Kopf
+    expect(k.gesperrt).toBe(false);
+    expect(k.wert).toBe("medium");
+    expect(k.eintraege).toEqual(["off", "low", "medium", "high"]);
+    expect(k.anzeige.medium).toBe("Medium");
     expect(effectiveSuppress("qwen3.6-27b", false)).toBe(false);
-    k.btn.click();
-    expect(k.state).toEqual({ suppress: true, schreibt: 1 });
   });
 
-  it("aus: nicht gedrückt, Request unterdrückt; ein Klick schaltet an", () => {
-    const k = zeile("qwen3.6-27b", "lmstudio", { suppress: true, schreibt: 0 });
-    expect(k.pressed).toBe("false");
-    expect(k.text).toBe("Thinking: off");
+  it("aus: „Aus“, und eine Wahl schaltet an und schreibt die Stufe mit", async () => {
+    const k = zeile("qwen3.6-27b", "lmstudio", neu({ suppress: true }));
+    expect(k.wert).toBe("off");
     expect(effectiveSuppress("qwen3.6-27b", true)).toBe(true);
-    k.btn.click();
-    expect(k.state).toEqual({ suppress: false, schreibt: 1 });
+    await k.wahl("low");
+    expect(k.state).toEqual({ suppress: false, level: "low", schreibt: 1 });
   });
 
-  it.each([false, true])("immer an (gpt-oss, Wunsch suppress=%s): gesperrt, gedrückt, Kit-Text, KEIN Schreibweg, Request unterdrückt nie", (suppress) => {
-    const k = zeile("gpt-oss-20b", "lmstudio", { suppress, schreibt: 0 });
-    expect(k.btn.disabled).toBe(true);
-    expect(k.pressed).toBe("true");
-    expect(k.text).toBe("Thinking: always on");
-    expect(k.aria).toBe("Thinking: always on. This model always thinks; thinking can't be turned off here.");
-    k.btn.click();
-    expect(k.state).toEqual({ suppress, schreibt: 0 });   // der Klick schreibt „Denken unterdrücken“ nicht um
+  it("DER KERN: eine gewählte Stufe bleibt stehen (kein Zurückspringen auf „Mittel“) und liegt in den Einstellungen", async () => {
+    const k = zeile("qwen3.6-27b", "lmstudio", neu());
+    await k.wahl("high");
+    expect(k.state).toEqual({ suppress: false, level: "high", schreibt: 1 });
+    k.bar.update();
+    expect(k.wert).toBe("high");
+    await k.wahl("low");
+    k.bar.update();
+    expect(k.wert).toBe("low");
+    expect(k.state.level).toBe("low");
+  });
+
+  it("Aus lässt die gewählte Stufe stehen, und Einschalten bringt sie zurück", async () => {
+    const k = zeile("qwen3.6-27b", "lmstudio", neu({ level: "high" }));
+    await k.wahl("off");
+    expect(k.state).toEqual({ suppress: true, level: "high", schreibt: 1 });
+    k.bar.update();
+    expect(k.wert).toBe("off");
+    const think = createThinkingBinding({ model: () => "qwen3.6-27b", backend: () => "lmstudio", suppress: () => k.state.suppress, level: () => k.state.level, setThinking: async (p) => { if (p.suppress !== undefined) k.state.suppress = p.suppress; } });
+    await think.toggle();                                         // der Befehl „Thinking umschalten“ schaltet wieder an
+    expect(think.current()).toBe("high");
+  });
+
+  it.each([false, true])("immer an (gpt-oss, Wunsch suppress=%s): gesperrt, Kit-Text, KEIN Schreibweg, Request unterdrückt nie", async (suppress) => {
+    const k = zeile("gpt-oss-20b", "lmstudio", neu({ suppress }));
+    expect(k.gesperrt).toBe(true);
+    expect(k.anzeige[k.wert]).toBe("Always on");
+    expect(k.aria).toBe("Thinking. Thinking: always on. This model always thinks; thinking can't be turned off here.");
+    expect(k.state).toEqual(neu({ suppress }));                    // das Zeichnen schreibt nichts; die Bedienung ist gesperrt, `toggle` und der Request prüfen die Sperre selbst (unten)
     expect(effectiveSuppress("gpt-oss-20b", suppress)).toBe(false);
   });
 
-  it("immer an, deutsch: „Denken: immer an“ (Kit-Text)", () => {
-    const k = zeile("gpt-oss-20b", "lmstudio", { suppress: false, schreibt: 0 }, "de");
-    expect(k.text).toBe("Denken: immer an");
-    expect(k.btn.disabled).toBe(true);
+  it("immer an, deutsch: „Immer an“ (Kit-Text)", () => {
+    const k = zeile("gpt-oss-20b", "lmstudio", neu(), "de");
+    expect(k.anzeige[k.wert]).toBe("Immer an");
+    expect(k.gesperrt).toBe(true);
   });
 
-  it("Claude, aus: „niedrigste Stufe“ statt „aus“ (der Request senkt nur den Aufwand), bedienbar, Request unterdrückt", () => {
-    const k = zeile("claude-sonnet-5-5", "anthropic", { suppress: true, schreibt: 0 });
-    expect(k.text).toBe("Thinking: lowest level");       // früher Kodas „Thinking: aus“ mit dem Claude-Hinweis: der Kit-Text sagt dasselbe und gilt für jede Familie, die sich nicht abschalten lässt
-    expect(k.aria).toContain("lowest available level");
-    expect(k.btn.disabled ?? false).toBe(false);
-    expect(effectiveSuppress("claude-sonnet-5-5", true)).toBe(true);
-    k.btn.click();
-    expect(k.state).toEqual({ suppress: false, schreibt: 1 });
+  it("Claude: die Stufen des Modells (low bis max), „aus“ ist dort keine Stufe, und eine gespeicherte Stufe wird auf die Liste gelegt", () => {
+    const aus = zeile("claude-sonnet-5-5", "anthropic", neu({ suppress: true }));
+    expect(aus.eintraege).not.toContain("off");
+    expect(aus.eintraege).toEqual(expect.arrayContaining(["low", "medium", "high"]));
+    expect(aus.gesperrt).toBe(false);
+    expect(effectiveSuppress("claude-sonnet-5-5", true)).toBe(true);   // der Request senkt dort nur den Aufwand (Kit)
+    const hoch = zeile("claude-sonnet-5-5", "anthropic", neu({ level: "high" }));
+    expect(hoch.wert).toBe("high");
   });
 
-  it("gemma 4: auf LM Studio lässt sich „aus“ nicht erreichen (niedrigste Stufe), auf Ollama schon — das Backend entscheidet die Beschriftung", () => {
-    const lms = zeile("google/gemma-4-26b-a4b", "lmstudio", { suppress: true, schreibt: 0 });
-    const ollama = zeile("gemma4:e4b", "ollama", { suppress: true, schreibt: 0 });
-    expect(lms.text).toBe("Thinking: lowest level");
-    expect(ollama.text).toBe("Thinking: off");
-    expect(lms.btn.disabled ?? false).toBe(false);   // kein „immer an“: der Request unterdrückt weiter (effectiveSuppress), der Kit-Text sagt nur, was auf diesem Backend ankommt
+  it("gemma 4: auf LM Studio gibt es „Aus“ nicht (niedrigste Stufe), auf Ollama schon — das Backend entscheidet die Liste", () => {
+    const lms = zeile("google/gemma-4-26b-a4b", "lmstudio", neu({ suppress: true }));
+    const ollama = zeile("gemma4:e4b", "ollama", neu({ suppress: true }));
+    expect(lms.eintraege).not.toContain("off");
+    expect(ollama.eintraege).toContain("off");
+    expect(lms.gesperrt).toBe(false);                              // kein „immer an“: der Request unterdrückt weiter (effectiveSuppress)
   });
 
-  it("„denkt vermutlich immer“ (deepseek-r1): der Hinweis steht im bedienbaren Knopf, an wie aus; der Knopf schaltet weiter und der Request unterdrückt", () => {
-    const an = zeile("deepseek-r1:8b", "ollama", { suppress: false, schreibt: 0 });
-    const aus = zeile("deepseek-r1:8b", "ollama", { suppress: true, schreibt: 0 });
-    expect(an.aria).toBe("Thinking: on. This model probably always thinks — turning it off likely has no effect");
-    expect(aus.aria).toBe("Thinking: off. This model probably always thinks — turning it off likely has no effect");
-    expect(an.text).toBe("Thinking: on");              // die sichtbare Beschriftung bleibt, der Hinweis steht im Namen des Knopfs (Tooltip)
-    expect(an.btn.disabled ?? false).toBe(false);
-    an.btn.click();
-    expect(an.state).toEqual({ suppress: true, schreibt: 1 });
+  it("„denkt vermutlich immer“ (deepseek-r1): der Hinweis steht im Namen des bedienbaren Dropdowns, an wie aus", async () => {
+    const an = zeile("deepseek-r1:8b", "lmstudio", neu());
+    const aus = zeile("deepseek-r1:8b", "lmstudio", neu({ suppress: true }));
+    expect(an.aria).toContain("This model probably always thinks — turning it off likely has no effect");
+    expect(aus.aria).toContain("This model probably always thinks — turning it off likely has no effect");
+    expect(an.gesperrt).toBe(false);
+    await an.wahl("off");
+    expect(an.state.suppress).toBe(true);
     expect(effectiveSuppress("deepseek-r1:8b", true)).toBe(true);
   });
 
-  it("der Hinweis auf Deutsch, und ein Modell ohne Verdacht (qwen3) trägt keinen aria-label", () => {
-    const de = zeile("qwq:32b", "lmstudio", { suppress: false, schreibt: 0 }, "de");
-    expect(de.aria).toBe("Thinking: on. Dieses Modell denkt vermutlich immer — Abschalten wirkt wahrscheinlich nicht");
-    const ohne = zeile("qwen3:8b", "lmstudio", { suppress: false, schreibt: 0 });
-    expect(ohne.aria).toBeNull();
+  it("der Hinweis auf Deutsch, und ein Modell ohne Verdacht (qwen3) trägt keinen", () => {
+    const de = zeile("qwq:32b", "lmstudio", neu(), "de");
+    expect(de.aria).toContain("Dieses Modell denkt vermutlich immer — Abschalten wirkt wahrscheinlich nicht");
+    const ohne = zeile("qwen3:8b", "lmstudio", neu());
+    expect(ohne.aria).not.toContain("probably");
   });
 
-  it("Claude: die Namens-Heuristik des Kits rät „denkt vermutlich immer“ — der Hinweis steht im Knopf; im Zustand aus nennt der Name nur den Grund „niedrigste Stufe“, der Hinweis entfällt dort (Entscheidung bleibt im Kit, Koda macht keine Ausnahme)", () => {
-    expect(createThinkingBinding({ model: () => "claude-sonnet-5-5", backend: () => "anthropic", suppress: () => false, setSuppress: async () => {} }).guessAlways()).toBe(true);
-    const an = zeile("claude-sonnet-5-5", "anthropic", { suppress: false, schreibt: 0 });
-    const aus = zeile("claude-sonnet-5-5", "anthropic", { suppress: true, schreibt: 0 });
-    expect(an.aria).toBe("Thinking: on. This model probably always thinks — turning it off likely has no effect");
-    // Der Name trägt höchstens EINEN Grund (obsidian-kit 0.72.0): im Zustand aus erklärt „niedrigste Stufe“ schon, warum der Knopf nicht abschaltet,
-    // der Verdacht „denkt vermutlich immer“ steht dort nicht noch einmal daneben. Im Zustand an (oben) bleibt er der einzige Grund.
-    expect(aus.aria!.startsWith("Thinking: lowest level. Thinking can't be fully turned off here")).toBe(true);
-    expect(aus.aria).not.toContain("probably always thinks");
-    expect(aus.btn.disabled ?? false).toBe(false);
+  it("Claude: die Namens-Heuristik des Kits rät „denkt vermutlich immer“ (Entscheidung bleibt im Kit, Koda macht keine Ausnahme)", () => {
+    expect(createThinkingBinding({ model: () => "claude-sonnet-5-5", backend: () => "anthropic", suppress: () => false, level: () => null, setThinking: async () => {} }).guessAlways()).toBe(true);
   });
 
   it("gpt-oss: gesperrt, und der Hinweis „vermutlich“ entfällt (das Modell denkt sicher)", () => {
-    const k = zeile("gpt-oss-20b", "lmstudio", { suppress: false, schreibt: 0 });
-    expect(k.aria).toBe("Thinking: always on. This model always thinks; thinking can't be turned off here.");
+    const k = zeile("gpt-oss-20b", "lmstudio", neu());
     expect(k.aria).not.toContain("probably");
   });
 
-  it("Claude, an: „Thinking: on“, nicht gesperrt (Claude ist kein immer-denkendes Modell im Sinn von gpt-oss)", () => {
-    const k = zeile("claude-sonnet-5-5", "anthropic", { suppress: false, schreibt: 0 });
-    expect(k.text).toBe("Thinking: on");
-    expect(k.btn.disabled ?? false).toBe(false);
-  });
-
-  it("ein Modellwechsel zeichnet den Knopf neu: gesperrt, sobald das gesendete Modell gpt-oss ist (bar.update() liest das Modell frisch)", () => {
+  it("ein Modellwechsel zeichnet die Steuerung neu: gesperrt, sobald das gesendete Modell gpt-oss ist (bar.update() liest das Modell frisch)", () => {
     let model = "qwen3:8b";
-    const state = { suppress: false };
-    const think = createThinkingBinding({ model: () => model, backend: () => "lmstudio", suppress: () => state.suppress, setSuppress: async () => {} });
+    const think = createThinkingBinding({ model: () => model, backend: () => "lmstudio", suppress: () => false, level: () => null, setThinking: async () => {} });
     const el = makeFakeEl();
     const bar = buildModelBar({
       app: {} as never, containerEl: el as never, onOtherEndpoint: null,
       llm: { models: async () => ({ models: [], reachable: true }), setModel: async () => {}, modelInUse: () => model, source: () => ({}) },
       thinking: {
         family: think.family, backend: think.backend, current: think.current, onLevel: think.onLevel, setLevel: think.setLevel, levelPicker: think.levelPicker,
-        strings: { button: () => "T", level: (l) => l, pickerLabel: "T" }, locked: () => (think.alwaysOn() ? thinkingLockedTexts("en") : undefined),
+        strings: { button: () => "T", pickerLabel: "T", ...thinkingLevelTexts("en") }, locked: () => (think.alwaysOn() ? thinkingLockedTexts("en") : undefined),
       },
     });
-    const btn = () => (el as any).querySelector(".okit-thinking-toggle");
-    expect(btn().disabled ?? false).toBe(false);
+    const gesperrt = (): boolean => (el as any).querySelector(".okit-thinking-control")?.children[1]?.__component.selectEl.disabled === true;
+    expect(gesperrt()).toBe(false);
     model = "gpt-oss:20b";
     bar.update();
-    expect(btn().disabled).toBe(true);
+    expect(gesperrt()).toBe(true);
     model = "qwen3:8b";
     bar.update();
-    expect(btn().disabled ?? false).toBe(false);
+    expect(gesperrt()).toBe(false);
   });
 });
 
 describe("Anbindung: alwaysOn, Befehl und Request-Seite", () => {
-  const binding = (model: string, suppress = false) => createThinkingBinding({ model: () => model, backend: () => "unknown", suppress: () => suppress, setSuppress: vi.fn(async () => {}) });
+  const binding = (model: string, suppress = false) => createThinkingBinding({ model: () => model, backend: () => "unknown", suppress: () => suppress, level: () => null, setThinking: vi.fn(async () => {}) });
 
   it("guessAlways nur für den Namens-Verdacht, nie für gpt-oss (gesperrt) und nie ohne Modell", () => {
     for (const m of ["deepseek-r1:8b", "qwq:32b", "magistral-small", "glm-z1:9b"]) expect(binding(m).guessAlways()).toBe(true);
@@ -173,26 +193,32 @@ describe("Anbindung: alwaysOn, Befehl und Request-Seite", () => {
     expect(binding("").alwaysOn()).toBe(false);
   });
 
-  it("current/onLevel/setLevel bilden suppressThinking ab: off ↔ suppress, jede andere Stufe ↔ nicht unterdrückt", async () => {
-    const setSuppress = vi.fn(async () => {});
-    const b = createThinkingBinding({ model: () => "qwen3:8b", backend: () => "unknown", suppress: () => true, setSuppress });
+  it("current/onLevel/setLevel bilden suppressThinking und thinkingLevel ab: off ↔ suppress, jede andere Stufe schaltet an UND merkt sich die Wahl", async () => {
+    const setThinking = vi.fn(async () => {});
+    const b = createThinkingBinding({ model: () => "qwen3:8b", backend: () => "unknown", suppress: () => true, level: () => null, setThinking });
     expect(b.current()).toBe("off");
-    expect(b.onLevel()).not.toBe("off");
+    expect(b.onLevel()).toBe("medium");                  // ohne eigene Wahl die Anzeige wie bisher; das Kit legt sie auf die Liste des Modells
     await b.setLevel("off");
-    await b.setLevel(b.onLevel());
-    expect(setSuppress.mock.calls).toEqual([[true], [false]]);
+    await b.setLevel("high");
+    expect(setThinking.mock.calls).toEqual([[{ suppress: true }], [{ suppress: false, level: "high" }]]);   // „aus“ lässt die Stufe stehen
     expect(b.levelPicker()).toBe(false);
   });
 
+  it("current und onLevel kennen die gewählte Stufe", () => {
+    const b = createThinkingBinding({ model: () => "qwen3:8b", backend: () => "unknown", suppress: () => false, level: () => "low", setThinking: async () => {} });
+    expect(b.current()).toBe("low");
+    expect(b.onLevel()).toBe("low");
+  });
+
   it("der Befehl „Thinking umschalten“ kippt an/aus und tut bei einem gesperrten Modell nichts", async () => {
-    const calls: boolean[] = [];
-    const mk = (model: string, suppress: boolean) => createThinkingBinding({ model: () => model, backend: () => "unknown", suppress: () => suppress, setSuppress: async (s) => { calls.push(s); } });
+    const calls: unknown[] = [];
+    const mk = (model: string, suppress: boolean) => createThinkingBinding({ model: () => model, backend: () => "unknown", suppress: () => suppress, level: () => null, setThinking: async (p) => { calls.push(p); } });
     await mk("qwen3:8b", false).toggle();
     await mk("qwen3:8b", true).toggle();
-    expect(calls).toEqual([true, false]);
+    expect(calls).toEqual([{ suppress: true }, { suppress: false }]);
     await mk("gpt-oss:20b", false).toggle();
     await mk("gpt-oss:20b", true).toggle();
-    expect(calls).toEqual([true, false]);               // die Sperre gilt auch für diesen Zugang
+    expect(calls).toHaveLength(2);                      // die Sperre gilt auch für diesen Zugang
   });
 });
 
@@ -207,7 +233,7 @@ describe("effectiveSuppress — der Request folgt der Sperre des Knopfs", () => 
   // Die reichere Erkennung des Kits (deepseek-r1, qwq: „denkt vermutlich immer“) fasst das Request-Verhalten nicht an: sie schlucken reasoning_effort:"none" als No-op,
   // gpt-oss/harmony lehnt den Request ab. Nur Letzteres rechtfertigt eine Sperre; Pflicht-Gegenprobe zur Zeile „alwaysOn“ oben.
   it.each(["deepseek-r1:8b", "qwq:32b", "magistral-small", "glm-z1:9b"])("%s: weder gesperrt noch vom Suppress ausgenommen", (model) => {
-    const b = createThinkingBinding({ model: () => model, backend: () => "unknown", suppress: () => true, setSuppress: async () => {} });
+    const b = createThinkingBinding({ model: () => model, backend: () => "unknown", suppress: () => true, level: () => null, setThinking: async () => {} });
     expect(b.alwaysOn()).toBe(false);
     expect(effectiveSuppress(model, true)).toBe(true);
   });
