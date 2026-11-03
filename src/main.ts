@@ -3,7 +3,7 @@ import "./i18n/strings";
 import { getLanguage } from "obsidian";
 import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
 import { resolveLang, type Lang } from "./core/lang";
-import { chatPlacement } from "./core/chat/leaf-placement";
+import { openChatLeaf } from "./vendor/kit-obsidian/chat-leaf";
 import { rowModel, type EndpointConfig } from "./vendor/kit/endpoint_config";
 import { loadKodaSettings } from "./core/settings-migration";
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
@@ -965,13 +965,9 @@ export default class KodaPlugin extends Plugin {
   isMobileDevice(): boolean { return Platform.isMobile; }
 
   async activateView(): Promise<void> {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_KODA)[0];
-    // Handy und Tablet: ein Tab im Hauptbereich statt der Schublade (Entscheidung Johannes 2026-11-02, `chatPlacement`); der Desktop bleibt in der rechten Seitenleiste.
-    const where = chatPlacement({ hasExisting: existing !== undefined, isMobile: this.isMobileDevice() });
-    const leaf: WorkspaceLeaf | null = where === "existing" ? (existing ?? null) : where === "tab" ? this.app.workspace.getLeaf("tab") : this.app.workspace.getRightLeaf(false);
-    if (leaf === null) return;
-    await leaf.setViewState({ type: VIEW_TYPE_KODA, active: true });
-    await this.app.workspace.revealLeaf(leaf);
+    // Wo Koda öffnet, entscheidet der Kit-Baustein (Entscheidung Johannes 2026-11-02): Handy und Tablet als Tab im Hauptbereich, ein in der Schublade gespeichertes Blatt wandert dorthin; der Desktop bleibt in der rechten Seitenleiste.
+    // Der Chat hält seinen Zustand im Plugin (`chatLog`, `session`), nicht im Blatt: das Schließen des Schubladen-Blatts verliert nichts.
+    await openChatLeaf(this.app.workspace, VIEW_TYPE_KODA, { isMobile: this.isMobileDevice() });
   }
 
   /** Belegung des Kontextfensters fuer die Statuszeile. Dieselbe Schaetzung, derselbe

@@ -261,6 +261,8 @@ const PUNKTE = [
   "120. Gegenprobe Zustandszeile: ohne die Klasse is-phone ist die ruhende Zeile da (die Regel ist auf das Handy begrenzt)",
   "121. Stufenwahl-Zeile: die Einstellungen führen weder „Level picker in chat“ noch „Stufenwahl im Chat“ (die Zeile hat bei einem Plugin mit Modellzeile keine Wirkung)",
   "122. Gegenprobe Stufenwahl-Zeile: derselbe Suchlauf findet eine bekannte Zeile („Suppress thinking“), sonst wäre „nicht gefunden“ nichts gemessen",
+  "123. Blatt in der Schublade (Kit 0.77.0 openChatLeaf): ein im Layout gespeichertes Koda-Blatt in der rechten Seitenleiste wandert bei gemeldetem Mobilgerät in den Hauptbereich, es bleibt eine Ansicht, und der Chat-Zustand (Verlauf, Arbeit) bleibt erhalten und steht in der neuen Ansicht",
+  "124. Gegenprobe Blatt in der Schublade: am Desktop bleibt dasselbe Blatt in der Seitenleiste (kein Wandern, kein neues Blatt)",
   "109. Das Move-Modal nennt für Memory.md die Folge (Zeile „Künftig“ mit dem Satz); eine andere Koda-Datei, die aus dem Ordner hinaus soll, fragt ohne die Zeile",
   "26. delete_note fragt auch im Koda-Ordner nach und legt die Notiz in den Papierkorb",
   "27. Restaurierte, nicht besuchte Tabs (DeferredViews) stehen im Arbeitskontext",
@@ -2267,6 +2269,61 @@ async function main(): Promise<void> {
     }
     record(P121, ok121, detail121);
     record(P122, ok122, detail122);
+
+    // --- 123/124. Ein in der Schublade gespeichertes Blatt wandert am Handy in den Hauptbereich (obsidian-kit 0.77.0 `openChatLeaf`, Welle 30) -------------------------------------------------
+    // Das Layout haelt das Blatt ueber Updates hinaus, `existing ?? ...` haette es dort gelassen. Der Chat-Zustand liegt im Plugin (`chatLog`, `session`), nicht im Blatt; geprueft wird, dass er das Schliessen des alten Blatts uebersteht.
+    const P123 = PUNKTE.find((n) => n.startsWith("123. "))!;
+    const P124 = PUNKTE.find((n) => n.startsWith("124. "))!;
+    let detail123 = "nicht gelaufen", ok123 = false, detail124 = "nicht gelaufen", ok124 = false;
+    try {
+      const w = await cdp.evaluate<{ vorMobil: string; nachMobil: string; anzahl: number; neuesBlatt: boolean; logGleich: boolean; blase: boolean; arbeitGleich: boolean; vorDesk: string; nachDesk: string; deskGleichesBlatt: boolean; deskAnzahl: number }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const TYP = "koda-agent-view";
+        const wo = () => { const l = app.workspace.getLeavesOfType(TYP)[0]; if (!l) return "keins"; const r = l.getRoot(); return r === app.workspace.rootSplit ? "hauptbereich" : r === app.workspace.rightSplit ? "seitenleiste" : "anderswo"; };
+        const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+        const logVorher = p.chatLog.slice();
+        const marke = "Frage-vor-dem-Wandern-" + Date.now();
+        let r = {};
+        try {
+          p.chatLog.push({ role: "user", content: marke });
+          const logAnzahl = p.chatLog.length, arbeit = JSON.stringify(p.session.arbeit ?? null);
+          app.workspace.detachLeavesOfType(TYP); await warte(400);
+          const schublade = app.workspace.getRightLeaf(false);
+          await schublade.setViewState({ type: TYP, active: true }); await warte(600);
+          r.vorMobil = wo();
+          const alt = app.workspace.getLeavesOfType(TYP)[0];
+          p.isMobileDevice = () => true;
+          await p.activateView(); await warte(800);
+          r.nachMobil = wo(); r.anzahl = app.workspace.getLeavesOfType(TYP).length;
+          r.neuesBlatt = app.workspace.getLeavesOfType(TYP)[0] !== alt;
+          r.logGleich = p.chatLog.length === logAnzahl;
+          r.arbeitGleich = JSON.stringify(p.session.arbeit ?? null) === arbeit;
+          r.blase = [...document.querySelectorAll(".koda-root .koda-user")].some((e) => e.textContent === marke);
+          delete p.isMobileDevice;
+          app.workspace.detachLeavesOfType(TYP); await warte(400);
+          const s2 = app.workspace.getRightLeaf(false);
+          await s2.setViewState({ type: TYP, active: true }); await warte(600);
+          r.vorDesk = wo();
+          const davor = app.workspace.getLeavesOfType(TYP)[0];
+          await p.activateView(); await warte(600);
+          r.nachDesk = wo(); r.deskAnzahl = app.workspace.getLeavesOfType(TYP).length; r.deskGleichesBlatt = app.workspace.getLeavesOfType(TYP)[0] === davor;
+        } finally {
+          delete p.isMobileDevice;
+          p.chatLog.length = 0; p.chatLog.push(...logVorher);
+          app.workspace.detachLeavesOfType(TYP); await warte(400);
+          await p.activateView(); await warte(600);
+        }
+        return r;`);
+      ok123 = w.vorMobil === "seitenleiste" && w.nachMobil === "hauptbereich" && w.anzahl === 1 && w.neuesBlatt && w.logGleich && w.arbeitGleich && w.blase;
+      detail123 = `Ausgang: Blatt in der ${w.vorMobil} · nach activateView (Mobilgerät gemeldet): ${w.nachMobil}, ${w.anzahl} Ansicht(en) (soll 1), neues Blatt: ${w.neuesBlatt} · Verlauf unverändert: ${w.logGleich}, Arbeit unverändert: ${w.arbeitGleich}, Frage steht in der neuen Ansicht: ${w.blase}`;
+      ok124 = w.vorDesk === "seitenleiste" && w.nachDesk === "seitenleiste" && w.deskAnzahl === 1 && w.deskGleichesBlatt;
+      detail124 = `Desktop: Ausgang ${w.vorDesk} · danach ${w.nachDesk}, ${w.deskAnzahl} Ansicht(en), dasselbe Blatt: ${w.deskGleichesBlatt}`;
+    } catch (error) {
+      detail123 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail124 = detail123;
+    }
+    record(P123, ok123, detail123);
+    record(P124, ok124, detail124);
 
     // --- 26. delete_note fragt AUCH im Koda-Ordner ---------------------------------------
     // Die Regel „Wirkung schlaegt Ort" ist im Adapter getestet; hier wird sie am laufenden
