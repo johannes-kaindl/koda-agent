@@ -131,7 +131,7 @@ When **Settings → Koda** opens, every endpoint row is checked: a check mark me
 
 ### The thinking dropdown says "Always on"
 
-**Cause:** Koda recognised a model that reasons regardless of what it is told.
+**Cause:** The dropdown shows **● Always on**, with a dot in front (every level in that dropdown starts with a sign: **○ Off**, **▄ Medium**, …). Koda recognised a model that reasons regardless of what it is told.
 
 **Fix:** None needed. Turning thinking off will probably not have an effect; that is the model, not Koda.
 
