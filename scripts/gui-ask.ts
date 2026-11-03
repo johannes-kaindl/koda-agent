@@ -73,7 +73,7 @@
 // Die CDP-Bruecke liegt seit 2026-08-16 zentral im Dach (tools/obsidian-cdp/) und wird
 // importiert, nicht vendored — sie ist plugin-neutral. Fehlt das Dach (fremder
 // Checkout), bricht esbuild beim Aufloesen ab: das ist die gewollte Meldung.
-import { Cdp, attachTo, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, bereiteInstanzVor, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
 
 const PLUGIN_ID = "koda-agent";
 
@@ -231,7 +231,7 @@ async function main(): Promise<void> {
 
   const question = flag("ask");
   if (question === undefined || question.trim() === "") {
-    console.error('Aufruf: npm run gui:ask -- --vault <name> --ask "<Frage>" [--expect <text>] [--runs N] [--level off|low|medium|high|xhigh|max]');
+    console.error('Aufruf: npm run gui:ask -- --vault <name> --ask "<Frage>" [--expect <text>] [--runs N] [--level off|low|medium|high|xhigh|max] [--endpoint <url> --model <name>]');
     process.exit(2);
   }
   const port = Number(flag("port"));
@@ -252,6 +252,9 @@ async function main(): Promise<void> {
   // `--level off|low|medium|high|xhigh|max`: stellt die Denkstufe wie das Dropdown der Modellzeile (Einstellungen `suppressThinking` und `thinkingLevel`), schaltet `saveThinking` an und stellt nach dem Lauf zurueck.
   // Gemessen wird das Denken der Antwort in Zeichen (Zeile „Denken“ im Bericht, Summe am Ende). Ein Messlauf je Stufe, Muster der vault-rag-Messung (gpt-oss: 55 gegen 41 Zeichen).
   const level = flag("level");
+  // `--endpoint <url> --model <name>`: setzt die erste Endpunkt-Zeile fuer den Lauf (der Staging-Vault hat nach `--setup` keinen echten Endpunkt) und stellt sie danach zurueck.
+  const endpoint = flag("endpoint");
+  const modell = flag("model");
   const LEVELS = ["off", "low", "medium", "high", "xhigh", "max"];
   if (level !== undefined && !LEVELS.includes(level)) {
     console.error(`--level ${level} ist keine Stufe (${LEVELS.join(", ")}).`);
@@ -274,6 +277,11 @@ async function main(): Promise<void> {
     // `requireVisible` holt das Fenster selbst nach vorn und bricht mit
     // Handlungsanweisung ab, wenn das nicht reicht.
     await requireVisible(cdp);
+    // `--bereite-vor`: frisches Profil (Vertrauensdialog, Restricted Mode, Plugin aktivieren, Sprache) wie die anderen Treiber; ohne den Schalter gilt die Instanz als vorbereitet.
+    if (argv.includes("--bereite-vor")) {
+      const vor = await bereiteInstanzVor(cdp, { pluginIds: [PLUGIN_ID], nurVault: vault, sprache: "en" });
+      console.log(`Instanz vorbereitet: ${vor.hinweis}`);
+    }
 
     const plugin = await cdp.evaluate<{ ok: boolean; version?: string; model?: string }>(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -297,6 +305,17 @@ async function main(): Promise<void> {
         await p.saveSettings();
         return alt;`);
       console.log(`Denkstufe: ${level} (vorher: ${vorher.suppress ? "aus" : "an"}, Stufe ${vorher.level ?? "Modellstandard"})\n`);
+    }
+    let endpunkteVorher: unknown = null;
+    if (endpoint !== undefined) {
+      endpunkteVorher = await cdp.evaluate<unknown>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const alt = JSON.parse(JSON.stringify(p.settings.endpoints));
+        p.settings.endpoints = [{ url: ${JSON.stringify(endpoint)}, model: ${JSON.stringify(modell ?? "")} }];
+        p.resolver?.invalidate?.();
+        await p.saveSettings();
+        return alt;`);
+      console.log(`Endpunkt: ${endpoint}${modell !== undefined ? ` · Modell ${modell}` : ""}\n`);
     }
     const denkzeichen: number[] = [];
 
@@ -373,6 +392,14 @@ async function main(): Promise<void> {
     }
 
     console.log(`Denkzeichen je Lauf${level !== undefined ? ` (Stufe ${level})` : ""}: ${denkzeichen.join(", ")}`);
+    if (endpunkteVorher !== null) {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.endpoints = ${JSON.stringify(endpunkteVorher)};
+        p.resolver?.invalidate?.();
+        await p.saveSettings();
+        return true;`);
+    }
     if (vorher !== null) {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
