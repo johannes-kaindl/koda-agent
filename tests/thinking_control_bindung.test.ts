@@ -60,7 +60,7 @@ describe("Denk-Dropdown der Modellzeile: die Steuerung des Kits mit Kodas Anbind
     expect(k.gesperrt).toBe(false);
     expect(k.wert).toBe("medium");
     expect(k.eintraege).toEqual(["off", "low", "medium", "high"]);
-    expect(k.anzeige.medium).toBe("Medium");
+    expect(k.anzeige.medium).toBe("▄ Medium");                    // seit obsidian-kit 0.76.0 beginnt der Eintrag in der Modellzeile mit dem Zeichen der Stufe
     expect(effectiveSuppress("qwen3.6-27b", false)).toBe(false);
   });
 
@@ -98,7 +98,7 @@ describe("Denk-Dropdown der Modellzeile: die Steuerung des Kits mit Kodas Anbind
   it.each([false, true])("immer an (gpt-oss, Wunsch suppress=%s): gesperrt, Kit-Text, KEIN Schreibweg, Request unterdrückt nie", async (suppress) => {
     const k = zeile("gpt-oss-20b", "lmstudio", neu({ suppress }));
     expect(k.gesperrt).toBe(true);
-    expect(k.anzeige[k.wert]).toBe("Always on");
+    expect(k.anzeige[k.wert]).toBe("● Always on");
     expect(k.aria).toBe("Thinking. Thinking: always on. This model always thinks; thinking can't be turned off here.");
     expect(k.state).toEqual(neu({ suppress }));                    // das Zeichnen schreibt nichts; die Bedienung ist gesperrt, `toggle` und der Request prüfen die Sperre selbst (unten)
     expect(effectiveSuppress("gpt-oss-20b", suppress)).toBe(false);
@@ -106,7 +106,7 @@ describe("Denk-Dropdown der Modellzeile: die Steuerung des Kits mit Kodas Anbind
 
   it("immer an, deutsch: „Immer an“ (Kit-Text)", () => {
     const k = zeile("gpt-oss-20b", "lmstudio", neu(), "de");
-    expect(k.anzeige[k.wert]).toBe("Immer an");
+    expect(k.anzeige[k.wert]).toBe("● Immer an");
     expect(k.gesperrt).toBe(true);
   });
 

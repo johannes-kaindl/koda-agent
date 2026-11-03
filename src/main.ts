@@ -1,8 +1,9 @@
-import { Plugin, WorkspaceLeaf, normalizePath, Notice, parseYaml, type Editor, type Menu } from "obsidian";
+import { Platform, Plugin, WorkspaceLeaf, normalizePath, Notice, parseYaml, type Editor, type Menu } from "obsidian";
 import "./i18n/strings";
 import { getLanguage } from "obsidian";
 import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
 import { resolveLang, type Lang } from "./core/lang";
+import { chatPlacement } from "./core/chat/leaf-placement";
 import { rowModel, type EndpointConfig } from "./vendor/kit/endpoint_config";
 import { loadKodaSettings } from "./core/settings-migration";
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
@@ -960,9 +961,14 @@ export default class KodaPlugin extends Plugin {
     if (view !== undefined) await fn(view);
   }
 
+  /** Die Plattformfrage von `activateView`, als eigene Methode, damit der GUI-Smoke sie am Desktop-Fenster umlegen kann (Pruefpunkt 116) statt `emulateMobile` zu rufen, das Obsidian neu laedt. */
+  isMobileDevice(): boolean { return Platform.isMobile; }
+
   async activateView(): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_KODA)[0];
-    const leaf: WorkspaceLeaf | null = existing ?? this.app.workspace.getRightLeaf(false);
+    // Handy und Tablet: ein Tab im Hauptbereich statt der Schublade (Entscheidung Johannes 2026-11-02, `chatPlacement`); der Desktop bleibt in der rechten Seitenleiste.
+    const where = chatPlacement({ hasExisting: existing !== undefined, isMobile: this.isMobileDevice() });
+    const leaf: WorkspaceLeaf | null = where === "existing" ? (existing ?? null) : where === "tab" ? this.app.workspace.getLeaf("tab") : this.app.workspace.getRightLeaf(false);
     if (leaf === null) return;
     await leaf.setViewState({ type: VIEW_TYPE_KODA, active: true });
     await this.app.workspace.revealLeaf(leaf);

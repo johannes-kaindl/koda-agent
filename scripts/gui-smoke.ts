@@ -254,6 +254,13 @@ const PUNKTE = [
   "113. Gegenprobe Composer: bei leerem Gespräch, Aufbewahrung 0 und ohne Lauf ist Neu gesperrt, der Verlauf-Knopf ausgeblendet und Stopp ausgeblendet",
   "114. Kompakter Composer: unter 640 px Höhe und ab 20 em Breite stehen Senden neben der Eingabe und die Knopfreihe samt Modellzeile darunter, das Modus-Dropdown entfällt",
   "115. Gegenprobe kompakter Composer: bei 800 px Höhe steht Senden nicht neben der Eingabe und das Modus-Dropdown ist da",
+  "116. Handy-Tab: auf einem Mobilgerät öffnet Koda als Tab im Hauptbereich (nicht in der Seitenleiste), ein schon offener Chat bleibt, wo er ist",
+  "117. Gegenprobe Handy-Tab: auf dem Desktop öffnet Koda in der rechten Seitenleiste, nicht im Hauptbereich",
+  "118. Host-Markierung des Kits: der view-content des Chats trägt okit-chat-host (markChatHost), der einer fremden Ansicht nicht",
+  "119. Zustandszeile am Handy: im Ruhezustand ausgeblendet, bei laufender Antwort und bei Warnung sichtbar, auf dem Tablet und am Desktop immer sichtbar",
+  "120. Gegenprobe Zustandszeile: ohne die Klasse is-phone ist die ruhende Zeile da (die Regel ist auf das Handy begrenzt)",
+  "121. Stufenwahl-Zeile: die Einstellungen führen weder „Level picker in chat“ noch „Stufenwahl im Chat“ (die Zeile hat bei einem Plugin mit Modellzeile keine Wirkung)",
+  "122. Gegenprobe Stufenwahl-Zeile: derselbe Suchlauf findet eine bekannte Zeile („Suppress thinking“), sonst wäre „nicht gefunden“ nichts gemessen",
   "109. Das Move-Modal nennt für Memory.md die Folge (Zeile „Künftig“ mit dem Satz); eine andere Koda-Datei, die aus dem Ordner hinaus soll, fragt ohne die Zeile",
   "26. delete_note fragt auch im Koda-Ordner nach und legt die Notiz in den Papierkorb",
   "27. Restaurierte, nicht besuchte Tabs (DeferredViews) stehen im Arbeitskontext",
@@ -1248,7 +1255,8 @@ async function main(): Promise<void> {
       "13. Denk-Dropdown der Modellzeile ist bei einem Modell, das sich nicht abschalten laesst, gesperrt (Kit-Feld locked), und der Befehl bleibt folgenlos",
       dritte.normalAus.da && !dritte.normalAus.disabled && !dritte.normalAn.disabled &&
         dritte.normalAus.wert === "off" && dritte.normalAn.wert === "medium" &&
-        dritte.gesperrt.disabled && /Always on|Immer an/.test(dritte.gesperrt.text) &&
+        dritte.normalAn.text === "▄ Medium" && dritte.normalAus.text === "○ Off" &&
+        dritte.gesperrt.disabled && /^● (Always on|Immer an)$/.test(dritte.gesperrt.text) &&
         dritte.vorBefehl === dritte.nachBefehl,
       `normal: „${dritte.normalAn.text}" / „${dritte.normalAus.text}" · gesperrt: „${dritte.gesperrt.text}" (disabled ${String(dritte.gesperrt.disabled)}) · Befehl folgenlos: ${String(dritte.vorBefehl === dritte.nachBefehl)}`,
     );
@@ -2141,6 +2149,124 @@ async function main(): Promise<void> {
     }
     record(P114, ok114, detail114);
     record(P115, ok115, detail115);
+
+    // --- 116-120. Handy-Tab, Host-Markierung des Kits und Zustandszeile am Handy (Welle 30, obsidian-kit 0.76.1) --------------------------------
+    // 116/117: `activateView` waehlt den Ort ueber `chatPlacement` (`isMobileDevice()`, liest Platform.isMobile). Die Zweitinstanz laeuft am Desktop; die Methode wird fuer den Aufruf an der Instanz auf true gelegt
+    // und danach wieder entfernt, statt `emulateMobile` zu rufen (das laedt Obsidian neu). Der Ort wird an der Wurzel des Blatts gelesen: rootSplit = Hauptbereich, rightSplit = Seitenleiste.
+    // 118: `markChatHost` setzt okit-chat-host auf den view-content des Chats. 119/120: die CSS-Regel `.is-phone .koda-status:not(.is-checking):not(.is-warning)` im echten Aufloeser von Obsidian.
+    const P116 = PUNKTE.find((n) => n.startsWith("116. "))!;
+    const P117 = PUNKTE.find((n) => n.startsWith("117. "))!;
+    const P118 = PUNKTE.find((n) => n.startsWith("118. "))!;
+    const P119 = PUNKTE.find((n) => n.startsWith("119. "))!;
+    const P120 = PUNKTE.find((n) => n.startsWith("120. "))!;
+    let detail116 = "nicht gelaufen", ok116 = false, detail117 = "nicht gelaufen", ok117 = false, detail118 = "nicht gelaufen", ok118 = false;
+    try {
+      const ort = await cdp.evaluate<{ mobilTab: string; mobilWieder: string; mobilAnzahl: number; platformGelesen: boolean; desktop: string; desktopAnzahl: number }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const TYP = "koda-agent-view";
+        const wo = () => { const l = app.workspace.getLeavesOfType(TYP)[0]; if (!l) return "keins"; const w = l.getRoot(); return w === app.workspace.rootSplit ? "hauptbereich" : w === app.workspace.rightSplit ? "seitenleiste" : "anderswo"; };
+        const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+        const vorher = p.isMobileDevice();
+        app.workspace.detachLeavesOfType(TYP); await warte(400);
+        let mobilTab, mobilWieder, mobilAnzahl, desktop, desktopAnzahl;
+        try {
+          p.isMobileDevice = () => true;
+          await p.activateView(); await warte(600); mobilTab = wo();
+          await p.activateView(); await warte(300); mobilWieder = wo(); mobilAnzahl = app.workspace.getLeavesOfType(TYP).length;
+        } finally { delete p.isMobileDevice; }
+        app.workspace.detachLeavesOfType(TYP); await warte(400);
+        await p.activateView(); await warte(600); desktop = wo(); desktopAnzahl = app.workspace.getLeavesOfType(TYP).length;
+        return { mobilTab, mobilWieder, mobilAnzahl, platformGelesen: p.isMobileDevice() === vorher && !Object.prototype.hasOwnProperty.call(p, "isMobileDevice"), desktop, desktopAnzahl };`);
+      ok116 = ort.mobilTab === "hauptbereich" && ort.mobilWieder === "hauptbereich" && ort.mobilAnzahl === 1 && ort.platformGelesen;
+      detail116 = `Mobilgerät gemeldet: Koda liegt im ${ort.mobilTab} · zweiter Aufruf: ${ort.mobilWieder}, ${ort.mobilAnzahl} Ansicht(en) (soll 1) · Umlegung danach entfernt: ${ort.platformGelesen}`;
+      ok117 = ort.desktop === "seitenleiste" && ort.desktopAnzahl === 1;
+      detail117 = `Desktop: Koda liegt in der ${ort.desktop}, ${ort.desktopAnzahl} Ansicht(en)`;
+      const host = await cdp.evaluate<{ chat: boolean; anzahlChat: number; fremd: boolean | null }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        if (p.views().length === 0) await p.activateView();
+        app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
+        await new Promise((r) => setTimeout(r, 400));
+        const vc = document.querySelector(".koda-root")?.closest(".view-content");
+        const fremd = app.workspace.getLeavesOfType("markdown")[0]?.view?.containerEl?.querySelector(".view-content") ?? null;
+        return { chat: !!vc && vc.classList.contains("okit-chat-host"), anzahlChat: document.querySelectorAll(".okit-chat-host").length, fremd: fremd ? fremd.classList.contains("okit-chat-host") : null };`);
+      ok118 = host.chat && host.anzahlChat >= 1 && host.fremd !== true;
+      detail118 = `view-content des Chats markiert: ${host.chat} · markierte Hosts im Fenster: ${host.anzahlChat} · fremde Markdown-Ansicht markiert: ${host.fremd === null ? "(keine offen)" : String(host.fremd)} (soll nein)`;
+    } catch (error) {
+      const abbruch = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      if (!ok116) detail116 = abbruch;
+      if (!ok117) detail117 = abbruch;
+      if (!ok118) detail118 = abbruch;
+    } finally {
+      await cdp.evaluate(`delete app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].isMobileDevice; return true;`).catch(() => undefined);
+    }
+    record(P116, ok116, detail116);
+    record(P117, ok117, detail117);
+    record(P118, ok118, detail118);
+
+    let detail119 = "nicht gelaufen", ok119 = false, detail120 = "nicht gelaufen", ok120 = false;
+    try {
+      const z = await cdp.evaluate<{ ruhe: string; laeuft: string; warnung: string; tablet: string; desktop: string; da: boolean }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        if (p.views().length === 0) await p.activateView();
+        app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
+        await new Promise((r) => setTimeout(r, 400));
+        const el = document.querySelector(".koda-root .koda-status");
+        if (!el) return { da: false, ruhe: "", laeuft: "", warnung: "", tablet: "", desktop: "" };
+        const klassen = el.className, versteckt = el.hidden, body = document.body.className;
+        const lies = (zustand, bodyKlasse) => {
+          el.className = "koda-status " + zustand; el.hidden = false;
+          document.body.classList.remove("is-phone", "is-tablet"); if (bodyKlasse) document.body.classList.add(bodyKlasse);
+          return getComputedStyle(el).display;
+        };
+        const r = {
+          da: true,
+          ruhe: lies("is-ok", "is-phone"), laeuft: lies("is-checking", "is-phone"), warnung: lies("is-warning", "is-phone"),
+          tablet: lies("is-ok", "is-tablet"), desktop: lies("is-ok", ""),
+        };
+        el.className = klassen; el.hidden = versteckt; document.body.className = body;
+        return r;`);
+      ok119 = z.da && z.ruhe === "none" && z.laeuft !== "none" && z.warnung !== "none" && z.tablet !== "none";
+      detail119 = `Handy: ruhend ${z.ruhe} (soll none) · laufende Antwort ${z.laeuft} · Warnung ${z.warnung} (beide sichtbar) · Tablet ruhend ${z.tablet} (soll sichtbar)`;
+      ok120 = z.da && z.desktop !== "none";
+      detail120 = `ohne is-phone: ruhende Zeile ${z.desktop} (soll sichtbar) — die Regel ist auf das Handy begrenzt`;
+    } catch (error) {
+      detail119 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail120 = detail119;
+    }
+    record(P119, ok119, detail119);
+    record(P120, ok120, detail120);
+
+    // --- 121/122. Die Zeile „Stufenwahl im Chat“ erscheint in Kodas Einstellungen nicht (Kit 0.76.0 blendet sie ohne Wirkung aus; Koda baut den Anfrage-Abschnitt nicht) --------------------
+    const P121 = PUNKTE.find((n) => n.startsWith("121. "))!;
+    const P122 = PUNKTE.find((n) => n.startsWith("122. "))!;
+    let detail121 = "nicht gelaufen", ok121 = false, detail122 = "nicht gelaufen", ok122 = false;
+    let settings121: Cdp | null = null;
+    try {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        if (p.views().length === 0) await p.activateView();
+        app.setting.open();
+        app.setting.openTabById(${JSON.stringify(PLUGIN_ID)});
+        return true;`);
+      await new Promise((r) => setTimeout(r, 1200));
+      settings121 = await attachTo("settings", port, vault);
+      const suche = settings121 === null ? null : await pollUntil<{ stufenwahl: boolean; bekannt: boolean; zeilen: number } | null>(settings121, `
+        const namen = [...document.querySelectorAll(".setting-item-name")].map((e) => e.textContent.trim());
+        if (namen.length < 5) return null;
+        return { zeilen: namen.length, stufenwahl: namen.some((n) => /level picker in chat|stufenwahl im chat/i.test(n)), bekannt: namen.some((n) => /suppress thinking|denken unterdr/i.test(n)) };`, 8000);
+      ok121 = suche !== null && suche.zeilen >= 5 && !suche.stufenwahl;
+      detail121 = suche === null ? "Einstellungen nicht gelesen" : `${suche.zeilen} Zeilen gelesen · „Stufenwahl im Chat“ dabei: ${suche.stufenwahl} (soll nein)`;
+      ok122 = suche !== null && suche.bekannt;
+      detail122 = suche === null ? "Einstellungen nicht gelesen" : `bekannte Zeile „Suppress thinking“ gefunden: ${suche.bekannt} (soll ja, der Suchlauf kann also finden)`;
+    } catch (error) {
+      detail121 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail122 = detail121;
+    } finally {
+      settings121?.close();
+      await schliesseEinstellungen(cdp).catch(() => undefined);
+    }
+    record(P121, ok121, detail121);
+    record(P122, ok122, detail122);
 
     // --- 26. delete_note fragt AUCH im Koda-Ordner ---------------------------------------
     // Die Regel „Wirkung schlaegt Ort" ist im Adapter getestet; hier wird sie am laufenden

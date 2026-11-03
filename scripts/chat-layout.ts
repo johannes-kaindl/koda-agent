@@ -30,7 +30,7 @@ import { stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
 const REPO_NAME = "koda-agent";
 const PLUGIN_ID = "koda-agent";
-const PROFILE = "/tmp/obs-test-w29-koda";
+const PROFILE = "/tmp/obs-test-koda-agent";
 const OBSIDIAN_BIN = "/Applications/Obsidian.app/Contents/MacOS/Obsidian";
 const FAKE_MODEL = "qwen3-8b";
 const BREITE = 390;
@@ -127,6 +127,7 @@ interface Messung {
   ueberdeckung: string[];
   reihenfolge: string[];
   navbar: string;
+  hauptbereich: boolean; hostMarkiert: boolean; leereFlaeche: number; hostPadding: string;
 }
 
 /** Selektoren des neuen Aufbaus; der alte (vor Welle 29) hat `.koda-header`, `.koda-buttons` und die Modellzeile über dem Verlauf. Fehlt ein Teil, steht `null`. */
@@ -176,8 +177,22 @@ const MESS_JS = `
     tippflaechen: { neu: flaeche(teile.neu), verlauf: flaeche(teile.verlaufKnopf), neuLaden: flaeche(teile.neuLaden), senden: flaeche(teile.senden) },
     ueberdeckung, reihenfolge: reihe,
     navbar: nb ? ("y " + Math.round(nb.y) + " h " + Math.round(nb.height)) : "keine",
+    hauptbereich: !!document.querySelector(root)?.closest(".mod-root"),
+    hostMarkiert: !!document.querySelector(root)?.closest(".view-content")?.classList.contains("okit-chat-host"),
+    hostPadding: document.querySelector(root) ? getComputedStyle(document.querySelector(root).closest(".view-content")).paddingBottom : "?",
+    leereFlaeche: +((document.querySelector(".app-container")?.getBoundingClientRect().bottom ?? innerHeight) - tiefster).toFixed(1),
   };
 `;
+
+/** Setzt den Zustand der Tastatur wie Obsidian am iPhone (gemessen 2026-11-03): offen = App-Container um die Tastatur kleiner, `--keyboard-height` und `--safe-area-inset-bottom` auf der Tastaturhoehe, auf :root UND body;
+ *  zu = voll, 0 px und die echte Safe-Area (34 px). Muster: obsidian-kit/pilot/chat-tastatur.ts. */
+const geraetJs = (offen: boolean): string => `
+  const r = document.documentElement; const app = document.querySelector(".app-container");
+  for (const el of [r, document.body]) {
+    el.style.setProperty("--keyboard-height", "${offen ? TASTATUR : 0}px"); el.style.setProperty("--safe-area-inset-bottom", "${offen ? TASTATUR : 34}px");
+  }
+  if (app) app.style.height = "${offen ? HOEHE - TASTATUR + "px" : ""}";
+  return true;`;
 
 async function messe(cdp: Cdp, zustand: string): Promise<Messung> {
   const m = await cdp.evaluate<Omit<Messung, "zustand">>(MESS_JS);
@@ -194,6 +209,7 @@ function kurz(m: Messung): string {
     `  Tippflächen (B×H): Neu ${m.tippflaechen.neu?.join("×") ?? "—"} · Verlauf ${m.tippflaechen.verlauf?.join("×") ?? "—"} · Neu laden ${m.tippflaechen.neuLaden?.join("×") ?? "—"} · Senden ${m.tippflaechen.senden?.join("×") ?? "—"}`,
     `  Überdeckung: ${m.ueberdeckung.length === 0 ? "keine" : m.ueberdeckung.join("; ")}`,
     `  Reihenfolge: ${m.reihenfolge.join(" > ")} · Navigationsleiste ${m.navbar}`,
+    `  Hauptbereich ${String(m.hauptbereich)} · Host markiert ${String(m.hostMarkiert)} · Host-Abstand unten ${m.hostPadding} · leere Fläche unter dem tiefsten Element ${m.leereFlaeche} px`,
   ].join("\n");
 }
 
@@ -201,7 +217,7 @@ async function main(): Promise<void> {
   const port = Number(flag("--port"));
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("--port <1024-65535> ist Pflicht (9222 gehoert der regulaeren Instanz).");
   const tag = flag("--tag") ?? "lauf";
-  const out = flag("--out") ?? "/tmp/koda-w29";
+  const out = flag("--out") ?? "/tmp/koda-w30";
   const keep = Number(flag("--keep") ?? "5");
   const pluginDir = flag("--plugin-dir");
   mkdirSync(out, { recursive: true });
@@ -244,6 +260,8 @@ async function main(): Promise<void> {
       } else {
         await cdp.send("Emulation.setDeviceMetricsOverride", { width: breite, height: hoehe, deviceScaleFactor: 1, mobile: false });
       }
+      // Auf dem Handy oeffnet Koda als Tab im Hauptbereich (Welle 30): die Ansicht aus der Seitenleiste des Desktop-Laufs schliessen und neu oeffnen, wie ein Nutzer am Geraet.
+      if (mobil) await cdp.evaluate(`app.workspace.detachLeavesOfType("koda-agent-view"); await new Promise((r) => setTimeout(r, 400)); return true;`);
       await cdp.evaluate(`const p = app.plugins.plugins[${q(PLUGIN_ID)}]; if (p.views().length === 0) await p.activateView(); app.commands.executeCommandById(${q(`${PLUGIN_ID}:tab-chat`)}); return true;`);
       if (mobil) {
         // Eine Antwort in den Verlauf (die Mobil-Instanz hat ein neues Fenster; das Gespraech liegt in current.jsonl).
@@ -254,12 +272,17 @@ async function main(): Promise<void> {
       }
       for (const [schema, name] of [["moonstone", "hell"], ["obsidian", "dunkel"]] as const) {
         await cdp.evaluate(`app.vault.setConfig("theme", ${q(schema)}); app.updateTheme(); app.workspace.trigger("css-change"); await new Promise((r) => setTimeout(r, 600)); return true;`);
-        for (const mitTastatur of mobil ? [false, true] : [false]) {
-          const h = mitTastatur ? HOEHE - TASTATUR : hoehe;
+        // "ohne" = Tastatur zu (390 x 844); "tastatur" = die alte Emulation (Viewport 390 x 508, die Falte greift); "geraet" = wie am iPhone gemessen (Viewport bleibt 844, nur der App-Container wird 508 hoch,
+        // --keyboard-height und --safe-area-inset-bottom stehen auf der Tastaturhoehe; die Falte per max-height greift dort nicht).
+        for (const modus of mobil ? ["ohne", "tastatur", "geraet"] as const : ["ohne"] as const) {
+          const mitTastatur = modus !== "ohne";
+          const h = modus === "tastatur" ? HOEHE - TASTATUR : hoehe;
           await cdp.send("Emulation.setDeviceMetricsOverride", { width: breite, height: h, deviceScaleFactor: mobil ? 2 : 1, mobile: mobil });
+          if (mobil) await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 0, bottom: 34, left: 0, right: 0 } });
+          await cdp.evaluate(geraetJs(modus === "geraet"));
           await cdp.evaluate(mitTastatur ? `document.querySelector(".koda-input")?.focus(); return true;` : `document.activeElement?.blur?.(); return true;`);
           await sleep(900);
-          const zustand = `${tag}-${mobil ? "mobil" : "desktop"}-${name}-${mitTastatur ? "tastatur" : "ohne"}`;
+          const zustand = `${tag}-${mobil ? "mobil" : "desktop"}-${name}-${modus}`;
           const m = await messe(cdp, zustand);
           messungen.push(m);
           console.log(kurz(m));
@@ -273,6 +296,8 @@ async function main(): Promise<void> {
   } finally {
     if (cdp) {
       await cdp.send("Emulation.clearDeviceMetricsOverride").catch(() => undefined);
+      await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 0, bottom: 0, left: 0, right: 0 } }).catch(() => undefined);
+      await cdp.evaluate(geraetJs(false)).catch(() => undefined);
       // Das Profil behaelt die Emulation (localStorage): zurueckstellen, sonst startet der naechste Lauf mobil.
       await cdp.evaluate(`app.vault.setConfig("theme", "moonstone"); app.emulateMobile(false); return true;`).catch(() => undefined);
       await sleep(1500);

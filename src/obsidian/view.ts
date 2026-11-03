@@ -2,6 +2,7 @@ import { Component, ItemView, MarkdownRenderer, setIcon, type WorkspaceLeaf } fr
 import { t, getLang } from "../vendor/kit/i18n";
 import { confirmAction } from "../vendor/kit-obsidian/confirm";
 import { buildHubInto, type HubController, type HubPanel } from "../vendor/kit-obsidian/hub";
+import { markChatHost } from "../vendor/kit-obsidian/chat-host";
 import { buildModelBar, type ModelBar } from "../vendor/kit-obsidian/model-bar";
 import type { SessionState } from "../core/abilities/types";
 import { describeStateChange } from "../core/abilities/session";
@@ -61,6 +62,8 @@ export class KodaView extends ItemView {
 
   /** Die Modellzeile des Chats mit der Denk-Steuerung (Kit `buildModelBar`, Welle 27; `thinking` seit obsidian-kit 0.70.1). */
   private bar: ModelBar | null = null;
+  /** Nimmt die Host-Markierung des Kits (`okit-chat-host`, 0.76.1) zurueck: der Abstand unten am Handy kommt vom Kit, nicht von einer eigenen Regel. */
+  private releaseHost: (() => void) | null = null;
   /** Modus-Dropdown in der Knopfzeile — null vor onOpen. */
   private modeEl: HTMLSelectElement | null = null;
   /** Knopfreihe des Composers (Kit-Aufbau, von Hand): Neu und Verlauf links, Senden/Stopp rechts. */
@@ -165,6 +168,8 @@ export class KodaView extends ItemView {
     if (this.queryTimer !== null) { window.clearTimeout(this.queryTimer); this.queryTimer = null; }
     this.bar?.destroy();
     this.bar = null;
+    this.releaseHost?.();
+    this.releaseHost = null;
     this.hub?.destroy();
     this.hub = null;
     return Promise.resolve();
@@ -204,6 +209,9 @@ export class KodaView extends ItemView {
     // Verlauf, Statuszeile, dann der Composer (Eingabe, Knopfreihe, Modellzeile): die Anordnung des Kit-Chatfensters (obsidian-kit 0.74.0), von Hand gebaut, weil Koda sein eigenes Gespraech zeichnet.
     // Das Kit gibt eine alte Modellzeile nicht frei: vor jedem neuen Aufbau abmelden.
     this.bar?.destroy();
+    // Der Chat steht in einem `view-content`; auf dem Handy setzt das Kit dort den Abstand unten (bei offener Tastatur keine leere Flaeche). Erst die alte Markierung zurueck, dann neu.
+    this.releaseHost?.();
+    this.releaseHost = markChatHost(container);
     this.logEl = container.createDiv({ cls: "koda-log" });
     // Wikilinks aus Kodas Antworten oeffnen die Notiz. Delegiert statt pro Link
     // registriert, damit jeder spaetere Redraw automatisch mitgedeckt ist.

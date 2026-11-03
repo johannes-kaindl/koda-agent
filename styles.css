@@ -94,6 +94,10 @@
 .koda-status-icon svg { width: var(--icon-s); height: var(--icon-s); }
 .koda-status-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .koda-status.is-warning { color: var(--text-warning); }
+/* Am Handy (nicht auf dem Tablet) steht die Zustandszeile nur, solange eine Antwort laeuft (is-checking) oder die Warnung gilt (is-warning), wie die des Kits (Entscheidung Johannes 2026-11-02, Welle 30).
+   Im Ruhezustand ("Context 30 % used", die gewaehlte Arbeit) kostet sie rund 1,3 Zeilen Verlauf. Bewusst ohne Hoehenbedingung: am iPhone bleibt die Fensterhoehe bei offener Tastatur 844, nur der
+   App-Container schrumpft, ein @media (max-height) griffe dort nie (gemessen 2026-11-03). Nebenwirkung: bei geschlossener Tastatur fehlt die Belegung am Handy, solange keine Warnung gilt. */
+.is-phone .koda-status:not(.is-checking):not(.is-warning) { display: none; }
 /* Das animierte Element aus Johannes' Quicktask: solange gearbeitet wird, dreht sich der
    loader. Ohne Bewegung ist eine Statuszeile von einem eingefrorenen Fenster nicht zu
    unterscheiden — genau der Zustand, den sie beheben soll. */
@@ -121,7 +125,7 @@
 .is-mobile button.clickable-icon.koda-new, .is-mobile button.clickable-icon.koda-archive { min-width: calc(var(--size-4-10) + var(--size-4-1)); min-height: calc(var(--size-4-10) + var(--size-4-1)); display: flex; align-items: center; justify-content: center; }
 /* Kompakter Composer (Kit 0.74.0): unter 640 px Fensterhoehe und ab 20 em Breite des Chats steht Zeile eins mit Eingabe und Senden (im Lauf Stopp), Zeile zwei mit Neu, Verlauf und der Modellzeile;
    Senden steht nie neben Neu (Fehlklick). Die Hoehe fragt ein @media (ein Container braucht eine feste Hoehe, die der Chat nicht hat), die Breite ein benannter Container auf der Wurzel.
-   Das Modus-Dropdown findet dort keinen Platz (die Modellzeile braucht die ganze zweite Zeile, gemessen 2026-11-01: sonst Breite 0 und Ueberdeckung) und entfaellt in dieser Falte; der Modus bleibt
+   Das Modus-Dropdown findet dort keinen Platz (die Modellzeile braucht die ganze zweite Zeile, gemessen 2026-11-01: sonst Breite 0 und Ueberdeckung) und entfaellt in dieser Falte (das Symbol der Denkstufe bleibt seit Kit 0.76.0 stehen); der Modus bleibt
    im Tab „Kontext“ und ueber die Befehle erreichbar (ein Zustand, zwei Bedienstellen). */
 @media (max-height: 640px) {
   .koda-root { container-type: inline-size; container-name: koda-chat; }
@@ -133,7 +137,6 @@
     .koda-input-bar > .koda-mode { display: none; }
     .koda-input-bar > .okit-model-bar .okit-model-bar-row { flex-wrap: nowrap; }
     .koda-input-bar > .okit-model-bar .okit-model-bar-select { min-width: 4em; }
-    .koda-input-bar > .okit-model-bar .okit-thinking-icon { display: none; }
   }
 }
 /* Kontextzeile unter der Nutzer-Blase: leise wie die Marken, aufklappbar mit dem Block. */
@@ -544,9 +547,17 @@
 @keyframes okit-model-bar-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .okit-model-bar-refresh.is-loading svg { animation: none; } .okit-model-bar-refresh.is-loading { opacity: 0.5; } }
 .okit-model-bar .okit-thinking-control { flex: 0 0 auto; }
-@container okit-model-bar (width < 260px) { .okit-model-bar .okit-thinking-icon { display: none; } }
+@container okit-model-bar (width < 260px) { .okit-model-bar .okit-thinking-control select { width: calc(var(--size-2-3) + var(--size-4-6) + 1.2em); min-width: 0; padding-inline: var(--size-2-3) var(--size-4-6); text-overflow: clip; } }
 @container okit-model-bar (width < 200px) { .okit-model-bar-row { flex-wrap: wrap; } }
 .okit-model-bar-status { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; white-space: nowrap; }
+
+/* Host-Abstand im Hauptbereich auf dem Handy (0.76.0, Befund der Realprobe am iPhone: 215 px leere Fläche zwischen Senden und Tastatur). Die schwebende Navigationsleiste liegt über dem unteren Rand und braucht Platz
+   (--navbar-height plus die echte Safe-Area); bei offener Tastatur verkleinert Obsidian den App-Container selbst und die Leiste ist weg, dann braucht der Host nichts. Zwei Fallen: Obsidian setzt bei offener Tastatur
+   die Variable --safe-area-inset-bottom auf die Tastaturhöhe (328 px, darum env() statt der Variable: es bleibt der echte Wert), und es gibt keine Tastaturklasse, nur --keyboard-height (0px, offen die Tastaturhöhe):
+   die Zehn macht daraus einen Schalter (Leiste plus Safe-Area sind unter 100 px, 10 x Tastaturhöhe weit darüber, max() fängt es bei 0 ab). Mit der Host-Klasse und vier Klassen: die Regel schlägt Obsidians
+   .workspace-leaf-content .view-content (max(var(--safe-area-inset-bottom), var(--size-4-8))), die bei offener Tastatur selbst 328 px ergäbe. Nur im Hauptbereich; in einer Seitenleiste deckt die Schublade die Leiste ab.
+   Ungemessen: eine angedockte (nicht schwebende) Leiste, dort bleibt Obsidians Regel. */
+.is-mobile.is-floating-nav .mod-root .view-content.okit-chat-host { box-sizing: border-box; padding-bottom: max(0px, calc(var(--navbar-height) + env(safe-area-inset-bottom) - 10 * var(--keyboard-height, 0px))); }
 
 .okit-thinking-control { display: inline-flex; align-items: center; }
 .okit-thinking-toggle {
