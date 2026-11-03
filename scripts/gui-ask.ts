@@ -84,6 +84,8 @@ interface ChatMessage {
   content: string;
   toolCalls?: ToolCall[];
   toolCallId?: string;
+  /** Das Denken der Antwort (Anzeige-Feld, `saveThinking`); die Messgroesse von `--level`. */
+  thinking?: string;
   context?: { mode: string; items: { source: string; path: string }[]; text: string };
 }
 
@@ -105,7 +107,7 @@ type LogEntry = ChatMessage | CompactionRecord;
 
 /** Eine Zeile Bericht je Schritt, den Koda tatsaechlich gegangen ist. */
 interface Step {
-  kind: "tool-call" | "tool-result" | "answer" | "compaction" | "context";
+  kind: "tool-call" | "tool-result" | "answer" | "compaction" | "context" | "thinking";
   label: string;
   body: string;
 }
@@ -151,6 +153,7 @@ function toSteps(entries: LogEntry[]): Step[] {
         nameById.set(c.id, c.name);
         steps.push({ kind: "tool-call", label: c.name, body: c.arguments });
       }
+      if ((m.thinking ?? "").trim() !== "") steps.push({ kind: "thinking", label: `${(m.thinking ?? "").length} Zeichen`, body: m.thinking ?? "" });
       if (m.content.trim() !== "") steps.push({ kind: "answer", label: "Antwort", body: m.content });
     } else if (m.role === "tool") {
       const name = m.toolCallId === undefined ? "?" : nameById.get(m.toolCallId) ?? "?";
@@ -228,7 +231,7 @@ async function main(): Promise<void> {
 
   const question = flag("ask");
   if (question === undefined || question.trim() === "") {
-    console.error('Aufruf: npm run gui:ask -- --vault <name> --ask "<Frage>" [--expect <text>] [--runs N]');
+    console.error('Aufruf: npm run gui:ask -- --vault <name> --ask "<Frage>" [--expect <text>] [--runs N] [--level off|low|medium|high|xhigh|max]');
     process.exit(2);
   }
   const port = Number(flag("port"));
@@ -246,6 +249,14 @@ async function main(): Promise<void> {
   const full = argv.includes("--full");
   const expects = all("expect");
   const fresh = !argv.includes("--keep-session");
+  // `--level off|low|medium|high|xhigh|max`: stellt die Denkstufe wie das Dropdown der Modellzeile (Einstellungen `suppressThinking` und `thinkingLevel`), schaltet `saveThinking` an und stellt nach dem Lauf zurueck.
+  // Gemessen wird das Denken der Antwort in Zeichen (Zeile „Denken“ im Bericht, Summe am Ende). Ein Messlauf je Stufe, Muster der vault-rag-Messung (gpt-oss: 55 gegen 41 Zeichen).
+  const level = flag("level");
+  const LEVELS = ["off", "low", "medium", "high", "xhigh", "max"];
+  if (level !== undefined && !LEVELS.includes(level)) {
+    console.error(`--level ${level} ist keine Stufe (${LEVELS.join(", ")}).`);
+    process.exit(2);
+  }
 
   console.log(`Praxistest — Obsidian auf Port ${port}`);
   // `attachTo` unterscheidet Haupt- und Einstellungen-Fenster an der Sache (nur das
@@ -275,12 +286,26 @@ async function main(): Promise<void> {
     console.log(`Vault: ${await cdp.evaluate<string>("return app.vault.getName();")}`);
     console.log(`Koda ${plugin.version} · Modell ${plugin.model}`);
     console.log(`Frage: ${question}\n`);
+    let vorher: { suppress: boolean; level: string | null; save: boolean } | null = null;
+    if (level !== undefined) {
+      vorher = await cdp.evaluate<{ suppress: boolean; level: string | null; save: boolean }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const alt = { suppress: p.settings.suppressThinking, level: p.settings.thinkingLevel, save: p.settings.saveThinking };
+        p.settings.suppressThinking = ${level === "off" ? "true" : "false"};
+        p.settings.thinkingLevel = ${level === "off" ? "null" : JSON.stringify(level)};
+        p.settings.saveThinking = true;
+        await p.saveSettings();
+        return alt;`);
+      console.log(`Denkstufe: ${level} (vorher: ${vorher.suppress ? "aus" : "an"}, Stufe ${vorher.level ?? "Modellstandard"})\n`);
+    }
+    const denkzeichen: number[] = [];
 
     const seen: string[][] = [];
     for (let run = 1; run <= runs; run++) {
       if (runs > 1) console.log(`--- Lauf ${run}/${runs}`);
       const steps = await runOnce(cdp, question, timeoutMs, fresh);
       seen.push(steps.filter((s) => s.kind === "tool-call").map((s) => s.label));
+      denkzeichen.push(steps.filter((s) => s.kind === "thinking").reduce((n, s) => n + s.body.length, 0));
 
       console.log("");
       // Der System-Prompt VOR den Werkzeug-Aufrufen: was gesendet wurde, nicht nur was
@@ -320,6 +345,10 @@ async function main(): Promise<void> {
               : `      ${clip(s.body, 400)}`);
           }
         }
+        else if (s.kind === "thinking") {
+          console.log(`  ∴ Denken (${s.label})`);
+          console.log(full ? s.body.split("\n").map((l) => `      ${l}`).join("\n") : `      ${clip(s.body, 400)}`);
+        }
         else if (s.kind === "context") {
           console.log(`  ⊕ Arbeitskontext (${s.label})`);
           console.log(full ? s.body.split("\n").map((l) => `      ${l}`).join("\n") : `      ${clip(s.body, 400)}`);
@@ -343,6 +372,16 @@ async function main(): Promise<void> {
       console.log("");
     }
 
+    console.log(`Denkzeichen je Lauf${level !== undefined ? ` (Stufe ${level})` : ""}: ${denkzeichen.join(", ")}`);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.suppressThinking = ${JSON.stringify(vorher.suppress)};
+        p.settings.thinkingLevel = ${JSON.stringify(vorher.level)};
+        p.settings.saveThinking = ${JSON.stringify(vorher.save)};
+        await p.saveSettings();
+        return true;`);
+    }
     if (runs > 1) {
       console.log("Werkzeugwahl je Lauf (nicht deterministisch — Stichprobe, kein Beweis):");
       seen.forEach((tools, i) => console.log(`  ${i + 1}: ${tools.join(", ") || "(keins)"}`));
