@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.35.0] — 2026-11-03
+
 ### Changed
 
 - **On a phone or tablet, Koda opens as a tab in the main area instead of the side drawer.** Under the drawer, Obsidian's own tab picker hangs, and the chat ended about 155 px above the keyboard; in the main area it reaches down to the edge of the device (decided 2026-11-02, all mobile devices). On the desktop Koda still opens in the right sidebar and an open chat stays where it is. If the saved layout still holds Koda in the drawer, the next opening on a phone or tablet moves it to the main area (the drawer view is closed; the conversation, the chosen work and the context live in the plugin and stay).
