@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The plugin no longer carries a regular expression that Safari before 16.4 cannot parse.** The e-mail redaction rule (`redact`, code-kit 0.60.0) matches the same addresses without a lookbehind, so the plugin loads on older iPhones and iPads. The slash menu in the input field (`textarea-suggest`, obsidian-kit 0.80.3) takes its position from CSS custom properties instead of direct style assignments (store lint 0.5.0); it looks and behaves the same.
+
 ## [0.35.0] — 2026-11-03
 
 ### Changed

@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.77.0, src/obsidian/textarea-suggest.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.80.3, src/obsidian/textarea-suggest.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { findSlashQuery, removeSlashQuery, type SlashQuery } from "../kit/slash-query";
 
 /** Das `/`-Menü eines einfachen Textfelds (`<textarea>`, kein Editor): tippt der Nutzer am Textanfang oder nach einem Leerzeichen ein `/`,
@@ -125,7 +125,7 @@ export function attachTextareaSuggest<T>(el: HTMLTextAreaElement, opts: Textarea
     active = sameQuery && active >= 0 && active < items.length ? active : 0;
     if (!open) {
       // Verankert unten am Textfeld: Abstand zum unteren Rand des Elternknotens = Höhe über der Oberkante des Felds.
-      box.setCssProps({ left: `${el.offsetLeft}px`, bottom: `${Math.max(0, parent.clientHeight - el.offsetTop)}px`, width: `${el.offsetWidth}px` });
+      box.setCssProps({ "--okit-suggest-left": `${el.offsetLeft}px`, "--okit-suggest-bottom": `${Math.max(0, parent.clientHeight - el.offsetTop)}px`, "--okit-suggest-width": `${el.offsetWidth}px` }); // Custom Properties: eslint-plugin-obsidianmd 0.5.0 lässt in `setCssProps` nur `--name` zu; die Regel `.okit-suggest` liest sie
       setOpen(true);
     }
     markActive();
@@ -180,6 +180,7 @@ export const TEXTAREA_SUGGEST_CSS = `
 .okit-suggest:not(.is-open) { display: none; }
 .okit-suggest {
   position: absolute; z-index: var(--layer-popover);
+  left: var(--okit-suggest-left, 0); bottom: var(--okit-suggest-bottom, 0); width: var(--okit-suggest-width, auto);
   max-height: 16em; overflow-y: auto;
   background: var(--background-primary);
   border: var(--border-width) solid var(--background-modifier-border); border-radius: var(--radius-m);

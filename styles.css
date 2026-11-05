@@ -33,7 +33,7 @@
 .koda-tool { margin-bottom: var(--size-4-1); font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .koda-tool pre { white-space: pre-wrap; margin: var(--size-4-1) 0 0 0; }
 /* Streaming-Antwortbereich aus obsidian-kit (UI-STANDARD §8, `buildStreamArea` +
-   `createStableWriter`, Stand 0.63.0) — Kit-Vertrag: das Kit injiziert kein CSS, die
+   `createStableWriter`, Stand 0.80.3) — Kit-Vertrag: das Kit injiziert kein CSS, die
    Regeln gehoeren verbatim in die Consumer-`styles.css`. Nicht von Hand aendern, sondern
    den Block bei einem Re-Vendor ersetzen (Herkunft: obsidian-kit/src/obsidian/stream-area.ts). */
 .okit-stream { display: flex; flex-direction: column; min-height: 0; gap: var(--size-4-2); }
@@ -453,12 +453,13 @@
 .koda-ab-footer.is-warning { color: var(--text-warning); }
 .koda-ab-name-input { width: 100%; }
 
-/* „/“-Menue im Eingabefeld (obsidian-kit `textarea-suggest`, Stand 0.63.0) — Kit-Vertrag wie oben: verbatim kopiert,
+/* „/“-Menue im Eingabefeld (obsidian-kit `textarea-suggest`, Stand 0.80.3) — Kit-Vertrag wie oben: verbatim kopiert,
    bei einem Re-Vendor ersetzen (Herkunft: obsidian-kit/src/obsidian/textarea-suggest.ts). */
 .okit-suggest-host { position: relative; }
 .okit-suggest:not(.is-open) { display: none; }
 .okit-suggest {
   position: absolute; z-index: var(--layer-popover);
+  left: var(--okit-suggest-left, 0); bottom: var(--okit-suggest-bottom, 0); width: var(--okit-suggest-width, auto);
   max-height: 16em; overflow-y: auto;
   background: var(--background-primary);
   border: var(--border-width) solid var(--background-modifier-border); border-radius: var(--radius-m);

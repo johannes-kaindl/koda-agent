@@ -53,7 +53,10 @@
         "model-list-cache",
         "stream-blocks",
         "sse",
-        "redact",
+        {
+          "name": "redact",
+          "ref": "0.60.0"
+        },
         "secrets",
         "safe-markdown",
         "sampling-profiles",
@@ -123,7 +126,10 @@
         "tool-providers",
         "plugin-api",
         "capability-apis",
-        "textarea-suggest",
+        {
+          "name": "textarea-suggest",
+          "ref": "0.80.3"
+        },
         "clipboard",
         "segmented-control",
         "redline",
