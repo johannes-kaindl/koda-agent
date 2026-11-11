@@ -349,6 +349,8 @@ const PUNKTE = [
   "126. Gegenprobe Dateinamen: eine vorhandene Notiz mit „#“ im Namen bleibt anschreibbar (append) und umbenennbar, ihr Name wird nicht angefasst, und es entsteht keine bereinigte Zweitkopie",
   "127. Kopier-Knopf unter der fertigen Antwort: ein Klick legt den Markdown-Quelltext der Antwort in die Zwischenablage (genau einmal), quittiert mit is-copied und trägt ein aria-label",
   "128. Gegenprobe Kopier-Knopf unter der Antwort: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht",
+  "129. Redline-Kontrast im Bestätigungsdialog (replace): Löschung und Einfügung erreichen im Standardtheme hell und dunkel mindestens 4,5 zu 1 gegen den Dialoggrund",
+  "130. Gegenprobe Redline-Kontrast: der rohe Akzent (var(--color-orange) bzw. var(--color-blue)) unterschreitet 4,5 zu 1 in mindestens einer der vier Kombinationen — die Messung kann also rot werden",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -5389,6 +5391,78 @@ async function main(): Promise<void> {
           await wiederherstellen().catch(() => undefined);
           await cdp.evaluate(`await ${PL}.newChat(); return true;`).catch(() => undefined);
           await stub127.stop();
+        }
+      }
+
+      // --- 129/130. Kontrast von Löschung und Einfügung im Bestätigungsdialog (Welle 32, REDLINE_CSS aus obsidian-kit 0.80.4) ----
+      // Gemessen am echten Dialog (replace zeigt den Wortdiff als Redline): berechnete Farbe gegen den ersten deckenden Hintergrund darüber,
+      // WCAG-Kontrast. Die Themes „moonstone“ (hell) und „obsidian“ (dunkel) sind das Standardtheme; Kuro und Field Report misst das Kit selbst
+      // (kleinster Wert 5,10). 130 ist die Gegenprobe: derselbe Grund gegen den ROHEN Akzent, der vor 0.80.4 galt, muss mindestens einmal unter 4,5 liegen.
+      {
+        const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const P129 = PUNKTE.find((n) => n.startsWith("129. "))!;
+        const P130 = PUNKTE.find((n) => n.startsWith("130. "))!;
+        const NOTIZ = "Notes/Smoke129.md";
+        let themaVorher: unknown = null;
+        type Kontrast = { thema: string; del: number; ins: number; delRoh: number; insRoh: number; hell: boolean };
+        const messen = `
+          const parse = (c) => {
+            const m = /^rgba?\\(([^)]+)\\)$/.exec(c.trim());
+            if (m) { const v = m[1].split(/[ ,\\/]+/).filter(Boolean).map(Number); return { r: v[0], g: v[1], b: v[2], a: v[3] === undefined ? 1 : v[3] }; }
+            const q = /^color\\(srgb ([^)]+)\\)$/.exec(c.trim());
+            if (q) { const v = q[1].split(/[ \\/]+/).filter(Boolean).map(Number); return { r: v[0] * 255, g: v[1] * 255, b: v[2] * 255, a: v[3] === undefined ? 1 : v[3] }; }
+            throw new Error("Farbformat nicht gelesen: " + c);
+          };
+          const lum = ({ r, g, b }) => { const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+          const kontrast = (a, b) => { const la = lum(a), lb = lum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); };
+          const grund = (el) => { for (let e = el; e; e = e.parentElement) { const c = parse(getComputedStyle(e).backgroundColor); if (c.a >= 0.99) return c; } return { r: 255, g: 255, b: 255, a: 1 }; };
+          const del = document.querySelector(".modal-container .okit-redline-del");
+          const ins = document.querySelector(".modal-container .okit-redline-ins");
+          if (!del || !ins) return null;
+          const roh = (el, farbe) => { const s = document.createElement("span"); s.style.color = "var(" + farbe + ")"; el.parentElement.appendChild(s); const c = parse(getComputedStyle(s).color); s.remove(); return c; };
+          return {
+            thema: document.body.classList.contains("theme-dark") ? "dunkel" : "hell", hell: document.body.classList.contains("theme-light"),
+            del: kontrast(parse(getComputedStyle(del).color), grund(del)), ins: kontrast(parse(getComputedStyle(ins).color), grund(ins)),
+            delRoh: kontrast(roh(del, "--color-orange"), grund(del)), insRoh: kontrast(roh(ins, "--color-blue"), grund(ins)),
+          };`;
+        try {
+          themaVorher = await cdp.evaluate<unknown>(`return app.vault.getConfig ? app.vault.getConfig("theme") : null;`);
+          await cdp.evaluate(`
+            const alt = app.vault.getFileByPath(${JSON.stringify(NOTIZ)});
+            if (alt) await app.fileManager.trashFile(alt);
+            await app.vault.create(${JSON.stringify(NOTIZ)}, "alte Zeile\ngleiche Zeile\n");
+            window.__koda129 = null;
+            ${PL}.buildTools().run("write_note", { path: ${JSON.stringify(NOTIZ)}, content: "neue Zeile\ngleiche Zeile\n", mode: "replace" }).then((r) => { window.__koda129 = r; });
+            return true;`);
+          const da = await pollUntil<boolean>(cdp, `return document.querySelector(".modal-container .okit-redline-del") && document.querySelector(".modal-container .okit-redline-ins") ? true : null;`, 8000);
+          if (da === null) throw new Error("der Bestätigungsdialog mit Redline erschien nicht");
+          const werte: Kontrast[] = [];
+          for (const dunkel of [false, true]) {
+            await cdp.evaluate(`app.vault.setConfig("theme", ${dunkel ? '"obsidian"' : '"moonstone"'}); app.workspace.trigger("css-change"); return true;`);
+            await new Promise((r) => setTimeout(r, 400));
+            const k = await cdp.evaluate<Kontrast | null>(messen);
+            if (k === null) throw new Error("Löschung oder Einfügung nicht im Dialog");
+            if ((dunkel && k.hell) || (!dunkel && !k.hell)) throw new Error(`Thema nicht erreicht (verlangt ${dunkel ? "dunkel" : "hell"}, ist ${k.thema})`);
+            werte.push(k);
+          }
+          const f = (x: number): string => x.toFixed(2);
+          const alle = werte.flatMap((k) => [k.del, k.ins]);
+          const roh = werte.flatMap((k) => [k.delRoh, k.insRoh]);
+          record(P129, alle.every((x) => x >= 4.5),
+            werte.map((k) => `${k.thema}: Löschung ${f(k.del)}, Einfügung ${f(k.ins)}`).join(" · ") + " (soll ≥ 4,50)");
+          record(P130, roh.some((x) => x < 4.5),
+            werte.map((k) => `${k.thema} roh: orange ${f(k.delRoh)}, blau ${f(k.insRoh)}`).join(" · ") + " (mindestens ein Wert soll unter 4,50 liegen)");
+        } catch (error) {
+          for (const n of [P129, P130] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        } finally {
+          await cdp.evaluate(`
+            ${themaVorher === null ? "" : `app.vault.setConfig("theme", ${JSON.stringify(themaVorher)}); app.workspace.trigger("css-change");`}
+            return true;`).catch(() => undefined);
+          await schliesseDialog(cdp).catch(() => undefined);
+          await cdp.evaluate(`
+            const rest = app.vault.getFileByPath(${JSON.stringify(NOTIZ)});
+            if (rest) await app.fileManager.trashFile(rest);
+            return true;`).catch(() => undefined);
         }
       }
 
