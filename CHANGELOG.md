@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.36.0] — 2026-11-11
+
 ### Added
 
 - **A copy button under every finished answer.** One click puts the answer's Markdown source on the clipboard, the icon turns into a check mark for a moment, and a short notice confirms it. The button is always visible (there is no hover on a phone) and has a 44 px touch target there.
