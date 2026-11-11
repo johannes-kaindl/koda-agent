@@ -132,7 +132,10 @@
         },
         "clipboard",
         "segmented-control",
-        "redline",
+        {
+          "name": "redline",
+          "ref": "0.80.4"
+        },
         "model-bar",
         "model-bar-strings",
         "thinking-control",

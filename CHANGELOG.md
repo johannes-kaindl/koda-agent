@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Deletions and insertions in the confirmation preview are easier to read.** The strike-through (removed) and underline (added) text in the diff of a write or move now mixes its accent colour with the theme's text colour (orange and blue), which reaches a contrast of at least 4.5 : 1 in the default theme, Field Report and Kuro, light and dark (the raw accent colours measured 2.9 to 4.2 : 1 in four of the twelve cases). Only the redline module and its CSS were taken from obsidian-kit 0.80.4; the rest of the kit pin stays.
+
 ### Fixed
 
 - **The plugin no longer carries a regular expression that Safari before 16.4 cannot parse.** The e-mail redaction rule (`redact`, code-kit 0.60.0) matches the same addresses without a lookbehind, so the plugin loads on older iPhones and iPads. The slash menu in the input field (`textarea-suggest`, obsidian-kit 0.80.3) takes its position from CSS custom properties instead of direct style assignments (store lint 0.5.0); it looks and behaves the same.
