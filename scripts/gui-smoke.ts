@@ -345,6 +345,10 @@ const PUNKTE = [
   "99. Handpunkt 18 an der Naht: ohne vault-rag keine semantische Beschriftung; mit dem Stub ist sie da, und Koda traegt related_notes nie selbst (es kommt nur ueber einen Anbieter, Punkt 78)",
   "100. Gegenprobe Denkblock kopierbar nach der Antwort: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht",
   "101. Gegenprobe Denkblock kopierbar während des Stroms: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht",
+  "125. Dateinamen aus dem Modell: write_note (create) und move_note bereinigen den neuen Namen und einen neuen Ordner im Pfad (Doppelpunkt, den Obsidian selbst ablehnt, und Fragezeichen) und melden den geschriebenen Pfad",
+  "126. Gegenprobe Dateinamen: eine vorhandene Notiz mit „#“ im Namen bleibt anschreibbar (append) und umbenennbar, ihr Name wird nicht angefasst, und es entsteht keine bereinigte Zweitkopie",
+  "127. Kopier-Knopf unter der fertigen Antwort: ein Klick legt den Markdown-Quelltext der Antwort in die Zwischenablage (genau einmal), quittiert mit is-copied und trägt ein aria-label",
+  "128. Gegenprobe Kopier-Knopf unter der Antwort: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -5258,6 +5262,133 @@ async function main(): Promise<void> {
         } catch (error) { abbruch(P90, error); abbruch(P101, error); } finally {
           await cdp.evaluate(`await ${PL}.newChat(); return true;`).catch(() => undefined);
           await stub90.stop();
+        }
+      }
+
+      // --- 125/126. Dateinamen aus dem Modell durch die Richtlinie (Welle 32, obsidian-kit `safeFileName`) ----
+      // Gefahren ueber DENSELBEN Weg wie das Modell (`buildTools().run`), im Koda-Ordner (dort fragt kein Dialog). Ohne das Plugin
+      // filename-sanitizer gelten die Kit-Regeln: „: “ wird „ — “, „?“ faellt weg. 126 ist die Gegenprobe: ein vorhandener Name wird nie angefasst.
+      {
+        const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const P125 = PUNKTE.find((n) => n.startsWith("125. "))!;
+        const P126 = PUNKTE.find((n) => n.startsWith("126. "))!;
+        const aufraeumen = (): Promise<unknown> => cdp.evaluate(`
+          for (const pfad of ["Koda/Smoke125 — Plan.md", "Koda/Smoke125 — Ordner/n.md", "Koda/Smoke125: Plan?.md", "Koda/Smoke125 — Neu.md", "Koda/Smoke126 #alt.md", "Koda/Smoke126 neu.md", "Koda/Smoke126 alt.md", "Koda/Smoke126  alt.md"]) {
+            const f = app.vault.getFileByPath(pfad);
+            if (f) await app.vault.delete(f);
+          }
+          const ordner = app.vault.getFolderByPath("Koda/Smoke125 — Ordner");
+          if (ordner) await app.vault.delete(ordner, true);
+          return true;`);
+        try {
+          await aufraeumen();
+          const lauf = await cdp.evaluate<{
+            a: { ok: boolean; content?: string; error?: string }; b: { ok: boolean; content?: string; error?: string }; c: { ok: boolean; content?: string; error?: string };
+            roh: boolean; ordnerDatei: boolean; ordnerRoh: boolean; neu: boolean; altWeg: boolean;
+          }>(`
+            const t = ${PL}.buildTools();
+            const a = await t.run("write_note", { path: "Koda/Smoke125: Plan?.md", content: "x", mode: "create" });
+            const b = await t.run("write_note", { path: "Koda/Smoke125: Ordner/n.md", content: "x", mode: "create" });
+            const c = await t.run("move_note", { source_path: "Koda/Smoke125 — Plan.md", destination_path: "Koda/Smoke125: Neu?.md" });
+            return {
+              a, b, c,
+              roh: app.vault.getFileByPath("Koda/Smoke125: Plan?.md") !== null,
+              ordnerDatei: app.vault.getFileByPath("Koda/Smoke125 — Ordner/n.md") !== null,
+              ordnerRoh: app.vault.getFolderByPath("Koda/Smoke125: Ordner") !== null,
+              neu: app.vault.getFileByPath("Koda/Smoke125 — Neu.md") !== null,
+              altWeg: app.vault.getFileByPath("Koda/Smoke125 — Plan.md") === null,
+            };`);
+          record(P125,
+            lauf.a.ok && lauf.b.ok && lauf.c.ok && !lauf.roh && lauf.ordnerDatei && !lauf.ordnerRoh && lauf.neu && lauf.altWeg
+              && /Dateinamen-Richtlinie/.test(lauf.a.content ?? "") && (lauf.a.content ?? "").includes("Koda/Smoke125 — Plan.md"),
+            `write_note „Smoke125: Plan?.md“ → ${lauf.a.ok ? `„${lauf.a.content}“` : `FEHLER ${lauf.a.error}`} · Rohname angelegt: ${lauf.roh} · neuer Ordner „Smoke125 — Ordner“ mit Datei: ${lauf.ordnerDatei}, Rohordner: ${lauf.ordnerRoh} · move_note → „Smoke125 — Neu.md“: ${lauf.neu} (${lauf.c.ok ? lauf.c.content : lauf.c.error})`);
+        } catch (error) { unmeasured(P125, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); } finally { await aufraeumen().catch(() => undefined); }
+
+        try {
+          const r = await cdp.evaluate<{
+            anh: { ok: boolean; content?: string; error?: string }; mv: { ok: boolean; content?: string; error?: string };
+            inhalt: string | null; zweitkopie: boolean; umbenannt: boolean; altNochDa: boolean;
+          }>(`
+            await app.vault.create("Koda/Smoke126 #alt.md", "alt");
+            const t = ${PL}.buildTools();
+            const anh = await t.run("write_note", { path: "Koda/Smoke126 #alt.md", content: "mehr", mode: "append" });
+            const f = app.vault.getFileByPath("Koda/Smoke126 #alt.md");
+            const inhalt = f ? await app.vault.read(f) : null;
+            const zweitkopie = app.vault.getFileByPath("Koda/Smoke126 alt.md") !== null || app.vault.getFileByPath("Koda/Smoke126  alt.md") !== null;
+            const mv = await t.run("move_note", { source_path: "Koda/Smoke126 #alt.md", destination_path: "Koda/Smoke126 neu.md" });
+            return {
+              anh, mv, inhalt, zweitkopie,
+              umbenannt: app.vault.getFileByPath("Koda/Smoke126 neu.md") !== null,
+              altNochDa: app.vault.getFileByPath("Koda/Smoke126 #alt.md") !== null,
+            };`);
+          record(P126,
+            r.anh.ok && /mehr/.test(r.inhalt ?? "") && !r.zweitkopie && r.mv.ok && r.umbenannt && !r.altNochDa && !/Dateinamen-Richtlinie/.test(r.anh.content ?? "") && !/Dateinamen-Richtlinie/.test(r.mv.content ?? ""),
+            `append an „Smoke126 #alt.md“: ${r.anh.ok ? `„${r.anh.content}“` : `FEHLER ${r.anh.error}`}, Inhalt danach „${(r.inhalt ?? "").replace(/\n/g, "↵")}“ · bereinigte Zweitkopie: ${r.zweitkopie} · move_note der Quelle mit „#“: ${r.mv.ok ? `„${r.mv.content}“` : `FEHLER ${r.mv.error}`}`);
+        } catch (error) { unmeasured(P126, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); } finally { await aufraeumen().catch(() => undefined); }
+      }
+
+      // --- 127/128. Kopier-Knopf unter der fertigen Antwort (Welle 32) ----
+      // Der Stub antwortet mit Markdown; kopiert werden muss der QUELLTEXT (nicht der gerenderte Text). `writeText` wird aufgezeichnet und danach
+      // wiederhergestellt (CORE-TEST-21). 128 ist die Gegenprobe und prueft sich selbst: quittierte der Knopf schon im Erfolgsfall nicht, ist sie nichts gemessen.
+      {
+        const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+        const P127 = PUNKTE.find((n) => n.startsWith("127. "))!;
+        const P128 = PUNKTE.find((n) => n.startsWith("128. "))!;
+        const ANTWORT = "Antwort **127** mit [[Notes/Tools]] und `code`.";
+        const stub127 = await startLlmStub({ models: ["smoke-model"], standard: { text: ANTWORT } });
+        const probe = (modus: "ok" | "ablehnen"): string => `
+          const knoepfe = [...document.querySelectorAll(".koda-log .koda-assistant .koda-copy")];
+          const knopf = knoepfe[knoepfe.length - 1];
+          if (!knopf) return { fehlt: true, anzahl: 0, n: 0, text: null, quittiert: false, aria: "" };
+          const alt = Object.getOwnPropertyDescriptor(navigator.clipboard, "writeText");
+          window.__koda127 = { n: 0, text: null, alt: alt || null };
+          Object.defineProperty(navigator.clipboard, "writeText", { configurable: true, value: (t) => { window.__koda127.n += 1; window.__koda127.text = t; return ${modus === "ok" ? "Promise.resolve()" : 'Promise.reject(new Error("abgelehnt"))'}; } });
+          knopf.click();
+          await new Promise((r) => setTimeout(r, 400));
+          return { fehlt: false, anzahl: knoepfe.length, n: window.__koda127.n, text: window.__koda127.text, quittiert: knopf.classList.contains("is-copied"), aria: knopf.getAttribute("aria-label") || "" };`;
+        const wiederherstellen = (): Promise<unknown> => cdp.evaluate(`
+          const s = window.__koda127;
+          if (s) { if (s.alt) Object.defineProperty(navigator.clipboard, "writeText", s.alt); else delete navigator.clipboard.writeText; }
+          delete window.__koda127;
+          return true;`);
+        type Stand127 = { fehlt: boolean; anzahl: number; n: number; text: string | null; quittiert: boolean; aria: string };
+        try {
+          await setzeModell("smoke-model", stub127.url);
+          await cdp.evaluate(`
+            const p = ${PL};
+            if (p.views().length === 0) await p.activateView();
+            app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
+            await p.newChat();
+            return true;`);
+          await new Promise((r) => setTimeout(r, 300));
+          await cdp.evaluate(`await ${PL}.ask("Smoke 127: antworte"); return true;`);
+          const da = await pollUntil<boolean>(cdp, `return document.querySelector(".koda-log .koda-assistant .koda-copy") ? true : null;`, 6000, 200);
+          if (da === null) {
+            unmeasured(P127, "kein Kopier-Knopf unter der Antwort im DOM (.koda-assistant .koda-copy)");
+            unmeasured(P128, "ohne Kopier-Knopf keine Gegenprobe");
+          } else {
+            const ok = await cdp.evaluate<Stand127>(probe("ok"));
+            await wiederherstellen();
+            record(P127, ok.n === 1 && ok.text === ANTWORT && ok.quittiert && ok.aria !== "",
+              `${ok.n}× kopiert, Text ${ok.text === ANTWORT ? "ist der Quelltext der Antwort" : `„${ok.text}“ (NICHT der Quelltext)`} · Quittung ${ok.quittiert ? "da" : "fehlt"} · aria „${ok.aria}“ · ${ok.anzahl} Knopf/Knöpfe im Verlauf`);
+            if (!ok.quittiert || ok.n !== 1) {
+              unmeasured(P128, `Gegenprobe ohne Biss: im Erfolgsfall quittierte der Knopf nicht (${ok.n}× writeText, Quittung ${ok.quittiert ? "da" : "fehlt"})`);
+            } else {
+              const ende = await pollUntil<boolean>(cdp, `const k = [...document.querySelectorAll(".koda-log .koda-assistant .koda-copy")].pop(); return k && !k.classList.contains("is-copied") ? true : null;`, 4000, 150);
+              if (ende === null) unmeasured(P128, "die Quittung des Erfolgsfalls endete nicht binnen 4 s — die Gegenprobe läse deren Rest");
+              else {
+                const nein = await cdp.evaluate<Stand127>(probe("ablehnen"));
+                await wiederherstellen();
+                record(P128, nein.n === 1 && !nein.quittiert, `writeText abgelehnt (${nein.n}× aufgerufen): Knopf ${nein.quittiert ? "quittiert trotzdem" : "quittiert nicht"}`);
+              }
+            }
+          }
+        } catch (error) {
+          for (const n of [P127, P128] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        } finally {
+          await wiederherstellen().catch(() => undefined);
+          await cdp.evaluate(`await ${PL}.newChat(); return true;`).catch(() => undefined);
+          await stub127.stop();
         }
       }
 

@@ -35,6 +35,8 @@ Koda talks to any OpenAI-compatible chat endpoint. The example uses [LM Studio](
 
 While Koda works, the status line above the input says what it is doing, e.g. *Searching the vault for "project plan"…* or *Reading Notes/Project plan.md…*. Each tool call also appears in the chat as a step, so you can see which notes the answer is built on. The answer streams in; **Stop** ends it and keeps what has arrived. On a phone the line shows only while Koda works or when the context warning applies, so the conversation keeps its room.
 
+A finished answer carries a small copy button at its lower right corner; it puts the answer's Markdown source on the clipboard.
+
 Under your message, a collapsible line **Context: …** shows what went along with the question. By default that is the **Workspace** context: which note is open, what is selected, which tabs exist, as pointers only. The dropdown next to **Send** changes that per question; [Choose what goes along with a question](how-to/working-context.md) explains the modes.
 
 ## 5. Let Koda write something

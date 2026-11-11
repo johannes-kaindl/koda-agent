@@ -9,6 +9,8 @@ import { describeStateChange } from "../core/abilities/session";
 import { isChatMessage, isCompactionRecord, isErrorRecord, isSessionStateRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
 import { buildReasoningBlock, buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
+import { copyToClipboard } from "../vendor/kit-obsidian/clipboard";
+import { realClock } from "../vendor/kit-obsidian/clock";
 import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obsidian/stable-writer";
 import { renderMarkdownGuarded, type DomGuardOptions } from "../vendor/kit-obsidian/dom-guard";
 import { isSafeHref } from "../vendor/kit/link-guard";
@@ -413,6 +415,26 @@ export class KodaView extends ItemView {
     });
   }
 
+  /** Der Kopier-Knopf unter einer fertigen Antwort: kopiert den Markdown-Quelltext der Antwort (`koda-copy`, der Griff fuer Tests und Treiber).
+   *  Immer sichtbar und nicht erst beim Hovern, denn auf dem Handy gibt es kein Hover; die Tippflaeche ist dort 44 px (`styles.css`).
+   *  Die Quittung am Knopf (Haken, `is-copied`) ist dieselbe wie am Denkblock. */
+  private answerCopyButton(bubble: HTMLElement, markdown: string): void {
+    bubble.addClass("koda-has-actions");
+    const row = bubble.createDiv({ cls: "koda-msg-actions" });
+    const btn = row.createEl("button", { cls: "clickable-icon koda-copy", attr: { type: "button", "aria-label": t("view.answerCopy") } });
+    setIcon(btn, "copy");
+    btn.addEventListener("click", () => {
+      void copyToClipboard(markdown, {
+        copiedMessage: t("view.answerCopied"),
+        onCopied: () => {
+          setIcon(btn, "check");
+          btn.addClass("is-copied");
+          realClock.setTimeout(() => { setIcon(btn, "copy"); btn.removeClass("is-copied"); }, 1500);
+        },
+      });
+    });
+  }
+
   /** Die Schalter „Links und Bilder in Antworten“ (Kit `domGuard`), je Antwort frisch gelesen: ein Umlegen wirkt auf die nächste Antwort und den nächsten Neuzeichnen des Verlaufs. */
   private guardOptions(): DomGuardOptions {
     const s = this.plugin.settings;
@@ -484,7 +506,7 @@ export class KodaView extends ItemView {
       // Das Denken steht VOR dem Antworttext, zugeklappt (Entscheidung 2026-10-17); es ist ein Anzeige-Feld und geht nie ans Modell.
       if (thinking !== undefined && thinking !== "") this.thinkingBlock(thinking);
       const el = this.logEl.createDiv({ cls: "koda-msg koda-assistant" });
-      pending.push(this.renderMarkdownInto(el, content));
+      pending.push(this.renderMarkdownInto(el, content).then(() => { this.answerCopyButton(el, content); }));
     };
     let toolNames = new Map<string, string>();
     // Die Quellen gehoeren unter die ANTWORT, nicht unter die Frage: dort beantworten sie

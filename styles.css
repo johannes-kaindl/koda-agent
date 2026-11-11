@@ -16,6 +16,14 @@
 .koda-assistant > :last-child { margin-bottom: 0; }
 .koda-assistant ul, .koda-assistant ol { margin: var(--size-4-1) 0; padding-inline-start: var(--size-4-4); }
 .koda-user { background: var(--background-secondary); }
+/* Kopier-Knopf unter einer fertigen Antwort (view.ts `answerCopyButton`): leise, immer sichtbar, rechts; auf dem Handy eine 44-px-Tippflaeche, das Symbol bleibt klein (wie das Kit am Denkblock). */
+.koda-has-actions > :nth-last-child(2) { margin-bottom: 0; }
+.koda-msg-actions { display: flex; justify-content: flex-end; margin-top: var(--size-2-1); }
+.koda-copy { color: var(--text-faint); height: auto; padding: var(--size-2-1) var(--size-2-2); }
+.koda-copy.is-copied { color: var(--text-success); }
+.koda-copy .svg-icon { width: var(--icon-xs); height: var(--icon-xs); }
+.is-mobile .koda-copy { position: relative; }
+.is-mobile .koda-copy::after { content: ""; position: absolute; top: 50%; left: 50%; width: calc(var(--size-4-10) + var(--size-4-1)); height: calc(var(--size-4-10) + var(--size-4-1)); transform: translate(-50%, -50%); }
 .koda-assistant { background: var(--background-primary-alt); }
 /* Ein gekappter Link (der Wächter hat das href entfernt, Klasse und Pfeil-Icon blieben) sieht auch im fertigen Antworttext wie Text aus. Das Kit (STREAM_AREA_CSS, 0.72.0) deckt nur
    `.okit-stream-body` ab; der Verlauf (`renderLog`) steht in `.koda-assistant`. Dieselben zwei Regeln für ihn; ohne !important, nur gekappte Links (Punkt 106 misst es im Renderer). */
