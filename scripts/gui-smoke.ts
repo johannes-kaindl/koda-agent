@@ -5430,9 +5430,9 @@ async function main(): Promise<void> {
           await cdp.evaluate(`
             const alt = app.vault.getFileByPath(${JSON.stringify(NOTIZ)});
             if (alt) await app.fileManager.trashFile(alt);
-            await app.vault.create(${JSON.stringify(NOTIZ)}, "alte Zeile\ngleiche Zeile\n");
+            await app.vault.create(${JSON.stringify(NOTIZ)}, "alte Zeile\\ngleiche Zeile\\n");
             window.__koda129 = null;
-            ${PL}.buildTools().run("write_note", { path: ${JSON.stringify(NOTIZ)}, content: "neue Zeile\ngleiche Zeile\n", mode: "replace" }).then((r) => { window.__koda129 = r; });
+            ${PL}.buildTools().run("write_note", { path: ${JSON.stringify(NOTIZ)}, content: "neue Zeile\\ngleiche Zeile\\n", mode: "replace" }).then((r) => { window.__koda129 = r; });
             return true;`);
           const da = await pollUntil<boolean>(cdp, `return document.querySelector(".modal-container .okit-redline-del") && document.querySelector(".modal-container .okit-redline-ins") ? true : null;`, 8000);
           if (da === null) throw new Error("der Bestätigungsdialog mit Redline erschien nicht");
