@@ -5366,7 +5366,10 @@ async function main(): Promise<void> {
           await cdp.evaluate(`await ${PL}.ask("Smoke 127: antworte"); return true;`);
           const da = await pollUntil<boolean>(cdp, `return document.querySelector(".koda-log .koda-assistant .koda-copy") ? true : null;`, 6000, 200);
           if (da === null) {
-            unmeasured(P127, "kein Kopier-Knopf unter der Antwort im DOM (.koda-assistant .koda-copy)");
+            // Steht die Antwort da, der Knopf aber nicht, ist das der Nutzer-Defekt (rot); fehlt schon die Antwort, gibt es nichts zu messen.
+            const antwort = await cdp.evaluate<boolean>(`return !!document.querySelector(".koda-log .koda-assistant:not(.koda-placeholder)");`);
+            if (antwort) record(P127, false, "die Antwort steht im Verlauf, aber ohne Kopier-Knopf (.koda-assistant .koda-copy)");
+            else unmeasured(P127, "keine Antwort im Verlauf — es gibt nichts zu kopieren");
             unmeasured(P128, "ohne Kopier-Knopf keine Gegenprobe");
           } else {
             const ok = await cdp.evaluate<Stand127>(probe("ok"));
