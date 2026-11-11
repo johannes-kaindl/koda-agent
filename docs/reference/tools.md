@@ -23,13 +23,13 @@ The model decides which tool to call while it answers; every call appears as a s
 | `delete_note` | Moves a note to the vault's trash (as configured in Obsidian). The dialog warns how many links will break. | always |
 | `save_memory` | Appends a dated line to `<Koda folder>/Memory.md`, which goes into every conversation. Adding a line is how Koda remembers, so it never asks. | never (Koda folder) |
 | `load_skill` | Reads the full instructions of a skill that is listed under `## Skills` with its description only. Skills with `pinned: true` are already in the prompt. A skill switched off in the settings, in the Abilities tab or in the task is refused. | never |
-| `write_skill` | Creates or replaces a skill in `<Koda folder>/Skills/`. | always |
+| `write_skill` | Creates or replaces a skill in `<Koda folder>/Skills/`. The skill name goes through the file-name policy (see *File names* below). | always |
 
 Only `.md` notes are written; `.base` and `.canvas` are read-only for Koda.
 
 ## File names
 
-A name Koda invents for a **new** note, a new folder in its path or the target of `move_note` goes through a file-name policy before anything is written, and the dialog shows the cleaned path. Notes and folders that already exist keep their names, and so does the source of a move. If the plugin *Filename Sanitizer* is active, its policy decides; without it Koda applies the default rules of the obsidian-kit library: `: ` becomes ` — `, `:`, `\`, `/` and `|` become `-`, `?`, `<` and `>` go, `*` becomes `_`, `"` becomes `'`, `#` and `^` become a space, `[` and `]` become `(` and `)`; control characters and spaces or dots at the edge of the name go, a name is at most 255 bytes long, and an empty one becomes `Untitled`. When the name changed, the answer to the model says so, so it knows the path to use next. If the cleaned name is already taken, the write is refused as before ("exists already").
+A name Koda invents for a **new** note, a new folder in its path, the name of a skill or the target of `move_note` goes through a file-name policy before anything is written, and the dialog shows the cleaned path. Notes and folders that already exist keep their names, and so does the source of a move. If the plugin *Filename Sanitizer* is active, its policy decides; without it Koda applies the default rules of the obsidian-kit library: `: ` becomes ` — `, `:`, `\`, `/` and `|` become `-`, `?`, `<` and `>` go, `*` becomes `_`, `"` becomes `'`, `#` and `^` become a space, `[` and `]` become `(` and `)`; control characters and spaces or dots at the edge of the name go, a name is at most 255 bytes long, and an empty one becomes `Untitled`. When the name changed, the answer to the model says so, so it knows the path to use next. If the cleaned name is already taken, the write is refused as before ("exists already").
 
 ## Tools from other plugins
 

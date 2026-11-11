@@ -545,8 +545,12 @@ export class VaultTools implements ToolRunner {
     if (!decDesc.ok) return { ok: false, error: decDesc.error };
     body = decBody.text;
     description = decDesc.text;
-    const clean = sanitizeSkillName(name);
-    if (clean === "") return { ok: false, error: "name fehlt oder besteht nur aus unerlaubten Zeichen" };
+    const stripped = sanitizeSkillName(name);
+    if (stripped === "") return { ok: false, error: "name fehlt oder besteht nur aus unerlaubten Zeichen" };
+    // Der Name kommt vom Modell und wird ein Dateiname: durch die Richtlinie (ersetzt statt zu loeschen: „Plan: Q1“ wird „Plan — Q1“). `sanitizeSkillName`
+    // bleibt die Vorpruefung (ein Name nur aus unerlaubten Zeichen ist ein Fehler, kein Skill namens „---“) und der Rueckfall ohne die Option.
+    const policy = this.opts.safeName;
+    const clean = policy === undefined ? stripped : policy(`${name.replace(/\.md$/i, "")}.md`, "file").replace(/\.md$/i, "").replace(/\s+/g, " ").trim();
     const desc = description.trim().replace(/\s*\n\s*/g, " ");
     if (desc === "") return { ok: false, error: "description fehlt — sie erklaert dem Nutzer, was sich kuenftig aendert" };
 

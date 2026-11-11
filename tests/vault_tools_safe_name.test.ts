@@ -139,3 +139,34 @@ describe("move_note: Ziel durch die Richtlinie", () => {
     if (req?.kind === "move") expect(req.destination).toBe("Notes/b — c.md");
   });
 });
+
+describe("write_skill: Skill-Name durch die Richtlinie", () => {
+  const skill = (name: string): Record<string, unknown> => ({ name, description: "Antworte kurz", body: "Regel", mode: "create" });
+
+  it("ersetzt den Doppelpunkt statt ihn zu löschen und meldet den Pfad", async () => {
+    const v = fakeVault({});
+    const r = await new VaultTools(v, yes, opts).run("write_skill", skill("Plan: Q1"));
+    expect(r.ok).toBe(true);
+    expect(Object.keys(v.files)).toEqual(["Koda/Skills/Plan — Q1.md"]);
+    if (r.ok) expect(r.content).toContain("Koda/Skills/Plan — Q1.md");
+  });
+
+  it("ein Name, den die Richtlinie nicht ändert, bleibt", async () => {
+    const v = fakeVault({});
+    await new VaultTools(v, yes, opts).run("write_skill", skill("Projektnotizen"));
+    expect(Object.keys(v.files)).toEqual(["Koda/Skills/Projektnotizen.md"]);
+  });
+
+  it("ein Name nur aus unerlaubten Zeichen bleibt der Fehler, kein Skill namens '---'", async () => {
+    const v = fakeVault({});
+    const r = await new VaultTools(v, yes, opts).run("write_skill", skill("///"));
+    expect(r.ok).toBe(false);
+    expect(Object.keys(v.files)).toEqual([]);
+  });
+
+  it("ohne die Option bleibt es beim lokalen Bereinigen (Altaufrufer)", async () => {
+    const v = fakeVault({});
+    await new VaultTools(v, yes, base).run("write_skill", skill("Plan: Q1"));
+    expect(Object.keys(v.files)).toEqual(["Koda/Skills/Plan Q1.md"]);
+  });
+});
