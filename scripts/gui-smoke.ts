@@ -351,6 +351,8 @@ const PUNKTE = [
   "128. Gegenprobe Kopier-Knopf unter der Antwort: lehnt die Zwischenablage den Schreibversuch ab, quittiert der Knopf nicht",
   "129. Redline-Kontrast im Bestätigungsdialog (replace): Löschung und Einfügung erreichen im Standardtheme hell und dunkel mindestens 4,5 zu 1 gegen den Dialoggrund",
   "130. Gegenprobe Redline-Kontrast: der rohe Akzent (var(--color-orange) bzw. var(--color-blue)) unterschreitet 4,5 zu 1 in mindestens einer der vier Kombinationen — die Messung kann also rot werden",
+  "131. Markieren in der Antwort (Desktop): ein echter Dreifachklick auf den Absatz der fertigen Antwort markiert ihren Text (Selection gleich Absatz), user-select ist nicht none",
+  "132. Gegenprobe Markieren: mit user-select none am Verlauf markiert derselbe Dreifachklick nichts von der Antwort — die Messung kann also rot werden",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -5385,6 +5387,57 @@ async function main(): Promise<void> {
                 const nein = await cdp.evaluate<Stand127>(probe("ablehnen"));
                 await wiederherstellen();
                 record(P128, nein.n === 1 && !nein.quittiert, `writeText abgelehnt (${nein.n}× aufgerufen): Knopf ${nein.quittiert ? "quittiert trotzdem" : "quittiert nicht"}`);
+              }
+            }
+          }
+
+          // 131/132. Markieren derselben Antwort mit einem ECHTEN Dreifachklick (Input.dispatchMouseEvent, clickCount 3) auf das erste Wort.
+          // Gemessen wird die Selection des Dokuments; user-select wird zusaetzlich gelesen. Die Gegenprobe legt user-select none auf den Verlauf.
+          const P131 = PUNKTE.find((n) => n.startsWith("131. "))!;
+          const P132 = PUNKTE.find((n) => n.startsWith("132. "))!;
+          if (da === null) {
+            for (const n of [P131, P132] as const) unmeasured(n, "keine Antwort mit Kopier-Knopf im Verlauf — es gibt nichts zu markieren");
+          } else {
+            type Auswahl = { sel: string; absatz: string; userSelect: string };
+            const wortPunkt = await cdp.evaluate<{ x: number; y: number } | null>(`
+              const p = [...document.querySelectorAll(".koda-log .koda-assistant p")].pop();
+              if (!p) return null;
+              p.scrollIntoView({ block: "center" });
+              const t = document.createTreeWalker(p, NodeFilter.SHOW_TEXT).nextNode();
+              if (!t) return null;
+              const r = document.createRange(); r.setStart(t, 0); r.setEnd(t, Math.min(3, t.textContent.length));
+              const b = r.getBoundingClientRect();
+              return b.width === 0 ? null : { x: b.left + b.width / 2, y: b.top + b.height / 2 };`);
+            if (wortPunkt === null) {
+              for (const n of [P131, P132] as const) unmeasured(n, "kein Absatz mit Text in der Antwort gefunden");
+            } else {
+              const dreifach = async (): Promise<Auswahl> => {
+                await cdp.evaluate(`window.getSelection().removeAllRanges(); return true;`);
+                const common = { x: wortPunkt.x, y: wortPunkt.y, button: "left", buttons: 1 };
+                await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...common, buttons: 0, clickCount: 0 });
+                for (const n of [1, 2, 3]) {
+                  await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", ...common, clickCount: n });
+                  await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", ...common, buttons: 0, clickCount: n });
+                }
+                await new Promise((r) => setTimeout(r, 200));
+                return cdp.evaluate<Auswahl>(`
+                  const p = [...document.querySelectorAll(".koda-log .koda-assistant p")].pop();
+                  return { sel: window.getSelection().toString(), absatz: p ? p.textContent : "", userSelect: p ? getComputedStyle(p).userSelect : "" };`);
+              };
+              try {
+                const ja = await dreifach();
+                const ganz = ja.sel.trim() !== "" && ja.absatz.trim().startsWith(ja.sel.trim().slice(0, 12)) && ja.sel.trim().length >= ja.absatz.trim().length - 2;
+                record(P131, ganz && ja.userSelect !== "none",
+                  `Selection ${ja.sel.trim().length} Zeichen von ${ja.absatz.trim().length} im Absatz („${ja.sel.trim().slice(0, 40)}“) · user-select ${ja.userSelect}`);
+                if (!ganz) unmeasured(P132, "Gegenprobe ohne Biss: schon die Hauptprobe markierte den Absatz nicht");
+                else {
+                  await cdp.evaluate(`document.querySelector(".koda-log").style.userSelect = "none"; document.querySelector(".koda-log").style.setProperty("-webkit-user-select", "none"); return true;`);
+                  const nein = await dreifach();
+                  await cdp.evaluate(`const l = document.querySelector(".koda-log"); l.style.removeProperty("user-select"); l.style.removeProperty("-webkit-user-select"); window.getSelection().removeAllRanges(); return true;`);
+                  record(P132, nein.sel.trim() === "", `mit user-select none markiert der Dreifachklick ${nein.sel.trim().length} Zeichen (soll 0)`);
+                }
+              } finally {
+                await cdp.evaluate(`const l = document.querySelector(".koda-log"); if (l) { l.style.removeProperty("user-select"); l.style.removeProperty("-webkit-user-select"); } window.getSelection().removeAllRanges(); return true;`).catch(() => undefined);
               }
             }
           }
