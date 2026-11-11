@@ -168,6 +168,11 @@ export class VaultTools implements ToolRunner {
        *  frisch je Aufruf aus dem Plugin-Register; `null` = nicht (mehr) da. */
       ocr?: () => OcrProviderApi | null;
       imageGen?: () => ImageGenProviderApi | null;
+      /** Bringt einen NEU gebildeten Namen (ein Segment, kein Pfad) in die Dateinamen-Richtlinie des Nutzers: `safeFileName` aus dem Kit,
+       *  zuerst ueber die API von `filename-sanitizer`, sonst mit den Kit-Regeln. Fehlt das Feld, bleibt der Name, wie das Modell ihn
+       *  schrieb (Tests, die nur den Werkzeug-Kern messen). Angewendet wird nur auf Namen, die das Modell erfindet: das Ziel von
+       *  `write_note` (create) und `move_note`, nie auf einen vorhandenen Pfad. */
+      safeName?: (name: string, kind: "file" | "folder") => string;
       /** Dateigroesse des Bildes in Byte, `null` wenn es nicht existiert. Synchron aus dem
        *  Datei-Index — kein Lesen, bevor die Grenze geprueft ist. */
       imageSize?: (path: string) => number | null;
@@ -401,6 +406,26 @@ export class VaultTools implements ToolRunner {
     return { ok: true, content: h === "" ? `geöffnet: ${norm}` : `geöffnet: ${norm} (Abschnitt „${h}“)` };
   }
 
+  /** Der Pfad, den das Modell fuer eine NEUE Notiz nennt, mit Namen nach der Richtlinie: die Datei immer, ein Ordner nur, wenn es ihn
+   *  noch nicht gibt (ein vorhandener Ordner heisst, wie er heisst, sonst fuehrt der Pfad ins Leere). Ein Pfad ohne `safeName` bleibt. */
+  private safePath(norm: string): string {
+    const clean = this.opts.safeName;
+    if (clean === undefined) return norm;
+    const folders = new Set(this.vault.listFolderPaths());
+    const parts = norm.split("/");
+    return parts
+      .map((seg, i) => {
+        if (i === parts.length - 1) return clean(seg, "file");
+        return folders.has(parts.slice(0, i + 1).join("/")) ? seg : clean(seg, "folder");
+      })
+      .join("/");
+  }
+
+  /** Der Hinweis hinter einer Erfolgsmeldung, wenn die Richtlinie den Namen des Modells geaendert hat; sonst leer. */
+  private static renamedNote(asked: string, written: string): string {
+    return asked === written ? "" : ` — Name an die Dateinamen-Richtlinie angepasst (angefragt: ${asked})`;
+  }
+
   private async write(path: string, content: string, mode: string): Promise<ToolOutcome> {
     if (mode !== "create" && mode !== "append" && mode !== "replace") {
       return { ok: false, error: `mode muss create|append|replace sein, war: "${mode}"` };
@@ -408,7 +433,9 @@ export class VaultTools implements ToolRunner {
     const decoded = decodeByteTokens(content);
     if (!decoded.ok) return { ok: false, error: decoded.error };
     content = decoded.text;
-    const norm = resolveNotePath(path);
+    const asked = resolveNotePath(path);
+    // Nur eine neue Notiz bekommt einen neuen Namen; append/replace nennen eine vorhandene und bleiben bei ihrem Pfad.
+    const norm = mode === "create" ? this.safePath(asked) : asked;
     const exists = await this.vault.exists(norm);
     if (mode === "create" && exists) return { ok: false, error: `existiert schon: "${norm}" — nutze append oder replace` };
     if (mode === "create") {
@@ -439,7 +466,7 @@ export class VaultTools implements ToolRunner {
     if (mode === "create") await this.vault.create(norm, effective);
     else if (mode === "append") await this.vault.append(norm, effective);
     else await this.vault.overwrite(norm, effective);
-    return { ok: true, content: `geschrieben: ${norm} (${mode})` };
+    return { ok: true, content: `geschrieben: ${norm} (${mode})${VaultTools.renamedNote(asked, norm)}` };
   }
 
   /** Verschieben und Umbenennen — fuer Obsidian dieselbe Operation, fuer den Nutzer nicht.
@@ -449,7 +476,10 @@ export class VaultTools implements ToolRunner {
    *  vor die Existenzpruefung zieht, laesst den Nutzer einen Vorgang bestaetigen, der
    *  danach an einer Kleinigkeit scheitert — und gewoehnt ihn daran, Modale wegzuklicken. */
   private async moveNote(source: string, destination: string): Promise<ToolOutcome> {
-    const plan = planMove(source, destination);
+    // Das Ziel ist ein vom Modell erfundener Name; die Quelle ist vorhanden und bleibt. Vor `planMove`, damit auch die Gleichheit
+    // von Quelle und Ziel am bereinigten Namen gemessen wird.
+    const askedDestination = resolveNotePath(destination);
+    const plan = planMove(source, this.safePath(askedDestination));
     if (!(await this.vault.exists(plan.source))) {
       return { ok: false, error: `nicht gefunden: "${plan.source}"` };
     }
@@ -479,7 +509,7 @@ export class VaultTools implements ToolRunner {
 
     await this.vault.move(plan.source, plan.destination);
     const verb = plan.kind === "rename" ? "umbenannt" : "verschoben";
-    return { ok: true, content: `${verb}: ${plan.source} → ${plan.destination}` };
+    return { ok: true, content: `${verb}: ${plan.source} → ${plan.destination}${VaultTools.renamedNote(askedDestination, plan.destination)}` };
   }
 
   /** Loeschen fragt IMMER — auch im Koda-Ordner, wo Schreiben frei ist.

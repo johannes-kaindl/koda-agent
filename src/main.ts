@@ -4,6 +4,7 @@ import { getLanguage } from "obsidian";
 import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
 import { resolveLang, type Lang } from "./core/lang";
 import { openChatLeaf } from "./vendor/kit-obsidian/chat-leaf";
+import { safeFileName } from "./vendor/kit-obsidian/safe-file-name";
 import { rowModel, type EndpointConfig } from "./vendor/kit/endpoint_config";
 import { loadKodaSettings } from "./core/settings-migration";
 import type { EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
@@ -1148,6 +1149,8 @@ export default class KodaPlugin extends Plugin {
         return findToolProvider(this.app, id);
       },
       skillMode: (name) => skillModeLookup(this.skillsCache, this.currentArbeit(), this.session.overlay)(name),
+      // Dateinamen, die das Modell erfindet (write_note create, move_note): erst die API von filename-sanitizer, sonst die Kit-Regeln.
+      safeName: (name, kind) => safeFileName(this.app, name, { caller: this.manifest.id, kind }).name,
       imageMode: () => this.imageMode(),
       ocr: () => readOcrApi(this.app),
       imageGen: () => readImageGenApi(this.app),
