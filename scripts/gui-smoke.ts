@@ -5374,6 +5374,19 @@ async function main(): Promise<void> {
             else unmeasured(P127, "keine Antwort im Verlauf — es gibt nichts zu kopieren");
             unmeasured(P128, "ohne Kopier-Knopf keine Gegenprobe");
           } else {
+            // Bilder zum Ansehen (kein Messpunkt): nur mit der Umgebungsvariablen KODA_BILDER, hell und dunkel, die letzte Antwort samt Knopf.
+            const bilderDir = process.env["KODA_BILDER"] ?? "";
+            if (bilderDir !== "") {
+              mkdirSync(bilderDir, { recursive: true });
+              const thema127 = await cdp.evaluate<unknown>(`return app.vault.getConfig ? app.vault.getConfig("theme") : null;`);
+              for (const dunkel of [false, true]) {
+                await cdp.evaluate(`app.vault.setConfig("theme", ${dunkel ? '"obsidian"' : '"moonstone"'}); app.workspace.trigger("css-change"); return true;`);
+                await new Promise((r) => setTimeout(r, 500));
+                const box = await boxOf(cdp, ".koda-log");
+                writeFileSync(`${bilderDir}/antwort-kopieren-${dunkel ? "dunkel" : "hell"}.png`, await capture(cdp, box ?? undefined));
+              }
+              if (thema127 !== null) await cdp.evaluate(`app.vault.setConfig("theme", ${JSON.stringify(thema127)}); app.workspace.trigger("css-change"); return true;`);
+            }
             const ok = await cdp.evaluate<Stand127>(probe("ok"));
             await wiederherstellen();
             record(P127, ok.n === 1 && ok.text === ANTWORT && ok.quittiert && ok.aria !== "",
@@ -5498,6 +5511,12 @@ async function main(): Promise<void> {
             await new Promise((r) => setTimeout(r, 400));
             const k = await cdp.evaluate<Kontrast | null>(messen);
             if (k === null) throw new Error("Löschung oder Einfügung nicht im Dialog");
+            const bilderDir129 = process.env["KODA_BILDER"] ?? "";
+            if (bilderDir129 !== "") {
+              mkdirSync(bilderDir129, { recursive: true });
+              const box = await boxOf(cdp, ".modal-container .modal");
+              writeFileSync(`${bilderDir129}/redline-dialog-${dunkel ? "dunkel" : "hell"}.png`, await capture(cdp, box ?? undefined));
+            }
             if ((dunkel && k.hell) || (!dunkel && !k.hell)) throw new Error(`Thema nicht erreicht (verlangt ${dunkel ? "dunkel" : "hell"}, ist ${k.thema})`);
             werte.push(k);
           }
