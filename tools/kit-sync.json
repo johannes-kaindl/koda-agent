@@ -25,6 +25,10 @@
         {
           "name": "filename-sanitizer-source",
           "ref": "0.82.2"
+        },
+        {
+          "name": "vault-path",
+          "ref": "0.82.2"
         }
       ],
       "rewrite": [

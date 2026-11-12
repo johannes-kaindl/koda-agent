@@ -14,8 +14,11 @@
  *  Nur fuer den VERGLEICH: ausgegeben wird immer der Originalpfad, denn mit dem muss
  *  `read_note` anschliessend die Datei finden. */
 import { countInFolders, pathsInFolder } from "../../vendor/kit/folder-scope";
+import { canonVaultDir } from "../../vendor/kit/vault-path";
 import type { TreeBlock } from "./tree";
 
+/** NFC fuer DATEINAMEN und Pfadlisten (wo Backslash und Schraegstriche nichts zu normalisieren haben). Ein Ordnerstring geht
+ *  durch `canonVaultDir` (obsidian-kit `vault-path`: NFC plus Slash-Rauschen); `nf` ist dafuer nicht mehr zustaendig. */
 export const nf = (s: string): string => s.normalize("NFC");
 
 /** Eine Notiz, die so heisst wie der Ordner, in dem sie liegt (`_Tasks/_Tasks.md`) —
@@ -130,14 +133,14 @@ export function knownFolders(allPaths: string[], folderPaths: string[]): Map<str
   const out = new Map<string, string>();
   for (const f of [...folderPaths, ...allFolders(allPaths)]) {
     const clean = f.replace(/^\/+|\/+$/g, "");
-    if (clean !== "" && !out.has(nf(clean))) out.set(nf(clean), clean);
+    if (clean !== "" && !out.has(canonVaultDir(clean))) out.set(canonVaultDir(clean), clean);
   }
   return out;
 }
 
 /** Existiert `folder`? Die Vault-Wurzel immer. */
 export function folderExists(allPaths: string[], folderPaths: string[], folder: string): boolean {
-  return folder === "" || knownFolders(allPaths, folderPaths).has(nf(folder));
+  return folder === "" || knownFolders(allPaths, folderPaths).has(canonVaultDir(folder));
 }
 
 /** Was eine Liste von `folder` NICHT zeigt, obwohl es dort liegt.
@@ -156,7 +159,8 @@ export function folderExists(allPaths: string[], folderPaths: string[], folder: 
 export function collectSubfolders(
   allPaths: string[], folderPaths: string[], folder: string, recursive: boolean, otherPaths: string[] = [],
 ): Subfolder[] {
-  const prefix = folder === "" ? "" : `${nf(folder)}/`;
+  const canon = canonVaultDir(folder);
+  const prefix = canon === "" ? "" : `${canon}/`;
   const candidates: [string, string][] = [];
   for (const [n, original] of knownFolders(allPaths, folderPaths)) {
     if (!n.startsWith(prefix)) continue;
@@ -297,10 +301,10 @@ function editDistance(a: string, b: string): number {
  *  ORT. Der dritte haelt das Ergebnis deterministisch, wenn die ersten beiden nichts
  *  unterscheiden — Determinismus ist der Daseinszweck dieses Werkzeugs. */
 function byNearness(candidates: string[], wanted: string): string[] {
-  const w = nf(wanted).toLowerCase().split("/").filter((x) => x !== "");
+  const w = canonVaultDir(wanted).toLowerCase().split("/").filter((x) => x !== "");
   const wLast = w[w.length - 1] ?? "";
   const key = (c: string): [number, number, number] => {
-    const parts = nf(c).toLowerCase().split("/");
+    const parts = canonVaultDir(c).toLowerCase().split("/");
     let shared = 0;
     while (shared < parts.length && shared < w.length && parts[shared] === w[shared]) shared++;
     const last = parts[parts.length - 1] ?? "";
@@ -343,12 +347,12 @@ export function suggestFolders(allPaths: string[], folder: string, max: number =
   // Verglichen wird durchgehend normalisiert, zurueckgegeben immer der Originalpfad:
   // sonst schlaegt ein korrekt geschriebener Ordner mit Umlaut ins Leere und der Nutzer
   // liest einen Vorschlag, der optisch identisch zu seiner Eingabe ist.
-  const want = nf(folder);
+  const want = canonVaultDir(folder);
   const wanted = (want.split("/").pop() ?? "").toLowerCase();
 
   if (wanted !== "") {
     const near = folders.filter((f) => {
-      const last = (nf(f).split("/").pop() ?? "").toLowerCase();
+      const last = (canonVaultDir(f).split("/").pop() ?? "").toLowerCase();
       return last !== "" && (last.includes(wanted) || wanted.includes(last));
     });
     if (near.length > 0) return byNearness(near, folder).slice(0, max);
@@ -365,9 +369,9 @@ export function suggestFolders(allPaths: string[], folder: string, max: number =
   for (let i = parts.length; i >= 0; i--) {
     const base = parts.slice(0, i).join("/");
     const prefix = base === "" ? "" : `${base}/`;
-    if (base !== "" && !folders.some((f) => nf(f) === base)) continue;
+    if (base !== "" && !folders.some((f) => canonVaultDir(f) === base)) continue;
     const children = folders.filter((f) => {
-      const n = nf(f);
+      const n = canonVaultDir(f);
       return n.startsWith(prefix) && !n.slice(prefix.length).includes("/") && n !== base;
     });
     if (children.length > 0) return byNearness(children, folder).slice(0, max);

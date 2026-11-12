@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A folder typed with a trailing slash or a backslash is found.** `list_notes` and the folder suggestions compared folder names with plain Unicode normalisation only; they now use the kit's shared folder comparison, so `Bücher/` or `Bücher\Tief` lead to the same folder as `Bücher`.
+
 ## [0.36.0] — 2026-11-11
 
 ### Added
