@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.36.1] — 2026-11-12
+
 ### Fixed
 
 - **An unsent message and the status line survive Koda moving to a tab.** On a phone or tablet Koda moves from the drawer to a tab in the main area when you open it; the text you had typed in the input field was lost on the way, and a reply that was still running showed no activity in the new view until its next step. The text now comes along and the status line shows the running reply at once.
