@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **An unsent message and the status line survive Koda moving to a tab.** On a phone or tablet Koda moves from the drawer to a tab in the main area when you open it; the text you had typed in the input field was lost on the way, and a reply that was still running showed no activity in the new view until its next step. The text now comes along and the status line shows the running reply at once.
 - **A folder typed with a trailing slash or a backslash is found.** `list_notes` and the folder suggestions compared folder names with plain Unicode normalisation only; they now use the kit's shared folder comparison, so `Bücher/` or `Bücher\Tief` lead to the same folder as `Bücher`.
 
 ## [0.36.0] — 2026-11-11

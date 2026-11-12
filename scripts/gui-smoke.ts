@@ -353,6 +353,10 @@ const PUNKTE = [
   "130. Gegenprobe Redline-Kontrast: der rohe Akzent (var(--color-orange) bzw. var(--color-blue)) unterschreitet 4,5 zu 1 in mindestens einer der vier Kombinationen — die Messung kann also rot werden",
   "131. Markieren in der Antwort (Desktop): ein echter Dreifachklick auf den Absatz der fertigen Antwort markiert ihren Text (Selection gleich Absatz), user-select ist nicht none",
   "132. Gegenprobe Markieren: mit user-select none am Verlauf markiert derselbe Dreifachklick nichts von der Antwort — die Messung kann also rot werden",
+  "133. Blatt wandert mit ungesendetem Eingabetext (Mobilgerät gemeldet, Blatt in der Schublade): der Text im Eingabefeld steht nach dem Wandern im Eingabefeld der neuen Ansicht",
+  "134. Gegenprobe Entwurf: am Desktop bleibt dasselbe Blatt, der Text steht unverändert im selben Eingabefeld — die Messung von 133 kann also grün werden",
+  "135. Blatt wandert während einer laufenden Antwort (Stub mit langsamem Strom): Stopp ist in der neuen Ansicht sichtbar, die Statuszeile zeigt den Lauf, weitere Stücke kommen in der neuen Ansicht an, am Ende steht die ganze Antwort dort und der Lauf ist frei",
+  "136. Gegenprobe laufende Antwort: derselbe Lauf ohne Wandern (Desktop) endet mit der ganzen Antwort in der Ansicht — die Messung von 135 kann also grün werden",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -2332,6 +2336,152 @@ async function main(): Promise<void> {
     }
     record(P123, ok123, detail123);
     record(P124, ok124, detail124);
+
+    // --- 133–136. Entwurf und laufende Antwort beim Wandern des Blatts (Welle 33, Task „Blatt wandert mit ungesendetem Eingabetext …“) --------------------------------
+    // Das Blatt trägt zwei Zustände, die nicht im Plugin liegen: den Text im Eingabefeld (ein DOM-Knoten der alten Ansicht) und den Strom einer laufenden Antwort (die neue Ansicht legt ihren Bereich erst beim nächsten Stück an).
+    // 133/134: Entwurf; 135/136: Lauf gegen einen Stub mit langsamem Strom. Die Plattformfrage wird wie in 123 an der Instanz umgelegt.
+    const P133 = PUNKTE.find((n) => n.startsWith("133. "))!;
+    const P134 = PUNKTE.find((n) => n.startsWith("134. "))!;
+    const P135 = PUNKTE.find((n) => n.startsWith("135. "))!;
+    const P136 = PUNKTE.find((n) => n.startsWith("136. "))!;
+    let ok133 = false, detail133 = "nicht gelaufen", ok134 = false, detail134 = "nicht gelaufen";
+    try {
+      const w = await cdp.evaluate<{ vorMobil: string; nachMobil: string; mobilWert: string | null; neuesFeld: boolean; vorDesk: string; nachDesk: string; deskWert: string | null; gleichesFeld: boolean }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const TYP = "koda-agent-view";
+        const wo = () => { const l = app.workspace.getLeavesOfType(TYP)[0]; if (!l) return "keins"; const r = l.getRoot(); return r === app.workspace.rootSplit ? "hauptbereich" : r === app.workspace.rightSplit ? "seitenleiste" : "anderswo"; };
+        const feld = () => app.workspace.getLeavesOfType(TYP)[0]?.view?.containerEl?.querySelector("textarea.koda-input") ?? null;
+        const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+        const entwurf = "Entwurf-vor-dem-Wandern-" + Date.now();
+        let r = {};
+        try {
+          app.workspace.detachLeavesOfType(TYP); await warte(400);
+          await app.workspace.getRightLeaf(false).setViewState({ type: TYP, active: true }); await warte(600);
+          r.vorMobil = wo();
+          const alt = feld(); alt.value = entwurf; alt.dispatchEvent(new Event("input"));
+          p.isMobileDevice = () => true;
+          await p.activateView(); await warte(800);
+          delete p.isMobileDevice;
+          r.nachMobil = wo(); const neu = feld(); r.mobilWert = neu ? neu.value : null; r.neuesFeld = neu !== alt;
+          app.workspace.detachLeavesOfType(TYP); await warte(400);
+          await app.workspace.getRightLeaf(false).setViewState({ type: TYP, active: true }); await warte(600);
+          r.vorDesk = wo();
+          const f2 = feld(); f2.value = entwurf; f2.dispatchEvent(new Event("input"));
+          await p.activateView(); await warte(600);
+          r.nachDesk = wo(); const f3 = feld(); r.deskWert = f3 ? f3.value : null; r.gleichesFeld = f3 === f2;
+        } finally {
+          delete p.isMobileDevice;
+          app.workspace.detachLeavesOfType(TYP); await warte(400);
+          await p.activateView(); await warte(600);
+          // Der Entwurf wandert mit dem Blatt: den Rest dieses Punkts aus Feld und Plugin räumen, sonst steht er im nächsten Punkt im Eingabefeld.
+          p.draft = ""; const rest = feld(); if (rest) rest.value = "";
+          p.setContextQuery("");
+        }
+        return r;`);
+      ok133 = w.vorMobil === "seitenleiste" && w.nachMobil === "hauptbereich" && w.neuesFeld && (w.mobilWert ?? "").startsWith("Entwurf-vor-dem-Wandern-");
+      detail133 = `Ausgang ${w.vorMobil} · nach activateView (Mobilgerät gemeldet): ${w.nachMobil}, neues Eingabefeld: ${w.neuesFeld} · Text im neuen Feld: ${w.mobilWert === null ? "kein Feld" : w.mobilWert === "" ? "leer (verloren)" : `„${w.mobilWert}“`}`;
+      ok134 = w.vorDesk === "seitenleiste" && w.nachDesk === "seitenleiste" && w.gleichesFeld && (w.deskWert ?? "").startsWith("Entwurf-vor-dem-Wandern-");
+      detail134 = `Desktop: Ausgang ${w.vorDesk} · danach ${w.nachDesk}, selbes Feld: ${w.gleichesFeld}, Text: ${w.deskWert === null ? "kein Feld" : w.deskWert === "" ? "leer" : `„${w.deskWert}“`}`;
+    } catch (error) {
+      detail133 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail134 = detail133;
+    }
+    record(P133, ok133, detail133);
+    record(P134, ok134, detail134);
+
+    const STUECKE135 = ["Eins ", "Zwei ", "Drei ", "Vier ", "Fuenf ", "Sechs ", "Sieben ", "Acht"];
+    const lauf135 = async (wandern: boolean): Promise<{ ok: boolean; detail: string }> => {
+      const stub = await startLlmStub({ models: ["smoke-model"], standard: { stuecke: STUECKE135, takt: 600 } });
+      try {
+        const r = await cdp.evaluate<{
+          vorOrt: string; nachOrt: string; neuesBlatt: boolean;
+          imLauf: { stoppSichtbar: boolean; sendenSichtbar: boolean; statusLaeuft: boolean; streamText: string; busy: boolean } | null;
+          spaeterText: string; ende: { busy: boolean; sendenSichtbar: boolean; stoppSichtbar: boolean; text: string; logAntwort: string; blasen: number; streamReste: number } | null;
+        }>(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          const TYP = "koda-agent-view";
+          const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+          const wo = () => { const l = app.workspace.getLeavesOfType(TYP)[0]; if (!l) return "keins"; const rt = l.getRoot(); return rt === app.workspace.rootSplit ? "hauptbereich" : rt === app.workspace.rightSplit ? "seitenleiste" : "anderswo"; };
+          const ansicht = () => app.workspace.getLeavesOfType(TYP)[0]?.view?.containerEl ?? null;
+          const sicht = (e) => { if (!e) return false; const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+          const vorher = JSON.parse(JSON.stringify(p.settings.endpoints));
+          const logVorher = p.chatLog.slice();
+          let r = { imLauf: null, ende: null, spaeterText: "" };
+          try {
+            p.settings.endpoints = [{ url: ${JSON.stringify(stub.url)} }]; await p.saveSettings();
+            await p.newChat();
+            app.workspace.detachLeavesOfType(TYP); await warte(400);
+            await app.workspace.getRightLeaf(false).setViewState({ type: TYP, active: true }); await warte(600);
+            r.vorOrt = wo();
+            const alt = app.workspace.getLeavesOfType(TYP)[0];
+            void p.ask("Smoke-135: bitte langsam antworten.");
+            // Warten, bis der Strom in der Ansicht angekommen ist (mindestens ein Stück).
+            const t0 = Date.now();
+            while (Date.now() - t0 < 8000) { const a = ansicht()?.querySelector(".koda-streaming"); if (a && a.textContent.trim().length > 0) break; await warte(50); }
+            if (${wandern ? "true" : "false"}) {
+              p.isMobileDevice = () => true;
+              await p.activateView(); await warte(150);
+              delete p.isMobileDevice;
+            } else { await p.activateView(); await warte(150); }
+            r.nachOrt = wo(); r.neuesBlatt = app.workspace.getLeavesOfType(TYP)[0] !== alt;
+            const c = ansicht();
+            const strom = () => c.querySelector(".koda-streaming")?.textContent.trim() ?? "";
+            r.imLauf = {
+              stoppSichtbar: sicht(c.querySelector(".koda-stop")), sendenSichtbar: sicht(c.querySelector(".koda-send")),
+              statusLaeuft: !!c.querySelector(".koda-status.is-checking") && sicht(c.querySelector(".koda-status")),
+              streamText: strom(), busy: p.busy,
+            };
+            const t1 = Date.now();
+            while (Date.now() - t1 < 4000) { if (strom().length > r.imLauf.streamText.length) break; await warte(50); }
+            r.spaeterText = strom();
+            const t2 = Date.now();
+            while (p.busy && Date.now() - t2 < 20000) await warte(100);
+            await warte(500);
+            const c2 = ansicht();
+            const letzte = [...c2.querySelectorAll(".koda-assistant:not(.koda-placeholder)")].pop();
+            const logA = [...p.chatLog].reverse().find((e) => e && e.role === "assistant");
+            r.ende = {
+              busy: p.busy, sendenSichtbar: sicht(c2.querySelector(".koda-send")), stoppSichtbar: sicht(c2.querySelector(".koda-stop")),
+              text: letzte ? letzte.textContent.trim() : "", logAntwort: logA ? String(logA.content) : "",
+              blasen: c2.querySelectorAll(".koda-assistant:not(.koda-placeholder)").length, streamReste: c2.querySelectorAll(".koda-streaming").length,
+            };
+          } finally {
+            delete p.isMobileDevice;
+            p.settings.endpoints = vorher; await p.saveSettings();
+            await p.newChat(); p.chatLog.length = 0; p.chatLog.push(...logVorher);
+            app.workspace.detachLeavesOfType(TYP); await warte(400);
+            await p.activateView(); await warte(600);
+          }
+          return r;`);
+        const ganz = STUECKE135.join("");
+        const lauf = r.imLauf, ende = r.ende;
+        const endeOk = ende !== null && !ende.busy && ende.sendenSichtbar && !ende.stoppSichtbar && ende.text === ganz.trim() && ende.logAntwort === ganz && ende.blasen === 1 && ende.streamReste === 0;
+        const laufDetail = lauf === null ? "keine Messung im Lauf"
+          : `im Lauf: Stopp ${lauf.stoppSichtbar ? "sichtbar" : "unsichtbar"}, Senden ${lauf.sendenSichtbar ? "sichtbar" : "unsichtbar"}, Statuszeile ${lauf.statusLaeuft ? "zeigt den Lauf" : "zeigt keinen Lauf"}, Strom „${lauf.streamText}“ → später „${r.spaeterText}“`;
+        const endeDetail = ende === null ? "kein Ende gemessen"
+          : `Ende: busy ${ende.busy}, Senden ${ende.sendenSichtbar ? "sichtbar" : "unsichtbar"}, Stopp ${ende.stoppSichtbar ? "sichtbar" : "unsichtbar"}, ${ende.blasen} Antwortblase(n), Strom-Reste ${ende.streamReste}, Text ${ende.text === ganz.trim() ? "vollständig" : `„${ende.text}“`}, Verlauf ${ende.logAntwort === ganz ? "vollständig" : `„${ende.logAntwort}“`}`;
+        const ortOk = wandern ? r.vorOrt === "seitenleiste" && r.nachOrt === "hauptbereich" && r.neuesBlatt : r.nachOrt === "seitenleiste" && !r.neuesBlatt;
+        const laufOk = lauf !== null && lauf.busy && lauf.stoppSichtbar && !lauf.sendenSichtbar && lauf.statusLaeuft && r.spaeterText.length > lauf.streamText.length;
+        return { ok: ortOk && (wandern ? laufOk : true) && endeOk, detail: `Ort: ${r.vorOrt} → ${r.nachOrt}, neues Blatt: ${r.neuesBlatt} · ${laufDetail} · ${endeDetail}` };
+      } finally {
+        await stub.stop();
+      }
+    };
+    let ok135 = false, detail135 = "nicht gelaufen", ok136 = false, detail136 = "nicht gelaufen";
+    try {
+      const a = await lauf135(true);
+      ok135 = a.ok; detail135 = a.detail;
+    } catch (error) {
+      detail135 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    try {
+      const b = await lauf135(false);
+      ok136 = b.ok; detail136 = b.detail;
+    } catch (error) {
+      detail136 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    record(P135, ok135, detail135);
+    record(P136, ok136, detail136);
 
     // --- 26. delete_note fragt AUCH im Koda-Ordner ---------------------------------------
     // Die Regel „Wirkung schlaegt Ort" ist im Adapter getestet; hier wird sie am laufenden

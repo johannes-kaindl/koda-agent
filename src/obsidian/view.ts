@@ -146,7 +146,9 @@ export class KodaView extends ItemView {
     );
 
     this.renderLog();
-    this.paintStatus();
+    // Ein Lauf, der schon läuft, wenn die Ansicht entsteht (das Blatt wanderte mitten in der Antwort): die Statuszeile und die Modellzeile zeigen ihn ab jetzt, nicht erst beim nächsten Ereignis des Laufs.
+    if (this.plugin.busy) this.activity({ kind: "ask" });
+    else this.paintStatus();
     return Promise.resolve();
   }
 
@@ -165,6 +167,7 @@ export class KodaView extends ItemView {
   }
 
   onClose(): Promise<void> {
+    this.plugin.draft = this.inputEl?.value ?? "";
     this.suggest?.destroy();
     this.suggest = null;
     if (this.queryTimer !== null) { window.clearTimeout(this.queryTimer); this.queryTimer = null; }
@@ -252,6 +255,9 @@ export class KodaView extends ItemView {
       },
     });
     this.inputEl = composer.createEl("textarea", { cls: "koda-input", attr: { placeholder: t("view.placeholder"), rows: "2" } });
+    // Ein ungesendeter Text liegt im Feld dieser Ansicht; wandert das Blatt (Handy: Schublade → Tab), stirbt die Ansicht mit ihm. `onClose` legt ihn im Plugin ab, die nächste Ansicht nimmt ihn hier wieder auf.
+    this.inputEl.value = this.plugin.draft;
+    this.plugin.draft = "";
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
     });

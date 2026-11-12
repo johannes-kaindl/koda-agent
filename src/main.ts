@@ -101,6 +101,8 @@ export default class KodaPlugin extends Plugin {
   settings: KodaSettings = DEFAULT_SETTINGS;
   chatLog: LogEntry[] = [];
   busy = false;
+  /** Der ungesendete Text im Eingabefeld, solange keine Ansicht offen ist: die Ansicht legt ihn beim Schließen hier ab und nimmt ihn beim Öffnen wieder auf (das Blatt wandert am Handy von der Schublade in den Hauptbereich). */
+  draft = "";
   /** Transiente Notiz (Fehler/Abbruch/Rundenlimit) als Plugin-State statt DOM-Append —
    *  renderLog() zeichnet sie am Ende neu; ein Voll-Redraw kann sie sonst sofort wieder loeschen. */
   lastNotice: { text: string; kind: "error" | "neutral" } | null = null;
