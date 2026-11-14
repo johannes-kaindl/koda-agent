@@ -16,14 +16,9 @@
 .koda-assistant > :last-child { margin-bottom: 0; }
 .koda-assistant ul, .koda-assistant ol { margin: var(--size-4-1) 0; padding-inline-start: var(--size-4-4); }
 .koda-user { background: var(--background-secondary); }
-/* Kopier-Knopf unter einer fertigen Antwort (view.ts `answerCopyButton`): leise, immer sichtbar, rechts; auf dem Handy eine 44-px-Tippflaeche, das Symbol bleibt klein (wie das Kit am Denkblock). */
+/* Zeile unter einer fertigen Antwort (view.ts `answerCopyButton`): der Kopier-Knopf selbst kommt aus dem Kit (`.okit-copy-button`, COPY_BUTTON_CSS unten); `.koda-copy` bleibt nur als Griff an ihm. */
 .koda-has-actions > :nth-last-child(2) { margin-bottom: 0; }
 .koda-msg-actions { display: flex; justify-content: flex-end; margin-top: var(--size-2-1); }
-.koda-copy { color: var(--text-faint); height: auto; padding: var(--size-2-1) var(--size-2-2); }
-.koda-copy.is-copied { color: var(--text-success); }
-.koda-copy .svg-icon { width: var(--icon-xs); height: var(--icon-xs); }
-.is-mobile .koda-copy { position: relative; }
-.is-mobile .koda-copy::after { content: ""; position: absolute; top: 50%; left: 50%; width: calc(var(--size-4-10) + var(--size-4-1)); height: calc(var(--size-4-10) + var(--size-4-1)); transform: translate(-50%, -50%); }
 .koda-assistant { background: var(--background-primary-alt); }
 /* Ein gekappter Link (der Wächter hat das href entfernt, Klasse und Pfeil-Icon blieben) sieht auch im fertigen Antworttext wie Text aus. Das Kit (STREAM_AREA_CSS, 0.72.0) deckt nur
    `.okit-stream-body` ab; der Verlauf (`renderLog`) steht in `.koda-assistant`. Dieselben zwei Regeln für ihn; ohne !important, nur gekappte Links (Punkt 106 misst es im Renderer). */
@@ -508,7 +503,7 @@
 .okit-segmented-btn:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: -2px; }
 .okit-segmented-btn:disabled { color: var(--text-faint); cursor: not-allowed; }
 
-/* Redline aus obsidian-kit 0.80.4 (`renderRedline`, REDLINE_CSS) — Kit-Vertrag wie oben (Herkunft: obsidian-kit/src/obsidian/redline.ts). */
+/* Redline aus obsidian-kit 0.88.0 (`renderRedline`, REDLINE_CSS) — Kit-Vertrag wie oben (Herkunft: obsidian-kit/src/obsidian/redline.ts). */
 .okit-redline {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -525,11 +520,11 @@
   color: var(--color-blue);
 }
 
-/* Kontrast 4,5 zu 1: die rohen Akzentfarben der Themes unterschreiten ihn (Orange hell, Blau dunkel, beide in Kuro hell); gegen den Text gemischt halten sie ihn in Standard, Field Report und Kuro. */
+/* Kontrast 4,5 zu 1: die rohen Akzentfarben der Themes unterschreiten ihn (Orange hell, Blau dunkel, beide in Kuro hell); gegen den Text gemischt halten sie ihn in Standard, Field Report und Kuro, auf dem Grund des Editors und auf dem der Seitenleiste (dunkel Standard: Einfügung 75 Prozent, gemessen 2026-11-12 mit 4,41 bei 80). */
 .theme-light .okit-redline-del { color: color-mix(in srgb, var(--color-orange) 60%, var(--text-normal)); }
 .theme-light .okit-redline-ins { color: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
 .theme-dark .okit-redline-del { color: color-mix(in srgb, var(--color-orange) 80%, var(--text-normal)); }
-.theme-dark .okit-redline-ins { color: color-mix(in srgb, var(--color-blue) 80%, var(--text-normal)); }
+.theme-dark .okit-redline-ins { color: color-mix(in srgb, var(--color-blue) 75%, var(--text-normal)); }
 
 .okit-redline-del[data-author="0"],
 .okit-redline-ins[data-author="0"] { color: var(--color-blue); }
@@ -543,6 +538,17 @@
 .okit-redline-ins[data-author="4"] { color: var(--color-yellow); }
 .okit-redline-del[data-author="5"],
 .okit-redline-ins[data-author="5"] { color: var(--color-pink); }
+
+/* Autorenplätze gegen den Text gemischt, je Modus (Spezifität größer als die Moduszeilen oben, die Reihenfolge ist egal). Hell brauchen alle sechs Plätze den Anteil, dunkel nur Blau und Pink.
+   Je größer der Anteil Text, desto näher rücken die Plätze zusammen: Kontrast und Unterscheidbarkeit gehen hier gegeneinander, die gemessenen Abstände stehen im CHANGELOG. */
+.theme-light .okit-redline-del[data-author="0"], .theme-light .okit-redline-ins[data-author="0"] { color: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
+.theme-light .okit-redline-del[data-author="1"], .theme-light .okit-redline-ins[data-author="1"] { color: color-mix(in srgb, var(--color-orange) 60%, var(--text-normal)); }
+.theme-light .okit-redline-del[data-author="2"], .theme-light .okit-redline-ins[data-author="2"] { color: color-mix(in srgb, var(--color-purple) 60%, var(--text-normal)); }
+.theme-light .okit-redline-del[data-author="3"], .theme-light .okit-redline-ins[data-author="3"] { color: color-mix(in srgb, var(--color-cyan) 45%, var(--text-normal)); }
+.theme-light .okit-redline-del[data-author="4"], .theme-light .okit-redline-ins[data-author="4"] { color: color-mix(in srgb, var(--color-yellow) 40%, var(--text-normal)); }
+.theme-light .okit-redline-del[data-author="5"], .theme-light .okit-redline-ins[data-author="5"] { color: color-mix(in srgb, var(--color-pink) 50%, var(--text-normal)); }
+.theme-dark .okit-redline-del[data-author="0"], .theme-dark .okit-redline-ins[data-author="0"] { color: color-mix(in srgb, var(--color-blue) 75%, var(--text-normal)); }
+.theme-dark .okit-redline-del[data-author="5"], .theme-dark .okit-redline-ins[data-author="5"] { color: color-mix(in srgb, var(--color-pink) 90%, var(--text-normal)); }
 
 /* Modellzeile (obsidian-kit model-bar, MODEL_BAR_CSS, 0.74.0) und Denk-Steuerung (thinking-control, THINKING_CONTROL_CSS): wortgleich aus dem Kit, nicht von Hand ändern. */
 .okit-model-bar { position: relative; width: 100%; min-width: 0; container-type: inline-size; container-name: okit-model-bar; }
@@ -611,3 +617,10 @@
 .okit-chat-archive-unreadable { padding: var(--size-4-2) var(--size-4-3); color: var(--text-muted); font-size: var(--font-ui-smaller); border-top: var(--border-width) solid var(--background-modifier-border); }
 /* Auf Mobil sind die Symbole mindestens 44 px hoch und breit (Zielgröße): 4 × 12 = 48 px. Die Stufe --size-4-11 gibt es in Obsidian nicht (Pilot 2026-10-27: Zielgröße blieb bei 30 × 26 px); die Zeile wächst mit. */
 .is-mobile .okit-chat-archive-actions .clickable-icon { min-width: var(--size-4-12); min-height: var(--size-4-12); display: flex; align-items: center; justify-content: center; }
+
+/* Kopier-Knopf aus obsidian-kit 0.88.0 (`createCopyButton`, COPY_BUTTON_CSS) — Kit-Vertrag wie oben (Herkunft: obsidian-kit/src/obsidian/copy-button.ts). */
+.okit-copy-button { color: var(--text-faint); height: auto; padding: var(--size-2-1) var(--size-2-2); }
+.okit-copy-button.is-copied { color: var(--text-success); }
+.okit-copy-button .svg-icon { width: var(--icon-xs); height: var(--icon-xs); }
+.is-mobile .okit-copy-button { position: relative; }
+.is-mobile .okit-copy-button::after { content: ""; position: absolute; top: 50%; left: 50%; width: calc(var(--size-4-10) + var(--size-4-1)); height: calc(var(--size-4-10) + var(--size-4-1)); transform: translate(-50%, -50%); }

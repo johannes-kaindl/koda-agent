@@ -9,8 +9,7 @@ import { describeStateChange } from "../core/abilities/session";
 import { isChatMessage, isCompactionRecord, isErrorRecord, isSessionStateRecord, type CompactionRecord } from "../core/agent/types";
 import { nextActivity, IDLE, type Activity, type ActivityEvent } from "../core/chat/activity";
 import { buildReasoningBlock, buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
-import { copyToClipboard } from "../vendor/kit-obsidian/clipboard";
-import { realClock } from "../vendor/kit-obsidian/clock";
+import { createCopyButton, type CopyButton } from "../vendor/kit-obsidian/copy-button";
 import { createStableWriter, type StableMarkdownWriter } from "../vendor/kit-obsidian/stable-writer";
 import { renderMarkdownGuarded, type DomGuardOptions } from "../vendor/kit-obsidian/dom-guard";
 import { isSafeHref } from "../vendor/kit/link-guard";
@@ -81,6 +80,7 @@ export class KodaView extends ItemView {
   private suggest: TextareaSuggest | null = null;
   /** Namen der Skills fuer das „/“-Menue, beim Oeffnen des Menues frisch gelesen (siehe `slashGroups`). */
   private slashSkills: string[] = [];
+  private copyButtons: CopyButton[] = [];
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: KodaPlugin) {
     super(leaf);
@@ -177,6 +177,7 @@ export class KodaView extends ItemView {
     this.releaseHost = null;
     this.hub?.destroy();
     this.hub = null;
+    this.disposeCopyButtons();
     return Promise.resolve();
   }
 
@@ -421,24 +422,19 @@ export class KodaView extends ItemView {
     });
   }
 
-  /** Der Kopier-Knopf unter einer fertigen Antwort: kopiert den Markdown-Quelltext der Antwort (`koda-copy`, der Griff fuer Tests und Treiber).
-   *  Immer sichtbar und nicht erst beim Hovern, denn auf dem Handy gibt es kein Hover; die Tippflaeche ist dort 44 px (`styles.css`).
-   *  Die Quittung am Knopf (Haken, `is-copied`) ist dieselbe wie am Denkblock. */
+  /** Der Kopier-Knopf unter einer fertigen Antwort: kopiert den Markdown-Quelltext der Antwort (Kit `createCopyButton`, obsidian-kit 0.86.0; vorher ein Eigenbau mit denselben Massen).
+   *  `koda-copy` bleibt als Zusatzklasse und damit der Griff fuer Tests, Treiber und Nutzer-Snippets; die Regeln (leise, Haken, 44-px-Tippflaeche am Handy) tragen jetzt `.okit-copy-button`
+   *  aus `COPY_BUTTON_CSS` in `styles.css`. Immer sichtbar und nicht erst beim Hovern, denn auf dem Handy gibt es kein Hover. Der Zeitgeber der Quittung wird beim Neuzeichnen des Verlaufs
+   *  und beim Schliessen der Ansicht aufgeraeumt (`disposeCopyButtons`). */
   private answerCopyButton(bubble: HTMLElement, markdown: string): void {
     bubble.addClass("koda-has-actions");
     const row = bubble.createDiv({ cls: "koda-msg-actions" });
-    const btn = row.createEl("button", { cls: "clickable-icon koda-copy", attr: { type: "button", "aria-label": t("view.answerCopy") } });
-    setIcon(btn, "copy");
-    btn.addEventListener("click", () => {
-      void copyToClipboard(markdown, {
-        copiedMessage: t("view.answerCopied"),
-        onCopied: () => {
-          setIcon(btn, "check");
-          btn.addClass("is-copied");
-          realClock.setTimeout(() => { setIcon(btn, "copy"); btn.removeClass("is-copied"); }, 1500);
-        },
-      });
-    });
+    this.copyButtons.push(createCopyButton(row, { label: t("view.answerCopy"), text: markdown, cls: "koda-copy", copiedMessage: t("view.answerCopied") }));
+  }
+
+  private disposeCopyButtons(): void {
+    for (const b of this.copyButtons) b.dispose();
+    this.copyButtons = [];
   }
 
   /** Die Schalter „Links und Bilder in Antworten“ (Kit `domGuard`), je Antwort frisch gelesen: ein Umlegen wirkt auf die nächste Antwort und den nächsten Neuzeichnen des Verlaufs. */
@@ -499,6 +495,7 @@ export class KodaView extends ItemView {
   /** Voll-Redraw aus plugin.chatLog (Sessionstart, final, Fehler). */
   renderLog(): void {
     this.syncComposer();   // Neu ist gesperrt, solange das Gespraech leer ist
+    this.disposeCopyButtons();
     this.logEl.empty();
     this.endStream();
     this.streamArea = null;

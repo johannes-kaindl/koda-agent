@@ -155,10 +155,14 @@
           "ref": "0.80.3"
         },
         "clipboard",
+        {
+          "name": "copy-button",
+          "ref": "0.88.0"
+        },
         "segmented-control",
         {
           "name": "redline",
-          "ref": "0.80.4"
+          "ref": "0.88.0"
         },
         "model-bar",
         "model-bar-strings",
