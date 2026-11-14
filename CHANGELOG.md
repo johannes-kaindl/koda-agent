@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.37.0] — 2026-11-14
+
 ### Fixed
 
 - **A reply that is still running when Koda moves to a tab now shows what was already written.** On a phone or tablet Koda moves from the drawer to a tab in the main area when you open it; until now the new view showed the running reply only from its next piece on (the beginning appeared when the reply ended). The text and thinking written so far are now drawn into the new view at once.
