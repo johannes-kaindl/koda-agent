@@ -142,11 +142,14 @@ function twoEndpointManager(over: { models?: Record<string, string[] | { error: 
     { id: "claude", label: "Claude API", url: "https://api.anthropic.com", provider: "anthropic", capabilities: ["chat"], defaultModel: "claude-sonnet-5-5", enabled: over.disabledId !== "claude", hasSecret: true, transport: "anthropic" },
   ];
   const lists = over.models ?? { lm: ["qwen", "gemma"], claude: ["claude-sonnet-5-5", "claude-haiku-5-5"] };
-  const m = fakeManager();
+  // Jede Auflösung trägt die `id` ihres Eintrags (Kit 0.89.0 liest sie, statt sie aus der Liste zu raten).
+  const aufgeloest = (id: string): ResolvedEndpoint => (id === "claude" ? claudeEp : { id: "lm", label: "LM Studio", config: { url: "http://lm" }, defaultModel: "qwen" }) as ResolvedEndpoint;
   return {
-    ...m,
+    ...fakeManager(),
     list: (f) => (entries as unknown as ReturnType<LlmEndpointManagerApi["list"]>).filter((e) => f?.capability === undefined || e.capabilities.includes(f.capability)),
     models: async (id) => (lists[id] ?? { error: "not-found" }) as string[] | ApiError,
+    resolve: async () => aufgeloest(entries.find((e) => e.enabled)?.id ?? "lm") as ResolvedEndpoint | ApiError,
+    materialize: async (id) => (entries.some((e) => e.id === id) ? (entries.find((e) => e.id === id)!.enabled ? aufgeloest(id) : { error: "disabled" }) : { error: "not-found" }) as ResolvedEndpoint | ApiError,
   };
 }
 
@@ -183,7 +186,7 @@ describe("Modellzeile — Gruppen nach Endpunkt (Kit 0.87.0)", () => {
     expect(x.llm.activeEndpointId()).toBe("claude");
     const y = setup({ manager: twoEndpointManager({ disabledId: "lm" }), choice: { endpointId: "weg" } });
     await y.resolver.resolve();
-    expect(y.llm.activeEndpointId()).toBe("claude");             // verwaiste Wahl: Automatisch nimmt den ersten eingeschalteten
+    expect(y.llm.activeEndpointId()).toBe("claude");             // verwaiste Wahl: die Kennung der Auflösung, hier der erste eingeschaltete
   });
   it("choice() liest die gespeicherte Wahl", () => {
     expect(setup({ manager: twoEndpointManager(), choice: { endpointId: "lm", model: "gemma" } }).llm.choice()).toEqual({ endpointId: "lm", model: "gemma" });
@@ -225,18 +228,14 @@ describe("Modellzeile — Gruppen nach Endpunkt (Kit 0.87.0)", () => {
     expect(b.mock.calls.length).toBe(nb);                         // abgemeldet
   });
   it("verwaiste Wahl (der gewählte Endpunkt ist abgeschaltet): source() trägt den Grund, activeEndpointId ist der Automatisch-Endpunkt, nicht die tote Wahl", async () => {
-    const m = twoEndpointManager();
-    const abgeschaltet = { ...m, materialize: async (id: string) => (id === "claude" ? { error: "disabled" } : fakeManager().materialize(id)) } as LlmEndpointManagerApi;
-    const x = setup({ manager: abgeschaltet, choice: { endpointId: "claude", model: "claude-haiku-5-5" } });
+    const x = setup({ manager: twoEndpointManager({ disabledId: "claude" }), choice: { endpointId: "claude", model: "claude-haiku-5-5" } });
     await x.resolver.resolve();
     expect(x.llm.source().reason).toBe("disabled");
     expect(x.llm.activeEndpointId()).toBe("lm");                       // die erste Zeile der Liste, die „Automatisch“ nimmt (hier fakeManager.resolve → claudeEp, die Liste führt lm zuerst)
     expect(x.llm.choice()).toEqual({ endpointId: "claude", model: "claude-haiku-5-5" });   // die gespeicherte Wahl bleibt unangetastet
   });
   it("ohne verwaiste Wahl trägt source() keinen Grund", async () => {
-    const m = twoEndpointManager();
-    const vorhanden = { ...m, materialize: async () => claudeEp as ResolvedEndpoint | ApiError } as LlmEndpointManagerApi;
-    const x = setup({ manager: vorhanden, choice: { endpointId: "lm" } });
+    const x = setup({ manager: twoEndpointManager(), choice: { endpointId: "lm" } });
     await x.resolver.resolve();
     expect(x.llm.source().reason).toBeUndefined();
   });
@@ -253,5 +252,30 @@ describe("Modellzeile — Gruppen nach Endpunkt (Kit 0.87.0)", () => {
     const x = setup({ manager: m, choice: { endpointId: "claude" } });
     expect((await x.llm.models()).models).toEqual(["claude-sonnet-5-5", "claude-haiku-5-5"]);
     expect(gefragt).toBe(0);
+  });
+  it("activeEndpointId wird gelesen, nicht aus der Liste geraten: antwortet der erste Eintrag nicht und löst der Manager auf den zweiten auf, ist der zweite der aktive (Kit 0.89.0)", async () => {
+    const m = { ...twoEndpointManager(), resolve: async () => claudeEp as ResolvedEndpoint } as LlmEndpointManagerApi;   // die Liste führt lm zuerst, die Auflösung nimmt claude
+    const x = setup({ manager: m, choice: {} });
+    await x.resolver.resolve();
+    expect(x.llm.activeEndpointId()).toBe("claude");
+  });
+  it("activeEndpointId ohne Kennung in der Auflösung (ein Fremd-Manager ohne id): unbekannt bleibt unbekannt", async () => {
+    const ohneId = { ...twoEndpointManager(), resolve: async () => ({ label: "x", config: { url: "http://x" } }) as unknown as ResolvedEndpoint } as LlmEndpointManagerApi;
+    const x = setup({ manager: ohneId, choice: {} });
+    await x.resolver.resolve();
+    expect(x.llm.activeEndpointId()).toBeUndefined();
+  });
+  it("setModel mit Manager bindet den aktiven Endpunkt, wenn die Wahl noch keinen trägt (ein Modellname gilt nur auf seinem Endpunkt)", async () => {
+    const x = setup({ manager: twoEndpointManager(), choice: {} });
+    await x.llm.setModel("gemma");
+    expect(x.port.settings.choice).toEqual({ endpointId: "lm", model: "gemma" });
+  });
+  it("setModel mit Manager schreibt eine verwaiste Wahl auf den aktiven Endpunkt um; die Wahl eines lebenden Endpunkts behält ihn", async () => {
+    const verwaist = setup({ manager: twoEndpointManager({ disabledId: "claude" }), choice: { endpointId: "claude", model: "claude-haiku-5-5" } });
+    await verwaist.llm.setModel("gemma");
+    expect(verwaist.port.settings.choice).toEqual({ endpointId: "lm", model: "gemma" });
+    const lebend = setup({ manager: twoEndpointManager(), choice: { endpointId: "claude" } });
+    await lebend.llm.setModel("claude-haiku-5-5");
+    expect(lebend.port.settings.choice).toEqual({ endpointId: "claude", model: "claude-haiku-5-5" });
   });
 });

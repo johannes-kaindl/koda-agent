@@ -32,6 +32,8 @@ export interface ResolvedEndpoint {
   selected?: string;
   /** Das Standardmodell des Endpunkts (nur Manager), für „Automatisch (…)“. */
   defaultModel?: string;
+  /** Die Kennung des Manager-Eintrags, den die Auflösung benutzt hat (obsidian-kit 0.89.0: gelesen, nie aus `list()` geraten); fehlt bei lokalen Zeilen und bei einem Manager ohne `id`. */
+  endpointId?: string;
   /** Warum die Wahl des Nutzers nicht galt und „Automatisch“ einsprang (nur Manager: `disabled`, `not-found`, `secret-missing`): die Modellzeile zeigt dann „Automatisch“ mit Warnzeichen. */
   reason?: ApiErrorCode;
   /** Die Modelltabelle des Managers (nur Manager): daraus entsteht die Liste der Modellzeile, ohne einen Abruf mit Bearer an eine Messages-API. */
@@ -89,6 +91,11 @@ export class EndpointResolver {
     return this.cached === null ? { transport: "http", backend: "unknown" } : { transport: this.cached.transport, backend: this.cached.backend };
   }
 
+  /** Der Manager-Eintrag der gemerkten Auflösung, synchron (`undefined`: noch nicht aufgelöst, lokal oder ohne Kennung). */
+  peekEndpointId(): string | undefined {
+    return this.cached?.endpointId;
+  }
+
   /** Der Grund, aus dem die Wahl nicht galt (siehe `ResolvedEndpoint.reason`), synchron. */
   peekReason(): ApiErrorCode | undefined {
     return this.cached?.reason;
@@ -133,6 +140,7 @@ export class EndpointResolver {
           ...(r.defaultModel ? { defaultModel: r.defaultModel } : {}),
           ...(r.models ? { models: r.models } : {}),
           ...(r.reason ? { reason: r.reason } : {}),
+          ...(r.endpointId ? { endpointId: r.endpointId } : {}),
         };
         this.reason = r.config === null && r.kind === "manager" ? (r.reason ?? "no-endpoint") : null;
         this.cached = ep;

@@ -30,7 +30,7 @@ export interface ModelBarSettingsPort {
 }
 
 export interface ModelBarLlmDeps {
-  resolver: Pick<EndpointResolver, "resolve" | "peekSelected" | "peekDefault" | "peekKind" | "peekReason">;
+  resolver: Pick<EndpointResolver, "resolve" | "peekSelected" | "peekDefault" | "peekKind" | "peekReason" | "peekEndpointId">;
   settings: ModelBarSettingsPort;
   /** Erreichbarkeit und Liste einer lokalen Zeile (ein Abruf, mit Schlüssel aus dem Schlüsselbund). */
   listModels(ep: EndpointConfig): Promise<ModelListResult>;
@@ -62,15 +62,9 @@ export function createModelBarLlm(d: ModelBarLlmDeps): ModelBarLlm {
     return m.list(MANAGER_FILTER).filter((e) => e.enabled).map((e) => ({ id: e.id, label: e.label, ...(e.defaultModel ? { defaultModel: e.defaultModel } : {}) }));
   }
 
-  /** Der Endpunkt, den die Auflösung wirklich nimmt: die Wahl, wenn es sie in der Liste gibt, sonst der erste eingeschaltete („Automatisch“, derselbe, den `resolve()` nimmt). */
+  /** Der Endpunkt, den die Auflösung wirklich nimmt: die Kennung, die der Manager mitgeliefert hat (obsidian-kit 0.89.0), nicht aus der Liste geraten (vorher band ein nicht erreichbarer erster Eintrag den falschen). */
   function activeEndpointId(): string | undefined {
-    const m = d.manager();
-    if (m === null || d.resolver.peekKind() !== "manager") return undefined;
-    const list = m.list(MANAGER_FILTER);
-    // Eine verwaiste Wahl (abgeschaltet, ohne Schlüssel) gilt nicht: die Auflösung ist auf „Automatisch“ gefallen (`list()` führt abgeschaltete Einträge weiter, `resolve()` überspringt sie).
-    const wanted = d.resolver.peekReason() === undefined ? d.settings.getChoice().endpointId : undefined;
-    if (wanted !== undefined && list.some((e) => e.id === wanted)) return wanted;
-    return list.find((e) => e.enabled)?.id;
+    return d.manager() === null || d.resolver.peekKind() !== "manager" ? undefined : d.resolver.peekEndpointId();
   }
 
   async function modelsOf(endpointId: string, opts?: { force?: boolean }): Promise<ModelListResult> {
@@ -109,7 +103,11 @@ export function createModelBarLlm(d: ModelBarLlmDeps): ModelBarLlm {
       if (ep === null) return;
       if (ep.kind === "manager") {
         const { model: _old, ...rest } = d.settings.getChoice();
-        await d.settings.update({ choice: model !== "" ? { ...rest, model } : rest });
+        // Ein Modellname gilt nur auf seinem Endpunkt (obsidian-kit 0.89.0, `applyModel`): die Wahl bindet den aktiven Endpunkt, wenn sie noch keinen trägt, und schreibt eine verwaiste Wahl
+        // (abgeschaltet, gelöscht, ohne Schlüssel: die Auflösung ist auf „Automatisch“ gefallen) auf ihn um; sonst bliebe die tote Kennung stehen und die Wahl wirkte nie.
+        const active = activeEndpointId();
+        const bound = active !== undefined && (rest.endpointId === undefined || d.resolver.peekReason() !== undefined) ? { ...rest, endpointId: active } : rest;
+        await d.settings.update({ choice: model !== "" ? { ...bound, model } : bound });
       } else {
         // Die Zeile NACH dem Auflösen lesen: die gesendete Zeile ist nicht immer die erste.
         const rows = d.settings.getEndpoints();

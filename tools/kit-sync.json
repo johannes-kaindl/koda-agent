@@ -17,7 +17,10 @@
         "explain-texts",
         "ocr-provider",
         "image-gen-provider",
-        "endpoint-source",
+        {
+          "name": "endpoint-source",
+          "ref": "0.89.0"
+        },
         "endpoint-secret-hook",
         "tool-provider",
         "provider-error-texts",
@@ -141,7 +144,7 @@
         "stable-writer",
         {
           "name": "dom-guard",
-          "ref": "0.88.0"
+          "ref": "0.89.0"
         },
         "help-setting",
         "chat-client",
@@ -164,24 +167,24 @@
         "clipboard",
         {
           "name": "copy-button",
-          "ref": "0.88.0"
+          "ref": "0.89.0"
         },
         "segmented-control",
         {
           "name": "redline",
-          "ref": "0.88.0"
+          "ref": "0.89.0"
         },
         {
           "name": "model-bar",
-          "ref": "0.88.0"
+          "ref": "0.89.0"
         },
         {
           "name": "model-bar-strings",
-          "ref": "0.88.0"
+          "ref": "0.89.0"
         },
         {
           "name": "thinking-control",
-          "ref": "0.88.0"
+          "ref": "0.89.0"
         },
         "chat-host",
         "chat-leaf",
@@ -217,7 +220,10 @@
       "source": "obsidian-kit",
       "from": "src/testing",
       "modules": [
-        "kit-css",
+        {
+          "name": "kit-css",
+          "ref": "0.89.0"
+        },
         "obsidian-mock",
         "linear-probe"
       ]
