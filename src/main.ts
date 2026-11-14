@@ -101,6 +101,10 @@ export default class KodaPlugin extends Plugin {
   settings: KodaSettings = DEFAULT_SETTINGS;
   chatLog: LogEntry[] = [];
   busy = false;
+  /** Was der laufende Block schon gestreamt hat (Antworttext und Denken seit dem letzten Werkzeugschritt). Die Ansicht legt ihren Strombereich erst beim nächsten Stück an; wandert das Blatt mitten in
+   *  der Antwort (Handy: Schublade → Tab), bekäme die neue Ansicht sonst nur, was danach kommt (Smoke 135: „Zwei“ statt „Eins Zwei“). `replayLiveStream` zeichnet es in die neue Ansicht nach. */
+  private liveText = "";
+  private liveReasoning = "";
   /** Der ungesendete Text im Eingabefeld, solange keine Ansicht offen ist: die Ansicht legt ihn beim Schließen hier ab und nimmt ihn beim Öffnen wieder auf (das Blatt wandert am Handy von der Schublade in den Hauptbereich). */
   draft = "";
   /** Transiente Notiz (Fehler/Abbruch/Rundenlimit) als Plugin-State statt DOM-Append —
@@ -1353,6 +1357,7 @@ export default class KodaPlugin extends Plugin {
   async ask(question: string): Promise<void> {
     if (this.busy) return;
     this.busy = true;
+    this.liveText = ""; this.liveReasoning = "";
     this.lastNotice = null;
     this.abort = new AbortController();
     for (const v of this.views()) v.activity({ kind: "ask" });
@@ -1526,8 +1531,8 @@ export default class KodaPlugin extends Plugin {
           }),
         },
         [system, ...this.chatLog],
-        (tok) => { for (const v of this.views()) { v.activity({ kind: "token" }); v.streamToken(tok); } },
-        (r) => { for (const v of this.views()) { v.activity({ kind: "reasoning" }); v.streamReasoning(r); } },
+        (tok) => { this.liveText += tok; for (const v of this.views()) { v.activity({ kind: "token" }); v.streamToken(tok); } },
+        (r) => { this.liveReasoning += r; for (const v of this.views()) { v.activity({ kind: "reasoning" }); v.streamReasoning(r); } },
         (e) => {
           if (e.kind === "tool-call-head") for (const v of this.views()) v.activity({ kind: "tool-call-head", name: e.name });
           if (e.kind === "tool-start") for (const v of this.views()) {
@@ -1539,6 +1544,7 @@ export default class KodaPlugin extends Plugin {
             if (path !== null) readPaths.push(path);
           }
           if (e.kind === "tool-end") for (const v of this.views()) v.activity({ kind: "tool-end" });
+          if (e.kind === "tool-end") { this.liveText = ""; this.liveReasoning = ""; }   // das Werkzeug beendet den Block der Ansicht (`toolStep` → `endStream`)
           if (e.kind === "tool-end") for (const v of this.views()) v.toolStep(
             `${e.outcome.ok ? "✓" : "✗"} ${e.call.name}`,
             e.outcome.ok ? e.outcome.content.slice(0, 400) : e.outcome.error,
@@ -1561,7 +1567,7 @@ export default class KodaPlugin extends Plugin {
           if (e.kind === "vision-fallback") this.lastNotice = { text: t("view.visionFallback", e.paths.join(", ")), kind: "neutral" };
         },
         this.abort.signal,
-        () => { for (const v of this.views()) v.resetStreamContent(); },
+        () => { this.liveText = ""; for (const v of this.views()) v.resetStreamContent(); },
       );
 
       // `saveThinking` aus: das Denken verschwindet mit dem Antwortende (Anzeige-Feld, nie am Draht).
@@ -1577,11 +1583,19 @@ export default class KodaPlugin extends Plugin {
       await this.recordFailure(t("err.generic", message));
     } finally {
       this.busy = false;
+      this.liveText = ""; this.liveReasoning = "";
       this.abort = null;
       for (const v of this.views()) { v.activity({ kind: "done" }); v.renderLog(); }
       // Das Ende jeder Runde (auch Abbruch und Fehler) legt das Gespräch im Verlauf ab; der Lauf wartet nicht darauf und scheitert nie daran.
       if (this.archiveOn()) void this.persistConvo();
     }
+  }
+
+  /** Eine Ansicht, die mitten in einem Lauf entsteht (das Blatt wanderte), bekommt den bisherigen Text und das Denken des laufenden Blocks nachgezeichnet; danach kommen die weiteren Stücke wie bei jeder Ansicht. */
+  replayLiveStream(view: Pick<KodaView, "streamToken" | "streamReasoning">): void {
+    if (!this.busy) return;
+    if (this.liveReasoning !== "") view.streamReasoning(this.liveReasoning);
+    if (this.liveText !== "") view.streamToken(this.liveText);
   }
 
   /** Gescheiterter Versuch: Marke in Verlauf und JSONL, damit die Frage nicht ohne Grund

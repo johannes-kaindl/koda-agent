@@ -147,7 +147,7 @@ export class KodaView extends ItemView {
 
     this.renderLog();
     // Ein Lauf, der schon läuft, wenn die Ansicht entsteht (das Blatt wanderte mitten in der Antwort): die Statuszeile und die Modellzeile zeigen ihn ab jetzt, nicht erst beim nächsten Ereignis des Laufs.
-    if (this.plugin.busy) this.activity({ kind: "ask" });
+    if (this.plugin.busy) { this.activity({ kind: "ask" }); this.plugin.replayLiveStream(this); }
     else this.paintStatus();
     return Promise.resolve();
   }

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A reply that is still running when Koda moves to a tab now shows what was already written.** On a phone or tablet Koda moves from the drawer to a tab in the main area when you open it; until now the new view showed the running reply only from its next piece on (the beginning appeared when the reply ended). The text and thinking written so far are now drawn into the new view at once.
+
 ### Changed
 
 - **The copy button under an answer now comes from the shared library** (obsidian-kit 0.88.0, `createCopyButton`) instead of a copy inside Koda. Looks and behaves the same (check mark for a moment, short notice, 44 px touch target on a phone); the timer of the check mark is now cleaned up when the view closes or the log is redrawn. **If you restyle the button with a CSS snippet:** the class `koda-copy` is still on the button, but Koda's own look rules for it are gone; they now sit on `okit-copy-button` (colour, padding, check-mark colour, the phone touch area). A snippet that targets `.koda-copy` keeps matching, but one that relied on Koda's rules being there should name `.okit-copy-button` too.

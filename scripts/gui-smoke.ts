@@ -355,7 +355,7 @@ const PUNKTE = [
   "132. Gegenprobe Markieren: mit user-select none am Verlauf markiert derselbe Dreifachklick nichts von der Antwort — die Messung kann also rot werden",
   "133. Blatt wandert mit ungesendetem Eingabetext (Mobilgerät gemeldet, Blatt in der Schublade): der Text im Eingabefeld steht nach dem Wandern im Eingabefeld der neuen Ansicht",
   "134. Gegenprobe Entwurf: am Desktop bleibt dasselbe Blatt, der Text steht unverändert im selben Eingabefeld — die Messung von 133 kann also grün werden",
-  "135. Blatt wandert während einer laufenden Antwort (Stub mit langsamem Strom): Stopp ist in der neuen Ansicht sichtbar, die Statuszeile zeigt den Lauf, weitere Stücke kommen in der neuen Ansicht an, am Ende steht die ganze Antwort dort und der Lauf ist frei",
+  "135. Blatt wandert während einer laufenden Antwort (Stub mit langsamem Strom): Stopp ist in der neuen Ansicht sichtbar, die Statuszeile zeigt den Lauf, der bisherige Antworttext steht sofort in der neuen Ansicht, weitere Stücke kommen dort an, am Ende steht die ganze Antwort dort und der Lauf ist frei",
   "136. Gegenprobe laufende Antwort: derselbe Lauf ohne Wandern (Desktop) endet mit der ganzen Antwort in der Ansicht — die Messung von 135 kann also grün werden",
   "137. Linkschutz-Härtung im Strom (code-kit 0.68.0, dom-guard 0.88.0): rohes HTML mit on*, ping, formaction, form, form-Attribut, commandfor, popovertarget und label-for, mitten im laufenden Strom in den Antwortbereich gesetzt, verliert diese Marker, der https-Link bleibt; Gegenprobe: dasselbe HTML außerhalb des Beobachters behält alle Marker",
   "138. Linkschutz-Härtung im Verlauf-Weg (renderMarkdownGuarded, wie renderLog): rohes HTML, das während des Renderns in den Container gesetzt wird, verliert dieselben Marker, der https-Link bleibt; Gegenprobe: dasselbe HTML außerhalb des Beobachters behält alle Marker",
@@ -2466,7 +2466,7 @@ async function main(): Promise<void> {
         const endeDetail = ende === null ? "kein Ende gemessen"
           : `Ende: busy ${ende.busy}, Senden ${ende.sendenSichtbar ? "sichtbar" : "unsichtbar"}, Stopp ${ende.stoppSichtbar ? "sichtbar" : "unsichtbar"}, ${ende.blasen} Antwortblase(n), Strom-Reste ${ende.streamReste}, Text ${ende.text === ganz.trim() ? "vollständig" : `„${ende.text}“`}, Verlauf ${ende.logAntwort === ganz ? "vollständig" : `„${ende.logAntwort}“`}`;
         const ortOk = wandern ? r.vorOrt === "seitenleiste" && r.nachOrt === "hauptbereich" && r.neuesBlatt : r.nachOrt === "seitenleiste" && !r.neuesBlatt;
-        const laufOk = lauf !== null && lauf.busy && lauf.stoppSichtbar && !lauf.sendenSichtbar && lauf.statusLaeuft && r.spaeterText.length > lauf.streamText.length;
+        const laufOk = lauf !== null && lauf.busy && lauf.stoppSichtbar && !lauf.sendenSichtbar && lauf.statusLaeuft && lauf.streamText.startsWith(STUECKE135[0]!.trim()) && r.spaeterText.length > lauf.streamText.length;   // das Davor steht sofort in der neuen Ansicht (Puffer des Plugins), nicht erst ab dem naechsten Stueck
         return { ok: ortOk && (wandern ? laufOk : true) && endeOk, detail: `Ort: ${r.vorOrt} → ${r.nachOrt}, neues Blatt: ${r.neuesBlatt} · ${laufDetail} · ${endeDetail}` };
       } finally {
         await stub.stop();
