@@ -240,4 +240,18 @@ describe("Modellzeile — Gruppen nach Endpunkt (Kit 0.87.0)", () => {
     await x.resolver.resolve();
     expect(x.llm.source().reason).toBeUndefined();
   });
+  it("models() mit Manager: trägt die Auflösung keine Modelltabelle, fragt der Adapter den Manager nach der Liste des aktiven Endpunkts (sonst stünde dort „keine Modelle gemeldet“)", async () => {
+    const m = twoEndpointManager();
+    const ohneTabelle = { ...m, resolve: async () => ({ id: "lm", label: "LM Studio", config: { url: "http://lm" }, defaultModel: "qwen" }) as ResolvedEndpoint, materialize: async () => ({ id: "lm", label: "LM Studio", config: { url: "http://lm" }, defaultModel: "qwen" }) as ResolvedEndpoint } as LlmEndpointManagerApi;
+    const x = setup({ manager: ohneTabelle, choice: { endpointId: "lm" } });
+    expect(await x.llm.models()).toEqual({ models: ["qwen", "gemma"], reachable: true });
+    expect(x.probes).toEqual([]);                                   // kein Abruf mit Bearer am Endpunkt selbst, der Manager kennt den Weg
+  });
+  it("models() mit Manager: die Tabelle der Auflösung gewinnt, der Manager wird nicht zusätzlich gefragt", async () => {
+    let gefragt = 0;
+    const m = { ...fakeManager(), models: async () => { gefragt += 1; return ["nie"]; } } as LlmEndpointManagerApi;
+    const x = setup({ manager: m, choice: { endpointId: "claude" } });
+    expect((await x.llm.models()).models).toEqual(["claude-sonnet-5-5", "claude-haiku-5-5"]);
+    expect(gefragt).toBe(0);
+  });
 });

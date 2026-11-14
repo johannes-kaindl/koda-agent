@@ -92,7 +92,13 @@ export function createModelBarLlm(d: ModelBarLlmDeps): ModelBarLlm {
   async function models(): Promise<ModelListResult> {
     const ep = await d.resolver.resolve();
     if (ep === null) return { models: [], reachable: false };
-    if (ep.kind === "manager") return { models: (ep.models ?? []).map((m) => m.id), reachable: true };
+    if (ep.kind === "manager") {
+      const table = (ep.models ?? []).map((m) => m.id);
+      if (table.length > 0) return { models: table, reachable: true };
+      // Ohne Modelltabelle (ein lokaler Endpunkt am Manager, etwa LM Studio) kennt der Manager die Liste: sonst stünde beim aktiven Endpunkt „keine Modelle gemeldet“.
+      const id = activeEndpointId();
+      return id === undefined ? { models: [], reachable: true } : modelsOf(id);
+    }
     return d.listModels(ep.config);
   }
 

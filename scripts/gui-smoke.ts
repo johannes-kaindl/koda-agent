@@ -2611,13 +2611,13 @@ async function main(): Promise<void> {
       const P141 = PUNKTE.find((n) => n.startsWith("141. "))!;
       const PLG = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
       const stub = await startLlmStub({ models: ["qwen3.6-smoke", "lm-zwei"] });
-      type Zeile139 = { gruppen: { label: string; optionen: { text: string; disabled: boolean; wert: string }[] }[]; erste: string; wert: string; text: string; gesperrt: boolean };
+      type Zeile139 = { alle: string[]; gruppen: { label: string; optionen: { text: string; disabled: boolean; wert: string }[] }[]; erste: string; wert: string; text: string; gesperrt: boolean };
       // Liest das Dropdown: Gruppen mit ihren Optionen, die erste Option (Automatisch), den gewaehlten Wert und seinen Text; `bedingung` (JS-Ausdruck ueber `z`) entscheidet, ob der Zustand schon der gesuchte ist.
       const lies139 = (bedingung: string): string => `
         const s = document.querySelector(".koda-root .okit-model-bar-select");
         if (!s) return null;
         const optionen = (g) => [...g.querySelectorAll("option")].map((o) => ({ text: o.textContent ?? "", disabled: o.disabled, wert: o.value }));
-        const z = { gruppen: [...s.querySelectorAll("optgroup")].map((g) => ({ label: g.label, optionen: optionen(g) })), erste: s.options[0]?.textContent ?? "", wert: s.value, text: s.selectedOptions[0]?.textContent ?? "", gesperrt: s.disabled };
+        const z = { alle: [...s.options].map((o) => o.textContent ?? ""), gruppen: [...s.querySelectorAll("optgroup")].map((g) => ({ label: g.label, optionen: optionen(g) })), erste: s.options[0]?.textContent ?? "", wert: s.value, text: s.selectedOptions[0]?.textContent ?? "", gesperrt: s.disabled };
         return (${bedingung}) ? z : null;`;
       const wartePunkt = (bedingung: string): Promise<Zeile139 | null> => pollUntil<Zeile139>(cdp, lies139(bedingung), 15_000, 250).catch(() => null);
       try {
@@ -2684,7 +2684,7 @@ async function main(): Promise<void> {
           await cdp.evaluate(`
             const p = ${PLG}; p.settings.useEndpointManager = false; p.settings.choice = {}; p.settings.endpoints = [{ url: ${JSON.stringify(stub.url)} }];
             await p.saveSettings(); return true;`);
-          const z3 = await wartePunkt(`z.gruppen.length === 0 && z.wert !== undefined`);
+          const z3 = await wartePunkt(`z.gruppen.length === 0 && z.alle.some((t) => t.includes("lm-zwei"))`);
           const flach = await cdp.evaluate<string[] | null>(`const s = document.querySelector(".koda-root .okit-model-bar-select"); return s ? [...s.options].map((o) => o.textContent ?? "") : null;`);
           if (z3 === null || flach === null) record(P140, false, `die Zeile wurde nach dem Ausschalten nicht flach (Gruppen: ${z3 === null ? "unbekannt" : String(z3.gruppen.length)})`);
           else record(P140, z3.gruppen.length === 0 && flach.some((t) => t.includes("lm-zwei")), `Opt-in aus: ${z3.gruppen.length} Gruppen · Optionen ${JSON.stringify(flach)} (soll: keine Gruppe, die Liste des Stubs)`);
