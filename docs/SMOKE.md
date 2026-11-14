@@ -1490,3 +1490,12 @@ Zweitinstanz :9754, `--exclusive all`, je Lauf ein frischer Prozess, Staging-Vau
 - **Erster Lauf:** 137 und 138 „nichts gemessen“, weil der Zähler der Gegenprobe Elemente statt Attribute zählte (2 statt 6); die Gültigkeitsprüfung hat angeschlagen, der Wächter war nicht Gegenstand. Zähler korrigiert.
 - **Gegenprobe gegen die alten Vendor-Dateien (`git stash` von `src/vendor`, Build, `--setup`, frischer Prozess):** 134 grün · **2 rot (137, 138)** · 2 übersprungen · 0 nichts gemessen; im Container blieben `onclick`/`ping` am Anker, form 1, formaction 1, on* 2, ping 1, Seitenbezug-Attribute 6.
 - **Endstand (neue Vendor-Dateien):** **136 grün · 0 rot · 2 übersprungen** (1b ohne vault-rag, 96 „in diesem Layout nicht anwendbar“) **· 0 nichts gemessen**, von 138 (187 s); Gate 1258/1258.
+
+## Belegter Lauf: 2026-11-14, Welle 34 koda — Kopier-Knopf, Redline, Modellzeile mit Gruppen, gepufferter Strom (141 Punkte, Stand: Punkte 139–141 stehen aus)
+
+Zweitinstanz, `--exclusive all`, Staging-Vault aus dem Fixture, Build von `c3abb9a`, Kit-Pins noch auf obsidian-kit 0.88.0. Neu sind 139–141 (Modellzeile gegen einen Fake-Manager im Fenster: Gruppen je Endpunkt, Gegenprobe Opt-in aus, Selbst-Abo über `saveSettings`) und die Verschärfung von 135 (der Strom der neuen Ansicht beginnt mit dem bisherigen Text).
+
+- **Lauf 1 und 2:** 136 grün · **3 rot (139, 140, 141)** · 2 übersprungen · 0 nichts gemessen, von 141 (rund 205 s). Ursache der drei roten: ohne Modelltabelle fragte der Adapter den Manager nicht nach der Liste („no models reported“); behoben in `98b1c20`, per Unit-Test belegt, im Fenster noch nicht neu gefahren.
+- **Grün belegt:** 127 Kopier-Knopf (einmal kopiert, Quelltext, Quittung, `aria-label`), 129/130 Redline-Kontrast (hell: Löschung 5,73 · Einfügung 8,20; dunkel: Löschung 8,01 · Einfügung 5,36; ohne die Kit-Farben orange 2,95/7,27 und blau 4,95/4,24, die Messung kann also rot werden), 136–138.
+- **Gegenprobe Strom:** der Build vor `eb84cca` zeigte nach dem Wandern des Blatts den Strom „“ (später „Zwei“), der neue Build beginnt mit „Eins“.
+- **Offen:** ein Lauf mit Stand `18559af` (Kit 0.89.0, Rückfall-Fix, Strom-Fix) für 135 und 139–141; Beleg und Gegenproben folgen an dieser Stelle, bis dahin kein Release.
