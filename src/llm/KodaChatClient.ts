@@ -117,10 +117,11 @@ function paramsFor(cfg: ChatConfig, suppress: boolean): Record<string, unknown> 
 
 /** Eine gewaehlte Stufe geht an HTTP-Endpunkte als `reasoning_effort`, damit das Dropdown der Modellzeile nichts verspricht, was nicht ankommt. Ohne eigene Wahl und bei ausgeschaltetem Denken
  *  ist es leer (der Draht bleibt wie vor der Chat-Zeile); ein Modell, das immer denkt (gpt-oss), bekommt nie eine Stufe von einem anderen Modell (der Knopf ist dort gesperrt). `xhigh` und `max` gibt es
- *  nur bei Claude, ein gespeicherter Wert von dort wird fuer lokale Modelle `high` (die Liste eines lokalen Modells endet dort). */
+ *  nur bei Claude, ein gespeicherter Wert von dort wird fuer lokale Modelle `high` (die Liste eines lokalen Modells endet dort). `minimal` (code-kit 0.65.0) bietet nur gpt-oss an, das hier nie eine Stufe bekommt; ein gespeichertes
+ *  `minimal` wird fuer jedes andere lokale Modell `low`, wie die Tabelle des Kits es fuer jede Familie ausser gpt-oss tut. */
 function httpEffort(model: string, suppress: boolean, chosen: ThinkingLevel | null): Record<string, unknown> {
   if (suppress || chosen === null || chosen === "off" || isAlwaysOnThinker(model)) return {};
-  return { reasoning_effort: chosen === "xhigh" || chosen === "max" ? "high" : chosen };
+  return { reasoning_effort: chosen === "xhigh" || chosen === "max" ? "high" : chosen === "minimal" ? "low" : chosen };
 }
 
 export class KodaChatClient {

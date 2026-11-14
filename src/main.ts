@@ -680,8 +680,8 @@ export default class KodaPlugin extends Plugin {
       },
     }),
     async (ep) => (await this.probe(ep)).reachable,
-    // Der gemerkte Endpunkt hat sich geändert: die Modellzeile samt Denk-Knopf liest sein Modell.
-    () => { for (const v of this.views()) v.syncModelBar(); },
+    // Der gemerkte Endpunkt hat sich geändert: die Modellzeile samt Denk-Knopf liest sein Modell. Sie abonniert die Verbindung selbst (Kit 0.87.0, `subscribe`), also melden statt jede Ansicht anzustoßen.
+    () => { this.modelBarLlm.notify(); },
     () => this.endpointSource(),
   );
 
@@ -699,6 +699,7 @@ export default class KodaPlugin extends Plugin {
       },
     },
     listModels: async (ep) => { const r = await this.probeModels(ep); return { models: r.models, reachable: r.status.reachable }; },
+    manager: () => this.endpointSource().manager,
   });
 
   /** Für die Ansicht: die Verbindung der Modellzeile. */

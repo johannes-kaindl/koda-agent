@@ -1,3 +1,4 @@
+import { describe, expect, it, vi } from "vitest";
 import { EndpointResolver } from "../src/core/llm/failover";
 import { createModelBarLlm, type ModelBarSettingsPort } from "../src/core/llm/model-bar-llm";
 import type { EndpointConfig } from "../src/vendor/kit/endpoint_config";
@@ -8,7 +9,7 @@ import type { ApiError, LlmEndpointManagerApi, ResolvedEndpoint } from "../src/v
 
 interface Port extends ModelBarSettingsPort { settings: { endpoints: EndpointConfig[]; choice: { endpointId?: string; model?: string } }; saved: number }
 
-function setup(over: { endpoints?: EndpointConfig[]; manager?: LlmEndpointManagerApi | null; choice?: { endpointId?: string; model?: string }; reachable?: (url: string) => boolean; lists?: Record<string, string[]> } = {}) {
+function setup(over: { endpoints?: EndpointConfig[]; manager?: LlmEndpointManagerApi | null; managerOff?: boolean; choice?: { endpointId?: string; model?: string }; reachable?: (url: string) => boolean; lists?: Record<string, string[]> } = {}) {
   const port = {
     settings: { endpoints: over.endpoints ?? [{ url: "http://a", model: "m-a" }, { url: "http://b", model: "m-b" }], choice: over.choice ?? {} },
     saved: 0,
@@ -33,6 +34,7 @@ function setup(over: { endpoints?: EndpointConfig[]; manager?: LlmEndpointManage
     resolver,
     settings: port,
     listModels: async (ep) => { probes.push(ep.url); return { models: lists[ep.url] ?? [], reachable: true }; },
+    manager: () => (over.managerOff === true ? null : over.manager ?? null),
   });
   return { port, resolver, llm, probes };
 }
@@ -128,5 +130,114 @@ describe("Modellzeile — Anzeige", () => {
     const x = setup();
     await x.llm.models();
     expect(x.llm.source()).toEqual({});
+  });
+});
+
+
+// Welle 34: obsidian-kit 0.87.0 gruppiert das Dropdown nach Endpunkt. Sechs Pflichtmethoden an `ModelBarConnection`; mit Manager liefert Koda die Endpunkte seiner Wahl-Liste (Fähigkeit chat,
+// Transporte http und anthropic, wie der Einstellungs-Tab), ohne Manager `[]` (dann bleibt die Zeile eine flache Liste, der Fall „Opt-in aus“).
+function twoEndpointManager(over: { models?: Record<string, string[] | { error: string }>; disabledId?: string } = {}): LlmEndpointManagerApi {
+  const entries = [
+    { id: "lm", label: "LM Studio", url: "http://lm", provider: "lmstudio", capabilities: ["chat"], defaultModel: "qwen", enabled: over.disabledId !== "lm", hasSecret: false },
+    { id: "claude", label: "Claude API", url: "https://api.anthropic.com", provider: "anthropic", capabilities: ["chat"], defaultModel: "claude-sonnet-5-5", enabled: over.disabledId !== "claude", hasSecret: true, transport: "anthropic" },
+  ];
+  const lists = over.models ?? { lm: ["qwen", "gemma"], claude: ["claude-sonnet-5-5", "claude-haiku-5-5"] };
+  const m = fakeManager();
+  return {
+    ...m,
+    list: (f) => (entries as unknown as ReturnType<LlmEndpointManagerApi["list"]>).filter((e) => f?.capability === undefined || e.capabilities.includes(f.capability)),
+    models: async (id) => (lists[id] ?? { error: "not-found" }) as string[] | ApiError,
+  };
+}
+
+describe("Modellzeile — Gruppen nach Endpunkt (Kit 0.87.0)", () => {
+  it("ohne Manager (Opt-in aus oder nicht installiert): endpoints() ist leer, die Zeile bleibt eine flache Liste", () => {
+    const x = setup({ managerOff: true });
+    expect(x.llm.endpoints()).toEqual([]);
+    expect(x.llm.activeEndpointId()).toBeUndefined();
+  });
+  it("mit Manager: die eingeschalteten Endpunkte der Liste mit Bezeichnung und Standardmodell", () => {
+    const x = setup({ manager: twoEndpointManager({ disabledId: "lm" }) });
+    expect(x.llm.endpoints()).toEqual([{ id: "claude", label: "Claude API", defaultModel: "claude-sonnet-5-5" }]);
+  });
+  it("modelsOf: die Modelle des genannten Endpunkts; ein Fehler oder Wurf des Managers ist nicht erreichbar, nie ein Wurf", async () => {
+    const x = setup({ manager: twoEndpointManager({ models: { lm: ["qwen"], claude: { error: "unreachable" } } }) });
+    expect(await x.llm.modelsOf("lm")).toEqual({ models: ["qwen"], reachable: true });
+    expect(await x.llm.modelsOf("claude")).toEqual({ models: [], reachable: false });
+    expect(await x.llm.modelsOf("weg")).toEqual({ models: [], reachable: false });
+    const kaputt = { ...twoEndpointManager(), models: async () => { throw new Error("boom"); } } as LlmEndpointManagerApi;
+    expect(await setup({ manager: kaputt }).llm.modelsOf("lm")).toEqual({ models: [], reachable: false });
+  });
+  it("modelsOf reicht force an den Manager durch", async () => {
+    const seen: unknown[] = [];
+    const m = { ...twoEndpointManager(), models: async (_id: string, o?: { force?: boolean }) => { seen.push(o); return ["x"]; } } as LlmEndpointManagerApi;
+    const x = setup({ manager: m });
+    await x.llm.modelsOf("lm", { force: true });
+    await x.llm.modelsOf("lm");
+    expect(seen).toEqual([{ force: true }, undefined]);
+  });
+  it("activeEndpointId: die Wahl, wenn es sie gibt; sonst der erste eingeschaltete (Automatisch); erst nach dem Auflösen", async () => {
+    const x = setup({ manager: twoEndpointManager(), choice: { endpointId: "claude" } });
+    expect(x.llm.activeEndpointId()).toBeUndefined();            // noch nicht aufgelöst
+    await x.resolver.resolve();
+    expect(x.llm.activeEndpointId()).toBe("claude");
+    const y = setup({ manager: twoEndpointManager({ disabledId: "lm" }), choice: { endpointId: "weg" } });
+    await y.resolver.resolve();
+    expect(y.llm.activeEndpointId()).toBe("claude");             // verwaiste Wahl: Automatisch nimmt den ersten eingeschalteten
+  });
+  it("choice() liest die gespeicherte Wahl", () => {
+    expect(setup({ manager: twoEndpointManager(), choice: { endpointId: "lm", model: "gemma" } }).llm.choice()).toEqual({ endpointId: "lm", model: "gemma" });
+  });
+  it("setChoice schreibt Endpunkt UND Modell, löst neu auf und meldet den Zuhörern; Transport und Backend stehen danach noch da", async () => {
+    const x = setup({ manager: twoEndpointManager(), choice: { endpointId: "lm" } });
+    let calls = 0;
+    x.llm.subscribe(() => { calls += 1; });
+    await x.llm.setChoice({ endpointId: "claude", model: "claude-haiku-5-5" });
+    expect(x.port.settings.choice).toEqual({ endpointId: "claude", model: "claude-haiku-5-5" });
+    expect(x.port.saved).toBe(1);
+    expect(x.resolver.peekTransport().transport).toBe("anthropic");   // aufgelöst, sonst „http“
+    expect(calls).toBeGreaterThan(0);
+  });
+  it("setChoice: scheitert das Speichern, wirft es (die Zeile zeigt dann wieder die geltende Wahl) und meldet nichts", async () => {
+    const x = setup({ manager: twoEndpointManager(), choice: { endpointId: "lm" } });
+    x.port.update = async () => { throw new Error("Platte voll"); };
+    let calls = 0;
+    x.llm.subscribe(() => { calls += 1; });
+    await expect(x.llm.setChoice({ endpointId: "claude" })).rejects.toThrow("Platte voll");
+    expect(calls).toBe(0);
+  });
+  it("subscribe: mehrere Zuhörer, die Abmeldung wirkt, ein werfender Zuhörer stört die anderen nicht; setModel meldet auch", async () => {
+    const x = setup();
+    const a = vi.fn(); const b = vi.fn();
+    const offA = x.llm.subscribe(() => { throw new Error("Zuhörer"); });
+    x.llm.subscribe(a);
+    const offB = x.llm.subscribe(b);
+    await x.llm.setModel("a2");
+    expect(a).toHaveBeenCalled();
+    expect(b).toHaveBeenCalled();
+    offA(); offB();
+    const n = a.mock.calls.length;
+    x.llm.notify();
+    expect(a.mock.calls.length).toBe(n + 1);
+    expect(b.mock.calls.length).toBeGreaterThan(0);
+    const nb = b.mock.calls.length;
+    x.llm.notify();
+    expect(b.mock.calls.length).toBe(nb);                         // abgemeldet
+  });
+  it("verwaiste Wahl (der gewählte Endpunkt ist abgeschaltet): source() trägt den Grund, activeEndpointId ist der Automatisch-Endpunkt, nicht die tote Wahl", async () => {
+    const m = twoEndpointManager();
+    const abgeschaltet = { ...m, materialize: async (id: string) => (id === "claude" ? { error: "disabled" } : fakeManager().materialize(id)) } as LlmEndpointManagerApi;
+    const x = setup({ manager: abgeschaltet, choice: { endpointId: "claude", model: "claude-haiku-5-5" } });
+    await x.resolver.resolve();
+    expect(x.llm.source().reason).toBe("disabled");
+    expect(x.llm.activeEndpointId()).toBe("lm");                       // die erste Zeile der Liste, die „Automatisch“ nimmt (hier fakeManager.resolve → claudeEp, die Liste führt lm zuerst)
+    expect(x.llm.choice()).toEqual({ endpointId: "claude", model: "claude-haiku-5-5" });   // die gespeicherte Wahl bleibt unangetastet
+  });
+  it("ohne verwaiste Wahl trägt source() keinen Grund", async () => {
+    const m = twoEndpointManager();
+    const vorhanden = { ...m, materialize: async () => claudeEp as ResolvedEndpoint | ApiError } as LlmEndpointManagerApi;
+    const x = setup({ manager: vorhanden, choice: { endpointId: "lm" } });
+    await x.resolver.resolve();
+    expect(x.llm.source().reason).toBeUndefined();
   });
 });

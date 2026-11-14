@@ -213,6 +213,12 @@ describe("KodaChatClient — gewählte Denkstufe", () => {
     }
   });
 
+  it("HTTP: ein gespeichertes minimal (code-kit 0.65.0, nur gpt-oss bietet es an) wird für ein lokales Modell niedrig, nie ein unbekannter Wert am Draht", async () => {
+    const sent: Sent[] = [];
+    await run(new KodaChatClient(http(sent), 1000, fakeClock), { ...local, suppressThinking: false, thinkingLevel: "minimal" });
+    expect(sent[0]?.body.reasoning_effort).toBe("low");
+  });
+
   it("HTTP, immer-an-Modell (gpt-oss): nie eine Stufe von einem anderen Modell, der Knopf ist dort gesperrt", async () => {
     const sent: Sent[] = [];
     await run(new KodaChatClient(http(sent), 1000, fakeClock), { ...local, model: "gpt-oss-20b", suppressThinking: false, thinkingLevel: "low" });

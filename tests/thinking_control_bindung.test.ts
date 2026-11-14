@@ -1,9 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 import { thinkingAlwaysGuessHint, thinkingLevelTexts, thinkingLockedTexts, thinkingOffTexts } from "../src/vendor/kit-obsidian/thinking-control";
-import { buildModelBar } from "../src/vendor/kit-obsidian/model-bar";
+import { buildModelBar, type ModelBarConnection } from "../src/vendor/kit-obsidian/model-bar";
 import { createThinkingBinding, effectiveSuppress } from "../src/core/chat/thinking-binding";
 import type { ThinkingLevel } from "../src/vendor/kit/sampling-profiles";
 import { makeFakeEl } from "./vendor/kit/obsidian-mock";
+
+/** Eine Verbindung ohne Endpunkte (Kit 0.87.0: sechs Pflichtmethoden): die Zeile zeichnet eine flache Liste wie vor den Gruppen. */
+function flatLlm(modelInUse: () => string, models: string[]): ModelBarConnection {
+  return {
+    models: async () => ({ models, reachable: true }), setModel: async () => {}, modelInUse, source: () => ({}),
+    endpoints: () => [], activeEndpointId: () => undefined, modelsOf: async () => ({ models: [], reachable: false }),
+    choice: () => ({}), setChoice: async () => {}, subscribe: () => () => {},
+  };
+}
 
 // Welle 27 (K3), nachgeführt mit obsidian-kit 0.70.1 (locked), 0.71.0 (hint) und 0.73.0 (Stufen-Dropdown): Kodas Denk-Steuerung ist die des Kits in der Modellzeile (`buildModelBar({ thinking })`), seit 0.73.0 immer
 // ein Dropdown mit den Stufen des Modells; der dritte Zustand „immer an“ (gpt-oss) läuft über das Kit-Feld `locked`. Gemessen wird die ECHTE Kit-Steuerung mit Kodas Anbindung (`createThinkingBinding`), nicht ein Nachbau:
@@ -28,7 +37,7 @@ function zeile(model: string, backend: string, state: Zustand, lang: "en" | "de"
   const bar = buildModelBar({
     app: {} as never,
     containerEl: el as never,
-    llm: { models: async () => ({ models: [model], reachable: true }), setModel: async () => {}, modelInUse: () => model, source: () => ({}) },
+    llm: flatLlm(() => model, [model]),
     onOtherEndpoint: null,
     strings: { lang },
     thinking: {
@@ -161,7 +170,7 @@ describe("Denk-Dropdown der Modellzeile: die Steuerung des Kits mit Kodas Anbind
     const el = makeFakeEl();
     const bar = buildModelBar({
       app: {} as never, containerEl: el as never, onOtherEndpoint: null,
-      llm: { models: async () => ({ models: [], reachable: true }), setModel: async () => {}, modelInUse: () => model, source: () => ({}) },
+      llm: flatLlm(() => model, []),
       thinking: {
         family: think.family, backend: think.backend, current: think.current, onLevel: think.onLevel, setLevel: think.setLevel, levelPicker: think.levelPicker,
         strings: { button: () => "T", pickerLabel: "T", ...thinkingLevelTexts("en") }, locked: () => (think.alwaysOn() ? thinkingLockedTexts("en") : undefined),

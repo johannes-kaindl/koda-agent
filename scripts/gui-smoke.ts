@@ -359,6 +359,9 @@ const PUNKTE = [
   "136. Gegenprobe laufende Antwort: derselbe Lauf ohne Wandern (Desktop) endet mit der ganzen Antwort in der Ansicht — die Messung von 135 kann also grün werden",
   "137. Linkschutz-Härtung im Strom (code-kit 0.68.0, dom-guard 0.88.0): rohes HTML mit on*, ping, formaction, form, form-Attribut, commandfor, popovertarget und label-for, mitten im laufenden Strom in den Antwortbereich gesetzt, verliert diese Marker, der https-Link bleibt; Gegenprobe: dasselbe HTML außerhalb des Beobachters behält alle Marker",
   "138. Linkschutz-Härtung im Verlauf-Weg (renderMarkdownGuarded, wie renderLog): rohes HTML, das während des Renderns in den Container gesetzt wird, verliert dieselben Marker, der https-Link bleibt; Gegenprobe: dasselbe HTML außerhalb des Beobachters behält alle Marker",
+  "139. Modellzeile mit Gruppen (obsidian-kit 0.87.0, Fake-Manager mit drei Endpunkten, Opt-in an): eine optgroup je Endpunkt, „Automatisch“ oben, ein nicht erreichbarer Endpunkt behält seine Gruppe mit gesperrtem Eintrag, ein Modell unter dem zweiten Endpunkt zu wählen schreibt Endpunkt UND Modell in die Wahl und das Dropdown zeigt es",
+  "140. Gegenprobe Gruppen: derselbe Fake-Manager mit Opt-in aus — die Zeile ist eine flache Liste ohne optgroup (der Zweig „endpoints() leer“ trägt, die Gruppen aus 139 kamen also vom Manager)",
+  "141. Modellzeile folgt der Einstellung (Selbst-Abo): die Wahl über saveSettings() (der Weg des Einstellungs-Tabs) zeichnet das Dropdown auf die neue Gruppe und das neue Modell, ohne dass jemand die Zeile anstößt",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -2596,6 +2599,109 @@ async function main(): Promise<void> {
       else { const a = auswertung137(d.mess, d.marker); record(P138, a.ok, `im Container von renderMarkdownGuarded: ${a.text} · Gegenprobe ausserhalb: ${gegenText137(d.gegen)} (alle verlangt: Marker da)`); }
     } catch (error) {
       unmeasured(P138, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // --- 139–141. Modellzeile mit Gruppen nach Endpunkt (Welle 34, obsidian-kit 0.87.0/0.88.0) -------------------------------------------------------------------------------------------
+    // Ein echter Endpoint Manager ist im Staging-Vault nicht installiert; die Zeile liest ihn nur über `app.plugins.plugins["llm-endpoint-manager"].api` (Form-Prüfung `isLlmEndpointManagerApi`).
+    // Der Punkt setzt dort einen Fake ein (drei Endpunkte, einer davon antwortet nie) und stellt danach Einstellungen und Registry-Eintrag zurück. Gemessen wird der Zweig `endpoints()` des Adapters
+    // (`core/llm/model-bar-llm.ts`) am echten Dropdown; die Gegenprobe (140) schaltet dasselbe Fake mit dem Opt-in aus.
+    {
+      const P139 = PUNKTE.find((n) => n.startsWith("139. "))!;
+      const P140 = PUNKTE.find((n) => n.startsWith("140. "))!;
+      const P141 = PUNKTE.find((n) => n.startsWith("141. "))!;
+      const PLG = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+      const stub = await startLlmStub({ models: ["qwen3.6-smoke", "lm-zwei"] });
+      type Zeile139 = { gruppen: { label: string; optionen: { text: string; disabled: boolean; wert: string }[] }[]; erste: string; wert: string; text: string; gesperrt: boolean };
+      // Liest das Dropdown: Gruppen mit ihren Optionen, die erste Option (Automatisch), den gewaehlten Wert und seinen Text; `bedingung` (JS-Ausdruck ueber `z`) entscheidet, ob der Zustand schon der gesuchte ist.
+      const lies139 = (bedingung: string): string => `
+        const s = document.querySelector(".koda-root .okit-model-bar-select");
+        if (!s) return null;
+        const optionen = (g) => [...g.querySelectorAll("option")].map((o) => ({ text: o.textContent ?? "", disabled: o.disabled, wert: o.value }));
+        const z = { gruppen: [...s.querySelectorAll("optgroup")].map((g) => ({ label: g.label, optionen: optionen(g) })), erste: s.options[0]?.textContent ?? "", wert: s.value, text: s.selectedOptions[0]?.textContent ?? "", gesperrt: s.disabled };
+        return (${bedingung}) ? z : null;`;
+      const wartePunkt = (bedingung: string): Promise<Zeile139 | null> => pollUntil<Zeile139>(cdp, lies139(bedingung), 15_000, 250).catch(() => null);
+      try {
+        const eingerichtet = await cdp.evaluate<boolean>(`
+          const p = ${PLG};
+          if (p.views().length === 0) await p.activateView();
+          app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
+          window.__koda139 = {
+            endpoints: JSON.parse(JSON.stringify(p.settings.endpoints)), use: p.settings.useEndpointManager, choice: JSON.parse(JSON.stringify(p.settings.choice)),
+            hatte: Object.prototype.hasOwnProperty.call(app.plugins.plugins, "llm-endpoint-manager"), alt: app.plugins.plugins["llm-endpoint-manager"],
+          };
+          const url = ${JSON.stringify(stub.url)};
+          const eintrag = (id, label, def) => ({ id, label, url, provider: "lmstudio", capabilities: ["chat"], defaultModel: def, enabled: true, hasSecret: false });
+          const liste = [eintrag("lm", "Smoke LM", "qwen3.6-smoke"), eintrag("zwei", "Smoke Zwei", "zwei-std"), eintrag("aus", "Smoke Offline", "aus-std")];
+          const modelle = { lm: ["qwen3.6-smoke", "lm-zwei"], zwei: ["z-eins", "z-zwei"], aus: { error: "unreachable" } };
+          const hoerer = new Set();
+          const aufloesen = async (id) => { const e = liste.find((x) => x.id === id) ?? liste[0]; return { id: e.id, label: e.label, config: { url }, defaultModel: e.defaultModel }; };
+          app.plugins.plugins["llm-endpoint-manager"] = { api: {
+            version: 1, list: () => liste.map((e) => ({ ...e })), get: (id) => liste.find((e) => e.id === id) ?? null,
+            resolve: async () => aufloesen("lm"), materialize: async (id) => (liste.some((e) => e.id === id) ? aufloesen(id) : { error: "not-found" }),
+            models: async (id) => modelle[id] ?? { error: "not-found" }, importEndpoints: async () => ({ added: [], merged: [], skipped: [] }),
+            on: (ev, cb) => { hoerer.add(cb); return () => hoerer.delete(cb); },
+          } };
+          p.settings.useEndpointManager = true; p.settings.choice = {};
+          await p.saveSettings();
+          return true;`);
+        if (!eingerichtet) throw new Error("Fake-Manager nicht eingerichtet");
+
+        // 139: Gruppen.
+        const z = await wartePunkt(`z.gruppen.length === 3 && z.gruppen.every((g) => g.optionen.length > 0)`);
+        if (z === null) unmeasured(P139, "die Zeile zeigte nach 15 s keine drei Gruppen (Manager-Weg nicht erreicht)");
+        else {
+          const lm = z.gruppen.find((g) => g.label === "Smoke LM"), zwei = z.gruppen.find((g) => g.label === "Smoke Zwei"), aus = z.gruppen.find((g) => g.label === "Smoke Offline");
+          const gruppenOk = !!lm && !!zwei && !!aus
+            && lm.optionen.map((o) => o.text).join("|") === "Default (qwen3.6-smoke)|qwen3.6-smoke|lm-zwei" && zwei.optionen.map((o) => o.text).join("|") === "Default (zwei-std)|z-eins|z-zwei"
+            && aus.optionen.length >= 1 && aus.optionen.some((o) => o.disabled && o.wert === "" && /nicht erreichbar|not reachable/i.test(o.text));
+          // Auswahl: ein Modell unter dem ZWEITEN Endpunkt.
+          await cdp.evaluate(`
+            const s = document.querySelector(".koda-root .okit-model-bar-select");
+            const o = [...s.querySelectorAll("optgroup[label='Smoke Zwei'] option")].find((x) => x.textContent === "z-zwei");
+            s.value = o.value; s.dispatchEvent(new Event("change", { bubbles: true }));
+            await new Promise((r) => setTimeout(r, 1500)); return true;`);
+          const nach = await cdp.evaluate<{ choice: unknown; gesendet: string; text: string; wert: string }>(`
+            const p = ${PLG}; const s = document.querySelector(".koda-root .okit-model-bar-select");
+            return { choice: p.settings.choice, gesendet: p.sentModel(), text: s.selectedOptions[0]?.textContent ?? "", wert: s.value };`);
+          const waehlenOk = JSON.stringify(nach.choice) === JSON.stringify({ endpointId: "zwei", model: "z-zwei" }) && nach.gesendet === "z-zwei" && nach.text === "z-zwei";
+          record(P139, gruppenOk && waehlenOk && /Automatisch|Automatic/i.test(z.erste),
+            `Gruppen ${z.gruppen.map((g) => `${g.label}[${g.optionen.map((o) => o.text + (o.disabled ? " (gesperrt)" : "")).join(", ")}]`).join(" · ")} · erste Option „${z.erste}“ · nach der Wahl: choice ${JSON.stringify(nach.choice)} · gesendet „${nach.gesendet}“ · gezeigt „${nach.text}“`);
+        }
+
+        // 141: die Einstellung (Weg des Einstellungs-Tabs) zeichnet nach.
+        try {
+          await cdp.evaluate(`
+            const p = ${PLG}; p.settings.choice = { endpointId: "lm", model: "lm-zwei" }; await p.saveSettings();
+            return true;`);
+          const z2 = await wartePunkt(`z.text === "lm-zwei"`);
+          const c2 = await cdp.evaluate<unknown>(`return ${PLG}.settings.choice;`);
+          if (z2 === null) record(P141, false, `das Dropdown zeigte nach der Einstellung nicht „lm-zwei“ (zuletzt: choice ${JSON.stringify(c2)})`);
+          else record(P141, z2.text === "lm-zwei" && z2.wert.includes("lm"), `nach saveSettings() mit choice lm/lm-zwei: gezeigt „${z2.text}“ (Wert ${JSON.stringify(z2.wert)}) · choice ${JSON.stringify(c2)}`);
+        } catch (error) { unmeasured(P141, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); }
+
+        // 140: Gegenprobe, Opt-in aus.
+        try {
+          await cdp.evaluate(`
+            const p = ${PLG}; p.settings.useEndpointManager = false; p.settings.choice = {}; p.settings.endpoints = [{ url: ${JSON.stringify(stub.url)} }];
+            await p.saveSettings(); return true;`);
+          const z3 = await wartePunkt(`z.gruppen.length === 0 && z.wert !== undefined`);
+          const flach = await cdp.evaluate<string[] | null>(`const s = document.querySelector(".koda-root .okit-model-bar-select"); return s ? [...s.options].map((o) => o.textContent ?? "") : null;`);
+          if (z3 === null || flach === null) record(P140, false, `die Zeile wurde nach dem Ausschalten nicht flach (Gruppen: ${z3 === null ? "unbekannt" : String(z3.gruppen.length)})`);
+          else record(P140, z3.gruppen.length === 0 && flach.some((t) => t.includes("lm-zwei")), `Opt-in aus: ${z3.gruppen.length} Gruppen · Optionen ${JSON.stringify(flach)} (soll: keine Gruppe, die Liste des Stubs)`);
+        } catch (error) { unmeasured(P140, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); }
+      } catch (error) {
+        for (const n of [P139, P140, P141]) if (!bilanz.eintraege().some((x) => x.name === n)) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        await cdp.evaluate(`
+          const p = ${PLG}; const v = window.__koda139;
+          if (v) {
+            p.settings.endpoints = v.endpoints; p.settings.useEndpointManager = v.use; p.settings.choice = v.choice;
+            if (v.hatte) app.plugins.plugins["llm-endpoint-manager"] = v.alt; else delete app.plugins.plugins["llm-endpoint-manager"];
+            await p.saveSettings(); delete window.__koda139;
+          }
+          return true;`).catch(() => undefined);
+        await stub.stop();
+      }
     }
 
     // --- 26. delete_note fragt AUCH im Koda-Ordner ---------------------------------------

@@ -70,7 +70,10 @@
           "name": "safe-markdown",
           "ref": "0.68.0"
         },
-        "sampling-profiles",
+        {
+          "name": "sampling-profiles",
+          "ref": "0.68.0"
+        },
         "llm-json",
         "data-url",
         "think-toggle",
@@ -94,7 +97,11 @@
           "name": "filename-policy",
           "ref": "0.63.0"
         },
-        "chat-history"
+        "chat-history",
+        {
+          "name": "error-message",
+          "ref": "0.68.0"
+        }
       ]
     },
     {
@@ -164,9 +171,18 @@
           "name": "redline",
           "ref": "0.88.0"
         },
-        "model-bar",
-        "model-bar-strings",
-        "thinking-control",
+        {
+          "name": "model-bar",
+          "ref": "0.88.0"
+        },
+        {
+          "name": "model-bar-strings",
+          "ref": "0.88.0"
+        },
+        {
+          "name": "thinking-control",
+          "ref": "0.88.0"
+        },
         "chat-host",
         "chat-leaf",
         "link-settings",
