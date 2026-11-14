@@ -66,7 +66,10 @@
           "ref": "0.60.0"
         },
         "secrets",
-        "safe-markdown",
+        {
+          "name": "safe-markdown",
+          "ref": "0.68.0"
+        },
         "sampling-profiles",
         "llm-json",
         "data-url",
@@ -99,9 +102,15 @@
       "source": "code-kit",
       "from": "src/ts/web",
       "modules": [
-        "remote-resources",
+        {
+          "name": "remote-resources",
+          "ref": "0.68.0"
+        },
         "clipboard",
-        "link-guard"
+        {
+          "name": "link-guard",
+          "ref": "0.68.0"
+        }
       ],
       "rewrite": [
         [
@@ -123,7 +132,10 @@
         "hub",
         "collapsible",
         "stable-writer",
-        "dom-guard",
+        {
+          "name": "dom-guard",
+          "ref": "0.88.0"
+        },
         "help-setting",
         "chat-client",
         "chat-transport",

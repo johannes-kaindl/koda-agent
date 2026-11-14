@@ -357,6 +357,8 @@ const PUNKTE = [
   "134. Gegenprobe Entwurf: am Desktop bleibt dasselbe Blatt, der Text steht unverändert im selben Eingabefeld — die Messung von 133 kann also grün werden",
   "135. Blatt wandert während einer laufenden Antwort (Stub mit langsamem Strom): Stopp ist in der neuen Ansicht sichtbar, die Statuszeile zeigt den Lauf, weitere Stücke kommen in der neuen Ansicht an, am Ende steht die ganze Antwort dort und der Lauf ist frei",
   "136. Gegenprobe laufende Antwort: derselbe Lauf ohne Wandern (Desktop) endet mit der ganzen Antwort in der Ansicht — die Messung von 135 kann also grün werden",
+  "137. Linkschutz-Härtung im Strom (code-kit 0.68.0, dom-guard 0.88.0): rohes HTML mit on*, ping, formaction, form, form-Attribut, commandfor, popovertarget und label-for, mitten im laufenden Strom in den Antwortbereich gesetzt, verliert diese Marker, der https-Link bleibt; Gegenprobe: dasselbe HTML außerhalb des Beobachters behält alle Marker",
+  "138. Linkschutz-Härtung im Verlauf-Weg (renderMarkdownGuarded, wie renderLog): rohes HTML, das während des Renderns in den Container gesetzt wird, verliert dieselben Marker, der https-Link bleibt; Gegenprobe: dasselbe HTML außerhalb des Beobachters behält alle Marker",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -2482,6 +2484,119 @@ async function main(): Promise<void> {
     }
     record(P135, ok135, detail135);
     record(P136, ok136, detail136);
+
+    // --- 137/138. Linkschutz-Härtung (Welle 34, Linie Linkschutz; code-kit 0.68.0 link-guard/remote-resources/safe-markdown, obsidian-kit 0.88.0 dom-guard) -----------------
+    // Modelltext erreicht den Wächter im Normalfall nie: `neutralizeModelMarkdown` maskiert `<` vor dem Parser. Der Wächter ist das Netz dahinter, und gemessen wird das Netz, am echten Fenster:
+    // rohes HTML wird per `innerHTML` (kein Obsidian-Sanitizer) in den Bereich gesetzt, den ein Beobachter bewacht. Koda hat zwei Wege: den Strom (`createStableWriter`, Beobachter lebt bis zum
+    // Ende der Antwort; 137) und den Verlauf-Neurender (`renderMarkdownGuarded` über `renderMarkdownInto`, Beobachter lebt bis zum Ende des Renderns plus Schlussdurchgang; 138).
+    // Gegenprobe in beiden: dasselbe HTML außerhalb eines Beobachters muss alle Marker behalten, sonst wäre „gekappt“ nichts wert.
+    const P137 = PUNKTE.find((n) => n.startsWith("137. "))!;
+    const P138 = PUNKTE.find((n) => n.startsWith("138. "))!;
+    const HTML_MARKER = "__kodaOnMarker";
+    const HTML_PROBE = [
+      `<a href="https://example.org/ok" onclick="window.${HTML_MARKER} = 1" ping="https://example.invalid/ping">h-ok</a>`,
+      `<p onmouseover="window.${HTML_MARKER} = 2">h-p</p>`,
+      '<form action="https://example.invalid/form"><button formaction="https://example.invalid/fa">h-form</button></form>',
+      '<button form="kf" commandfor="kd" popovertarget="kd" command="show-modal" popovertargetaction="show">h-ref</button><label for="kc">h-label</label>',
+    ].join("");
+    // Zaehlt die Marker unter `root`; als JS-Text in die Auswertung im Fenster eingesetzt.
+    const ZAEHLE = `
+      const zaehle = (root) => {
+        const all = Array.from(root.querySelectorAll("*"));
+        const anker = all.find((e) => e.localName === "a" && e.textContent === "h-ok");
+        const mit = (...n) => all.filter((e) => n.some((x) => e.hasAttribute(x))).length;
+        return {
+          anker: anker ? { h: anker.getAttribute("href"), attrs: anker.getAttributeNames().filter((n) => n.startsWith("on") || n === "ping") } : null,
+          forms: all.filter((e) => e.localName === "form").length,
+          formaction: mit("formaction"),
+          on: all.filter((e) => e.getAttributeNames().some((n) => n.startsWith("on"))).length,
+          ping: mit("ping"),
+          seite: all.reduce((n, e) => n + ["form", "commandfor", "command", "popovertarget", "popovertargetaction"].filter((x) => e.hasAttribute(x)).length + (e.localName === "label" && e.hasAttribute("for") ? 1 : 0), 0),
+        };
+      };`;
+    type Zahl137 = { anker: { h: string | null; attrs: string[] } | null; forms: number; formaction: number; on: number; ping: number; seite: number };
+    const gegenWirkt137 = (g: Zahl137): boolean => g.forms >= 1 && g.formaction >= 1 && g.on >= 2 && g.ping >= 1 && g.seite >= 6 && g.anker !== null && g.anker.attrs.length >= 2;
+    const gegenText137 = (g: Zahl137): string => `form ${g.forms}, formaction ${g.formaction}, on* ${g.on}, ping ${g.ping}, Seitenbezug-Attribute ${g.seite}, Anker-Attribute [${g.anker?.attrs.join(",")}]`;
+    const auswertung137 = (m: Zahl137, marker: string): { ok: boolean; text: string } => ({
+      ok: m.anker !== null && m.anker.h === "https://example.org/ok" && m.anker.attrs.length === 0 && m.forms === 0 && m.formaction === 0 && m.on === 0 && m.ping === 0 && m.seite === 0 && marker === "undefined",
+      text: `https-Anker ${m.anker ? `da, href ${String(m.anker.h)}, on*/ping [${m.anker.attrs.join(",")}]` : "FEHLT"} · form ${m.forms} · formaction ${m.formaction} · on* ${m.on} · ping ${m.ping} · Seitenbezug-Attribute (form/commandfor/command/popovertarget/popovertargetaction/label-for) ${m.seite} · Marker ${marker} (verlangt: undefined)`,
+    });
+    // 137: Strom.
+    {
+      const stub = await startLlmStub({ models: ["smoke-model"], standard: { stuecke: Array.from({ length: 12 }, (_, i) => `Stueck ${i + 1} laeuft, bitte warten. `), takt: 500 } });
+      try {
+        const d = await cdp.evaluate<{ laeuft: boolean; laeuftNoch: boolean; gegen: Zahl137; mess: Zahl137; marker: string } | null>(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          const TYP = "koda-agent-view";
+          const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+          const vorher = JSON.parse(JSON.stringify(p.settings.endpoints));
+          const logVorher = p.chatLog.slice();
+          delete window.${HTML_MARKER};
+          let r = null;
+          try {
+            p.settings.endpoints = [{ url: ${JSON.stringify(stub.url)} }]; await p.saveSettings();
+            await p.newChat();
+            void p.ask("Smoke-137: bitte langsam antworten.");
+            const t0 = Date.now(); let body = null;
+            while (Date.now() - t0 < 10000) { body = document.querySelector(".koda-streaming .okit-stream-body"); if (body && body.textContent.trim().length > 0) break; body = null; await warte(50); }
+            if (!body) return null;
+            ${ZAEHLE}
+            const laeuft = p.busy;
+            const aussen = document.body.createDiv();
+            aussen.innerHTML = ${JSON.stringify(HTML_PROBE)};
+            const gegen = zaehle(aussen);
+            const innen = body.createDiv({ cls: "sa-p137-probe" });
+            innen.innerHTML = ${JSON.stringify(HTML_PROBE)};
+            await warte(800);
+            const mess = zaehle(innen);
+            const laeuftNoch = p.busy;
+            innen.remove(); aussen.remove();
+            r = { laeuft, laeuftNoch, gegen, mess, marker: String(window.${HTML_MARKER}) };
+          } finally {
+            const t1 = Date.now(); while (p.busy && Date.now() - t1 < 20000) await warte(100);
+            p.settings.endpoints = vorher; await p.saveSettings();
+            await p.newChat(); p.chatLog.length = 0; p.chatLog.push(...logVorher);
+          }
+          return r;`);
+        if (d === null) unmeasured(P137, "kein Antwortbereich im laufenden Strom gefunden (nach 10 s)");
+        // Gueltig nur, wenn der Strom waehrend der ganzen Probe lief: danach ist der Beobachter getrennt, „nicht gekappt“ waere kein Befund ueber den Waechter.
+        else if (!d.laeuft || !d.laeuftNoch) unmeasured(P137, `der Strom lief nicht waehrend der Probe (Beginn ${String(d.laeuft)}, Ende ${String(d.laeuftNoch)}): der Beobachter war nicht angehaengt`);
+        else if (!gegenWirkt137(d.gegen)) unmeasured(P137, `die Gegenprobe ausserhalb des Beobachters behielt nicht alle Marker (${gegenText137(d.gegen)}): „gekappt“ waere ohne sie nichts wert`);
+        else { const a = auswertung137(d.mess, d.marker); record(P137, a.ok, `im Antwortbereich (Strom lief): ${a.text} · Gegenprobe ausserhalb: ${gegenText137(d.gegen)} (alle verlangt: Marker da)`); }
+      } catch (error) {
+        unmeasured(P137, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        await stub.stop();
+      }
+    }
+    // 138: Verlauf-Weg. `renderMarkdownInto` ist privat, am laufenden Objekt aber erreichbar; der Aufruf haengt den Beobachter synchron an, das HTML kommt direkt danach in den Container.
+    try {
+      const d = await cdp.evaluate<{ schnittstelle: boolean; imContainer: boolean; gegen: Zahl137; mess: Zahl137; marker: string } | null>(`
+        const v = app.workspace.getLeavesOfType("koda-agent-view")[0]?.view;
+        if (!v || typeof v.renderMarkdownInto !== "function") return { schnittstelle: false };
+        delete window.${HTML_MARKER};
+        ${ZAEHLE}
+        const aussen = document.body.createDiv();
+        aussen.innerHTML = ${JSON.stringify(HTML_PROBE)};
+        const gegen = zaehle(aussen);
+        const el = document.body.createDiv({ cls: "markdown-rendered" });
+        const fertig = v.renderMarkdownInto(el, "Probe fuer den Verlauf-Weg.");
+        const innen = el.createDiv({ cls: "sa-p138-probe" });
+        innen.innerHTML = ${JSON.stringify(HTML_PROBE)};
+        await fertig;
+        await new Promise((r) => setTimeout(r, 300));
+        const imContainer = innen.isConnected && el.contains(innen);
+        const mess = zaehle(innen);
+        const marker = String(window.${HTML_MARKER});
+        innen.remove(); el.remove(); aussen.remove();
+        return { schnittstelle: true, imContainer, gegen, mess, marker };`);
+      if (d === null || !d.schnittstelle) unmeasured(P138, "keine Ansicht oder renderMarkdownInto nicht erreichbar");
+      else if (!d.imContainer) unmeasured(P138, "der Renderer hat die eingesetzte Probe aus dem Container entfernt: der Wächter hat sie nie gesehen");
+      else if (!gegenWirkt137(d.gegen)) unmeasured(P138, `die Gegenprobe ausserhalb des Beobachters behielt nicht alle Marker (${gegenText137(d.gegen)}): „gekappt“ waere ohne sie nichts wert`);
+      else { const a = auswertung137(d.mess, d.marker); record(P138, a.ok, `im Container von renderMarkdownGuarded: ${a.text} · Gegenprobe ausserhalb: ${gegenText137(d.gegen)} (alle verlangt: Marker da)`); }
+    } catch (error) {
+      unmeasured(P138, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
     // --- 26. delete_note fragt AUCH im Koda-Ordner ---------------------------------------
     // Die Regel „Wirkung schlaegt Ort" ist im Adapter getestet; hier wird sie am laufenden
