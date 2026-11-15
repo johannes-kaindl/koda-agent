@@ -31,7 +31,7 @@ import {
 import { t, getLang } from "../vendor/kit/i18n";
 import { githubHelpUrls, helpSettingDefinition } from "../vendor/kit-obsidian/help-setting";
 import { chatArchiveSettingDefinitions, type ChatArchiveSettingKey } from "../vendor/kit-obsidian/chat-archive-settings";
-import { resolveChatArchiveStrings } from "../vendor/kit-obsidian/chat-archive-strings";
+import { resolveChatArchiveStrings } from "../vendor/kit/chat-archive-strings";
 import { linkSettingDefinitions, resolveLinkSettingsStrings, type LinkSettingKey } from "../vendor/kit-obsidian/link-settings";
 import { modeLabel } from "../core/context/labels";
 import { AVAILABLE_MODES } from "../core/context/types";

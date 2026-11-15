@@ -53,7 +53,7 @@ import { toLabMessages, describeLlmFailure, readNotePathOf } from "./core/agent/
 import { logToLab } from "./vendor/kit-obsidian/lab-client";
 import { SessionStore } from "./core/memory/session";
 import { ConvoArchive, KODA_LOG_PAYLOAD, fromPayload, renderKodaNote } from "./core/memory/koda-archive";
-import { createChatArchive, type ChatArchive, type ChatArchiveEntry } from "./vendor/kit-obsidian/chat-archive";
+import { createChatArchive, type ChatArchive, type ChatArchiveEntry } from "./vendor/kit/chat-archive-store";
 import { openChatArchive } from "./vendor/kit-obsidian/chat-archive-dialog";
 import type { ChatRecord } from "./vendor/kit/chat-archive";
 import { parseSkill, type Skill } from "./core/skills/skill";

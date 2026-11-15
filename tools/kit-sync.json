@@ -1,10 +1,10 @@
 {
   "sources": {
     "obsidian-kit": {
-      "ref": "0.77.0"
+      "ref": "0.92.0"
     },
     "code-kit": {
-      "ref": "0.40.0"
+      "ref": "0.73.0"
     }
   },
   "targets": [
@@ -17,22 +17,14 @@
         "explain-texts",
         "ocr-provider",
         "image-gen-provider",
-        {
-          "name": "endpoint-source",
-          "ref": "0.89.0"
-        },
+        "endpoint-source",
         "endpoint-secret-hook",
         "tool-provider",
         "provider-error-texts",
         "audio-provider",
-        {
-          "name": "filename-sanitizer-source",
-          "ref": "0.82.2"
-        },
-        {
-          "name": "vault-path",
-          "ref": "0.82.2"
-        }
+        "filename-sanitizer-source",
+        "vault-path",
+        "describe-provider"
       ],
       "rewrite": [
         [
@@ -64,19 +56,10 @@
         "model-list-cache",
         "stream-blocks",
         "sse",
-        {
-          "name": "redact",
-          "ref": "0.60.0"
-        },
+        "redact",
         "secrets",
-        {
-          "name": "safe-markdown",
-          "ref": "0.68.0"
-        },
-        {
-          "name": "sampling-profiles",
-          "ref": "0.68.0"
-        },
+        "safe-markdown",
+        "sampling-profiles",
         "llm-json",
         "data-url",
         "think-toggle",
@@ -84,27 +67,18 @@
         "validate-input",
         "slash-query",
         "rel-path",
-        {
-          "name": "folder-scope",
-          "ref": "0.44.0"
-        },
-        {
-          "name": "fold-case",
-          "ref": "0.44.0"
-        },
+        "folder-scope",
+        "fold-case",
         "local-stamp",
         "anthropic-wire",
         "chat-archive",
         "filename-template",
-        {
-          "name": "filename-policy",
-          "ref": "0.63.0"
-        },
+        "filename-policy",
         "chat-history",
-        {
-          "name": "error-message",
-          "ref": "0.68.0"
-        }
+        "error-message",
+        "chat-archive-store",
+        "chat-archive-strings",
+        "run-exclusive"
       ]
     },
     {
@@ -112,15 +86,10 @@
       "source": "code-kit",
       "from": "src/ts/web",
       "modules": [
-        {
-          "name": "remote-resources",
-          "ref": "0.68.0"
-        },
+        "remote-resources",
         "clipboard",
-        {
-          "name": "link-guard",
-          "ref": "0.68.0"
-        }
+        "link-guard",
+        "leave-tree"
       ],
       "rewrite": [
         [
@@ -142,10 +111,7 @@
         "hub",
         "collapsible",
         "stable-writer",
-        {
-          "name": "dom-guard",
-          "ref": "0.89.0"
-        },
+        "dom-guard",
         "help-setting",
         "chat-client",
         "chat-transport",
@@ -160,45 +126,22 @@
         "tool-providers",
         "plugin-api",
         "capability-apis",
-        {
-          "name": "textarea-suggest",
-          "ref": "0.80.3"
-        },
+        "textarea-suggest",
         "clipboard",
-        {
-          "name": "copy-button",
-          "ref": "0.89.0"
-        },
+        "copy-button",
         "segmented-control",
-        {
-          "name": "redline",
-          "ref": "0.89.0"
-        },
-        {
-          "name": "model-bar",
-          "ref": "0.89.0"
-        },
-        {
-          "name": "model-bar-strings",
-          "ref": "0.89.0"
-        },
-        {
-          "name": "thinking-control",
-          "ref": "0.89.0"
-        },
+        "redline",
+        "model-bar",
+        "model-bar-strings",
+        "thinking-control",
         "chat-host",
         "chat-leaf",
         "link-settings",
         "chat-archive-dialog",
-        "chat-archive",
-        "chat-archive-strings",
-        "run-exclusive",
         "chat-archive-settings",
         "chat-archive-css",
-        {
-          "name": "safe-file-name",
-          "ref": "0.82.2"
-        }
+        "safe-file-name",
+        "setting-body-host"
       ],
       "rewrite": [
         [
@@ -220,10 +163,7 @@
       "source": "obsidian-kit",
       "from": "src/testing",
       "modules": [
-        {
-          "name": "kit-css",
-          "ref": "0.89.0"
-        },
+        "kit-css",
         "obsidian-mock",
         "linear-probe"
       ]
