@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.37.1] — 2026-11-15
+
 ### Fixed
 
 - **The error dialog "A JavaScript error occurred in the main process" no longer appears when a reply or a note holds an `iframe` that points at an `app:`, relative or `file:` address.** The guard in the Markdown renderer leaves a removed `iframe`, `frame`, `object` or `embed` as an empty, hidden shell for 250 ms before it takes it out (kit update to obsidian-kit 0.92.0 and code-kit 0.73.0). Nothing is visible; a driver check straight after the guard that expects no `iframe` waits 250 ms.
