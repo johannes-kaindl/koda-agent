@@ -165,7 +165,11 @@
       "modules": [
         "kit-css",
         "obsidian-mock",
-        "linear-probe"
+        "linear-probe",
+        {
+          "name": "dom-guard-probe",
+          "ref": "0.93.0"
+        }
       ]
     }
   ]
