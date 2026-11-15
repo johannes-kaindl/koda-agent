@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.92.0, src/pure/provider-error-texts.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.93.0, src/pure/provider-error-texts.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Fehlertexte (EN/DE) zu den Fehlercodes der Fähigkeits-Verträge `image-gen-provider`, `ocr-provider`, `audio-provider` und `describe-provider`, neben deren Typen.
  *
  *  Die Verträge nennen einen Code und eine Meldung des Anbieters; was der Nutzer liest, bauten die Konsumenten selbst, und zwar
@@ -24,6 +24,7 @@ export const IMAGE_GEN_ERROR_TEXTS: Record<Lang, Record<ImageGenProviderErrorCod
     timeout: "Image generation took too long",
     busy: "Image generation is busy, try again later",
     refused: "Image generation refused the request",
+    aborted: "Image generation was cancelled",
     failed: "Image generation failed",
   },
   de: {
@@ -31,6 +32,7 @@ export const IMAGE_GEN_ERROR_TEXTS: Record<Lang, Record<ImageGenProviderErrorCod
     timeout: "Bildgenerierung hat zu lange gebraucht",
     busy: "Bildgenerierung ist beschäftigt, später erneut versuchen",
     refused: "Bildgenerierung hat den Auftrag abgelehnt",
+    aborted: "Bildgenerierung wurde abgebrochen",
     failed: "Bildgenerierung fehlgeschlagen",
   },
 };
@@ -42,6 +44,7 @@ export const OCR_ERROR_TEXTS: Record<Lang, Record<OcrProviderErrorCode, string>>
     timeout: "Text recognition took too long",
     busy: "Text recognition is busy, try again later",
     unsupported: "Text recognition can't read this image format",
+    aborted: "Text recognition was cancelled",
     failed: "Text recognition failed",
   },
   de: {
@@ -50,11 +53,12 @@ export const OCR_ERROR_TEXTS: Record<Lang, Record<OcrProviderErrorCode, string>>
     timeout: "Texterkennung hat zu lange gebraucht",
     busy: "Texterkennung ist beschäftigt, später erneut versuchen",
     unsupported: "Dieses Bildformat liest die Texterkennung nicht",
+    aborted: "Texterkennung wurde abgebrochen",
     failed: "Texterkennung fehlgeschlagen",
   },
 };
 
-/** Bildbeschreibung (`describe-provider`): die sechs Codes der Texterkennung plus `aborted` (der Nutzer hat abgebrochen, kein Fehler des Anbieters). Neu nach dem Muster von `OCR_ERROR_TEXTS`. */
+/** Bildbeschreibung (`describe-provider`): dieselben Codes wie die Texterkennung; `aborted` (der Nutzer hat abgebrochen, kein Fehler des Anbieters) kam hier in Welle 34 zuerst, die drei anderen Verträge folgten 0.93.0. Neu nach dem Muster von `OCR_ERROR_TEXTS`. */
 export const DESCRIBE_ERROR_TEXTS: Record<Lang, Record<DescribeProviderErrorCode, string>> = {
   en: {
     "backend-unavailable": "Image description isn't available",
@@ -76,7 +80,7 @@ export const DESCRIBE_ERROR_TEXTS: Record<Lang, Record<DescribeProviderErrorCode
   },
 };
 
-/** Audio (Transkription und Sprachausgabe, `audio-provider`) hat dieselben sechs Codes wie die Texterkennung. Anders als bei Bild und OCR gab es hier keine
+/** Audio (Transkription und Sprachausgabe, `audio-provider`) hat dieselben sieben Codes wie die Texterkennung (seit 0.93.0 mit `aborted`). Anders als bei Bild und OCR gab es hier keine
  *  Konsumentenfassung zum Übernehmen — die Sätze sind nach dem Muster von `OCR_ERROR_TEXTS` neu, auf Wunsch des Masters (Welle 24) „Bibliothek ab Eins“. */
 export const AUDIO_ERROR_TEXTS: Record<Lang, Record<AudioProviderErrorCode, string>> = {
   en: {
@@ -85,6 +89,7 @@ export const AUDIO_ERROR_TEXTS: Record<Lang, Record<AudioProviderErrorCode, stri
     timeout: "Audio processing took too long",
     busy: "Audio processing is busy, try again later",
     unsupported: "This audio format isn't supported",
+    aborted: "Audio processing was cancelled",
     failed: "Audio processing failed",
   },
   de: {
@@ -93,6 +98,7 @@ export const AUDIO_ERROR_TEXTS: Record<Lang, Record<AudioProviderErrorCode, stri
     timeout: "Audioverarbeitung hat zu lange gebraucht",
     busy: "Audioverarbeitung ist beschäftigt, später erneut versuchen",
     unsupported: "Dieses Audioformat wird nicht unterstützt",
+    aborted: "Audioverarbeitung wurde abgebrochen",
     failed: "Audioverarbeitung fehlgeschlagen",
   },
 };
