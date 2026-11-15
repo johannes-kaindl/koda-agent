@@ -132,7 +132,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "node:process";
-import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, clearNotices, clickReal, istAbgebrochen, pollUntil, requireVisible, schliesseDialog, schliesseEinstellungen } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, clearNotices, clickReal, entferneFakeManager, installFakeManager, istAbgebrochen, pollUntil, requireVisible, schliesseDialog, schliesseEinstellungen } from "../../tools/obsidian-cdp/cdp.js";
 import { messeFolge, zeichneFolge } from "../../tools/obsidian-cdp/folge.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { gegenprobeErreichbarkeit, gegenprobeFokus, messeDenkblockKopierbar, messeErreichbarkeit, messeFokusErhalt, mitHoehe, zeichnePflicht, type PflichtTeilurteil } from "../../tools/obsidian-cdp/pflichtpunkte.js";
@@ -2621,30 +2621,25 @@ async function main(): Promise<void> {
         return (${bedingung}) ? z : null;`;
       const wartePunkt = (bedingung: string): Promise<Zeile139 | null> => pollUntil<Zeile139>(cdp, lies139(bedingung), 15_000, 250).catch(() => null);
       try {
-        const eingerichtet = await cdp.evaluate<boolean>(`
+        await cdp.evaluate(`
           const p = ${PLG};
           if (p.views().length === 0) await p.activateView();
           app.commands.executeCommandById(${JSON.stringify(PLUGIN_ID + ":tab-chat")});
-          window.__koda139 = {
-            endpoints: JSON.parse(JSON.stringify(p.settings.endpoints)), use: p.settings.useEndpointManager, choice: JSON.parse(JSON.stringify(p.settings.choice)),
-            hatte: Object.prototype.hasOwnProperty.call(app.plugins.plugins, "llm-endpoint-manager"), alt: app.plugins.plugins["llm-endpoint-manager"],
-          };
-          const url = ${JSON.stringify(stub.url)};
-          const eintrag = (id, label, def) => ({ id, label, url, provider: "lmstudio", capabilities: ["chat"], defaultModel: def, enabled: true, hasSecret: false });
-          const liste = [eintrag("lm", "Smoke LM", "qwen3.6-smoke"), eintrag("zwei", "Smoke Zwei", "zwei-std"), eintrag("aus", "Smoke Offline", "aus-std")];
-          const modelle = { lm: ["qwen3.6-smoke", "lm-zwei"], zwei: ["z-eins", "z-zwei"], aus: { error: "unreachable" } };
-          const hoerer = new Set();
-          const aufloesen = async (id) => { const e = liste.find((x) => x.id === id) ?? liste[0]; return { id: e.id, label: e.label, config: { url }, defaultModel: e.defaultModel }; };
-          app.plugins.plugins["llm-endpoint-manager"] = { api: {
-            version: 1, list: () => liste.map((e) => ({ ...e })), get: (id) => liste.find((e) => e.id === id) ?? null,
-            resolve: async () => aufloesen("lm"), materialize: async (id) => (liste.some((e) => e.id === id) ? aufloesen(id) : { error: "not-found" }),
-            models: async (id) => modelle[id] ?? { error: "not-found" }, importEndpoints: async () => ({ added: [], merged: [], skipped: [] }),
-            on: (ev, cb) => { hoerer.add(cb); return () => hoerer.delete(cb); },
-          } };
-          p.settings.useEndpointManager = true; p.settings.choice = {};
+          window.__koda139 = { endpoints: JSON.parse(JSON.stringify(p.settings.endpoints)), use: p.settings.useEndpointManager, choice: JSON.parse(JSON.stringify(p.settings.choice)) };
+          return true;`);
+        // Der geteilte Fake (tools/obsidian-cdp/fake-manager.ts): drei Endpunkte hinter derselben Stub-URL, der dritte meldet `models()` als unerreichbar. Er sichert den vorgefundenen Slot selbst.
+        const einbau = await installFakeManager(cdp, {
+          endpunkte: [
+            { id: "lm", label: "Smoke LM", url: stub.url, provider: "lmstudio", models: ["qwen3.6-smoke", "lm-zwei"], defaultModel: "qwen3.6-smoke" },
+            { id: "zwei", label: "Smoke Zwei", url: stub.url, provider: "lmstudio", models: ["z-eins", "z-zwei"], defaultModel: "zwei-std" },
+            { id: "aus", label: "Smoke Offline", url: stub.url, provider: "lmstudio", models: [], defaultModel: "aus-std", unerreichbar: true },
+          ],
+        });
+        const eingerichtet = einbau.installiert && await cdp.evaluate<boolean>(`
+          const p = ${PLG}; p.settings.useEndpointManager = true; p.settings.choice = {};
           await p.saveSettings();
           return true;`);
-        if (!eingerichtet) throw new Error("Fake-Manager nicht eingerichtet");
+        if (!eingerichtet) throw new Error(`Fake-Manager nicht eingerichtet${einbau.grund ? ` (${einbau.grund})` : ""}`);
 
         // 139: Gruppen.
         const z = await wartePunkt(`z.gruppen.length === 3 && z.gruppen.every((g) => g.optionen.length > 0)`);
@@ -2696,10 +2691,10 @@ async function main(): Promise<void> {
           const p = ${PLG}; const v = window.__koda139;
           if (v) {
             p.settings.endpoints = v.endpoints; p.settings.useEndpointManager = v.use; p.settings.choice = v.choice;
-            if (v.hatte) app.plugins.plugins["llm-endpoint-manager"] = v.alt; else delete app.plugins.plugins["llm-endpoint-manager"];
             await p.saveSettings(); delete window.__koda139;
           }
           return true;`).catch(() => undefined);
+        await entferneFakeManager(cdp).catch(() => undefined);
         await stub.stop();
       }
     }
