@@ -82,16 +82,13 @@
  * Das Gespraech ist danach weg: `newChat()` leert `sessions/current.jsonl`, und der Verlauf vergangener Chats ist als Vorgabe aus
  * (Aufbewahrung 0), legt es also nirgends ab. Wer gerade an einem Gespraech misst, faehrt den Smoke davor oder danach.
  *
+ * Der Treiber startet keine Instanz und kennt kein `--launch`: er haengt sich an die laufende auf `--port`. Start, Profil, `.asar`, fremdes `HOME` und Beenden der eigenen PID
+ * macht `tools/obsidian-cdp/messlauf.sh` (README dort § Messlauf in einem Aufruf, an diesem Treiber erprobt 2026-11-01); `--setup` ruft das Skript selbst. Aus dem Plugin-Ordner:
+ *
  * ```bash
- * UD=/tmp/obs-test-koda-agent; mkdir -p "$UD"
- * lsof -nP -iTCP:<PORT> -sTCP:LISTEN && echo "Port belegt — anderen waehlen (Port laut Auftrag bzw. frei, nie aus diesem Kommentar)"
- * pgrep -f "user-data-dir=$UD" && echo "Profil belegt — $UD-wNN nehmen, nie beenden"
- * cp ~/Library/Application\ Support/obsidian/obsidian-*.asar "$UD"/   # aktuelle Version statt gebuendelter
- * node -e 'const p=process.env.STAGING_VAULTS_DIR+"/koda-agent";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{"koda-agent":{path:p,ts:Date.now(),open:true}}}))' "$UD"
- * /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=<PORT> --lang=en-US &   # je Messlauf frischer Prozess, PID merken
- * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label koda-agent --intent "Smoke :<PORT>" --exclusive all --port <PORT> --ttl 900
- * npm run smoke:gui -- --port <PORT> --vault koda-agent
- * python3 ~/.claude/hooks/obsidian-cdp-lock.py release           # danach nur die eigene PID beenden
+ * export REPO=koda-agent PORT=<PORT> SMOKE_ARGS="--vault koda-agent" \
+ *   && python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label koda-agent --intent "Smoke :<PORT>" --exclusive all --port <PORT> --ttl 900 \
+ *   && ../tools/obsidian-cdp/messlauf.sh
  * ```
  *
  * Der erste Lauf nach der Profilanlage ist ein Aufwaermlauf und zaehlt nicht.
@@ -139,6 +136,7 @@ import { gegenprobeErreichbarkeit, gegenprobeFokus, messeDenkblockKopierbar, mes
 import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
+import { lehneLaunchAb } from "../../tools/obsidian-cdp/zweitinstanz.js";
 
 const PLUGIN_ID = "koda-agent";
 /** Repo- und Vault-Name sind hier dasselbe Wort — der Staging-Vault heisst wie das Repo. */
@@ -509,6 +507,7 @@ function setup(): void {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  lehneLaunchAb(args, "koda-agent");
   if (args.has("setup")) {
     setup();
     return;
