@@ -32,7 +32,14 @@ function setup(): void {
   const ziel = join(v, ".obsidian", "plugins", "tasknotes");
   mkdirSync(ziel, { recursive: true });
   for (const f of ["main.js", "manifest.json", "styles.css"]) cpSync(join(quelle, f), join(ziel, f));
-  writeFileSync(join(v, ".obsidian", "community-plugins.json"), JSON.stringify(["tasknotes"]));
+  // Koda selbst (der Build dieses Repos), damit M9 die Anbindung an das echte Register misst.
+  const koda = join(v, ".obsidian", "plugins", "koda-agent");
+  mkdirSync(koda, { recursive: true });
+  for (const f of ["main.js", "manifest.json", "styles.css"]) {
+    if (!existsSync(f)) throw new Error(`${f} fehlt: erst npm run build`);
+    cpSync(f, join(koda, f));
+  }
+  writeFileSync(join(v, ".obsidian", "community-plugins.json"), JSON.stringify(["tasknotes", "koda-agent"]));
   mkdirSync(join(v, "Notes"), { recursive: true });
   writeFileSync(join(v, "Notes", "Start.md"), "# Start\n");
   console.log(`Staging-Vault: ${v}`);
@@ -55,7 +62,7 @@ async function main(): Promise<void> {
   };
   try {
     await requireVisible(cdp);
-    const vor = await bereiteInstanzVor(cdp, { pluginIds: ["tasknotes"], nurVault: VAULT, sprache: "en" });
+    const vor = await bereiteInstanzVor(cdp, { pluginIds: ["tasknotes", "koda-agent"], nurVault: VAULT, sprache: "en" });
     console.log(`Instanz vorbereitet: ${vor.hinweis}`);
     const TN = `const p = app.plugins.plugins.tasknotes; const api = p && p.api;`;
     // Eine Ausnahme der API als Wert: Klasse, Name, Code (TaskNotesApiError), Meldung.
@@ -116,6 +123,20 @@ async function main(): Promise<void> {
         statusUnbekannt: await fang(async () => { const t = (await api.listTasks()).find((x) => String(x.title).startsWith('Lab')); return api.updateTask(t.path, { status: 'gibt-es-nicht' }); }),
         validateTask: api.validateTask ? api.validateTask({ title: 'x', status: 'gibt-es-nicht' }) : 'fehlt',
         validatePatch: api.validateTaskPatch ? api.validateTaskPatch({ priority: 5 }) : 'fehlt' };`);
+    await step("M9 Koda: Werkzeugliste, Route und tasknotes_list über das echte Register (ohne Modell, ohne Bestätigungsdialog)", `${FANG} ${warte}
+      const k = app.plugins.plugins['koda-agent'];
+      if (!k) return { koda: false };
+      const set = k.currentToolSet();
+      const namen = set.defs.map((d) => d.name).filter((n) => n.startsWith('tasknotes_'));
+      const tools = k.buildTools();
+      const api = app.plugins.plugins.tasknotes.api;
+      await api.createTask({ title: 'Lab Koda', due: '2026-12-01' }); await warte(1200);
+      const liste = await tools.run('tasknotes_list', {});
+      const unbekannterStatus = await tools.run('tasknotes_update', { path: 'TaskNotes/Tasks/Lab Koda.md', status: 'gibt-es-nicht' });
+      const ohneArgument = await tools.run('tasknotes_delete', {});
+      const gleich = (await api.getTask('TaskNotes/Tasks/Lab Koda.md')).status;
+      await api.deleteTask('TaskNotes/Tasks/Lab Koda.md');
+      return { koda: true, version: k.manifest.version, namen, route: set.routes.get('tasknotes_list'), schreibend: [...set.writes].filter((n) => n.startsWith('tasknotes_')), liste, unbekannterStatus, ohneArgument, statusDanachUnveraendert: gleich };`);
     await step("M8 deleteTask (Papierkorb-Einstellung des Vaults beachtet?)", `${TN} ${FANG} ${warte}
       const lab = (await api.listTasks()).filter((t) => String(t.title).startsWith('Lab'));
       const ergebnisse = [];
