@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Two commands drop the plugin name from their names (UI-STANDARD §11).** The palette shows "Koda: Open chat" and "Koda: Ask about the selection" instead of "Koda: Open Koda" and "Koda: Ask Koda about the selection" (German: "Chat öffnen", "Zur Markierung fragen"); the ribbon tooltip of the dog icon now reads "Open chat". The command ids stay, so bound hotkeys keep working.
+
 ### Fixed
 
 - **A very long run of spaces or blank lines no longer freezes Obsidian for seconds.** Five places read such a run quadratically: the property overview of `list_notes` (a note property with tens of thousands of blanks), the `remember` and skill-description tools (text from the model), the memory file when a line is appended, and the folder placeholder in the rules text. A run of 50,000 characters took about two seconds and the time grew with the square of the length; it is now linear.

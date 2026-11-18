@@ -30,7 +30,7 @@ Koda talks to any OpenAI-compatible chat endpoint. The example uses [LM Studio](
 ## 4. Ask the first question
 
 1. Open a note you know something about.
-2. Open Koda: select the **dog icon** in the ribbon (tooltip **Open Koda**), or run **Koda: Open Koda** from the command palette. The sidebar opens with a **Chat** and a **Context** tab. On a phone or tablet Koda opens as a tab in the main area instead.
+2. Open Koda: select the **dog icon** in the ribbon (tooltip **Open chat**), or run **Koda: Open chat** from the command palette. The sidebar opens with a **Chat** and a **Context** tab. On a phone or tablet Koda opens as a tab in the main area instead.
 3. Type a question about your vault, for example *"Which notes mention the project plan?"*, and press **Send**.
 
 While Koda works, the status line above the input says what it is doing, e.g. *Searching the vault for "project plan"…* or *Reading Notes/Project plan.md…*. Each tool call also appears in the chat as a step, so you can see which notes the answer is built on. The answer streams in; **Stop** ends it and keeps what has arrived. On a phone the line shows only while Koda works or when the context warning applies, so the conversation keeps its room.

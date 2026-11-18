@@ -16,7 +16,7 @@ The dropdown next to **Send** sets the mode for the next question. The same choi
 
 The mode Koda starts with after Obsidian starts is the setting **Context mode on startup** (default **Workspace**).
 
-To ask about a passage directly: select it, right-click, and choose **Ask Koda** (or run **Koda: Ask Koda about the selection**). The sidebar opens with the cursor in the input field; if the mode was **Off**, it switches to **Workspace**, so the selection goes along.
+To ask about a passage directly: select it, right-click, and choose **Ask Koda** (or run **Koda: Ask about the selection**). The sidebar opens with the cursor in the input field; if the mode was **Off**, it switches to **Workspace**, so the selection goes along.
 
 ## Take rows from a base along
 

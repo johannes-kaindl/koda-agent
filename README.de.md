@@ -52,7 +52,7 @@ Mit [AnySource Sideloader](https://github.com/johannes-kaindl/anysource-sideload
 ## Verwendung
 
 1. Modell-Server starten, **Einstellungen → Koda** öffnen, prüfen, dass die Endpunkt-Zeile (Standard `http://127.0.0.1:1234`) ein grünes Häkchen zeigt, und in der Endpunkt-Zeile (**Modelle abrufen**) das Modell wählen.
-2. Die Seitenleiste über das **Hunde-Symbol** in der Menüleiste oder den Befehl **Koda öffnen** öffnen.
+2. Die Seitenleiste über das **Hunde-Symbol** in der Menüleiste oder den Befehl **Chat öffnen** öffnen.
 3. Eine Frage zu deinem Vault stellen. Die Statuszeile sagt, was Koda gerade tut; jeder Werkzeugaufruf erscheint im Chat.
 4. Im Tab **Kontext** oder über das Dropdown neben **Senden** prüfen und ändern, was mitgeht.
 5. Schreibvorgänge im Dialog erlauben oder abbrechen, der sich vor jeder Änderung außerhalb des Koda-Ordners öffnet.

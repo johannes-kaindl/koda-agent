@@ -54,7 +54,7 @@ Download `main.js`, `manifest.json` and `styles.css` from the [latest release](h
 ## Usage
 
 1. Start your model server, open **Settings → Koda**, check that the endpoint row (default `http://127.0.0.1:1234`) shows a green check mark, and pick the model in the endpoint row (**Fetch models**).
-2. Open the sidebar with the **dog icon** in the ribbon or the command **Open Koda**.
+2. Open the sidebar with the **dog icon** in the ribbon or the command **Open chat**.
 3. Ask a question about your vault. The status line says what Koda is doing; each tool call appears in the chat.
 4. Check or change what goes along in the **Context** tab, or with the dropdown next to **Send**.
 5. Approve or cancel writes in the dialog that opens before any change outside the Koda folder.
