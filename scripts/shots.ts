@@ -36,7 +36,7 @@
 import { join } from "node:path";
 import { argv, cwd, exit } from "node:process";
 
-import { attachTo, Cdp, clearNotices, closeExtraLeaves, openExisting, pollUntil, requireUntil, schliesseEinstellungen, setAppConfig } from "../../tools/obsidian-cdp/cdp.js";
+import { attachTo, bereiteInstanzVor, Cdp, clearNotices, closeExtraLeaves, openExisting, pollUntil, requireUntil, schliesseEinstellungen, setAppConfig } from "../../tools/obsidian-cdp/cdp.js";
 import { startLlmStub, type Antwort, type StubAnfrage } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture, setWindowSize, writeShot, type Rect } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -328,6 +328,13 @@ async function main(): Promise<void> {
 
   const cdp = await attachTo("workspace", port, vault);
   if (!cdp) throw new Error(`Kein Obsidian-Hauptfenster auf Port ${port}${vault ? ` fuer Vault „${vault}"` : ""}.`);
+
+  // Frisches Profil: Vertrauensdialog bestätigen, Restricted Mode aufheben, Plugin laden, Aufnahmesprache setzen. Ohne den Aufruf zeigt jedes Bild
+  // den Vertrauensdialog, und das Plugin fehlt im Renderer (Brücke README § Frisches Profil vorbereiten).
+  const vor = await bereiteInstanzVor(cdp, { pluginIds: [PLUGIN_ID], nurVault: vault, sprache: "en" });
+  console.log(`Instanz: ${vor.hinweis}`);
+  // Der Sprach-Guard unten liest nur `localStorage.language`, das `sprache: "en"` selbst setzt; die Oberfläche kommt vom Start (`--lang=en-US`).
+  if (vor.sprachePasst === false) throw new Error(`Oberfläche nicht Englisch: ${vor.hinweis}`);
 
   const sprache = await cdp.evaluate<string>(`return window.localStorage.getItem("language") ?? "en";`);
   if (sprache !== "en") {
