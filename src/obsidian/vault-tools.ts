@@ -551,7 +551,7 @@ export class VaultTools implements ToolRunner {
     // bleibt die Vorpruefung (ein Name nur aus unerlaubten Zeichen ist ein Fehler, kein Skill namens „---“) und der Rueckfall ohne die Option.
     const policy = this.opts.safeName;
     const clean = policy === undefined ? stripped : policy(`${name.replace(/\.md$/i, "")}.md`, "file").replace(/\.md$/i, "").replace(/\s+/g, " ").trim();
-    const desc = description.trim().replace(/\s*\n\s*/g, " ");
+    const desc = oneLine(description);
     if (desc === "") return { ok: false, error: "description fehlt — sie erklaert dem Nutzer, was sich kuenftig aendert" };
 
     const path = skillPath(this.opts.kodaFolder(), clean);
@@ -622,7 +622,7 @@ export class VaultTools implements ToolRunner {
     // Ein bloßes trim() liesse Folgezeilen als nicht-Bullet-Text im Memory-File
     // landen. Daher innere Zeilenumbrueche (+ das sie umgebende Whitespace) auf
     // ein Leerzeichen kollabieren.
-    const clean = text.trim().replace(/\s*\n\s*/g, " ");
+    const clean = oneLine(text);
     const path = `${this.opts.kodaFolder().replace(/\/+$/, "")}/${MEMORY_FILE}`;
     const existing = (await this.vault.exists(path)) ? await this.vault.read(path) : "";
     await this.vault.overwrite(path, appendMemoryLine(existing, clean, this.opts.today()));
@@ -726,6 +726,12 @@ export class VaultTools implements ToolRunner {
 }
 
 function str(v: unknown): string { return typeof v === "string" ? v : ""; }
+
+/** Eine Zeile aus Modelltext: jeder Leerraum-Lauf mit Zeilenumbruch wird ein Leerzeichen. Frühere Fassung (Regex aus Leerraum, Zeilenumbruch, Leerraum) war auf einem langen Lauf
+ *  ohne Zeilenumbruch quadratisch (Fuzz in `tests/linear-fuzz.test.ts`, dort an `formatFieldValue` gemessen, dieselbe Form). */
+function oneLine(text: string): string {
+  return text.trim().replace(/\s+/g, (run) => (run.includes("\n") ? " " : run));
+}
 function num(v: unknown, fallback: number): number { return typeof v === "number" && v > 0 ? Math.min(v, 25) : fallback; }
 
 /** Modelle liefern Booleans mal als `true`, mal als `"true"`, mal als `1`/`0`. Tolerant

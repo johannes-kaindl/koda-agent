@@ -80,8 +80,10 @@ export function formatFieldValue(v: unknown): string {
   return "{…}";
 }
 
+/** Jeder Leerraum-Lauf mit einem Zeilenumbruch wird ein Leerzeichen, Läufe ohne bleiben. Frühere Fassung war ein Regex aus Leerraum, optionalem Wagenrücklauf, Zeilenumbruch, Leerraum: auf einem langen Lauf ohne Zeilenumbruch
+ *  griff jede Startposition den ganzen Rest des Laufs und lief zurück (quadratisch, 50 000 Zeichen rund 2 s); der Fuzz in `tests/linear-fuzz.test.ts` fand es. */
 function collapse(s: string): string {
-  return s.replace(/\s*\r?\n\s*/g, " ").trim();
+  return s.replace(/\s+/g, (run) => (run.includes("\n") ? " " : run)).trim();
 }
 
 /** Gekuerzt wird nach CODEPOINTS, nicht nach UTF-16-Einheiten: `slice` mitten durch ein

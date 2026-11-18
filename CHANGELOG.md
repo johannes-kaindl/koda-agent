@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A very long run of spaces or blank lines no longer freezes Obsidian for seconds.** Five places read such a run quadratically: the property overview of `list_notes` (a note property with tens of thousands of blanks), the `remember` and skill-description tools (text from the model), the memory file when a line is appended, and the folder placeholder in the rules text. A run of 50,000 characters took about two seconds and the time grew with the square of the length; it is now linear.
+
 ## [0.38.0] — 2026-11-18
 
 ### Added

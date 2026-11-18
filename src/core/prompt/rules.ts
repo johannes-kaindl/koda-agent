@@ -33,7 +33,9 @@ export function effectiveRules(override?: string): string {
  *  Tippfehler des Nutzers (dann soll er ihn sehen) oder ein Platzhalter aus einer neueren
  *  Version (dann waere Verschlucken der schlechtere Ausgang). */
 export function renderRules(template: string, opts: { lang: "de" | "en"; folder: string }): string {
-  const folder = opts.folder.replace(/\/+$/, "");
+  let end = opts.folder.length; // Schrägstriche am Ende abschneiden; `replace(/\/+$/, "")` war auf einem langen Schrägstrich-Lauf quadratisch
+  while (end > 0 && opts.folder.charCodeAt(end - 1) === 47) end--;
+  const folder = opts.folder.slice(0, end);
   return template
     .split(PLACEHOLDER_LANG).join(LANGUAGE_NAME[opts.lang])
     .split(PLACEHOLDER_FOLDER).join(folder);
