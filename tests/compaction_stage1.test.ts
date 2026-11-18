@@ -1,3 +1,5 @@
+import { toWireMessages } from "../src/core/agent/types";
+import { IMAGE_EST_CHARS } from "../src/core/tools/images";
 import { estimateTokens } from "../src/core/agent/compaction/estimate";
 import { planStage1 } from "../src/core/agent/compaction/stage1";
 import { projectForModel, STUB_MIN_CHARS } from "../src/core/agent/compaction/project";
@@ -64,5 +66,29 @@ describe("planStage1 mit Kontextbloecken", () => {
   it("ohne Kontextbloecke fehlt stats.contexts — alte Marken bleiben, wie sie sind", () => {
     const h: LogEntry[] = [u("F"), call("c1", "read_note", '{"path":"A.md"}'), tool("c1", big("A"))];
     expect(planStage1(projectForModel(h), 0, "T")!.stats.contexts).toBeUndefined();
+  });
+});
+
+describe("estimateTokens — Differential gegen die eigene Fassung vor dem Kit-Tausch (code-kit model-context)", () => {
+  // Die alte Rechnung, wortgleich: Zeichen der Wire-Form + Overhead + Bildzuschlag, durch 4, aufgerundet.
+  const alt = (msgs: ChatMessage[], overheadChars = 0): number => {
+    const images = msgs.reduce((n, m) => n + (m.images?.length ?? 0), 0);
+    return Math.ceil((JSON.stringify(toWireMessages(msgs)).length + overheadChars + images * IMAGE_EST_CHARS) / 4);
+  };
+  it("liefert dieselbe Zahl fuer Verlaeufe mit Text, Tool-Aufrufen, Bildern, Umlauten und Overhead", () => {
+    const img = (n: number): ChatMessage => ({ role: "user", content: "Bild", images: Array.from({ length: n }, (_, i) => ({ path: `b${i}.png` })) });
+    const faelle: Array<[ChatMessage[], number]> = [
+      [[], 0],
+      [[u("")], 0],
+      [[u("abcd")], 0],
+      [[u("äöü ß 日本語 \u{1F600}")], 7],
+      [[u("a".repeat(1001)), call("c1", "read_note", '{"path":"A.md"}'), tool("c1", "b".repeat(333))], 400],
+      [[img(1)], 0],
+      [[img(3), u("x")], 1234],
+    ];
+    for (const [msgs, ov] of faelle) expect(estimateTokens(msgs, ov)).toBe(alt(msgs, ov));
+  });
+  it("deckt viele Laengen ab (jede Rundungsgrenze von 4 Zeichen)", () => {
+    for (let n = 0; n < 200; n++) expect(estimateTokens([u("a".repeat(n))], n % 7)).toBe(alt([u("a".repeat(n))], n % 7));
   });
 });
