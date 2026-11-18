@@ -14,6 +14,8 @@ function fakeApi(over: Partial<TaskNotesApi> = {}): TaskNotesApi & { calls: stri
     updateTask: async (p, d) => { calls.push(`update:${p}:${JSON.stringify(d)}`); return task({ path: p, ...d }); },
     completeTask: async (p) => { calls.push(`complete:${p}`); return task({ path: p, status: "done", completedDate: "2026-11-18" }); },
     deleteTask: async (p) => { calls.push(`delete:${p}`); },
+    getStatuses: () => [{ value: "open", isCompleted: false }, { value: "in-progress", isCompleted: false }, { value: "done", isCompleted: true }],
+    getPriorities: () => [{ value: "low" }, { value: "normal" }, { value: "high" }],
     ...over,
   };
 }
@@ -137,6 +139,49 @@ describe("Schreibwerkzeuge — Bestätigung je Schreibvorgang", () => {
     const err = Object.assign(new Error("Task not found: Tasks/x.md"), { code: "task_not_found" });
     const { p } = prov(fakeApi({ updateTask: async () => { throw err; } }));
     expect(await p.executeTool("tasknotes_update", { path: "Tasks/x.md", status: "done" }, { confirm: yes })).toEqual({ ok: false, reason: "failed", message: "Task not found: Tasks/x.md (task_not_found)" });
+  });
+});
+
+describe("Status und Priorität werden gegen die Kataloge von TaskNotes geprüft (gemessen 2026-11-18: updateTask schreibt einen unbekannten Status ungeprüft)", () => {
+  const p = (api = fakeApi()) => ({ api, p: createTaskNotesProvider(() => api) });
+  it("lehnt einen unbekannten Status bei update ab, nennt die erlaubten Werte und fragt nicht", async () => {
+    const { api, p: prov } = p();
+    const confirm = vi.fn(yes);
+    const r = await prov.executeTool("tasknotes_update", { path: "Tasks/a.md", status: "gibt-es-nicht" }, { lang: "en", confirm });
+    expect(r).toMatchObject({ ok: false, reason: "bad-args", field: "status" });
+    expect((r as { message: string }).message).toContain("open, in-progress, done");
+    expect(confirm).not.toHaveBeenCalled();
+    expect(api.calls).toEqual([]);
+  });
+  it("gilt ebenso für create und für die Priorität", async () => {
+    const { api, p: prov } = p();
+    expect(await prov.executeTool("tasknotes_create", { title: "x", status: "erledigt" }, { confirm: yes })).toMatchObject({ reason: "bad-args", field: "status" });
+    const r = await prov.executeTool("tasknotes_create", { title: "x", priority: "dringend" }, { lang: "de", confirm: yes });
+    expect(r).toMatchObject({ reason: "bad-args", field: "priority" });
+    expect((r as { message: string }).message).toContain("low, normal, high");
+    expect(api.calls).toEqual([]);
+  });
+  it("nimmt bekannte Werte an, ohne auf Groß/Klein zu bestehen, und reicht den Wert des Katalogs durch", async () => {
+    const { api, p: prov } = p();
+    await prov.executeTool("tasknotes_update", { path: "Tasks/a.md", status: "IN-PROGRESS", priority: "High" }, { confirm: yes });
+    expect(api.calls).toEqual([`update:Tasks/a.md:${JSON.stringify({ status: "in-progress", priority: "high" })}`]);
+  });
+  it("nennt die erlaubten Werte in der Beschreibung des Werkzeugs", () => {
+    const d = createTaskNotesProvider(() => fakeApi()).tools({ lang: "en" }).find((t) => t.name === "tasknotes_update");
+    const props = (d?.parameters as { properties: Record<string, { description: string }> }).properties;
+    expect(props.status.description).toContain("open, in-progress, done");
+    expect(props.priority.description).toContain("low, normal, high");
+  });
+  it("ohne Kataloge (ältere TaskNotes) wird nicht geraten: Werte gehen durch", async () => {
+    const api = fakeApi({ getStatuses: undefined, getPriorities: undefined });
+    await createTaskNotesProvider(() => api).executeTool("tasknotes_update", { path: "Tasks/a.md", status: "irgendwas" }, { confirm: yes });
+    expect(api.calls).toHaveLength(1);
+  });
+  it("die Liste zählt als erledigt, was der Katalog als erledigt führt, auch ohne completedDate", async () => {
+    const api = fakeApi({ listTasks: async () => [task({ path: "T/x.md", title: "fertig", status: "done" }), task({ path: "T/y.md", title: "offen", status: "open" })] });
+    const r = (await createTaskNotesProvider(() => api).executeTool("tasknotes_list", {}, { lang: "en" })) as { content: string };
+    expect(r.content).toContain("offen");
+    expect(r.content).not.toContain("fertig");
   });
 });
 

@@ -17,6 +17,9 @@ export interface TaskNotesApi {
   completeTask(path: string): Promise<TaskInfo>;
   deleteTask(path: string): Promise<void>;
   getTask?(path: string): Promise<TaskInfo | null>;
+  /** Kataloge (synchron). Gemessen an 4.18.4: `updateTask` prüft den Status NICHT, ein unbekannter Wert landet in der Datei: der Adapter prüft selbst. */
+  getStatuses?(): Array<{ value: string; isCompleted?: boolean }>;
+  getPriorities?(): Array<{ value: string }>;
 }
 
 export interface TaskInfo {
@@ -56,8 +59,24 @@ const SCHEMA_FIELDS = {
   details: { type: "string", description: "Free text for the task body. Optional." },
 } as const;
 
-function defs(lang: ToolLang): ProviderToolDef[] {
+/** Die Werte der Kataloge als Liste; leer, wenn TaskNotes sie nicht nennt oder der Aufruf wirft. */
+function catalog(read: (() => Array<{ value: string }>) | undefined): string[] {
+  try {
+    return read ? read().map((x) => x.value).filter((v) => typeof v === "string" && v !== "") : [];
+  } catch {
+    return [];
+  }
+}
+
+function defs(lang: ToolLang, api: TaskNotesApi | null = null): ProviderToolDef[] {
   const d = (de: string, en: string): string => pick(T(de, en), lang);
+  const statuses = catalog(api?.getStatuses?.bind(api));
+  const priorities = catalog(api?.getPriorities?.bind(api));
+  const fields = {
+    ...SCHEMA_FIELDS,
+    status: { type: "string", description: statuses.length > 0 ? d(`Status. Erlaubt: ${statuses.join(", ")}. Optional.`, `Status. Allowed: ${statuses.join(", ")}. Optional.`) : SCHEMA_FIELDS.status.description },
+    priority: { type: "string", description: priorities.length > 0 ? d(`Priorität. Erlaubt: ${priorities.join(", ")}. Optional.`, `Priority. Allowed: ${priorities.join(", ")}. Optional.`) : SCHEMA_FIELDS.priority.description },
+  };
   return [
     {
       name: "tasknotes_list",
@@ -82,7 +101,7 @@ function defs(lang: ToolLang): ProviderToolDef[] {
         "Legt eine Aufgabe über TaskNotes an (Ordner, Dateiname und Feld-Mapping bestimmt TaskNotes). Der Nutzer wird vorher gefragt.",
         "Creates a task through TaskNotes (folder, file name and field mapping are TaskNotes' own). The user is asked first.",
       ),
-      parameters: { type: "object", properties: { ...SCHEMA_FIELDS }, required: ["title"] },
+      parameters: { type: "object", properties: { ...fields }, required: ["title"] },
       writes: true,
     },
     {
@@ -91,7 +110,7 @@ function defs(lang: ToolLang): ProviderToolDef[] {
         "Ändert Felder einer bestehenden Aufgabe (Pfad aus tasknotes_list). Nur die genannten Felder ändern sich. Der Nutzer wird vorher gefragt.",
         "Changes fields of an existing task (path from tasknotes_list). Only the named fields change. The user is asked first.",
       ),
-      parameters: { type: "object", properties: { path: { type: "string", description: d("Pfad der Aufgabe.", "Path of the task.") }, ...SCHEMA_FIELDS }, required: ["path"] },
+      parameters: { type: "object", properties: { path: { type: "string", description: d("Pfad der Aufgabe.", "Path of the task.") }, ...fields }, required: ["path"] },
       writes: true,
     },
     {
@@ -138,6 +157,22 @@ function pickFields(args: Record<string, unknown>): { ok: true; fields: Record<s
   return { ok: true, fields };
 }
 
+/** Status und Priorität gegen die Kataloge von TaskNotes: kanonischer Wert (Schreibweise des Katalogs) oder ein Fehler mit den erlaubten Werten. */
+function checkCatalogs(fields: Record<string, unknown>, api: TaskNotesApi, lang: ToolLang): { ok: true } | { ok: false; field: string; message: string } {
+  for (const [field, read] of [["status", api.getStatuses?.bind(api)], ["priority", api.getPriorities?.bind(api)]] as const) {
+    const given = fields[field];
+    if (typeof given !== "string") continue;
+    const allowed = catalog(read);
+    if (allowed.length === 0) continue; // ohne Katalog nicht raten
+    const hit = allowed.find((v) => v.toLowerCase() === given.toLowerCase());
+    if (hit === undefined) {
+      return { ok: false, field, message: pick(T(`${field} "${given}" gibt es in TaskNotes nicht. Erlaubt: ${allowed.join(", ")}.`, `${field} "${given}" does not exist in TaskNotes. Allowed: ${allowed.join(", ")}.`), lang) };
+    }
+    fields[field] = hit;
+  }
+  return { ok: true };
+}
+
 function errorText(e: unknown): { code?: string; message: string } {
   const o = (e !== null && typeof e === "object" ? e : {}) as { code?: unknown; message?: unknown };
   return { ...(typeof o.code === "string" ? { code: o.code } : {}), message: typeof o.message === "string" && o.message !== "" ? o.message : String(e) };
@@ -146,7 +181,8 @@ function errorText(e: unknown): { code?: string; message: string } {
 const line = (t: TaskInfo): string =>
   [t.path, t.title, t.status ?? "-", t.priority ?? "-", t.due ?? "-"].map((s) => String(s).replace(/\s+/g, " ")).join(" | ");
 
-const isDone = (t: TaskInfo): boolean => t.completedDate !== undefined && t.completedDate !== "" || t.archived === true;
+const isDone = (t: TaskInfo, completed: ReadonlySet<string>): boolean =>
+  (t.completedDate !== undefined && t.completedDate !== "") || t.archived === true || (t.status !== undefined && completed.has(t.status));
 
 /** Der Anbieter. `getApi` liest bei JEDEM Aufruf frisch (das Plugin kann zur Laufzeit an- oder abgeschaltet werden); `isCompleted(status)`
  *  fragt, ob ein Status als erledigt gilt (TaskNotes kennt sie in `statusManager`, der Adapter nicht). */
@@ -154,13 +190,14 @@ export function createTaskNotesProvider(getApi: () => TaskNotesApi | null): Tool
   return {
     version: 1,
     tools(opts) {
-      return getApi() === null ? [] : defs(opts?.lang ?? "en");
+      const api = getApi();
+      return api === null ? [] : defs(opts?.lang ?? "en", api);
     },
     async executeTool(name: string, args: Record<string, unknown>, opts?: ProviderCallOptions): Promise<ProviderResult> {
       const lang: ToolLang = opts?.lang ?? "en";
       const api = getApi();
       if (api === null) return { ok: false, reason: "unavailable", detail: "tasknotes-missing", message: pick(T("TaskNotes ist nicht geladen.", "TaskNotes is not loaded."), lang) };
-      const known = defs(lang).find((d) => d.name === name);
+      const known = defs(lang, api).find((d) => d.name === name);
       if (known === undefined) return { ok: false, reason: "unknown-tool", message: `${name}` };
       const confirm = async (summary: string, paths: string[]): Promise<ProviderResult | null> => {
         const yes = opts?.confirm ? await opts.confirm({ summary, paths }).catch(() => false) : false;
@@ -176,7 +213,8 @@ export function createTaskNotesProvider(getApi: () => TaskNotesApi | null): Tool
             const all = await api.listTasks();
             const status = str(args.status)?.toLowerCase();
             const text = str(args.text)?.toLowerCase();
-            const rows = all.filter((t) => (args.include_done === true || !isDone(t))
+            const completed = new Set((() => { try { return api.getStatuses?.() ?? []; } catch { return []; } })().filter((x) => x.isCompleted === true).map((x) => x.value));
+            const rows = all.filter((t) => (args.include_done === true || !isDone(t, completed))
               && (status === undefined || (t.status ?? "").toLowerCase() === status)
               && (text === undefined || t.title.toLowerCase().includes(text)));
             const shown = rows.slice(0, LIST_CAP);
@@ -190,6 +228,8 @@ export function createTaskNotesProvider(getApi: () => TaskNotesApi | null): Tool
             if (title === undefined) return { ok: false, reason: "bad-args", field: "title", message: pick(T("title fehlt.", "title is missing."), lang) };
             const f = pickFields(args);
             if (!f.ok) return { ok: false, reason: "bad-args", field: f.field, message: `${f.field}` };
+            const c = checkCatalogs(f.fields, api, lang);
+            if (!c.ok) return { ok: false, reason: "bad-args", field: c.field, message: c.message };
             const no = await confirm(pick(T(`Aufgabe anlegen: ${title}`, `Create task: ${title}`), lang), []);
             if (no) return no;
             const t = await api.createTask({ ...f.fields, title });
@@ -201,6 +241,8 @@ export function createTaskNotesProvider(getApi: () => TaskNotesApi | null): Tool
             const f = pickFields(args);
             if (!f.ok) return { ok: false, reason: "bad-args", field: f.field, message: `${f.field}` };
             if (Object.keys(f.fields).length === 0) return { ok: false, reason: "bad-args", field: "title", message: pick(T("Kein Feld zum Ändern genannt.", "No field to change was named."), lang) };
+            const c = checkCatalogs(f.fields, api, lang);
+            if (!c.ok) return { ok: false, reason: "bad-args", field: c.field, message: c.message };
             const no = await confirm(pick(T(`Aufgabe ändern (${Object.keys(f.fields).join(", ")}): ${path}`, `Change task (${Object.keys(f.fields).join(", ")}): ${path}`), lang), [path]);
             if (no) return no;
             const t = await api.updateTask(path, f.fields);
