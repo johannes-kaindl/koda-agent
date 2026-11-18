@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.38.0] — 2026-11-18
+
 ### Added
 
 - **Koda can read, create, change, complete and delete tasks through TaskNotes.** With the plugin TaskNotes active, five tools appear (`tasknotes_list`, `tasknotes_create`, `tasknotes_update`, `tasknotes_complete`, `tasknotes_delete`); each writing call asks first, deleting always. Koda uses TaskNotes' own interface, so its folder, file names and field mapping apply. Without TaskNotes nothing changes.
