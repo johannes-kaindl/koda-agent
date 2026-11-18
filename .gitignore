@@ -10,3 +10,4 @@ coverage/
 
 .claude/*
 !.claude/rules/
+.lab-tasknotes.mjs

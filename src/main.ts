@@ -41,7 +41,7 @@ import { findEndpointManager, onEndpointManagerChanged } from "./vendor/kit-obsi
 import { runAgent, type LoopLlm, type CompactionDeps } from "./core/agent/loop";
 import { type ChatMessage, type ErrorRecord, type LogEntry, type SessionStateRecord } from "./core/agent/types";
 import { HOST_TOOL_NAMES, toolSet, toWireTools, type ToolDef, type ToolSet } from "./core/tools/defs";
-import { findToolProvider, readProviderOffers } from "./vendor/kit-obsidian/tool-providers";
+import { findProvider, readOffers } from "./obsidian/providers";
 import type { ProviderOffer } from "./vendor/kit/tool-provider";
 import { confirmAction } from "./vendor/kit-obsidian/confirm";
 import { MEMORY_FILE, SKILLS_SUBFOLDER } from "./core/tools/write-policy";
@@ -553,7 +553,7 @@ export default class KodaPlugin extends Plugin {
     const a = this.currentArbeit();
     if (a === null) return [t("abilities.hint.notFound", name)];
     const { skills } = await this.readSkills();
-    const offers = readProviderOffers(this.app, this.promptLang());
+    const offers = readOffers(this.app, this.promptLang());
     const unknown = unknownEntries(a, { skills: skills.map((x) => x.name), ownTools: [...HOST_TOOL_NAMES], providers: offers.map((o) => o.id) });
     return [
       ...(this.arbeitParseInvalid.get(a.name) ?? []).map((e) => t("abilities.hint.invalid", e)),
@@ -567,7 +567,7 @@ export default class KodaPlugin extends Plugin {
 
   /** Fremde Werkzeuge je Anbieter, wie sie wirklich montiert sind (Kollisionen mit Kodas eigenen Namen fallen
    *  heraus — ein „Anbieter aus“ darf kein eigenes Werkzeug mit abschalten). Dieselbe Gruppierung wie der Settings-Tab. */
-  providerTools(offers: ProviderOffer[] = readProviderOffers(this.app, this.promptLang())): ProviderTools[] {
+  providerTools(offers: ProviderOffer[] = readOffers(this.app, this.promptLang())): ProviderTools[] {
     return providerToolGroups({ toolsDisabled: [], toolDescriptions: {} }, offers, HOST_TOOL_NAMES)
       .groups.map((g) => ({ id: g.id, tools: g.rows.map((r) => r.name) }));
   }
@@ -575,7 +575,7 @@ export default class KodaPlugin extends Plugin {
   /** Speist den Tab „Fähigkeiten“: dieselben Quellen, die `ask()` liest — es gibt keinen zweiten Weg zu dem, was gilt. */
   async abilitiesViewModel(): Promise<AbilitiesVM> {
     const { skills, failed } = await this.readSkills();
-    const offers = readProviderOffers(this.app, this.promptLang());
+    const offers = readOffers(this.app, this.promptLang());
     const eigene = toolRows(
       this.settings,
       { read: this.imageMode() !== "none", generate: readImageGenApi(this.app) !== null },
@@ -1007,7 +1007,7 @@ export default class KodaPlugin extends Plugin {
    *  — ein zweiter Aufbau waere eine zweite Wahrheit. */
   currentToolSet(): ToolSet {
     const lang = this.promptLang();
-    const providers = readProviderOffers(this.app, lang);
+    const providers = readOffers(this.app, lang);
     const opts = {
       readImage: this.imageMode() !== "none",
       generateImage: readImageGenApi(this.app) !== null,
@@ -1153,7 +1153,7 @@ export default class KodaPlugin extends Plugin {
       provider: (name) => {
         const id = this.currentToolSet().routes.get(name);
         if (id === undefined) return null;
-        return findToolProvider(this.app, id);
+        return findProvider(this.app, id);
       },
       skillMode: (name) => skillModeLookup(this.skillsCache, this.currentArbeit(), this.session.overlay)(name),
       // Dateinamen, die das Modell erfindet (write_note create, move_note): erst die API von filename-sanitizer, sonst die Kit-Regeln.

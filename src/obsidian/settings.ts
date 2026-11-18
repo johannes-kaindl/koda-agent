@@ -44,7 +44,8 @@ import { createModelListCache, type ModelListCache, type ModelListClient } from 
 import { ENDPOINT_PRESETS } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { endpointStatusView } from "../core/llm/endpoint-status-view";
-import { readProviderOffers, readToolProviderRejections } from "../vendor/kit-obsidian/tool-providers";
+import { readToolProviderRejections } from "../vendor/kit-obsidian/tool-providers";
+import { readOffers } from "./providers";
 import { renderSkillDefaults } from "./skill-defaults";
 import { renderPromptRow, renderToolList, type ModelControlCtx } from "./model-control";
 import { PromptPreviewModal } from "./prompt-modal";
@@ -404,7 +405,7 @@ export class KodaSettingsTab extends PluginSettingTab {
    *  die bei JEDEM Aufruf frisch gelesen werden, weil vault-rag zur Laufzeit an- und ausgehen
    *  kann — ein einmal gebauter Kontext wuerde das nicht mehr sehen. */
   private modelCtx(): ModelControlCtx {
-    const offers = readProviderOffers(this.app, this.plugin.promptLang());
+    const offers = readOffers(this.app, this.plugin.promptLang());
     return {
       settings: this.plugin.settings,
       save: () => this.plugin.saveSettings(),

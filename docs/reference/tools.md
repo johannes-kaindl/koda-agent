@@ -37,6 +37,10 @@ Other Obsidian plugins can offer Koda their tools. Koda looks for them each time
 
 Under **Settings → Koda → Model control → Tools** these tools stand in their own group "From the plugin …", with the same switch and description field as Koda's own. If a write would also affect something outside the vault (a calendar server, an invitation by mail), the dialog lists it under "Outside the vault". A plugin that does not follow the tool contract is not offered; the list says why, see [Troubleshooting](../how-to/troubleshooting.md#the-tools-of-another-plugin-are-missing-from-the-tool-list).
 
+### Tasks through TaskNotes
+
+When the plugin *TaskNotes* is active, Koda adds five tools for its tasks, in the group "From the plugin tasknotes": `tasknotes_list` (path, title, status, priority and due date of up to 50 tasks, with the total in the first line; filter by `status`, title `text`, `include_done`), `tasknotes_create`, `tasknotes_update` (only the named fields change), `tasknotes_complete` and `tasknotes_delete`. Koda keeps no task list of its own: every call goes to TaskNotes' in-app interface, so folder, file name, field mapping, default values and the trash setting are TaskNotes' own. Read the content of a task with `read_note` on the path from the list. The four writing tools ask first in the dialog **Koda wants to write through another plugin**, one question per call, and `tasknotes_delete` always asks. Without TaskNotes the tools do not exist, and nothing else in Koda changes. Each tool can be switched off in the tool list like any other.
+
 ## Commands
 
 All commands appear in the command palette with the prefix **Koda:**. None has a default hotkey; assign one under **Settings → Hotkeys**.

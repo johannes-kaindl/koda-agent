@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Koda can read, create, change, complete and delete tasks through TaskNotes.** With the plugin TaskNotes active, five tools appear (`tasknotes_list`, `tasknotes_create`, `tasknotes_update`, `tasknotes_complete`, `tasknotes_delete`); each writing call asks first, deleting always. Koda uses TaskNotes' own interface, so its folder, file names and field mapping apply. Without TaskNotes nothing changes.
+
+### Changed
+
+- **The API key field in the endpoint list reads "API key (optional)"** like the other plugins; the old placeholder was cut off in the narrow field. The hint to leave it empty for a local server moved into the description of the endpoint list.
+
 ## [0.37.1] — 2026-11-15
 
 ### Fixed
