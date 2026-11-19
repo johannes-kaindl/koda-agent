@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.38.1] — 2026-11-19
+
 ### Changed
 
 - **Two commands drop the plugin name from their names (UI-STANDARD §11).** The palette shows "Koda: Open chat" and "Koda: Ask about the selection" instead of "Koda: Open Koda" and "Koda: Ask Koda about the selection" (German: "Chat öffnen", "Zur Markierung fragen"); the ribbon tooltip of the dog icon now reads "Open chat". The command ids stay, so bound hotkeys keep working.
