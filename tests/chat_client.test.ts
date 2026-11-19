@@ -335,3 +335,28 @@ describe("KodaChatClient.complete", () => {
     expect(ms[0]).toBe(idle);
   });
 });
+
+describe("KodaChatClient.complete: Geheimnis hinter einem Wortzeichen geht nicht auf den Draht (code-kit 0.79.1)", () => {
+  const cases = [
+    ["Unterstrich + sk-", "key_sk-proj-abc123def456ghi789", "sk-proj-abc123def456ghi789"],
+    ["Unterstrich + AKIA", "my_AKIAIOSFODNN7EXAMPLE", "AKIAIOSFODNN7EXAMPLE"],
+    ["Unterstrich + Bearer", "x_Bearer abcdef1234567890token", "abcdef1234567890token"],
+  ] as const;
+  for (const [name, text, secret] of cases) {
+    it(`schwärzt in der Nachricht: ${name}`, async () => {
+      let body = "";
+      const transport: SseTransport = {
+        async postStream(_u, b, _h, onChunk) {
+          body = typeof b === "string" ? b : JSON.stringify(b);
+          onChunk(line({ choices: [{ delta: { content: "ok" } }] }) + "data: [DONE]\n");
+          return 200;
+        },
+      };
+      const client = new KodaChatClient(transport, 1000, fakeClock);
+      const r = await client.complete(cfg, [{ role: "user", content: `Meine Notiz: ${text} Ende` }], [], () => {}, () => {}, new AbortController().signal);
+      expect(r).toMatchObject({ ok: true });
+      expect(body).toContain("Meine Notiz");
+      expect(body).not.toContain(secret);
+    });
+  }
+});

@@ -1,10 +1,10 @@
 {
   "sources": {
     "obsidian-kit": {
-      "ref": "0.95.0"
+      "ref": "0.102.0"
     },
     "code-kit": {
-      "ref": "0.73.0"
+      "ref": "0.82.0"
     }
   },
   "targets": [
@@ -24,7 +24,8 @@
         "audio-provider",
         "filename-sanitizer-source",
         "vault-path",
-        "describe-provider"
+        "describe-provider",
+        "pseudonymizer-source"
       ],
       "rewrite": [
         [
@@ -131,6 +132,7 @@
         "copy-button",
         "segmented-control",
         "redline",
+        "redline-strings",
         "model-bar",
         "model-bar-strings",
         "thinking-control",

@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format follows
 
 - **A very long run of spaces or blank lines no longer freezes Obsidian for seconds.** Five places read such a run quadratically: the property overview of `list_notes` (a note property with tens of thousands of blanks), the `remember` and skill-description tools (text from the model), the memory file when a line is appended, and the folder placeholder in the rules text. A run of 50,000 characters took about two seconds and the time grew with the square of the length; it is now linear.
 
+- **Credentials that stand directly behind a word or underscore character are now redacted as well.** Before a message goes to the model (and into the llm-lab log), `key_sk-proj-…`, `my_AKIA…` and `x_Bearer …` are blanked like the same credential on its own; previously they went out in clear text.
+
 ## [0.38.0] — 2026-11-18
 
 ### Added
