@@ -8,6 +8,7 @@ import {
   type ToolRunner,
 } from "./types";
 import type { LlmResult } from "../../llm/KodaChatClient";
+import { isTruncated } from "../../vendor/kit/sampling-profiles";
 import { parseTextToolCall } from "./text-fallback";
 import { projectForModel, type ToolResultRule } from "./compaction/project";
 import { estimateTokens } from "./compaction/estimate";
@@ -258,7 +259,7 @@ async function runAgentImpl(
         content: r.content,
         ...(r.reasoning !== undefined && r.reasoning !== "" ? { reasoning: r.reasoning } : {}),
       });
-      onEvent({ kind: "final", text: r.content, truncated: r.finishReason === "length" });
+      onEvent({ kind: "final", text: r.content, truncated: isTruncated(r.finishReason) });
       return appended;
     }
 
