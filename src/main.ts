@@ -61,9 +61,9 @@ import type { Selection } from "./core/skills/select";
 import { CONTEXT_AUTO_K_MAX, CONTEXT_AUTO_K_MIN, CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN, DEFAULT_SETTINGS, type KodaSettings } from "./core/settings-types";
 import { VaultTools, type VaultPort } from "./obsidian/vault-tools";
 import { readRetrievalApi } from "./obsidian/retrieval";
-import { readImageGenApi, readOcrApi } from "./vendor/kit-obsidian/capability-apis";
+import { readDescribeApi, readImageGenApi, readOcrApi } from "./vendor/kit-obsidian/capability-apis";
 import { createImageUrlResolver } from "./obsidian/image-urls";
-import { chooseImageMode, ocrResult, type ImageMode } from "./core/tools/images";
+import { chooseImageMode, textResult, type ImageMode } from "./core/tools/images";
 import { guessFromName } from "./vendor/kit/capabilities";
 import { confirmWrite } from "./obsidian/confirm-write";
 import { estimateTokens } from "./core/agent/compaction/estimate";
@@ -1042,7 +1042,7 @@ export default class KodaPlugin extends Plugin {
    *  wenn image-to-markdown aktiv ist. Das Modell ist das gesendete (`sentModel()`) — dasselbe
    *  wie beim Thinking-Schalter. */
   imageMode(): ImageMode {
-    return chooseImageMode(guessFromName(this.sentModel()).vision, readOcrApi(this.app) !== null);
+    return chooseImageMode(guessFromName(this.sentModel()).vision, readOcrApi(this.app) !== null || readDescribeApi(this.app) !== null);
   }
 
   /** Nur die Namen — was der GUI-Smoke braucht (Pruefpunkt 17). */
@@ -1160,6 +1160,7 @@ export default class KodaPlugin extends Plugin {
       safeName: (name, kind) => safeFileName(this.app, name, { caller: this.manifest.id, kind }).name,
       imageMode: () => this.imageMode(),
       ocr: () => readOcrApi(this.app),
+      describe: () => readDescribeApi(this.app),
       imageGen: () => readImageGenApi(this.app),
       imageSize: (p) => this.app.vault.getFileByPath(p)?.stat.size ?? null,
       imageMaxKb: () => this.settings.imageMaxKb,
@@ -1522,12 +1523,8 @@ export default class KodaPlugin extends Plugin {
           // Nur mit aktivem OCR-Anbieter: ein Vision-Aufruf, den der Server mit HTTP-Fehler
           // quittiert, faellt auf den Text im Bild zurueck. Frisch gelesen — der Anbieter
           // kann waehrend des Laufs weg sein, dann scheitert die Texterkennung mit Klartext.
-          ...(readOcrApi(this.app) === null ? {} : {
-            ocrFallback: async (path: string) => {
-              const api = readOcrApi(this.app);
-              if (api === null) return { ok: false as const, error: "Texterkennung nicht verfügbar" };
-              return ocrResult(api, path, "vision-failed");
-            },
+          ...(readOcrApi(this.app) === null && readDescribeApi(this.app) === null ? {} : {
+            ocrFallback: async (path: string) => textResult({ describe: readDescribeApi(this.app), ocr: readOcrApi(this.app) }, path, "vision-failed"),
           }),
         },
         [system, ...this.chatLog],

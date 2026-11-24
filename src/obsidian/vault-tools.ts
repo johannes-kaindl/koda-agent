@@ -29,8 +29,9 @@ import { renderNow } from "../core/prompt/now";
 import type { EditorPort, WorkspacePort } from "../core/context/ports";
 import { renderWorkspaceReport } from "../core/context/workspace-line";
 import { DEFAULT_SETTINGS } from "../core/settings-types";
-import { ocrResult, visionResult, type ImageMode } from "../core/tools/images";
+import { textResult, visionResult, type ImageMode } from "../core/tools/images";
 import type { OcrProviderApi } from "../vendor/kit/ocr-provider";
+import type { DescribeProviderApi } from "../vendor/kit/describe-provider";
 import type { ImageGenProviderApi, ImageGenProviderError } from "../vendor/kit/image-gen-provider";
 import { imageGenErrorText } from "../vendor/kit/provider-error-texts";
 
@@ -167,6 +168,8 @@ export class VaultTools implements ToolRunner {
       /** OCR-Anbieter (image-to-markdown) und Bildgenerierungs-Anbieter (local-image-generator),
        *  frisch je Aufruf aus dem Plugin-Register; `null` = nicht (mehr) da. */
       ocr?: () => OcrProviderApi | null;
+      /** Bildbeschreibung (`describeImage`, dasselbe Plugin): vor der Texterkennung, wenn da. */
+      describe?: () => DescribeProviderApi | null;
       imageGen?: () => ImageGenProviderApi | null;
       /** Bringt einen NEU gebildeten Namen (ein Segment, kein Pfad) in die Dateinamen-Richtlinie des Nutzers: `safeFileName` aus dem Kit,
        *  zuerst ueber die API von `filename-sanitizer`, sonst mit den Kit-Regeln. Fehlt das Feld, bleibt der Name, wie das Modell ihn
@@ -319,10 +322,10 @@ export class VaultTools implements ToolRunner {
     if (size === null) return { ok: false, error: `nicht gefunden: "${norm}"` };
     const maxKb = this.opts.imageMaxKb?.() ?? DEFAULT_SETTINGS.imageMaxKb;
     const ocr = this.opts.ocr?.() ?? null;
+    const describe = this.opts.describe?.() ?? null;
     const tooBig = size > maxKb * 1024;
-    if (mode === "ocr" || (tooBig && ocr !== null)) {
-      if (ocr === null) return { ok: false, error: "Texterkennung nicht verfügbar: das Plugin image-to-markdown ist nicht (mehr) aktiv." };
-      return await ocrResult(ocr, norm, mode === "ocr" ? "no-vision" : "too-big");
+    if (mode === "ocr" || (tooBig && (ocr !== null || describe !== null))) {
+      return await textResult({ describe, ocr }, norm, mode === "ocr" ? "no-vision" : "too-big");
     }
     if (tooBig) {
       return { ok: false, error: `Bild zu groß: "${norm}" hat ${Math.ceil(size / 1024)} KB, die Grenze liegt bei ${maxKb} KB (Einstellung „Größtes Bild, das Koda liest“).` };

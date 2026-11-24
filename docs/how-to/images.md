@@ -7,14 +7,14 @@ Koda can open an image from your vault and describe or read it, and it can gener
 Ask about an image by its path or name: "What does `Attachments/receipt.png` show?" Koda calls `read_image` (formats: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`). What happens next depends on the model:
 
 - **A model that sees images** (Koda judges by the model name, for example a name with `vl`, `vision` or `gemma-4`) gets the picture together with the tool result and answers from it. "Probably" is enough; if the server refuses the picture, see below.
-- **A model that does not see images** gets the text in the image, if [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown) is active. That is text recognition: it reads printed text well and describes nothing.
+- **A model that does not see images** gets a description of the picture, if [Image to Markdown](https://github.com/johannes-kaindl/image-to-markdown) (version 0.35.0 or newer) is active and has a model for describing images. The result names its source ("Beschreibung von … (Bildbeschreibung, <model>)") and says that the picture came as a description. If the description fails or the plugin is older, Koda gets the text in the image instead (text recognition: it reads printed text well and describes nothing).
 - **Neither:** Koda does not offer `read_image` at all, so the model cannot waste a turn on it.
 
-If the server rejects a request with an image (HTTP error) and Image to Markdown is active, Koda swaps the picture for the recognised text, repeats the round once and says so in a notice.
+If the server rejects a request with an image (HTTP error) and Image to Markdown is active, Koda swaps the picture for the description (or the recognised text), repeats the round once and says so in a notice.
 
 Your session file keeps only the image's path, never the picture. Old pictures drop out of the conversation when Koda compacts it, like other bulky tool results.
 
-An image above **Largest image Koda reads** (**Settings → Koda**, default 4096 KB) is not sent to the model: with Image to Markdown active the text is read instead, otherwise the answer says the image is too large.
+An image above **Largest image Koda reads** (**Settings → Koda**, default 4096 KB) is not sent to the model: with Image to Markdown active the description or the text is read instead, otherwise the answer says the image is too large.
 
 ## Let Koda generate an image
 

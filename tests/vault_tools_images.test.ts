@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { VaultTools, type VaultPort } from "../src/obsidian/vault-tools";
 import type { OcrProviderApi } from "../src/vendor/kit/ocr-provider";
+import type { DescribeProviderApi } from "../src/vendor/kit/describe-provider";
 import type { ImageGenProviderApi } from "../src/vendor/kit/image-gen-provider";
 import type { ImageMode } from "../src/core/tools/images";
 
@@ -15,6 +16,7 @@ function vault(): VaultPort {
 interface Cfg {
   mode?: ImageMode;
   ocr?: OcrProviderApi | null;
+  describe?: DescribeProviderApi | null;
   gen?: ImageGenProviderApi | null;
   size?: number | null;
   maxKb?: number;
@@ -26,6 +28,7 @@ function tools(c: Cfg) {
     kodaFolder: () => "Koda", today: () => "2026-10-01", listMaxRows: () => 50,
     imageMode: () => c.mode ?? "vision",
     ocr: () => c.ocr ?? null,
+    describe: () => c.describe ?? null,
     imageGen: () => c.gen ?? null,
     imageSize: () => (c.size === undefined ? 1024 : c.size),
     imageMaxKb: () => c.maxKb ?? 4096,
@@ -46,6 +49,31 @@ describe("read_image", () => {
     expect(r).toMatchObject({ ok: true });
     expect(r.ok && r.content).toContain("Rechnung 42");
     expect(r.ok && r.images).toBeUndefined();
+  });
+  it("Textweg mit Beschreibungs-API: beschreibt statt Texterkennung und nennt die Quelle (Welle 37)", async () => {
+    const ocr = { version: 1 as const, extractText: vi.fn(async () => "Rechnung 42") };
+    const describe = { version: 1 as const, describeImage: vi.fn(async () => ({ text: "Ein Beleg mit Betrag." })) };
+    const r = await tools({ mode: "ocr", ocr, describe }).run("read_image", { path: "a.png" });
+    expect(describe.describeImage).toHaveBeenCalledWith("a.png", expect.objectContaining({ language: "de" }));
+    expect(ocr.extractText).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ ok: true, source: "describe:image-to-markdown" });
+    expect(r.ok && r.content).toContain("Ein Beleg mit Betrag.");
+  });
+  it("Beschreibung scheitert: die Texterkennung springt ein (Welle 37)", async () => {
+    const ocr = { version: 1 as const, extractText: vi.fn(async () => "Rechnung 42") };
+    const describe = { version: 1 as const, describeImage: async () => ({ error: "busy" as const, message: "m" }) };
+    const r = await tools({ mode: "ocr", ocr, describe }).run("read_image", { path: "a.png" });
+    expect(r).toMatchObject({ ok: true, source: "ocr:image-to-markdown" });
+  });
+  it("nur die Beschreibungs-API (OCR weg): sie traegt den Textweg (Welle 37)", async () => {
+    const describe = { version: 1 as const, describeImage: async () => ({ text: "Ein Foto." }) };
+    const r = await tools({ mode: "ocr", describe }).run("read_image", { path: "a.png" });
+    expect(r.ok && r.content).toContain("Ein Foto.");
+  });
+  it("zu gross fuer Vision: auch dann beschreibt die Beschreibungs-API (Welle 37)", async () => {
+    const describe = { version: 1 as const, describeImage: async () => ({ text: "Ein Scan." }) };
+    const r = await tools({ mode: "vision", size: 10 * 1024 * 1024, maxKb: 4096, describe }).run("read_image", { path: "scan.png" });
+    expect(r.ok && r.content).toContain("Ein Scan.");
   });
   it("OCR-Modus, aber der Anbieter ist inzwischen weg: Klartext statt Wurf", async () => {
     const r = await tools({ mode: "ocr", ocr: null }).run("read_image", { path: "a.png" });

@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   chooseImageMode, imageExtension, isImagePath,
-  IMAGE_EST_CHARS, ocrResult, visionResult,
+  IMAGE_EST_CHARS, ocrResult, visionResult, describeResult, textResult,
 } from "../src/core/tools/images";
 import { binaryToDataUrl } from "../src/vendor/kit/data-url";
 import { guessFromName } from "../src/vendor/kit/capabilities";
@@ -111,5 +111,60 @@ describe("ocrResult: Hinweiszeile", () => {
   it("ohne Grund bleibt die Ausgabe wie bisher", async () => {
     const r = await ocrResult(api, "a.png");
     expect(r.ok && r.content.startsWith("Text aus a.png")).toBe(true);
+  });
+});
+
+describe("describeResult (Welle 37)", () => {
+  it("liefert die Beschreibung mit Quelle, Pfad und Modell", async () => {
+    const r = await describeResult({ describeImage: async () => ({ text: "Ein Hund im Garten.", model: "qwen3-vl" }) }, "a.png");
+    expect(r).toMatchObject({ ok: true, source: "describe:image-to-markdown" });
+    expect(r.ok && r.content).toContain("Ein Hund im Garten.");
+    expect(r.ok && r.content).toContain("a.png");
+    expect(r.ok && r.content).toContain("qwen3-vl");
+    expect(r.ok && r.images).toBeUndefined();
+  });
+  it("bittet um eine deutsche Beschreibung", async () => {
+    let got: unknown;
+    await describeResult({ describeImage: async (_p, o) => { got = o; return { text: "x" }; } }, "a.png");
+    expect(got).toMatchObject({ language: "de" });
+  });
+  it("uebersetzt Vertragsfehler und faengt einen werfenden Anbieter ab", async () => {
+    const e = await describeResult({ describeImage: async () => ({ error: "busy", message: "m" }) }, "a.png");
+    expect(e.ok).toBe(false);
+    expect(!e.ok && e.error).toContain("m");
+    const w = await describeResult({ describeImage: async () => { throw new Error("kaputt"); } }, "a.png");
+    expect(!w.ok && w.error).toContain("kaputt");
+  });
+});
+
+describe("textResult: Beschreibung vor Texterkennung (Welle 37)", () => {
+  const describe_ = (text = "Beschreibung") => ({ describeImage: vi.fn(async () => ({ text })) });
+  const ocr = () => ({ extractText: vi.fn(async () => "OCR-Text") });
+  it("nimmt die Beschreibung, wenn sie da ist, und fragt die Texterkennung nicht", async () => {
+    const d = describe_(); const o = ocr();
+    const r = await textResult({ describe: d, ocr: o }, "a.png", "no-vision");
+    expect(r.ok && r.source).toBe("describe:image-to-markdown");
+    expect(o.extractText).not.toHaveBeenCalled();
+  });
+  it("faellt bei einem Fehler der Beschreibung auf die Texterkennung zurueck", async () => {
+    const d = { describeImage: vi.fn(async () => ({ error: "backend-unavailable" as const, message: "m" })) };
+    const r = await textResult({ describe: d, ocr: ocr() }, "a.png", "no-vision");
+    expect(d.describeImage).toHaveBeenCalled();
+    expect(r.ok && r.source).toBe("ocr:image-to-markdown");
+  });
+  it("ohne Beschreibungs-API wie bisher Texterkennung; ohne beide ein Fehler", async () => {
+    const r = await textResult({ describe: null, ocr: ocr() }, "a.png", "too-big");
+    expect(r.ok && r.source).toBe("ocr:image-to-markdown");
+    const n = await textResult({ describe: null, ocr: null }, "a.png", "too-big");
+    expect(n.ok).toBe(false);
+  });
+  it("nur Beschreibung, und sie scheitert: der Fehler der Beschreibung bleibt sichtbar", async () => {
+    const d = { describeImage: async () => ({ error: "timeout" as const, message: "zu lang" }) };
+    const r = await textResult({ describe: d, ocr: null }, "a.png", "no-vision");
+    expect(!r.ok && r.error).toContain("zu lang");
+  });
+  it("traegt den Grund (Hinweis) in die Beschreibung", async () => {
+    const r = await textResult({ describe: describe_(), ocr: null }, "a.png", "no-vision");
+    expect(r.ok && r.content).toMatch(/Hinweis/);
   });
 });
