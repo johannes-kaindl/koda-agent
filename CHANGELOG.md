@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.39.1] — 2026-11-24
+
 ### Fixed
 - **A skill description in the form of a time (`14:55`, `1:30:00`) is written quoted.** Obsidian can read a bare time in front matter as a number; the shared library now quotes it, so `write_skill` keeps the description as text.
 - The folder for the session files is created together with any missing parent folder (the shared folder creation of the library).
