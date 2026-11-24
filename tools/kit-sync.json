@@ -173,6 +173,24 @@
         "linear-probe",
         "dom-guard-probe"
       ]
+    },
+    {
+      "dir": "tests/vendor/kit",
+      "source": "obsidian-kit",
+      "from": "tests",
+      "modules": [
+        "filename-sanitizer-source.types.test.ts"
+      ],
+      "rewrite": [
+        [
+          "../src/pure/",
+          "../../../src/vendor/kit/"
+        ],
+        [
+          "../src/vendor/code-kit/pure/",
+          "../../../src/vendor/kit/"
+        ]
+      ]
     }
   ]
 }
