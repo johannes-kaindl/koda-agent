@@ -360,6 +360,7 @@ const PUNKTE = [
   "139. Modellzeile mit Gruppen (obsidian-kit 0.87.0, Fake-Manager mit drei Endpunkten, Opt-in an): eine optgroup je Endpunkt, „Automatisch“ oben, ein nicht erreichbarer Endpunkt behält seine Gruppe mit gesperrtem Eintrag, ein Modell unter dem zweiten Endpunkt zu wählen schreibt Endpunkt UND Modell in die Wahl und das Dropdown zeigt es",
   "140. Gegenprobe Gruppen: derselbe Fake-Manager mit Opt-in aus — die Zeile ist eine flache Liste ohne optgroup (der Zweig „endpoints() leer“ trägt, die Gruppen aus 139 kamen also vom Manager)",
   "141. Modellzeile folgt der Einstellung (Selbst-Abo): die Wahl über saveSettings() (der Weg des Einstellungs-Tabs) zeichnet das Dropdown auf die neue Gruppe und das neue Modell, ohne dass jemand die Zeile anstößt",
+  "142. read_image beschreibt (describeImage von image-to-markdown, Stub): das Text-Modell bekommt die Beschreibung mit Quelle statt des OCR-Texts; scheitert die Beschreibung, springt die Texterkennung ein",
 ] as const;
 const bilanz = createBilanz({ punkte: PUNKTE });
 const { skipped, unmeasured, abschluss } = bilanz;
@@ -4325,6 +4326,52 @@ async function main(): Promise<void> {
           await removeOcrStub();
         }
         record("58. Vision-Fehler: HTTP 400 nach einem Bild faellt auf Texterkennung zurueck, die Runde wiederholt sich", ok58, detail58);
+      }
+
+      // ── 142: Beschreibung vor Texterkennung (Welle 37) — dasselbe api-Objekt traegt extractText UND describeImage ──
+      {
+        const P142 = PUNKTE.find((n) => n.startsWith("142. "))!;
+        if (ocrVorher) {
+          skipped(P142, "ein image-to-markdown-Eintrag existiert bereits (echtes Plugin oder Rest eines abgebrochenen Laufs): der Stub kaeme nicht an");
+        } else {
+          const installDescribeStub = (modus: "ok" | "busy"): Promise<unknown> => cdp.evaluate(`
+            window.__kodaOcrSeen = []; window.__kodaDescSeen = [];
+            app.plugins.plugins["image-to-markdown"] = { __kodaSmokeStub: true, api: { version: 1,
+              extractText: async (p) => { window.__kodaOcrSeen.push(p); return "Smoke-Rechnung 42"; },
+              describeImage: async (p, o) => { window.__kodaDescSeen.push({ p, language: o?.language }); return ${modus === "ok" ? `{ text: "Smoke-Beschreibung: ein Beleg mit Betrag", model: "smoke-vl" }` : `{ error: "busy", message: "smoke-busy" }`}; } } };
+            return true;
+          `);
+          const lauf = async (modus: "ok" | "busy"): Promise<{ text: string; bild: boolean; ocr: string[]; desc: Array<{ p: string; language?: string }> } | null> => {
+            const fake = await startScriptedEndpoint((_b, n) => n === 1
+              ? { toolCall: { name: "read_image", args: JSON.stringify({ path: BILD }) } }
+              : { content: "Antwort." });
+            try {
+              await installDescribeStub(modus);
+              await setzeModell("qwen/qwen3.8-27b", fake.url);
+              await frageUndWarte("Lies " + BILD, fake, 2);
+              const b2 = fake.bodies[1];
+              if (b2 === undefined) return null;
+              const tn = toolNachricht(b2);
+              const gesehen = await cdp.evaluate<{ ocr: string[]; desc: Array<{ p: string; language?: string }> }>(`return { ocr: window.__kodaOcrSeen, desc: window.__kodaDescSeen };`);
+              return { text: typeof tn?.content === "string" ? tn.content : "", bild: JSON.stringify(b2).includes("image_url"), ...gesehen };
+            } finally {
+              await fake.close();
+              await cdp.evaluate(`delete window.__kodaDescSeen; return true;`).catch(() => undefined);
+              await removeOcrStub();
+            }
+          };
+          try {
+            const a = await lauf("ok");
+            const g = await lauf("busy");
+            if (a === null || g === null) unmeasured(P142, "die zweite Anfrage kam nicht an");
+            else {
+              const okA = a.text.includes("Smoke-Beschreibung") && a.text.includes("smoke-vl") && a.text.includes("Bildbeschreibung") && !a.text.includes("Smoke-Rechnung 42")
+                && !a.bild && a.desc.length === 1 && a.desc[0]?.p === BILD && a.desc[0]?.language === "de" && a.ocr.length === 0;
+              const okG = g.text.includes("Smoke-Rechnung 42") && !g.text.includes("Smoke-Beschreibung") && g.desc.length === 1 && g.ocr.length === 1 && g.ocr[0] === BILD;
+              record(P142, okA && okG, `Beschreibung: Tool-Ergebnis „${a.text.slice(0, 80).replace(/\s+/g, " ")}“ · describeImage ${JSON.stringify(a.desc)} · extractText ${JSON.stringify(a.ocr)} · image_url ${a.bild} || Gegenprobe (busy): Tool-Ergebnis „${g.text.slice(0, 60).replace(/\s+/g, " ")}“ · describeImage ${g.desc.length}x · extractText ${JSON.stringify(g.ocr)}`);
+            }
+          } catch (error) { unmeasured(P142, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); }
+        }
       }
     } finally {
       await raeumeBildAuf();
