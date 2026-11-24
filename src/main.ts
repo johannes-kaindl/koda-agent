@@ -2,6 +2,7 @@ import { Platform, Plugin, WorkspaceLeaf, normalizePath, Notice, parseYaml, type
 import "./i18n/strings";
 import { getLanguage } from "obsidian";
 import { pickLang, setLang, getLang, t } from "./vendor/kit/i18n";
+import { ensureDir } from "./vendor/kit/ensure-dir";
 import { resolveLang, type Lang } from "./core/lang";
 import { openChatLeaf } from "./vendor/kit-obsidian/chat-leaf";
 import { safeFileName } from "./vendor/kit-obsidian/safe-file-name";
@@ -942,7 +943,7 @@ export default class KodaPlugin extends Plugin {
   }
 
   private async ensureDir(dir: string): Promise<void> {
-    if (!(await this.app.vault.adapter.exists(dir))) await this.app.vault.adapter.mkdir(dir);
+    await ensureDir(this.app.vault.adapter, dir);
   }
 
   async saveSettings(): Promise<void> {

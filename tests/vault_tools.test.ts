@@ -179,6 +179,17 @@ describe("write_skill", () => {
     expect(cap.calls.length).toBe(1);
   });
 
+  it("quotet eine Beschreibung in Uhrzeitform, Obsidian liest 14:55 sonst als Zahl (Kit 0.108.0)", async () => {
+    const vault = fakeVault({});
+    const tools = new VaultTools(vault, yes, opts);
+    for (const zeit of ["14:55", "1:30:00"]) {
+      const r = await tools.run("write_skill", { name: "Zeit", description: zeit, body: "b", mode: "create" });
+      expect(r.ok).toBe(true);
+      expect(vault.files["Koda/Skills/Zeit.md"] ?? "").toContain(`description: "${zeit}"`);
+      delete vault.files["Koda/Skills/Zeit.md"];
+    }
+  });
+
   it("fragt IMMER nach, obwohl der Pfad im Koda-Ordner liegt", async () => {
     const vault = fakeVault({});
     const cap = capturingConfirm();

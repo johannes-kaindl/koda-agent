@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **A skill description in the form of a time (`14:55`, `1:30:00`) is written quoted.** Obsidian can read a bare time in front matter as a number; the shared library now quotes it, so `write_skill` keeps the description as text.
+- The folder for the session files is created together with any missing parent folder (the shared folder creation of the library).
+
+### Changed
+- Shared library updated (obsidian-kit 0.108.0, code-kit 0.88.0); the hub tab bar styles gain the rules for the overflow menu.
+
 ## [0.39.0] — 2026-11-24
 
 ### Added

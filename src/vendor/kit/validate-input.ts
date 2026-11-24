@@ -1,4 +1,4 @@
-// vendored from code-kit@0.87.0, src/ts/pure/validate-input.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.88.0, src/ts/pure/validate-input.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Checks a tool call's arguments against the JSON Schema that describes the tool — a small subset of it (flat, and nested objects since
  *  order 12, see below), and an honest one: what it does not judge it can name ({@link unsupportedSchemaKeywords}).
  *
@@ -57,6 +57,7 @@
  *  is linear in the input (tests at 1 000 / 10 000 / 50 000). */
 
 import { normFieldKey } from "./frontmatter-field";
+import { isStringList } from "./string-list";
 
 export type StringFormat = "date-time" | "date" | "email" | "uri" | "multiline";
 
@@ -152,26 +153,24 @@ const MAX_DEPTH = 32;
 type UnknownMode = "reject" | "ignore" | "warn";
 interface Ctx { unknown: UnknownMode }
 
-const isNames = (v: unknown): v is string[] => Array.isArray(v) && v.every((k): k is string => typeof k === "string");
-
 /** What is wrong with an object schema's own keywords (not with its fields), as text, or `null`. The texts of the first three are the ones the flat root always gave. */
 function objectSchemaProblem(s: Record<string, unknown>): string | null {
   const props = s["properties"] ?? {};
   if (!isObj(props)) return "properties must be an object";
   const required: unknown = s["required"] ?? [];
-  if (!isNames(required)) return "required must be a list of names";
+  if (!isStringList(required)) return "required must be a list of names";
   // A required name the schema does not list can never be satisfied in reject mode and is a lie in ignore mode (it would
   // count as given and not appear in `value`).
   const orphans = required.filter((k) => !Object.hasOwn(props, k));
   if (orphans.length > 0) return `required names a field that is not in properties: ${[...new Set(orphans)].join(", ")}`;
   const one = s["exactlyOne"];
   if (one !== undefined) {
-    if (!isNames(one) || one.length === 0) return "exactlyOne must be a non-empty list of names";
+    if (!isStringList(one) || one.length === 0) return "exactlyOne must be a non-empty list of names";
     const lost = one.filter((k) => !Object.hasOwn(props, k));
     if (lost.length > 0) return `exactlyOne names a field that is not in properties: ${[...new Set(lost)].join(", ")}`;
   }
   for (const [name, def] of Object.entries(props)) {
-    if (isObj(def) && def["aliases"] !== undefined && !isNames(def["aliases"])) return `aliases of ${name} must be a list of names`;
+    if (isObj(def) && def["aliases"] !== undefined && !isStringList(def["aliases"])) return `aliases of ${name} must be a list of names`;
   }
   return null;
 }
@@ -219,7 +218,7 @@ function checkObject(path: string, s: Record<string, unknown>, input: Record<str
     }
   }
   const one = s["exactlyOne"];
-  if (isNames(one)) {
+  if (isStringList(one)) {
     const names = [...new Set(one)];
     const present = names.filter((name) => given(valueOf(name)));
     if (present.length === 0) push(path, "one-of", `exactly one of ${names.join(", ")} is required`);
@@ -370,8 +369,8 @@ export function unsupportedSchemaKeywords(schema: unknown): string[] {
     found.push(k);
   }
   if (schema["type"] !== undefined && schema["type"] !== "object") found.push(`type=${show(schema["type"])}`);
-  if (schema["required"] !== undefined && !(Array.isArray(schema["required"]) && schema["required"].every((k) => typeof k === "string"))) found.push("required");
-  if (schema["exactlyOne"] !== undefined && !isNames(schema["exactlyOne"])) found.push("exactlyOne");
+  if (schema["required"] !== undefined && !isStringList(schema["required"])) found.push("required");
+  if (schema["exactlyOne"] !== undefined && !isStringList(schema["exactlyOne"])) found.push("exactlyOne");
   const props = schema["properties"];
   if (props !== undefined) {
     if (!isObj(props)) found.push("properties");
@@ -391,15 +390,15 @@ function fieldGaps(path: string, f: unknown, found: string[], depth: number): vo
   }
   // A keyword whose value the module cannot apply (`enum: "abc"`, `minLength: "3"`) is not checked either.
   const isNum = (v: unknown): boolean => typeof v === "number";
-  if (f["enum"] !== undefined && !(Array.isArray(f["enum"]) && f["enum"].every((e) => typeof e === "string"))) found.push(`${path}.enum`);
+  if (f["enum"] !== undefined && !isStringList(f["enum"])) found.push(`${path}.enum`);
   for (const k of ["minLength", "minimum", "maximum"]) if (f[k] !== undefined && !isNum(f[k])) found.push(`${path}.${k}`);
   if (type === "string" && f["format"] !== undefined && !(typeof f["format"] === "string" && FORMATS.has(f["format"]))) found.push(`${path}.format=${show(f["format"])}`);
-  if (f["aliases"] !== undefined && !isNames(f["aliases"])) found.push(`${path}.aliases`);
+  if (f["aliases"] !== undefined && !isStringList(f["aliases"])) found.push(`${path}.aliases`);
   const future = f["futureValues"];
   if (future !== undefined && !(isObj(future) && Object.values(future).every((v) => typeof v === "string"))) found.push(`${path}.futureValues`);
   if (type === "object") {
-    if (f["required"] !== undefined && !isNames(f["required"])) found.push(`${path}.required`);
-    if (f["exactlyOne"] !== undefined && !isNames(f["exactlyOne"])) found.push(`${path}.exactlyOne`);
+    if (f["required"] !== undefined && !isStringList(f["required"])) found.push(`${path}.required`);
+    if (f["exactlyOne"] !== undefined && !isStringList(f["exactlyOne"])) found.push(`${path}.exactlyOne`);
     const props = f["properties"];
     if (props !== undefined) {
       if (!isObj(props)) found.push(`${path}.properties`);
