@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.39.0] — 2026-11-24
+
 ### Added
 
 - **A model that cannot see images now gets a description of the picture.** When Image to Markdown (0.35.0 or newer) is active, `read_image` asks it to describe the image before it falls back to text recognition; the result names its source and says the picture came as a description. The same route serves an image above the size limit and the swap after a server rejects a picture. Older plugin versions behave as before (text recognition only).
