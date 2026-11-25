@@ -26,6 +26,7 @@ import { parseWhere, matchesWhere, describeWhere } from "../core/tools/where";
 import { collectFolderTree, renderTreeBlock } from "../core/tools/tree";
 import { decodeByteTokens } from "../core/tools/decode-byte-tokens";
 import { renderNow } from "../core/prompt/now";
+import { RAHMEN_STANDARD, kappeLesen, type RahmenSchalter } from "../core/agent/rahmen";
 import type { EditorPort, WorkspacePort } from "../core/context/ports";
 import { renderWorkspaceReport } from "../core/context/workspace-line";
 import { DEFAULT_SETTINGS } from "../core/settings-types";
@@ -188,6 +189,8 @@ export class VaultTools implements ToolRunner {
        *  Aufruf; `null` = unbekannt. `load_skill` lehnt einen Skill ab, der `aus` ist — auch wenn ihn nur
        *  das Overlay oder die Arbeit abgeschaltet hat (Spec Faehigkeiten § 7). Fehlt es, gilt das Frontmatter. */
       skillMode?: (name: string) => SkillMode | null;
+      /** Interne Schalter des Messrahmens (`rahmen.ts`); fehlt → `RAHMEN_STANDARD`. Das Plugin setzt es nie. */
+      rahmen?: Readonly<RahmenSchalter>;
     },
   ) {}
 
@@ -393,7 +396,7 @@ export class VaultTools implements ToolRunner {
   private async read(path: string): Promise<ToolOutcome> {
     const norm = resolveNotePath(path, READ_EXTENSIONS);
     const text = await this.vault.read(norm).catch(() => null);
-    return text === null ? { ok: false, error: `Notiz nicht gefunden: "${path}"` } : { ok: true, content: text };
+    return text === null ? { ok: false, error: `Notiz nicht gefunden: "${path}"` } : { ok: true, content: kappeLesen(text, this.opts.rahmen ?? RAHMEN_STANDARD) };
   }
 
   /** Oeffnet, ohne zu schreiben und ohne Rueckfrage: der Schutz ist die Werkzeugbeschreibung

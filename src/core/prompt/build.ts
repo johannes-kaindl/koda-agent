@@ -1,6 +1,7 @@
 import type { Selection } from "../skills/select";
 import { renderNow } from "./now";
 import { effectiveRules, renderRules } from "./rules";
+import { RAHMEN_STANDARD, kappeMemory, type RahmenSchalter } from "../agent/rahmen";
 
 /** Drei Schichten: Regelblock (ersetzbar), Memory, Skills. Die letzten beiden sind
  *  systemgesetzt und haengen auch an einem ueberschriebenen Regelblock — sie sind pro Lauf
@@ -17,12 +18,19 @@ export function buildSystemPrompt(opts: {
   now?: number;
   /** IANA-Zeitzone; fehlt → die des Rechners. */
   timeZone?: string;
+  /** Interne Schalter des Messrahmens (`rahmen.ts`); fehlt → `RAHMEN_STANDARD`, das Verhalten vor den Schaltern. */
+  rahmen?: Readonly<RahmenSchalter>;
 }): string {
+  const rahmen = opts.rahmen ?? RAHMEN_STANDARD;
   const parts = [renderRules(effectiveRules(opts.rulesOverride), { lang: opts.lang, folder: opts.kodaFolder })];
-  if (opts.memory.trim() !== "") parts.push(`## Memory\n${opts.memory.trim()}`);
+  if (opts.memory.trim() !== "") parts.push(`## Memory\n${kappeMemory(opts.memory.trim(), rahmen)}`);
   const skillsBlock = renderSkills(opts.skills);
   if (skillsBlock !== "") parts.push(skillsBlock);
-  if (opts.now !== undefined) parts.push(`## Now\n${renderNow(opts.now, opts.timeZone)}`);
+  if (opts.now !== undefined) {
+    const now = renderNow(opts.now, opts.timeZone);
+    // (a): `2026-09-30 (Wednesday) 23:45, Europe/Berlin` → `2026-09-30 (Wednesday), Europe/Berlin`.
+    parts.push(`## Now\n${rahmen.nowNurDatum ? now.replace(/ \d{2}:\d{2},/, ",") : now}`);
+  }
   return parts.join("\n\n");
 }
 

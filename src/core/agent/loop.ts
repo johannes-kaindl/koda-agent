@@ -14,6 +14,7 @@ import { projectForModel, type ToolResultRule } from "./compaction/project";
 import { estimateTokens } from "./compaction/estimate";
 import { planStage1 } from "./compaction/stage1";
 import { splitTurns, summarizeTurns, makeStage2Record, PACK_RATIO } from "./compaction/stage2";
+import { RAHMEN_STANDARD, WIEDERHOLUNGS_HINWEIS, type RahmenSchalter } from "./rahmen";
 
 export interface LoopLlm {
   complete(
@@ -83,6 +84,8 @@ export interface AgentDeps {
   /** Regeln, die ein Werkzeug-Ergebnis in der Projektion ersetzen (Skill-Hinweis). Als Funktion, weil ein
    *  Schalter im Tab mitten in einem Lauf schon ab der naechsten Runde greifen soll (wie `currentToolNames`). */
   projectionRules?: () => readonly ToolResultRule[];
+  /** Interne Schalter des Messrahmens (`rahmen.ts`); fehlt → `RAHMEN_STANDARD`. Das Plugin setzt es nie. */
+  rahmen?: Readonly<RahmenSchalter>;
 }
 
 /** Der Agent-Loop: LLM → Tools → LLM … bis finale Antwort, Fehler oder Runden-Limit.
@@ -202,6 +205,9 @@ async function runAgentImpl(
     return true;
   };
 
+  const rahmen = deps.rahmen ?? RAHMEN_STANDARD;
+  // (c): der zuletzt gescheiterte Aufruf (Name und Argumente) samt Fehlertext; ein erfolgreicher Aufruf setzt ihn zurück.
+  let letzterFehlschlag: string | null = null;
   let round = 0;
   let overflowRetried = false;
   let visionRetried = false;
@@ -277,10 +283,16 @@ async function runAgentImpl(
       onEvent({ kind: "tool-start", call });
       const outcome = await runOne(deps.tools, call);
       onEvent({ kind: "tool-end", call, outcome });
+      let fehlerText = outcome.ok ? "" : `ERROR: ${outcome.error}`;
+      if (rahmen.wiederholungsHinweis) {
+        const schluessel = outcome.ok ? null : `${call.name}\u0000${call.arguments}\u0000${outcome.error}`;
+        if (schluessel !== null && schluessel === letzterFehlschlag) fehlerText = `${fehlerText}\n${WIEDERHOLUNGS_HINWEIS}`;
+        letzterFehlschlag = schluessel;
+      }
       appended.push({
         role: "tool",
         toolCallId: call.id,
-        content: outcome.ok ? outcome.content : `ERROR: ${outcome.error}`,
+        content: outcome.ok ? outcome.content : fehlerText,
         ...(outcome.ok && outcome.images !== undefined && outcome.images.length > 0 ? { images: outcome.images } : {}),
       });
     }
