@@ -67,6 +67,7 @@ Aufbau im Einzelnen: `docs/internal/architecture.md`.
 - Vor UI-Arbeit: `obsidian-plugins:.claude/rules/ui-bausteine.md` und `obsidian-plugins:UI-STANDARD.md`.
 - Beim Ändern von Nutzer-Doku oder Meldungen: `docs/README.md` (Diátaxis-Index), `docs/how-to/troubleshooting.md`.
 - Katalog und Belege der Prüfpunkte des GUI-Smokes: `docs/SMOKE.md`.
+- Bevor du den Messrahmen (`scripts/messrahmen/`) oder die Mess-Schalter in `src/core/agent/rahmen.ts` fährst oder änderst: `docs/internal/messrahmen.md`.
 
 ## Memory
 
