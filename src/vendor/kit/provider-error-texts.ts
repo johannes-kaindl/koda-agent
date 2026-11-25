@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.108.0, src/pure/provider-error-texts.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.111.0, src/pure/provider-error-texts.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Fehlertexte (EN/DE) zu den Fehlercodes der Fähigkeits-Verträge `image-gen-provider`, `ocr-provider`, `audio-provider` und `describe-provider`, neben deren Typen.
  *
  *  Die Verträge nennen einen Code und eine Meldung des Anbieters; was der Nutzer liest, bauten die Konsumenten selbst, und zwar

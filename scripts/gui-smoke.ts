@@ -137,6 +137,7 @@ import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { boxOf, capture } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 import { lehneLaunchAb } from "../../tools/obsidian-cdp/zweitinstanz.js";
+import { errorMessage } from "../src/vendor/kit/error-message";
 
 const PLUGIN_ID = "koda-agent";
 /** Repo- und Vault-Name sind hier dasselbe Wort — der Staging-Vault heisst wie das Repo. */
@@ -893,7 +894,7 @@ async function main(): Promise<void> {
                 : `Status ${status ?? "(keiner)"} statt is-ok — erreichbarer Endpunkt nicht als solcher erkannt`;
           } catch (error) {
             survived = false;
-            detail = `Renderer antwortet nicht mehr (${error instanceof Error ? error.message : String(error)}) — Freeze-Verdacht`;
+            detail = `Renderer antwortet nicht mehr (${errorMessage(error)}) — Freeze-Verdacht`;
           }
           record("3. Klick auf „Verbindung prüfen“ friert den Renderer nicht ein", survived, detail);
 
@@ -922,7 +923,7 @@ async function main(): Promise<void> {
               12_000,
             );
           } catch (error) {
-            tot = `FEHLER: ${error instanceof Error ? error.message : String(error)}`;
+            tot = `FEHLER: ${errorMessage(error)}`;
           }
           record(
             "4. Toter Endpunkt wird als nicht erreichbar angezeigt",
@@ -1336,7 +1337,7 @@ async function main(): Promise<void> {
           const vorKlick = await pollUntil<{ value: string }>(
             settings16,
             `
-              const ta = document.querySelector("textarea.koda-prompt-textarea");
+              const ta = document.querySelector("textarea.okit-sysprompt-textarea");
               return ta ? { value: ta.value } : null;
             `,
             8000,
@@ -1347,9 +1348,9 @@ async function main(): Promise<void> {
             const geklickt = await clickReal(
               settings16,
               `(() => {
-                 const item = document.querySelector("textarea.koda-prompt-textarea")?.closest(".setting-item");
+                 const item = document.querySelector("textarea.okit-sysprompt-textarea")?.closest(".setting-item");
                  const kandidaten = item ? [...item.querySelectorAll("[aria-label]")] : [];
-                 return kandidaten.find((el) => /Ausgelieferte Fassung wiederherstellen|Restore the shipped version/.test(el.getAttribute("aria-label") ?? "")) ?? null;
+                 return kandidaten.find((el) => /Auf den mitgelieferten Prompt zurücksetzen|Reset to the shipped prompt/.test(el.getAttribute("aria-label") ?? "")) ?? null;
                })()`,
             );
             const leer = geklickt
@@ -1365,7 +1366,7 @@ async function main(): Promise<void> {
             const nachher = await pollUntil<{ value: string; placeholder: string }>(
               settings16,
               `
-                const ta = document.querySelector("textarea.koda-prompt-textarea");
+                const ta = document.querySelector("textarea.okit-sysprompt-textarea");
                 if (!ta || ta.value !== "") return null;
                 return { value: ta.value, placeholder: ta.placeholder };
               `,
@@ -1614,7 +1615,7 @@ async function main(): Promise<void> {
         (a === "gesperrt" && b !== "gesperrt" ? " — ⚠️ Cache hat nicht gegriffen, der Punkt belegt hide() dann NICHT" : "") +
         (a !== "gesperrt" ? " — ⚠️ toter Server wurde nicht als unerreichbar gelesen, Ausgangslage nicht hergestellt" : "");
     } catch (error) {
-      hidePunkt = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      hidePunkt = `Abbruch: ${errorMessage(error)}`;
     } finally {
       settings19?.close();
       await schliesseEinstellungen(cdp).catch(() => undefined);
@@ -1655,7 +1656,7 @@ async function main(): Promise<void> {
             : `aktiv ist Koda: ${String(punkt20.aktivIstKoda)} · Markierung: ${sel20 ? `${sel20.chars} Zeichen` : "fehlt"} · ${punkt20.text.split("\n")[1] ?? ""}`,
       );
     } catch (error) {
-      unmeasured("20. Arbeitsplatz-Block nennt aktive Notiz, Kopfdaten und Markierung — aus der Sidebar heraus", `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+      unmeasured("20. Arbeitsplatz-Block nennt aktive Notiz, Kopfdaten und Markierung — aus der Sidebar heraus", `Abbruch: ${errorMessage(error)}`);
     } finally {
       await cdp.evaluate(`
         app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].setContextMode(${JSON.stringify(vorherMode)});
@@ -1684,7 +1685,7 @@ async function main(): Promise<void> {
         `aus → null: ${String(punkt21.ausNull)} · Dropdown nach Befehl: ${punkt21.dropdownNachBefehl} · Modus nach Dropdown: ${punkt21.modeNachDropdown}`,
       );
     } catch (error) {
-      unmeasured("21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand", `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+      unmeasured("21. Modus Aus sendet keinen Kontext; Befehl und Dropdown schalten denselben Zustand", `Abbruch: ${errorMessage(error)}`);
     } finally {
       await cdp.evaluate(`
         app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].setContextMode(${JSON.stringify(vorherMode)});
@@ -1708,7 +1709,7 @@ async function main(): Promise<void> {
         `an: ${an.join(", ")} · aus: ${aus.join(", ")}`,
       );
     } catch (error) {
-      unmeasured("22. get_workspace und edit_active_note stehen in der gesendeten Liste und sind abschaltbar", `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+      unmeasured("22. get_workspace und edit_active_note stehen in der gesendeten Liste und sind abschaltbar", `Abbruch: ${errorMessage(error)}`);
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -1762,7 +1763,7 @@ async function main(): Promise<void> {
       const zeile = (t: string): string => t.split("\n").find((l) => l.startsWith("Model ")) ?? "(keine Model-Zeile)";
       detail23 = `veraltet: ${a?.ok === false ? "verweigert" : "GESCHRIEBEN"} (${a?.error ?? ""}) · gueltig: ${b?.ok === true ? "geschrieben" : "verweigert"} · A: „${zeile(inhaltA).slice(0, 40)}“ · B: „${zeile(inhaltB).slice(0, 40)}“${b?.content ? ` · ${b.content}` : ""}`;
     } catch (error) {
-      detail23 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail23 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       // Rueckschreibung ueber den EDITOR (nicht `vault.modify()`, s. Kommentar oben): der
       // root-split Leaf, der die Notiz noch offen haelt, bekommt den Fixture-Text direkt in
@@ -1851,7 +1852,7 @@ async function main(): Promise<void> {
       ok24 = r24?.ok === true && loestAuf === ZIEL24 && pfadWeg;
       detail24 = `Werkzeug: ${r24?.ok === true ? "verschoben" : `FEHLER (${r24?.error ?? "?"})`} · kurzer Link loest auf: ${loestAuf ?? "GAR NICHT"} · Pfad-Link im Text: ${pfadWeg ? "angepasst" : "UNVERAENDERT"} („${text.split("\n").filter((l) => l.includes("[[")).join(" | ")}") · alwaysUpdateLinks: ${String(linkOption)}`;
     } catch (error) {
-      detail24 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail24 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await cdp.evaluate(`
         const f = app.vault.getFileByPath(${JSON.stringify(ZIEL24)});
@@ -1896,7 +1897,7 @@ async function main(): Promise<void> {
       ok25 = nenntBeide && nenntZahl && nochDa;
       detail25 = `Pfade: ${nenntBeide ? "beide genannt" : `UNVOLLSTAENDIG („${gelesen.pfade.replace(/\n/g, " / ")}")`} · Reichweite: „${gelesen.hinweis}" ${nenntZahl ? "(2 erwartet, genannt)" : "(2 ERWARTET, FEHLT)"} · Knopf: „${gelesen.knopf}" · nach Abbruch am alten Ort: ${nochDa ? "ja" : "NEIN"}`;
     } catch (error) {
-      detail25 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail25 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await schliesseDialog(cdp).catch(() => undefined);
     }
@@ -1970,7 +1971,7 @@ async function main(): Promise<void> {
       ok109 = memoOk && andere.effekt === null && nochDa;
       detail109 = `Memory.md: Zeile ${memo.effekt === null ? "FEHLT" : `„${memo.effekt.replace(/\s+/g, " ")}“`} · Pfade genannt: ${memo.pfade.includes(MEMORY109)} · Gegenprobe (andere Koda-Datei, Modal erschien): Zeile ${andere.effekt === null ? "fehlt (richtig)" : `„${andere.effekt}“ (FALSCH)`} · nichts verschoben: ${nochDa} · Bilder ${bilder.join(", ")}`;
     } catch (error) {
-      detail109 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail109 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await cdp.evaluate(`
         ${themaVorher109 === null ? "" : `app.vault.setConfig("theme", ${JSON.stringify(themaVorher109)}); app.workspace.trigger("css-change");`}
@@ -2035,7 +2036,7 @@ async function main(): Promise<void> {
         befehl && eintrag !== null && /SMOKE-110 Frage/.test(eintrag) && zurueck !== null && zurueck.arbeit === "Smoke-Arbeit-110" && zurueck.imChat;
       detail110 = `Neu frei vor dem Klick: ${vor.neuFrei} · Modal bei Neu: ${modalOffen} (soll nein) · Dateien im Ordner: ${datei.n}, Payload koda-log/1 mit Frage: ${datei.inhalt.includes("koda-log/1") && datei.inhalt.includes("SMOKE-110 Frage")} · Gespraech danach: ${datei.laenge} Eintraege · Befehl verfuegbar: ${befehl} · Dialog-Eintrag „${(eintrag ?? "—").replace(/\s+/g, " ")}“ · wiederhergestellt: ${JSON.stringify(zurueck)}`;
     } catch (error) {
-      detail110 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail110 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await schliesseDialog(cdp).catch(() => undefined);
       await raeume110();
@@ -2060,7 +2061,7 @@ async function main(): Promise<void> {
       ok111 = titel !== null && /Gespräch verwerfen|Discard this conversation/.test(titel) && lage.kept === 2 && !lage.ordner && !lage.befehl;
       detail111 = `Rueckfrage „${titel ?? "—"}“ · Abbruch laesst ${lage.kept} Eintraege stehen · Ordner angelegt: ${lage.ordner} (soll nein) · Befehl „Open past chats…“ verfuegbar: ${lage.befehl} (soll nein)`;
     } catch (error) {
-      detail111 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail111 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await schliesseDialog(cdp).catch(() => undefined);
       await raeume110();
@@ -2103,7 +2104,7 @@ async function main(): Promise<void> {
         imLauf.neuGesperrt && imLauf.stoppSichtbar && !imLauf.sendenSichtbar;
       detail112 = `Kinder ${ruhe.kinder.join(" > ")} · Ruhe: Neu ${ruhe.neuSichtbar ? (ruhe.neuGesperrt ? "gesperrt" : "frei") : "unsichtbar"}, Verlauf ${ruhe.verlaufSichtbar}, Senden ${ruhe.sendenSichtbar}, Stopp ${ruhe.stoppSichtbar} · im Lauf: Neu ${imLauf.neuGesperrt ? "gesperrt" : "frei"}, Senden ${imLauf.sendenSichtbar}, Stopp ${imLauf.stoppSichtbar} · Kopfzeile ${ruhe.kopf}`;
     } catch (error) {
-      detail112 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail112 = `Abbruch: ${errorMessage(error)}`;
     }
     record(P112, ok112, detail112);
     try {
@@ -2117,7 +2118,7 @@ async function main(): Promise<void> {
       ok113 = leer.neuSichtbar && leer.neuGesperrt && !leer.verlaufSichtbar && leer.sendenSichtbar && !leer.stoppSichtbar;
       detail113 = `leer, Verlauf aus, kein Lauf: Neu ${leer.neuSichtbar ? (leer.neuGesperrt ? "gesperrt" : "frei") : "unsichtbar"} · Verlauf-Knopf sichtbar ${leer.verlaufSichtbar} (soll nein) · Senden ${leer.sendenSichtbar} · Stopp ${leer.stoppSichtbar} (soll nein)`;
     } catch (error) {
-      detail113 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail113 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await raeume110();
     }
@@ -2160,7 +2161,7 @@ async function main(): Promise<void> {
       ok115 = !gross.beside && gross.neuUnter && gross.modusDa && gross.breite >= 320;
       detail115 = `Chat ${Math.round(gross.breite)} px breit, Fenster ${gross.hoehe} px hoch: Senden neben der Eingabe ${gross.beside} (soll nein) · Modus-Dropdown da ${gross.modusDa} (soll ja)`;
     } catch (error) {
-      detail114 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail114 = `Abbruch: ${errorMessage(error)}`;
       detail115 = detail114;
     } finally {
       await cdp.send("Emulation.clearDeviceMetricsOverride").catch(() => undefined);
@@ -2211,7 +2212,7 @@ async function main(): Promise<void> {
       ok118 = host.chat && host.anzahlChat >= 1 && host.fremd !== true;
       detail118 = `view-content des Chats markiert: ${host.chat} · markierte Hosts im Fenster: ${host.anzahlChat} · fremde Markdown-Ansicht markiert: ${host.fremd === null ? "(keine offen)" : String(host.fremd)} (soll nein)`;
     } catch (error) {
-      const abbruch = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      const abbruch = `Abbruch: ${errorMessage(error)}`;
       if (!ok116) detail116 = abbruch;
       if (!ok117) detail117 = abbruch;
       if (!ok118) detail118 = abbruch;
@@ -2249,7 +2250,7 @@ async function main(): Promise<void> {
       ok120 = z.da && z.desktop !== "none";
       detail120 = `ohne is-phone: ruhende Zeile ${z.desktop} (soll sichtbar) — die Regel ist auf das Handy begrenzt`;
     } catch (error) {
-      detail119 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail119 = `Abbruch: ${errorMessage(error)}`;
       detail120 = detail119;
     }
     record(P119, ok119, detail119);
@@ -2278,7 +2279,7 @@ async function main(): Promise<void> {
       ok122 = suche !== null && suche.bekannt;
       detail122 = suche === null ? "Einstellungen nicht gelesen" : `bekannte Zeile „Suppress thinking“ gefunden: ${suche.bekannt} (soll ja, der Suchlauf kann also finden)`;
     } catch (error) {
-      detail121 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail121 = `Abbruch: ${errorMessage(error)}`;
       detail122 = detail121;
     } finally {
       settings121?.close();
@@ -2336,7 +2337,7 @@ async function main(): Promise<void> {
       ok124 = w.vorDesk === "seitenleiste" && w.nachDesk === "seitenleiste" && w.deskAnzahl === 1 && w.deskGleichesBlatt;
       detail124 = `Desktop: Ausgang ${w.vorDesk} · danach ${w.nachDesk}, ${w.deskAnzahl} Ansicht(en), dasselbe Blatt: ${w.deskGleichesBlatt}`;
     } catch (error) {
-      detail123 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail123 = `Abbruch: ${errorMessage(error)}`;
       detail124 = detail123;
     }
     record(P123, ok123, detail123);
@@ -2388,7 +2389,7 @@ async function main(): Promise<void> {
       ok134 = w.vorDesk === "seitenleiste" && w.nachDesk === "seitenleiste" && w.gleichesFeld && (w.deskWert ?? "").startsWith("Entwurf-vor-dem-Wandern-");
       detail134 = `Desktop: Ausgang ${w.vorDesk} · danach ${w.nachDesk}, selbes Feld: ${w.gleichesFeld}, Text: ${w.deskWert === null ? "kein Feld" : w.deskWert === "" ? "leer" : `„${w.deskWert}“`}`;
     } catch (error) {
-      detail133 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail133 = `Abbruch: ${errorMessage(error)}`;
       detail134 = detail133;
     }
     record(P133, ok133, detail133);
@@ -2477,13 +2478,13 @@ async function main(): Promise<void> {
       const a = await lauf135(true);
       ok135 = a.ok; detail135 = a.detail;
     } catch (error) {
-      detail135 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail135 = `Abbruch: ${errorMessage(error)}`;
     }
     try {
       const b = await lauf135(false);
       ok136 = b.ok; detail136 = b.detail;
     } catch (error) {
-      detail136 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail136 = `Abbruch: ${errorMessage(error)}`;
     }
     record(P135, ok135, detail135);
     record(P136, ok136, detail136);
@@ -2567,7 +2568,7 @@ async function main(): Promise<void> {
         else if (!gegenWirkt137(d.gegen)) unmeasured(P137, `die Gegenprobe ausserhalb des Beobachters behielt nicht alle Marker (${gegenText137(d.gegen)}): „gekappt“ waere ohne sie nichts wert`);
         else { const a = auswertung137(d.mess, d.marker); record(P137, a.ok, `im Antwortbereich (Strom lief): ${a.text} · Gegenprobe ausserhalb: ${gegenText137(d.gegen)} (alle verlangt: Marker da)`); }
       } catch (error) {
-        unmeasured(P137, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        unmeasured(P137, `Abbruch: ${errorMessage(error)}`);
       } finally {
         await stub.stop();
       }
@@ -2598,7 +2599,7 @@ async function main(): Promise<void> {
       else if (!gegenWirkt137(d.gegen)) unmeasured(P138, `die Gegenprobe ausserhalb des Beobachters behielt nicht alle Marker (${gegenText137(d.gegen)}): „gekappt“ waere ohne sie nichts wert`);
       else { const a = auswertung137(d.mess, d.marker); record(P138, a.ok, `im Container von renderMarkdownGuarded: ${a.text} · Gegenprobe ausserhalb: ${gegenText137(d.gegen)} (alle verlangt: Marker da)`); }
     } catch (error) {
-      unmeasured(P138, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+      unmeasured(P138, `Abbruch: ${errorMessage(error)}`);
     }
 
     // --- 139–141. Modellzeile mit Gruppen nach Endpunkt (Welle 34, obsidian-kit 0.87.0/0.88.0) -------------------------------------------------------------------------------------------
@@ -2672,7 +2673,7 @@ async function main(): Promise<void> {
           const c2 = await cdp.evaluate<unknown>(`return ${PLG}.settings.choice;`);
           if (z2 === null) record(P141, false, `das Dropdown zeigte nach der Einstellung nicht „lm-zwei“ (zuletzt: choice ${JSON.stringify(c2)})`);
           else record(P141, z2.text === "lm-zwei" && z2.wert.includes("lm"), `nach saveSettings() mit choice lm/lm-zwei: gezeigt „${z2.text}“ (Wert ${JSON.stringify(z2.wert)}) · choice ${JSON.stringify(c2)}`);
-        } catch (error) { unmeasured(P141, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); }
+        } catch (error) { unmeasured(P141, `Abbruch: ${errorMessage(error)}`); }
 
         // 140: Gegenprobe, Opt-in aus.
         try {
@@ -2683,9 +2684,9 @@ async function main(): Promise<void> {
           const flach = await cdp.evaluate<string[] | null>(`const s = document.querySelector(".koda-root .okit-model-bar-select"); return s ? [...s.options].map((o) => o.textContent ?? "") : null;`);
           if (z3 === null || flach === null) record(P140, false, `die Zeile wurde nach dem Ausschalten nicht flach (Gruppen: ${z3 === null ? "unbekannt" : String(z3.gruppen.length)})`);
           else record(P140, z3.gruppen.length === 0 && flach.some((t) => t.includes("lm-zwei")), `Opt-in aus: ${z3.gruppen.length} Gruppen · Optionen ${JSON.stringify(flach)} (soll: keine Gruppe, die Liste des Stubs)`);
-        } catch (error) { unmeasured(P140, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); }
+        } catch (error) { unmeasured(P140, `Abbruch: ${errorMessage(error)}`); }
       } catch (error) {
-        for (const n of [P139, P140, P141]) if (!bilanz.eintraege().some((x) => x.name === n)) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        for (const n of [P139, P140, P141]) if (!bilanz.eintraege().some((x) => x.name === n)) unmeasured(n, `Abbruch: ${errorMessage(error)}`);
       } finally {
         await cdp.evaluate(`
           const p = ${PLG}; const v = window.__koda139;
@@ -2727,7 +2728,7 @@ async function main(): Promise<void> {
       ok26 = gefragt && r26?.ok === true && weg;
       detail26 = `im Koda-Ordner gefragt: ja · Knopf: „${knopf}" · Werkzeug: ${r26?.ok === true ? "ok" : "FEHLER"} · Datei danach: ${weg ? "weg" : "NOCH DA"}`;
     } catch (error) {
-      detail26 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail26 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await cdp.evaluate(`
         const rest = app.vault.getFileByPath(${JSON.stringify(OPFER)});
@@ -2814,7 +2815,7 @@ async function main(): Promise<void> {
       ok28 = leavesMitA >= 2 && imBlockA === 1 && mess.items.length === eindeutig;
       detail28 = `Leaves auf „${TAB_A}": ${leavesMitA} · im Block: ${imBlockA} · Block-Eintraege ${mess.items.length} vs. eindeutige Pfade ${eindeutig}`;
     } catch (error) {
-      const grund = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      const grund = `Abbruch: ${errorMessage(error)}`;
       detail27 = grund;
       detail28 = grund;
     } finally {
@@ -2874,7 +2875,7 @@ async function main(): Promise<void> {
       ok29 = mass.tabs === 3 && mass.hoehe > 0 && mass.labels.length === 3;
       detail29 = `Tabs: ${mass.tabs} · kleinste Hoehe: ${mass.hoehe}px · Labels: ${mass.labels.join(" | ")}`;
     } catch (error) {
-      detail29 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail29 = `Abbruch: ${errorMessage(error)}`;
     }
     // Gegenprobe: in `src/obsidian/view.ts` in `buildHubInto(..., [chatPanel, this.ctxPanel], ...)`
     // das `this.ctxPanel` aus dem Panel-Array streichen, neu bauen/deployen. Erwartung: die
@@ -2913,7 +2914,7 @@ async function main(): Promise<void> {
       ok30 = r.vorher !== r.nachher && r.vorher === r.zurueck;
       detail30 = `Tab: ${r.pfad} · Block vorher ${r.vorher.length} Z. → abgewaehlt ${r.nachher.length} Z. → zurueckgesetzt ${r.zurueck.length} Z.`;
     } catch (error) {
-      detail30 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail30 = `Abbruch: ${errorMessage(error)}`;
     }
     record("30. Ein abgewaehlter Chip verschwindet aus dem gesendeten Block, Zuruecksetzen holt ihn wieder", ok30, detail30);
 
@@ -2952,7 +2953,7 @@ async function main(): Promise<void> {
       ok31 = gespeichert === true && nachReload === true;
       detail31 = `im Speicher: ${String(gespeichert)} · in data.json: ${String(nachReload)}`;
     } catch (error) {
-      detail31 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail31 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       // Fix-Runde 1, Finding 2: im finally, nicht am Ende des try — sonst verfaelscht ein
       // Abbruch NACH dem setCollapsed(true) (z. B. ein Timeout im pollUntil) die
@@ -3010,7 +3011,7 @@ async function main(): Promise<void> {
       ok32 = geo.display === "flex" && geo.diff <= 4;
       detail32 = `display: ${geo.display} · Panel-Unterkante ${geo.panelBottom.toFixed(1)}px · Eingabe-Unterkante ${geo.barBottom.toFixed(1)}px · Differenz ${geo.diff.toFixed(1)}px`;
     } catch (error) {
-      detail32 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail32 = `Abbruch: ${errorMessage(error)}`;
     }
     // Gegenprobe: in `styles.css` die Regel
     // `.koda-hub .okit-hub-panel[data-tab="chat"] { display: flex; flex-direction: column; overflow: hidden; }`
@@ -3060,7 +3061,7 @@ async function main(): Promise<void> {
       ok33 = r.hatVolltext && r.hatNachbarText && nachbarn > 0 && r.items.every((i) => i.kind === "full");
       detail33 = `Eintraege ${r.items.length} · Nachbarn ${nachbarn} · Volltext aktive Notiz ${r.hatVolltext} · Volltext Nachbar ${r.hatNachbarText}`;
     } catch (error) {
-      detail33 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail33 = `Abbruch: ${errorMessage(error)}`;
     }
     // Kein finally hier — Punkt 34 braucht den Modus Notiz absichtlich weiter aktiv (er
     // misst dieselbe Situation mit engerem Budget). Zurueckgesetzt wird erst am Ende von 35.
@@ -3105,7 +3106,7 @@ async function main(): Promise<void> {
       ok34 = r.hatMeldung && r.laenge <= 4000;
       detail34 = `Budget ${BUDGET34} · gekuerzte Eintraege ${r.gekuerzt} · Meldung im Block ${r.hatMeldung} · Blocklaenge ${r.laenge} Z.`;
     } catch (error) {
-      detail34 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail34 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -3136,7 +3137,7 @@ async function main(): Promise<void> {
       ok35 = r.mitManuell.includes(r.ziel) && !r.danach.includes(r.ziel);
       detail35 = `manuell nach dem Hinzufuegen: [${r.mitManuell.join(", ")}] · nach dem Entfernen: [${r.danach.join(", ")}]`;
     } catch (error) {
-      detail35 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail35 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       // Modus und Auswahl zurueck auf den Stand vor Punkt 33 — 34/35 liefen absichtlich
       // beide im Modus Notiz weiter.
@@ -3168,7 +3169,7 @@ async function main(): Promise<void> {
       ok36 = r.ok && r.inhalt.includes("views:") && r.mdOk;
       detail36 = `.base gelesen: ${r.ok} · .md gelesen: ${r.mdOk} · Anfang: ${JSON.stringify(r.inhalt.slice(0, 60))}`;
     } catch (error) {
-      detail36 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail36 = `Abbruch: ${errorMessage(error)}`;
     }
     record("36. read_note liest eine .base aus dem Fixture (und weiterhin .md)", ok36, detail36);
 
@@ -3215,7 +3216,7 @@ async function main(): Promise<void> {
       ok37 = r.anzahl === 2 && r.hoehe > 0 && !r.titel.includes("Notes/Compaction.md");
       detail37 = `Chips ${r.anzahl} · kleinste Hoehe ${r.hoehe}px · Titel: ${r.titel.join(" | ")}`;
     } catch (error) {
-      detail37 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail37 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -3264,7 +3265,7 @@ async function main(): Promise<void> {
       ok38 = r.istFehler && r.bodyHoehe > 0 && r.bodyText.length > 0;
       detail38 = `is-error: ${r.istFehler} · Body-Hoehe ${r.bodyHoehe}px · Text: "${r.bodyText}"`;
     } catch (error) {
-      detail38 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail38 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -3327,7 +3328,7 @@ async function main(): Promise<void> {
       ok39 = start.nachBefehl.includes(start.aktivPfad) && nachKlick.includes(start.aktivPfad);
       detail39 = `aktive Notiz: ${start.aktivPfad} · nach Befehl: [${start.nachBefehl.join(", ")}] · nach Klick: [${nachKlick.join(", ")}]`;
     } catch (error) {
-      detail39 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail39 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -3398,7 +3399,7 @@ async function main(): Promise<void> {
         writeFileSync("/tmp/w6-shots/koda-truncated.png", png);
       }
     } catch (error) {
-      detail40 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail40 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await fake?.close();
       fake = null;
@@ -3474,7 +3475,7 @@ async function main(): Promise<void> {
             + `promptTemplate ${gemeldet.promptTemplate.length} Z. · Nachrichten ${gemeldet.messages.length} (nur system/user/assistant) · content „${gemeldet.content}“`
           : "kein log()-Aufruf innerhalb 15s";
       } catch (error) {
-        detail41 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail41 = `Abbruch: ${errorMessage(error)}`;
       } finally {
         await fake?.close();
         fake = null;
@@ -3542,7 +3543,7 @@ async function main(): Promise<void> {
           + `fehlender Ordner ${fehlt ? "als nicht existent gemeldet" : `NICHT: ${(r42.fehlt?.error ?? r42.fehlt?.content ?? "").slice(0, 60)}`}`;
       }
     } catch (error) {
-      detail42 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail42 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       if (eigen42) await cdp.evaluate(`
         const f = app.vault.getAbstractFileByPath(${JSON.stringify(W42)});
@@ -3620,7 +3621,7 @@ async function main(): Promise<void> {
           && !r.failItems.some((i) => i.startsWith("vault:"));
         detail43 = `Modus ${r.mode} · Eintraege ${r.items.join(", ")} · Suche „${suche?.q ?? "—"}" k=${String(suche?.k)} · Gegenprobe offline: ${/nicht verfügbar|unavailable/.test(r.failText) ? "Hinweis im Block" : "KEIN Hinweis"}`;
       } catch (error) {
-        detail43 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail43 = `Abbruch: ${errorMessage(error)}`;
       }
       record("43. Modus Vault: Treffer zur gesendeten Frage im Volltext, Fehlschlag meldet sich", ok43, detail43);
 
@@ -3644,7 +3645,7 @@ async function main(): Promise<void> {
         ok44 = mit && ohne.disabled && ohne.modeNachBefehl === "workspace" && /vault-rag/.test(ohne.label);
         detail44 = `mit Stub waehlbar: ${String(mit)} · ohne: gesperrt ${String(ohne.disabled)} („${ohne.label}"), Befehl laesst Modus auf „${ohne.modeNachBefehl}"`;
       } catch (error) {
-        detail44 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail44 = `Abbruch: ${errorMessage(error)}`;
       }
       record("44. Modus Vault ist ohne vault-rag gesperrt (Dropdown und Befehl)", ok44, detail44);
 
@@ -3671,7 +3672,7 @@ async function main(): Promise<void> {
         ok45 = r.seenRelated && r.mit.includes("related:Koda/Memory.md") && !r.ohne.some((i) => i.startsWith("related:"));
         detail45 = `related() fuer die aktive Notiz: ${String(r.seenRelated)} · mit K: ${r.mit.join(", ")} · K=0: ${r.ohne.join(", ")}`;
       } catch (error) {
-        detail45 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail45 = `Abbruch: ${errorMessage(error)}`;
       }
       record("45. Modus Notiz: semantische Nachbarn aus related(), K = 0 schaltet ab", ok45, detail45);
 
@@ -3709,7 +3710,7 @@ async function main(): Promise<void> {
           ? "kein Vault-Chip binnen 5 s nach dem Tippen"
           : `Chips ${r.chips.join(", ")} · Suchen ${r.queries.map((q) => `„${q}"`).join(", ")} · Chat im Kontext-Tab ausgeblendet und Panel im Bild: ${String(chatWeg)}`;
       } catch (error) {
-        detail46 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail46 = `Abbruch: ${errorMessage(error)}`;
       } finally {
         await cdp.evaluate(`
           const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -3802,7 +3803,7 @@ async function main(): Promise<void> {
           + `abgeschaltet: gesendet ${aus.names.includes("smoke_echo")}, run „${aus.lauf.error ?? "ok?!"}“ · `
           + `entfernt: gesendet ${weg.names.includes("smoke_echo")}, run „${weg.lauf.error ?? "ok?!"}“`;
       } catch (error) {
-        detail47 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail47 = `Abbruch: ${errorMessage(error)}`;
       } finally {
         await cdp.evaluate(`
           delete app.plugins.plugins[${JSON.stringify(PROV)}];
@@ -3861,7 +3862,7 @@ async function main(): Promise<void> {
           + `ohne depth ${flachWieVorher ? "unverändert flach" : "VERÄNDERT"}`;
       }
     } catch (error) {
-      detail48 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail48 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       if (eigen48) await cdp.evaluate(`
         const f = app.vault.getAbstractFileByPath(${JSON.stringify(W48)});
@@ -3914,7 +3915,7 @@ async function main(): Promise<void> {
         ? `Notiz „${getroffen50.noticeText.slice(0, 120)}“ (${getroffen50.noticeKlasse})`
         : "kein Fehlerhinweis innerhalb 15s (leere Antwort ohne Grund?)";
     } catch (error) {
-      detail50 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail50 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await fake50.close();
     }
@@ -3956,7 +3957,7 @@ async function main(): Promise<void> {
         + `## Now im Prompt: ${nowAnhang !== "" ? `„${nowAnhang}“` : "FEHLT"}${r49.prompt.trimEnd().endsWith(nowAnhang) ? " (letzter Abschnitt)" : " (NICHT am Ende)"} · `
         + `Kalendertag der Renderer-Uhr ${r49.heute}${datumLauf === r49.heute && datumPrompt === r49.heute ? " stimmt" : " WEICHT AB"}`;
     } catch (error) {
-      detail49 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail49 = `Abbruch: ${errorMessage(error)}`;
     }
     record("51. Datum und Uhrzeit: ## Now im Prompt und get_datetime nennen den Kalendertag der Renderer-Uhr", ok49, detail49);
 
@@ -4017,7 +4018,7 @@ async function main(): Promise<void> {
           + `Pfad-Guard (../ und Ordner/Name) ${guard ? "lehnt ab" : "LIEFERT FREMDE NOTIZ"} · unbekannter Name nennt die Liste ${liste} · Ladezustand „${(r51.status ?? "").split("\n").find((z) => /on demand|auf Abruf/.test(z)) ?? "FEHLT"}“`;
       }
     } catch (error) {
-      detail51 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail51 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       if (eigen51) await cdp.evaluate(`
         for (const f of ${JSON.stringify(S51)}) { const x = app.vault.getAbstractFileByPath(f); if (x) await app.vault.delete(x, true); }
@@ -4065,7 +4066,7 @@ async function main(): Promise<void> {
           + `unvollständige Folge ${abgelehnt ? "abgelehnt, keine Datei" : `NICHT abgelehnt (ok=${r52.kaputt?.ok}, Datei da=${r52.kaputtDa})`}`;
       }
     } catch (error) {
-      detail52 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail52 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       if (eigen52) await cdp.evaluate(`
         for (const f of ${JSON.stringify([W52, W52b])}) { const x = app.vault.getAbstractFileByPath(f); if (x) await app.vault.delete(x, true); }
@@ -4116,7 +4117,7 @@ async function main(): Promise<void> {
       detail53 = `Notice „${r53.text.slice(0, 80)}…“ · Knopf „${r53.knopf}“ · Einstellung vor Klick ${r53.nachWarnung} (unverändert: ${r53.nachWarnung === 260000}), nach Klick ${r53.nachKlick} · `
         + `Bestätigung ${r53.bestaetigung} · zweiter Aufruf ${r53.nochmal === 0 ? "schweigt" : `MELDET ERNEUT (${r53.nochmal})`}`;
     } catch (error) {
-      detail53 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+      detail53 = `Abbruch: ${errorMessage(error)}`;
     } finally {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -4201,7 +4202,7 @@ async function main(): Promise<void> {
           && JSON.stringify(log.images) === JSON.stringify([{ path: BILD }]) && !log.base64;
         detail55 = `read_image in der Werkzeugliste: ${angeboten} · Tool-Ergebnis als Parts [${parts.map((x) => x.type).join(", ")}] · URL ${url === `data:image/png;base64,${PNG_B64}` ? "= Datei" : `ABWEICHEND (${url.slice(0, 40)})`} · Verlauf traegt ${JSON.stringify(log.images)}, Base64 im Verlauf: ${log.base64}`;
       } catch (error) {
-        detail55 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail55 = `Abbruch: ${errorMessage(error)}`;
       } finally {
         await fake55.close();
       }
@@ -4235,7 +4236,7 @@ async function main(): Promise<void> {
             && gesehen.length === 1 && gesehen[0] === BILD && ohne.names === false && ohne.run !== "ok";
           detail56 = `Werkzeug angeboten: ${angeboten} · Tool-Ergebnis „${text.slice(0, 70).replace(/\s+/g, " ")}“ · image_url im Request: ${JSON.stringify(b2).includes("image_url")} · Anbieter gerufen mit ${JSON.stringify(gesehen)} · ohne Anbieter in der Liste: ${ohne.names}, Aufruf „${ohne.run.slice(0, 60)}“`;
         } catch (error) {
-          detail56 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+          detail56 = `Abbruch: ${errorMessage(error)}`;
         } finally {
           await fake56.close();
           await removeOcrStub();
@@ -4281,7 +4282,7 @@ async function main(): Promise<void> {
             && seen.length === 2 && seen[0].folder === "Koda/images" && seen[1].folder === "Projekte57";
           detail57 = `angeboten: ${angeboten} · Koda-Ordner: ${frei.r.ok ? `Embed ${(frei.r.content ?? "").includes("![[Koda/images/smoke57.png]]")}` : "FEHLER"}, Modal ${frei.modal} · ausserhalb: Modal mit Prompt+Ordner ${modal !== null && modal.includes("Smoke Logo") && modal.includes("Projekte57")}, Anbieter vor dem Klick gerufen: ${vorClick} Mal · nach Zustimmung ok ${erlaubt?.ok} · Ablehnung „${abgelehnt?.error}“ · Anbieter insgesamt ${JSON.stringify(seen.map((x) => x.folder))}`;
         } catch (error) {
-          detail57 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+          detail57 = `Abbruch: ${errorMessage(error)}`;
         } finally {
           await cdp.evaluate(`
             if (app.plugins.plugins["local-image-generator"]?.__kodaSmokeStub) delete app.plugins.plugins["local-image-generator"];
@@ -4320,7 +4321,7 @@ async function main(): Promise<void> {
             && log.images === null && log.text.includes("Smoke-Rechnung 42") && log.letzte.includes("Rechnung 42");
           detail58 = `Anfragen ${fake58.bodies.length} · 2. mit image_url: ${b2 !== undefined && JSON.stringify(b2).includes("image_url")} (→ HTTP 400) · 3. ohne Bild, Text „${text3.slice(0, 60).replace(/\s+/g, " ")}“ · Verlauf geheilt: images ${JSON.stringify(log.images)} · Antwort „${log.letzte.slice(0, 40)}“`;
         } catch (error) {
-          detail58 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+          detail58 = `Abbruch: ${errorMessage(error)}`;
         } finally {
           await fake58.close();
           await removeOcrStub();
@@ -4370,7 +4371,7 @@ async function main(): Promise<void> {
               const okG = g.text.includes("Smoke-Rechnung 42") && !g.text.includes("Smoke-Beschreibung") && g.desc.length === 1 && g.ocr.length === 1 && g.ocr[0] === BILD;
               record(P142, okA && okG, `Beschreibung: Tool-Ergebnis „${a.text.slice(0, 80).replace(/\s+/g, " ")}“ · describeImage ${JSON.stringify(a.desc)} · extractText ${JSON.stringify(a.ocr)} · image_url ${a.bild} || Gegenprobe (busy): Tool-Ergebnis „${g.text.slice(0, 60).replace(/\s+/g, " ")}“ · describeImage ${g.desc.length}x · extractText ${JSON.stringify(g.ocr)}`);
             }
-          } catch (error) { unmeasured(P142, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); }
+          } catch (error) { unmeasured(P142, `Abbruch: ${errorMessage(error)}`); }
         }
       }
     } finally {
@@ -4439,7 +4440,7 @@ async function main(): Promise<void> {
           detail62 = `Lab-Aufrufe ${gesehen.length} · Original im Lab-Payload: ${lab.includes(TOKEN_KERN)} · Platzhalter im Lab-Payload: ${ph !== "" && lab.includes(ph)}`;
         }
       } catch (error) {
-        detail59 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail59 = `Abbruch: ${errorMessage(error)}`;
       } finally {
         await fake59.close();
         await cdp.evaluate(`
@@ -4487,7 +4488,7 @@ async function main(): Promise<void> {
         detail60 = `Klartext vorher in data.json: ${vorher} · aufgeloeste Config traegt den Schluessel: ${aufgeloest === KEY60} · nach dem Aufloesen in data.json: ${nachher.includes(KEY60)} (secretId da: ${nachher.includes("secretId")}) · `
           + `Authorization-Header am Endpunkt: ${fake60.authHeaders[0] === `Bearer ${KEY60}` ? "traegt den Schluessel" : `ABWEICHEND (${fake60.authHeaders[0] ?? "kein Aufruf"})`}`;
       } catch (error) {
-        detail60 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail60 = `Abbruch: ${errorMessage(error)}`;
       } finally {
         await fake60.close();
       }
@@ -4515,7 +4516,7 @@ async function main(): Promise<void> {
         ok61 = sauber(live) && sauber(neu);
         detail61 = `waehrend/nach dem Lauf: ${JSON.stringify(live)} · nach Neuzeichnen des Verlaufs: ${JSON.stringify(neu)} (img 0, pre 0, „dataviewjs“ als Text)`;
       } catch (error) {
-        detail61 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail61 = `Abbruch: ${errorMessage(error)}`;
       } finally {
         await fake61.close();
       }
@@ -4574,7 +4575,7 @@ async function main(): Promise<void> {
         ok63 = gespeichert && nach?.zeile === "legacy-63" && nach.feld === false && keineZeile && dom !== null && !dom.global;
         detail63 = `data.json ohne „model“, Zeile traegt legacy-63: ${gespeichert} · Feld im Speicher: ${nach?.feld} · Zeile „Model“ in den Einstellungen: ${dom === null ? "?" : !keineZeile} · „global model“ im Tab: ${dom?.global}`;
       } catch (error) {
-        detail63 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail63 = `Abbruch: ${errorMessage(error)}`;
       } finally {
         settings63?.close();
         await schliesseEinstellungen(cdp).catch(() => undefined);
@@ -4621,7 +4622,7 @@ async function main(): Promise<void> {
         ok64 = zahlenOk && leerOk && ctxHits64() === 1;
         detail64 = `Kontextzeile „${dom64?.text ?? "—"}“ (beide Zahlen: ${zahlenOk}) · Leer-Option: ${leerOk} · Anfragen an /api/v0/models: ${ctxHits64()} (soll 1)`;
       } catch (error) {
-        detail64 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+        detail64 = `Abbruch: ${errorMessage(error)}`;
       } finally {
         settings64?.close();
         await schliesseEinstellungen(cdp).catch(() => undefined);
@@ -4683,7 +4684,7 @@ async function main(): Promise<void> {
         const P66 = "66. Folge-Regel: Hochscrollen mitten im Strom wird respektiert, der Verlauf springt nicht zurueck";
         const P68 = "68. Strom mit absatzgrossen Stuecken: der Verlauf folgt dem Ende auch bei Spruengen ueber die Folge-Schwelle (Kit 0.59.0, withFollow)";
         const P69 = "69. Folge-Regel, zweite Haelfte: steht der Nutzer wieder unten, folgt der Verlauf dem Strom wieder";
-        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${errorMessage(error)}`);
 
         // 65. Kontrolle: ohne Stoerung folgt der Verlauf dem Ende.
         try {
@@ -4735,7 +4736,7 @@ async function main(): Promise<void> {
           }
           await abwarten();
         } catch (error) {
-          detail67 = `Abbruch: ${error instanceof Error ? error.message : String(error)}`;
+          detail67 = `Abbruch: ${errorMessage(error)}`;
         } finally {
           await stub67.stop();
         }
@@ -4746,7 +4747,7 @@ async function main(): Promise<void> {
       {
         const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
         const pause22 = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
-        const abbruch22 = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        const abbruch22 = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${errorMessage(error)}`);
         const chatZeigen = (): Promise<unknown> => cdp.evaluate(`
           const p = ${PL};
           if (p.views().length === 0) await p.activateView();
@@ -4800,7 +4801,7 @@ async function main(): Promise<void> {
               await pause22(900);
             }
             const m71 = await settings71.evaluate<{ listen: number; breite: number; zeilen: number }>(`
-              const ta = document.querySelector(".koda-prompt-textarea");
+              const ta = document.querySelector(".okit-sysprompt-textarea");
               return {
                 listen: document.querySelectorAll(".koda-tool-list").length,
                 zeilen: document.querySelectorAll(".koda-tool-row").length,
@@ -5155,7 +5156,7 @@ async function main(): Promise<void> {
       {
         const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
         const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
-        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${errorMessage(error)}`);
         const P79 = "79. Tab „Fähigkeiten“: sichtbar, ein Klick auf „ganz“ bringt den Skill-Text in den nächsten Prompt, der Overlay-Punkt erscheint und verschwindet mit dem Zurückschalten";
         const P80 = "80. Skill im Gespräch abgeschaltet: fehlt im Prompt, load_skill lehnt ab, ein früheres load_skill-Ergebnis wird in der Projektion zum Hinweis und steht im Chat wörtlich";
         const P81 = "81. Arbeit mit „übrige-skills: aus“: nur die genannten Skills im Prompt, Modus und Tiefe aus der Arbeit, Ordner zu Einzelpfaden, ungültige und fehlende Einträge als Hinweis";
@@ -5439,7 +5440,7 @@ async function main(): Promise<void> {
       {
         const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
         const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
-        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${errorMessage(error)}`);
         const P86 = "86. Bases: Übernahme als Tabelle, Default aus dem Lesecode, fehlende Werte leer";
         const P87 = "87. Bases: Übergabeform Notizen schickt die Zeilen im Volltext";
         const P88 = "88. Base in der Arbeit: die Arbeit öffnet die Base und übernimmt sie selbst, eine Ansicht fremden Typs wird mit Hinweis abgelehnt, „Neues Gespräch“ übernimmt frisch";
@@ -5593,7 +5594,7 @@ async function main(): Promise<void> {
       {
         const PL = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
         const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
-        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+        const abbruch = (name: (typeof PUNKTE)[number], error: unknown): void => unmeasured(name, `Abbruch: ${errorMessage(error)}`);
         const P89 = "89. Denkblock nach der Antwort: zugeklappt vor der Antwort, mit der Sitzung im JSONL, nie am Draht; der Schalter „Denken aufbewahren“ aus lässt ihn verschwinden";
         const P90 = "90. Denkblock kopierbar während des Stroms (Kit-Knopf): der Klick kopiert den bisherigen Denktext und klappt den Block nicht zu";
         const P91 = "91. Denkblock kopierbar nach der Antwort: der Klick kopiert den ganzen Denktext, quittiert mit is-copied und klappt den Block nicht auf";
@@ -5718,7 +5719,7 @@ async function main(): Promise<void> {
             lauf.a.ok && lauf.b.ok && lauf.c.ok && !lauf.roh && lauf.ordnerDatei && !lauf.ordnerRoh && lauf.neu && lauf.altWeg
               && /Dateinamen-Richtlinie/.test(lauf.a.content ?? "") && (lauf.a.content ?? "").includes("Koda/Smoke125 — Plan.md"),
             `write_note „Smoke125: Plan?.md“ → ${lauf.a.ok ? `„${lauf.a.content}“` : `FEHLER ${lauf.a.error}`} · Rohname angelegt: ${lauf.roh} · neuer Ordner „Smoke125 — Ordner“ mit Datei: ${lauf.ordnerDatei}, Rohordner: ${lauf.ordnerRoh} · move_note → „Smoke125 — Neu.md“: ${lauf.neu} (${lauf.c.ok ? lauf.c.content : lauf.c.error})`);
-        } catch (error) { unmeasured(P125, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); } finally { await aufraeumen().catch(() => undefined); }
+        } catch (error) { unmeasured(P125, `Abbruch: ${errorMessage(error)}`); } finally { await aufraeumen().catch(() => undefined); }
 
         try {
           const r = await cdp.evaluate<{
@@ -5740,7 +5741,7 @@ async function main(): Promise<void> {
           record(P126,
             r.anh.ok && /mehr/.test(r.inhalt ?? "") && !r.zweitkopie && r.mv.ok && r.umbenannt && !r.altNochDa && !/Dateinamen-Richtlinie/.test(r.anh.content ?? "") && !/Dateinamen-Richtlinie/.test(r.mv.content ?? ""),
             `append an „Smoke126 #alt.md“: ${r.anh.ok ? `„${r.anh.content}“` : `FEHLER ${r.anh.error}`}, Inhalt danach „${(r.inhalt ?? "").replace(/\n/g, "↵")}“ · bereinigte Zweitkopie: ${r.zweitkopie} · move_note der Quelle mit „#“: ${r.mv.ok ? `„${r.mv.content}“` : `FEHLER ${r.mv.error}`}`);
-        } catch (error) { unmeasured(P126, `Abbruch: ${error instanceof Error ? error.message : String(error)}`); } finally { await aufraeumen().catch(() => undefined); }
+        } catch (error) { unmeasured(P126, `Abbruch: ${errorMessage(error)}`); } finally { await aufraeumen().catch(() => undefined); }
       }
 
       // --- 127/128. Kopier-Knopf unter der fertigen Antwort (Welle 32) ----
@@ -5867,7 +5868,7 @@ async function main(): Promise<void> {
             }
           }
         } catch (error) {
-          for (const n of [P127, P128] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+          for (const n of [P127, P128] as const) unmeasured(n, `Abbruch: ${errorMessage(error)}`);
         } finally {
           await wiederherstellen().catch(() => undefined);
           await cdp.evaluate(`await ${PL}.newChat(); return true;`).catch(() => undefined);
@@ -5940,7 +5941,7 @@ async function main(): Promise<void> {
           record(P130, roh.some((x) => x < 4.5),
             werte.map((k) => `${k.thema} roh: orange ${f(k.delRoh)}, blau ${f(k.insRoh)}`).join(" · ") + " (mindestens ein Wert soll unter 4,50 liegen)");
         } catch (error) {
-          for (const n of [P129, P130] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+          for (const n of [P129, P130] as const) unmeasured(n, `Abbruch: ${errorMessage(error)}`);
         } finally {
           await cdp.evaluate(`
             ${themaVorher === null ? "" : `app.vault.setConfig("theme", ${JSON.stringify(themaVorher)}); app.workspace.trigger("css-change");`}
@@ -5983,7 +5984,7 @@ async function main(): Promise<void> {
           if (gegen.urteil === "gruen") bilanz.record(N96, true, gegen.detail);
           else skipped(N96, `in diesem Layout nicht anwendbar — ${gegen.detail}`);
         } catch (error) {
-          for (const n of [N92, N93, N94, N95, N96] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+          for (const n of [N92, N93, N94, N95, N96] as const) unmeasured(n, `Abbruch: ${errorMessage(error)}`);
         }
       }
 
@@ -6035,7 +6036,7 @@ async function main(): Promise<void> {
               !semantisch(ohneText) && !ohneNamen.includes("related_notes") && !mitNamen.includes("related_notes") && semantisch(anText),
               `ohne vault-rag: semantischer Teil ${semantisch(ohneText)} (soll nein) · related_notes ${ohneNamen.includes("related_notes")} (soll nein) · mit Stub (nur die Retrieval-API, kein Werkzeug-Vertrag): related_notes ${mitNamen.includes("related_notes")} (soll nein), semantischer Teil ${semantisch(anText)} (soll ja)`);
           } catch (error) {
-            for (const n of [P98, P99] as const) unmeasured(n, `Abbruch: ${error instanceof Error ? error.message : String(error)}`);
+            for (const n of [P98, P99] as const) unmeasured(n, `Abbruch: ${errorMessage(error)}`);
           } finally {
             await cdp.evaluate(`if (app.plugins.plugins["vault-retrieval"]?.__kodaSmokeStub) delete app.plugins.plugins["vault-retrieval"]; delete window.__kodaRag98; return true;`).catch(() => undefined);
           }

@@ -1,10 +1,10 @@
 {
   "sources": {
     "obsidian-kit": {
-      "ref": "0.108.0"
+      "ref": "0.111.0"
     },
     "code-kit": {
-      "ref": "0.88.0"
+      "ref": "0.91.1"
     }
   },
   "targets": [
@@ -82,7 +82,8 @@
         "chat-archive-strings",
         "run-exclusive",
         "string-list",
-        "ensure-dir"
+        "ensure-dir",
+        "prompt-override"
       ]
     },
     {
@@ -146,7 +147,9 @@
         "chat-archive-settings",
         "chat-archive-css",
         "safe-file-name",
-        "setting-body-host"
+        "setting-body-host",
+        "system-prompt-setting",
+        "status-indicator"
       ],
       "rewrite": [
         [

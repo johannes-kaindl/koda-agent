@@ -3,7 +3,7 @@ import { t, setLang } from "../src/vendor/kit/i18n";
 import "../src/i18n/strings";
 
 const KEYS = [
-  "settings.modelControl", "settings.prompt", "settings.prompt.desc", "settings.prompt.reset",
+  "settings.modelControl", "settings.prompt", "settings.prompt.desc",
   "settings.prompt.show", "settings.warn.noTools", "settings.warn.missingPlaceholder",
   "settings.warn.noReadingTool", "settings.tools", "settings.tools.desc",
   "prompt.modal.title", "prompt.modal.subtitle",

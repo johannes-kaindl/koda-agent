@@ -1,9 +1,12 @@
+import { effectivePrompt, fillPromptPlaceholders, missingPromptPlaceholders, promptPlaceholder } from "../../vendor/kit/prompt-override";
+
 /** Der ausgelieferte Regelblock — Schicht 1 von dreien (Memory und Skills haengen in
  *  `buildSystemPrompt` daran). Er ist eine VORLAGE: was vom Nutzer abhaengt, steht als
  *  Platzhalter darin, damit ein ueberschriebener Prompt einem spaeteren Ordner-Umzug oder
  *  Sprachwechsel folgt statt auf dem alten Wert stehen zu bleiben (Spec E1). */
-export const PLACEHOLDER_LANG = "{{sprache}}";
-export const PLACEHOLDER_FOLDER = "{{ordner}}";
+export const PLACEHOLDER_NAMES = ["sprache", "ordner"] as const;
+export const PLACEHOLDER_LANG = promptPlaceholder("sprache");
+export const PLACEHOLDER_FOLDER = promptPlaceholder("ordner");
 
 const LANGUAGE_NAME: Record<"de" | "en", string> = { de: "German", en: "English" };
 
@@ -19,26 +22,19 @@ export const DEFAULT_RULES = [
   "If two instructions conflict — two skills, or a skill and your memory — say so instead of silently picking one.",
 ].join("\n\n");
 
-/** „Leer heisst ausgeliefert" (Spec E2) steht genau HIER und sonst nirgends. Zuvor
- *  entschieden `build.ts` (was gesendet wird) und `view-model.ts` (was die Warnzeile prueft)
- *  das unabhaengig voneinander — liefen sie je auseinander, warnte die Oberflaeche ueber
- *  einen anderen Text als den gesendeten. Genau die zweite Wahrheit, gegen die diese Spec
- *  sonst sorgfaeltig ist. */
+/** „Leer heisst ausgeliefert" (Spec E2): seit Welle 38 die Kit-Regel `effectivePrompt` (code-kit `prompt-override`, aus diesem Plugin gehoben). `build.ts` (was gesendet
+ *  wird) und `view-model.ts` (was die Warnzeile prueft) rufen beide diese Funktion, damit die Oberflaeche ueber denselben Text warnt, der gesendet wird. */
 export function effectiveRules(override?: string): string {
-  const eigen = override ?? "";
-  return eigen.trim() === "" ? DEFAULT_RULES : eigen;
+  return effectivePrompt(override, DEFAULT_RULES);
 }
 
-/** Setzt die Platzhalter ein. Unbekannte `{{…}}` bleiben stehen: sie sind entweder ein
- *  Tippfehler des Nutzers (dann soll er ihn sehen) oder ein Platzhalter aus einer neueren
- *  Version (dann waere Verschlucken der schlechtere Ausgang). */
+/** Setzt die Platzhalter ein (code-kit `fillPromptPlaceholders`, ein Durchgang). Unbekannte `{{…}}` bleiben stehen: sie sind entweder ein
+ *  Tippfehler des Nutzers (dann soll er ihn sehen) oder ein Platzhalter aus einer neueren Version (dann waere Verschlucken der schlechtere Ausgang).
+ *  Die Schraegstriche am Ordnerende schneidet koda selbst ab (MIGRATION 0.110.0 Punkt 5): `{{ordner}}/` im Regelblock ergaebe sonst `Koda//`. */
 export function renderRules(template: string, opts: { lang: "de" | "en"; folder: string }): string {
   let end = opts.folder.length; // Schrägstriche am Ende abschneiden; `replace(/\/+$/, "")` war auf einem langen Schrägstrich-Lauf quadratisch
   while (end > 0 && opts.folder.charCodeAt(end - 1) === 47) end--;
-  const folder = opts.folder.slice(0, end);
-  return template
-    .split(PLACEHOLDER_LANG).join(LANGUAGE_NAME[opts.lang])
-    .split(PLACEHOLDER_FOLDER).join(folder);
+  return fillPromptPlaceholders(template, { sprache: LANGUAGE_NAME[opts.lang], ordner: opts.folder.slice(0, end) });
 }
 
 /** Die Werkzeuge, die Vault-Inhalt ins Gespraech holen. Steht hier als eine Liste und
@@ -53,7 +49,7 @@ export type RuleWarning = "no-tools" | "missing-placeholder" | "no-reading-tool"
 export function checkRules(text: string, activeReadingTools: string[], availableReadingTools: string[]): RuleWarning[] {
   const out: RuleWarning[] = [];
   if (!/tool|werkzeug/i.test(text)) out.push("no-tools");
-  if (!text.includes(PLACEHOLDER_LANG) || !text.includes(PLACEHOLDER_FOLDER)) out.push("missing-placeholder");
+  if (missingPromptPlaceholders(text, PLACEHOLDER_NAMES).length > 0) out.push("missing-placeholder");
   // Zwei Stufen desselben Befunds, und nur EINE davon wird gemeldet: „keines mehr" ist der
   // schwerere Fall und schliesst den leichteren ein. Beide zugleich zu zeigen waere ein
   // Fehlalarm neben einem echten Befund — und Fehlalarme erziehen zum Wegsehen.

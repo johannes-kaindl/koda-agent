@@ -1,7 +1,7 @@
-import { Setting, setIcon, type ButtonComponent, type TextAreaComponent, type ToggleComponent } from "obsidian";
-import { t } from "../vendor/kit/i18n";
-import { DEFAULT_RULES, effectiveRules, type RuleWarning } from "../core/prompt/rules";
-import { copyToClipboard } from "../vendor/kit-obsidian/clipboard";
+import { Setting, setIcon, type SettingGroup, type TextAreaComponent, type ToggleComponent } from "obsidian";
+import { getLang, t } from "../vendor/kit/i18n";
+import { DEFAULT_RULES, PLACEHOLDER_NAMES, type RuleWarning } from "../core/prompt/rules";
+import { systemPromptSettingDefinition } from "../vendor/kit-obsidian/system-prompt-setting";
 import { promptRow, providerToolGroups, toolRows, type ToolRowModel } from "../core/prompt/view-model";
 import { HOST_TOOL_NAMES } from "../core/tools/defs";
 import type { ProviderOffer, ToolProviderRejection } from "../vendor/kit/tool-provider";
@@ -35,103 +35,31 @@ function warnText(w: RuleWarning, toolsOff: string[]): string {
   return t(WARN_TEXT[w]).split("{{werkzeuge}}").join(toolsOff.join(", "));
 }
 
-/** Textarea + Zuruecksetzen + Warnzeile + Ansehen-Knopf. Der Auslieferungsstand steht als
- *  PLATZHALTER, nie als Wert: waere er der Wert, friere er beim ersten Oeffnen ein (Spec E2). */
-export function renderPromptRow(setting: Setting, ctx: ModelControlCtx): void {
-  const model = promptRow(ctx.settings, ctx.relatedAvailable);
-  setting.setName(t("settings.prompt")).setDesc(t("settings.prompt.desc"));
-  // Eigene Klasse fuer das Layout: die Textarea steht sonst neben dem Namen und bekommt vom
-  // Flex-Container der Zeile nur ~18 px (gemessen auf dem nativen 1.13-Pfad, Smoke-Punkt 71).
-  setting.setClass("koda-prompt-setting");
-
-  /** Zeichnet NUR die Warnzeilen neu, nicht den ganzen Tab. Zwei Gruende:
-   *  - Ein `ctx.refresh()` baut den Tab neu auf (`display()`), und dieses Neuzeichnen
-   *    liefe zwischen `mousedown` (das den blur ausloest) und `click` — der
-   *    Zuruecksetzen-Knopf waere im Moment seines eigenen Klicks schon ersetzt und der
-   *    Klick ginge verloren. Der Nutzer muesste zweimal druecken.
-   *  - Die Warnungen haengen an genau zwei Dingen (dem wirksamen Text und den aktiven
-   *    lesenden Werkzeugen); alles andere in der Zeile bleibt unberuehrt. */
-  const zeichneWarnungen = (): void => {
-    // `forEach` statt `for…of`: `NodeListOf` ist ohne die `dom.iterable`-Lib nicht iterierbar,
-    // und die Schleifenvariable waere `any` (dieselbe Form wie im Kit-Endpunkt-Editor).
-    setting.settingEl.querySelectorAll<HTMLElement>(".koda-warn").forEach((alt) => { alt.remove(); });
-    const jetzt = promptRow(ctx.settings, ctx.relatedAvailable);
-    for (const w of jetzt.warnings) {
-      // §8 Status-Indikator: Form UND Farbe UND State-Klasse UND aria-label — Farbe nie allein.
-      const text = warnText(w, jetzt.readingToolsOff);
-      const el = setting.settingEl.createDiv({ cls: "koda-warn is-warning" });
-      setIcon(el.createSpan({ cls: "koda-warn-icon" }), "alert-triangle");
-      el.createSpan({ text });
-      el.setAttribute("aria-label", text);
-    }
-  };
-
-  // Das Feld, wie es gerade steht — nicht `ctx.settings`: ein geladener Auslieferungstext ist noch keine Abweichung und wird erst
-  // mit der ersten Aenderung gespeichert.
-  let feld: TextAreaComponent | null = null;
-  let ladeKnopf: ButtonComponent | null = null;
-  const aktuellerText = (): string => effectiveRules(feld === null ? ctx.settings.systemPromptOverride : feld.getValue());
-  /** „Ausgelieferte Fassung bearbeiten“ gibt es nur bei leerem Feld: sonst ueberschriebe der Knopf den Text des Nutzers. */
-  const ladeKnopfPruefen = (): void => {
-    ladeKnopf?.setDisabled(feld !== null && feld.getValue().trim() !== "");
-  };
-
-  setting
-    .addTextArea((ta) => {
-      feld = ta;
-      ta.setPlaceholder(model.placeholder).setValue(model.value);
-      ta.inputEl.rows = 8;
-      ta.inputEl.addClass("koda-prompt-textarea");
-      // ZWEI Ereignisse fuer zwei verschiedene Dinge — bitte nicht wieder zusammenlegen.
-      // Sie standen kurzzeitig beide auf `blur`; das kostete getippten Text, weil im
-      // echten Chromium kein `blur` feuert, wenn das Einstellungsfenster per Escape
-      // schliesst, waehrend die Textarea den Fokus haelt (Review-Befund Fix-Runde 4).
-      //  - SPEICHERN bei `onChange`: kein Datenverlust. Zwischenstaende in der data.json
-      //    sind der billigere Preis als ein verschluckter Absatz — der Wert ist ohnehin
-      //    erst beim naechsten Gespraech wirksam, ein halb getippter Prompt richtet also
-      //    keinen Schaden an.
-      //  - ZEICHNEN bei `blur`: die zwei Warnungen, die am getippten Text haengen
-      //    (`no-tools`, `missing-placeholder`), muessen sichtbar werden, sobald die
-      //    Abweichung entsteht — sie sind die einzige Absicherung dieses Entwurfs
-      //    („warnen statt verbieten", Spec E3/E5). Bei jedem Tastendruck zu zeichnen geht
-      //    nicht: das Neuzeichnen zerstoert den Cursor. Der Grund fuer `blur` war also
-      //    immer das Re-Render, nie das Speichern.
-      ta.onChange((v) => {
-        // Gespeichert wird nur die Abweichung (Spec E2): wer den geladenen Auslieferungstext unveraendert laesst oder zurueckschreibt,
-        // behaelt „die ausgelieferte Fassung gilt“ — sonst fror eine spaetere Verbesserung fuer ihn ein.
-        ctx.settings.systemPromptOverride = v.trim() === DEFAULT_RULES.trim() ? "" : v;
-        void ctx.save();
-        ladeKnopfPruefen();
-      });
-      ta.inputEl.addEventListener("blur", () => { zeichneWarnungen(); });
-    })
-    .addButton((b) => {
-      ladeKnopf = b;
-      b.setButtonText(t("settings.prompt.load")).setTooltip(t("settings.prompt.load.tip")).onClick(() => {
-        if (feld === null || feld.getValue().trim() !== "") return;
-        // Nur ins Feld, nicht in die Einstellungen: ein Text, den der Nutzer nie anruehrt, ist keine Abweichung.
-        feld.setValue(DEFAULT_RULES);
-        feld.inputEl.focus();
-        ladeKnopfPruefen();
-        zeichneWarnungen();
-      });
-      ladeKnopfPruefen();
-    })
-    .addExtraButton((b) =>
-      b.setIcon("copy").setTooltip(t("settings.prompt.copy")).onClick(() => {
-        // Der Text, der im naechsten Gespraech gilt (Platzhalter unaufgeloest) — zum Archivieren vor dem Ueberschreiben.
-        void copyToClipboard(aktuellerText(), { copiedMessage: t("settings.prompt.copied") });
-      }),
-    )
-    .addExtraButton((b) =>
-      b.setIcon("rotate-ccw").setTooltip(t("settings.prompt.reset")).onClick(() => {
-        ctx.settings.systemPromptOverride = "";
-        void ctx.save().then(() => ctx.refresh());
-      }),
-    )
-    .addButton((b) => b.setButtonText(t("settings.prompt.show")).onClick(() => ctx.openPreview()));
-
-  zeichneWarnungen();
+/** Die Anweisungs-Zeile ist der Kit-Baustein `system-prompt-setting` (obsidian-kit 0.110.0, aus dieser Zeile gehoben, UI-STANDARD §8): leer heisst ausgeliefert
+ *  (Spec E2), Laden nur bei leerem Feld, Kopieren, Zuruecksetzen kopiert eigenen Text erst in die Zwischenablage, gespeichert wird bei `onChange` normalisiert,
+ *  die Warnungen zeichnet der Baustein bei Aufbau, `blur`, Laden und Zuruecksetzen (nie je Tastendruck, Cursor). Plugin-eigen bleiben: Name und Beschreibung
+ *  („Anweisung an Koda“ ist ein Regelblock, kein schlichter Systemprompt), die Warntexte samt `{{werkzeuge}}` (Spec E3, haengen auch an abgeschalteten
+ *  Lese-Werkzeugen) und der Knopf „Aktive Anweisung ansehen“, der hinter die Kit-Bedienteile kommt. */
+export function renderPromptRow(setting: Setting, ctx: ModelControlCtx, group?: SettingGroup): void {
+  const def = systemPromptSettingDefinition({
+    value: ctx.settings.systemPromptOverride,
+    shipped: DEFAULT_RULES,
+    placeholders: PLACEHOLDER_NAMES,
+    onChange: (v) => {
+      ctx.settings.systemPromptOverride = v;
+      return ctx.save();
+    },
+    // Die pure Pruefung `promptRow` (view-model, eine Wahrheit mit dem Sendeweg), aber auf dem Text im Feld: der Baustein reicht den wirksamen Text herein,
+    // der nie leer ist, also als Override gelesen genau dieser Text bleibt.
+    warnings: (wirksam) => {
+      const m = promptRow({ systemPromptOverride: wirksam, toolsDisabled: ctx.settings.toolsDisabled }, ctx.relatedAvailable);
+      return m.warnings.map((w) => warnText(w, m.readingToolsOff));
+    },
+    strings: { lang: getLang(), name: t("settings.prompt"), desc: t("settings.prompt.desc") },
+  });
+  // Die Kit-Zeile liest die Gruppe nicht; die Tests rufen ohne sie.
+  def.render(setting, group as SettingGroup);
+  setting.addButton((b) => b.setButtonText(t("settings.prompt.show")).onClick(() => ctx.openPreview()));
 }
 
 /** Referenz auf die interaktiven Komponenten EINER Werkzeug-Zeile — ueber den Namen

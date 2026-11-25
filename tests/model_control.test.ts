@@ -39,7 +39,7 @@ const textarea = (s: Setting): TextAreaComponent =>
   s.components.find((c) => c instanceof TextAreaComponent) as TextAreaComponent;
 const ladeKnopf = (s: Setting): { clickCB?: () => void } =>
   s.components.find((c) => !(c instanceof ExtraButtonComponent) && typeof (c as { clickCB?: unknown }).clickCB !== "undefined"
-    && (c as { textValue?: string }).textValue === "Edit the shipped version") as { clickCB?: () => void };
+    && (c as { textValue?: string }).textValue === "Edit shipped prompt") as { clickCB?: () => void };
 const kopierKnopf = (s: Setting): ExtraButtonComponent =>
   s.components.find((c) => c instanceof ExtraButtonComponent && c.iconName === "copy") as unknown as ExtraButtonComponent;
 const resetKnopf = (s: Setting): ExtraButtonComponent =>
@@ -73,20 +73,23 @@ describe("renderPromptRow", () => {
     const c = ctx();
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);
+    // Der Mock setzt beim onChange den Wert nicht selbst; der Kit-Baustein prueft den Text im Feld (wie im echten Chromium).
+    textarea(s).setValue("Sei knapp.");
     textarea(s).onChangeCB?.("Sei knapp."); // weder Werkzeuge noch Platzhalter
     expect(c.save).toHaveBeenCalled();
-    expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(0);
+    expect(s.settingEl.querySelectorAll(".okit-sysprompt-warning")).toHaveLength(0);
     textarea(s).inputEl.dispatchEvent({ type: "blur" });
-    expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(2);
+    expect(s.settingEl.querySelectorAll(".okit-sysprompt-warning")).toHaveLength(2);
   });
   it("nimmt eine ueberfluessige Warnzeile beim blur wieder weg, statt sie zu stapeln", () => {
     const c = ctx({ systemPromptOverride: "Sei knapp." });
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);
-    expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(2);
+    expect(s.settingEl.querySelectorAll(".okit-sysprompt-warning")).toHaveLength(2);
+    textarea(s).setValue(DEFAULT_RULES);
     textarea(s).onChangeCB?.(DEFAULT_RULES);
     textarea(s).inputEl.dispatchEvent({ type: "blur" });
-    expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(0);
+    expect(s.settingEl.querySelectorAll(".okit-sysprompt-warning")).toHaveLength(0);
   });
   it("zeichnet beim blur NUR die Warnzeilen, nicht den ganzen Tab", () => {
     // Ein voller `refresh()` liefe zwischen mousedown (das den blur ausloest) und click —
@@ -111,21 +114,31 @@ describe("renderPromptRow", () => {
     expect(resetKnopf(s)).toBeDefined();
     expect(resetKnopf(s).tooltip).not.toBe("");
   });
-  it("setzt beim Zuruecksetzen auf LEER — nicht auf eine Kopie des Auslieferungsstands", async () => {
-    // Der Kern von Spec E2: eine Kopie friere den Prompt beim ersten Oeffnen ein.
+  it("setzt beim Zuruecksetzen auf LEER — nicht auf eine Kopie des Auslieferungsstands — und legt eigenen Text vorher in die Zwischenablage", async () => {
+    // Der Kern von Spec E2: eine Kopie friere den Prompt beim ersten Oeffnen ein. Seit dem Kit-Baustein (Welle 38) geht eigener Text erst in die
+    // Zwischenablage, geleert wird erst nach gelungenem Kopieren; kein Neuaufbau des Tabs (ein `display()` zwischen mousedown und click verschluckte den Klick).
+    const kopiert = vi.mocked(copyToClipboard);
+    kopiert.mockClear();
     const c = ctx({ systemPromptOverride: "Eigenes" });
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, c);
     resetKnopf(s).clickCB?.();
-    expect(c.settings.systemPromptOverride).toBe("");
+    expect(kopiert).toHaveBeenLastCalledWith("Eigenes", expect.anything());
+    await vi.waitFor(() => { expect(c.settings.systemPromptOverride).toBe(""); });
     expect(c.settings.systemPromptOverride).not.toBe(DEFAULT_RULES);
-    // Drei statt zwei Ticks: `vi.fn(async () => {})` haengt gegenueber einer nackten
-    // async-Funktion einen zusaetzlichen Microtask-Tick ein (gemessen per Debug-Zaehlschleife
-    // — der Vorlagen-Brief nannte zwei und war damit knapp zu wenig).
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(c.refresh).toHaveBeenCalled();
+    expect(textarea(s).getValue()).toBe("");
+    expect(c.refresh).not.toHaveBeenCalled();
+  });
+  it("laesst eigenen Text stehen, wenn er sich beim Zuruecksetzen nicht kopieren laesst", async () => {
+    const kopiert = vi.mocked(copyToClipboard);
+    kopiert.mockResolvedValueOnce(false);
+    const c = ctx({ systemPromptOverride: "Eigenes" });
+    const s = new Setting(makeFakeEl());
+    renderPromptRow(s, c);
+    resetKnopf(s).clickCB?.();
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(c.settings.systemPromptOverride).toBe("Eigenes");
+    expect(textarea(s).getValue()).toBe("Eigenes");
   });
   it("legt die ausgelieferte Fassung auf Wunsch ins Feld, ohne etwas zu speichern", () => {
     const c = ctx();
@@ -168,12 +181,12 @@ describe("renderPromptRow", () => {
   it("warnt nicht beim Auslieferungsstand", () => {
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, ctx());
-    expect(s.settingEl.querySelectorAll(".koda-warn")).toHaveLength(0);
+    expect(s.settingEl.querySelectorAll(".okit-sysprompt-warning")).toHaveLength(0);
   });
   it("zeigt eine Warnzeile mit Zustandsklasse und aria-label (UI-STANDARD §8)", () => {
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, ctx({ systemPromptOverride: "Sei knapp. {{sprache}} {{ordner}}" }));
-    const warn = s.settingEl.querySelectorAll(".koda-warn");
+    const warn = s.settingEl.querySelectorAll(".okit-sysprompt-warning");
     expect(warn).toHaveLength(1);
     expect(warn[0].hasClass("is-warning")).toBe(true);
     expect(warn[0].getAttribute("aria-label")).toBeTruthy();
@@ -182,7 +195,7 @@ describe("renderPromptRow", () => {
   it("zeigt drei Warnzeilen, wenn drei Befunde vorliegen", () => {
     const s = new Setting(makeFakeEl());
     renderPromptRow(s, ctx({ systemPromptOverride: "nichts", toolsDisabled: ["search_notes", "read_note", "list_notes", "get_workspace"] }));
-    expect(s.settingEl.querySelectorAll(".koda-warn").length).toBe(3);
+    expect(s.settingEl.querySelectorAll(".okit-sysprompt-warning").length).toBe(3);
   });
   it("reicht den Ansehen-Knopf an den Kontext durch", () => {
     const c = ctx();

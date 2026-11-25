@@ -299,7 +299,7 @@ export class KodaSettingsTab extends PluginSettingTab {
           // `name` ist bei der nativen 1.13-API Pflicht (Suchindex) — `renderPromptRow`/
           // `renderToolList` setzen ihn intern noch einmal, das ist idempotent (wie bei
           // `renderModelPicker`).
-          { name: t("settings.prompt"), render: (setting) => renderPromptRow(setting, this.modelCtx()) },
+          { name: t("settings.prompt"), render: (setting, group) => renderPromptRow(setting, this.modelCtx(), group) },
           // Block-Body statt Ausdrucks-Body: `renderToolList` gibt die Zeilen-Handles
           // zurueck (Fix-Runde 1), die Definition erwartet aber `void | (() => void)` —
           // der Aufrufer hier braucht sie nicht und darf den Rueckgabewert ignorieren.

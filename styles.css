@@ -284,9 +284,6 @@
   min-width: 0;
   text-overflow: ellipsis;
 }
-.koda-prompt-setting { flex-wrap: wrap; }
-.koda-prompt-setting > .setting-item-control { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; }
-.koda-prompt-textarea { width: 100%; min-height: 8em; font-family: var(--font-monospace); }
 .koda-warn {
   display: flex; align-items: center; gap: var(--size-4-1);
   font-size: var(--font-ui-smaller); margin-top: var(--size-4-1);
@@ -654,3 +651,21 @@ button.okit-hub-more.is-hidden { display: none; }
 .okit-copy-button .svg-icon { width: var(--icon-xs); height: var(--icon-xs); }
 .is-mobile .okit-copy-button { position: relative; }
 .is-mobile .okit-copy-button::after { content: ""; position: absolute; top: 50%; left: 50%; width: calc(var(--size-4-10) + var(--size-4-1)); height: calc(var(--size-4-10) + var(--size-4-1)); transform: translate(-50%, -50%); }
+
+/* uebernommen aus src/vendor/kit-obsidian/system-prompt-setting.ts (SYSTEM_PROMPT_SETTING_CSS), obsidian-kit 0.111.0 */
+.okit-sysprompt-setting { flex-wrap: wrap; }
+.okit-sysprompt-setting > .setting-item-control { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; }
+.okit-sysprompt-textarea { width: 100%; min-height: 8em; font-family: var(--font-monospace); }
+.okit-sysprompt-warnings { flex: 1 1 100%; display: flex; flex-direction: column; gap: var(--size-4-1); margin-top: var(--size-4-1); }
+.okit-sysprompt-warnings:empty { display: none; }
+
+/* uebernommen aus src/vendor/kit-obsidian/status-indicator.ts (STATUS_INDICATOR_CSS), obsidian-kit 0.111.0 */
+.okit-status { display: flex; gap: var(--size-2-2); align-items: center; font-size: var(--font-ui-small); color: var(--text-muted); }
+.okit-status-icon { display: inline-flex; align-items: center; }
+.okit-status-icon svg { width: 14px; height: 14px; }
+.okit-status.is-ok .okit-status-icon { color: var(--text-success); }
+.okit-status.is-error .okit-status-icon { color: var(--text-error); }
+.okit-status.is-warning .okit-status-icon { color: var(--text-warning); }
+.okit-status.is-checking .okit-status-icon svg { animation: okit-status-spin 1.2s linear infinite; }
+@keyframes okit-status-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .okit-status.is-checking .okit-status-icon svg { animation: none; } }
