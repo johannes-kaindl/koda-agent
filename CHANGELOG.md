@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.40.0] — 2026-11-25
+
 ### Changed
 
 - **The “Instructions for Koda” row is the shared system prompt row of the library (obsidian-kit 0.110.0, lifted from this row).** Same behaviour as before (empty means the shipped version, “Edit shipped prompt”, copy, warnings), with one difference: resetting puts your own instructions into the clipboard first and only empties the field when that worked, so they are never lost. The placeholders `{{sprache}}` and `{{ordner}}` are listed under the description.
