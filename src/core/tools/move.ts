@@ -1,5 +1,6 @@
 import { resolveNotePath } from "./path-guard";
 import { writePolicy } from "./write-policy";
+import { vaultDirname } from "../../vendor/kit/vault-path";
 
 export type MoveDecision = "free" | "confirm";
 
@@ -37,11 +38,6 @@ export interface MovePlan {
   kind: "rename" | "move";
 }
 
-/** Ordner eines vault-relativen Pfades; "" ist die Vault-Wurzel und ein gueltiger Wert. */
-function folderOf(path: string): string {
-  const at = path.lastIndexOf("/");
-  return at === -1 ? "" : path.slice(0, at);
-}
 
 /** Beide Pfade durch denselben Guard wie `read_note`/`write_note` — kein Traversal,
  *  nur `.md`, vault-relativ. Identische Pfade sind ein Fehler und keine Nulloperation:
@@ -50,5 +46,5 @@ export function planMove(source: string, destination: string): MovePlan {
   const from = resolveNotePath(source);
   const to = resolveNotePath(destination);
   if (from === to) throw new Error(`Quelle und Ziel sind der gleiche Pfad: "${from}"`);
-  return { source: from, destination: to, kind: folderOf(from) === folderOf(to) ? "rename" : "move" };
+  return { source: from, destination: to, kind: vaultDirname(from) === vaultDirname(to) ? "rename" : "move" };
 }

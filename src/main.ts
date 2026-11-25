@@ -89,6 +89,7 @@ import { pickNote } from "./obsidian/note-picker";
 import { pickFolder } from "./obsidian/folder-picker";
 import { resolveFolderPath } from "./core/tools/path-guard";
 import type { CollapsibleStorage } from "./vendor/kit-obsidian/collapsible";
+import { errorMessage } from "./vendor/kit/error-message";
 
 /** Eine Skill-Datei, die NICHT in die Auswahl kam — mit Ursache statt Sammelbegriff:
  *  "read-error" (Datei liess sich nicht lesen) und "no-description" (Frontmatter ohne
@@ -298,7 +299,7 @@ export default class KodaPlugin extends Plugin {
     try {
       norm = resolveFolderPath(ordner);
     } catch (err) {
-      new Notice(t("picker.folder.invalid", err instanceof Error ? err.message : String(err)));
+      new Notice(t("picker.folder.invalid", errorMessage(err)));
       return;
     }
     // Ein leeres Feld normalisiert auf "" — das ist der ganze Vault, keine Auswahl, die
@@ -1375,7 +1376,7 @@ export default class KodaPlugin extends Plugin {
       // aber ein Neustart stellt Arbeit und Overlay daraus wieder her (Spec § 3).
       const toAppend: LogEntry[] = [];
       if (needsSessionRecord(this.chatLog, this.session)) {
-        const rec: SessionStateRecord = { kind: "session", at: new Date().toISOString(), state: JSON.parse(JSON.stringify(this.session)) as SessionState };
+        const rec: SessionStateRecord = { kind: "session", at: new Date().toISOString(), state: structuredClone(this.session) };
         toAppend.push(rec);
       }
       toAppend.push(userMsg);
@@ -1604,15 +1605,11 @@ export default class KodaPlugin extends Plugin {
     await this.store.appendMessages([rec]);
   }
 
+  /** Elternordner eines Pfades samt aller Ebenen (code-kit `ensureDir`: von oben, ein gewonnenes Rennen ist kein Fehler). Ein Fehler beim Anlegen geht an den
+   *  Aufrufer weiter, statt still verschluckt zu werden: das folgende `create` scheiterte sonst mit einer Meldung, die den Ordner nicht nennt. */
   private async ensureParents(path: string): Promise<void> {
-    const parts = path.split("/").slice(0, -1);
-    let cur = "";
-    for (const part of parts) {
-      cur = cur === "" ? part : `${cur}/${part}`;
-      if (this.app.vault.getFolderByPath(cur) === null) {
-        await this.app.vault.createFolder(cur).catch(() => {});
-      }
-    }
+    const at = path.lastIndexOf("/");
+    if (at > 0) await ensureDir(this.app.vault.adapter, path.slice(0, at));
   }
 
   private async readMemory(): Promise<string> {

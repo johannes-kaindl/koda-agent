@@ -74,6 +74,7 @@
 // importiert, nicht vendored — sie ist plugin-neutral. Fehlt das Dach (fremder
 // Checkout), bricht esbuild beim Aufloesen ab: das ist die gewollte Meldung.
 import { Cdp, attachTo, bereiteInstanzVor, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { errorMessage } from "../src/vendor/kit/error-message";
 
 const PLUGIN_ID = "koda-agent";
 
@@ -419,6 +420,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(`\nFEHLER: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`\nFEHLER: ${errorMessage(error)}`);
   process.exit(1);
 });

@@ -1,5 +1,6 @@
 import { isSemanticNotice } from "./semantic";
 import { AVAILABLE_MODES, type ContextAttachment, type ContextMode } from "./types";
+import { baseName, splitFileName } from "../../vendor/kit/rel-path";
 
 type Lang = "de" | "en";
 
@@ -28,7 +29,8 @@ export function modeOptions(lang: Lang, vaultAvailable: boolean): ModeOption[] {
 }
 
 function basename(path: string): string {
-  return path.split("/").pop()?.replace(/\.md$/i, "") ?? path;
+  const { stem, ext } = splitFileName(path);
+  return ext === "md" ? stem : baseName(path);
 }
 
 /** Eine Zeile fuer die Kontextzeile unter der Nutzer-Blase. NICHT fuer den gui:ask-Bericht —

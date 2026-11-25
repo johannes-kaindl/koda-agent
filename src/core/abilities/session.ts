@@ -5,28 +5,26 @@ import type { LogEntry } from "../agent/types";
 import { isSessionStateRecord } from "../agent/types";
 import { overlayCount } from "./resolve";
 import { emptyOverlay, SKILL_MODES, type Overlay, type SessionState } from "./types";
+import { isPlainObject } from "../../vendor/kit/settings_schema";
 
-function isMap(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
 
 function isValueMap(v: unknown, allowed: readonly string[]): boolean {
-  return isMap(v) && Object.values(v).every((x) => typeof x === "string" && allowed.includes(x));
+  return isPlainObject(v) && Object.values(v).every((x) => typeof x === "string" && allowed.includes(x));
 }
 
 /** Form-Prüfung für eine Marke aus dem JSONL: ein kaputter Zustand soll die Marke kosten, nie das Gespräch. */
 export function isSessionState(v: unknown): v is SessionState {
-  if (!isMap(v)) return false;
+  if (!isPlainObject(v)) return false;
   if (v["arbeit"] !== null && typeof v["arbeit"] !== "string") return false;
   if (!Array.isArray(v["manual"]) || !v["manual"].every((p) => typeof p === "string")) return false;
   // `bases` fehlt in Marken aus der Zeit vor Plan 2 (gueltig); die Schnappschuesse selbst prueft nur die Form der Liste — ein
   // kaputter Eintrag kostet beim Rendern den Eintrag, nicht das Gespraech.
   if (v["bases"] !== undefined && !Array.isArray(v["bases"])) return false;
   const o = v["overlay"];
-  if (!isMap(o)) return false;
+  if (!isPlainObject(o)) return false;
   if (!isValueMap(o["skills"], SKILL_MODES) || !isValueMap(o["werkzeuge"], ["an", "aus"]) || !isValueMap(o["anbieter"], ["an", "aus"])) return false;
   const k = o["kontext"];
-  if (!isMap(k)) return false;
+  if (!isPlainObject(k)) return false;
   if (k["modus"] !== undefined && !isContextMode(k["modus"])) return false;
   for (const key of ["tiefe", "nachbarn"]) if (k[key] !== undefined && typeof k[key] !== "number") return false;
   return true;

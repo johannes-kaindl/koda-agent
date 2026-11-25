@@ -14,6 +14,7 @@ import { cpSync, existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Cdp, bereiteInstanzVor, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { errorMessage } from "../src/vendor/kit/error-message";
 
 const VAULT = "koda-agent-tasknotes";
 const staging = (): string => join(process.env.STAGING_VAULTS_DIR ?? "", VAULT);
@@ -55,7 +56,7 @@ async function main(): Promise<void> {
   const out: Step[] = [];
   const step = async (name: string, expr: string): Promise<unknown> => {
     let value: unknown;
-    try { value = await cdp.evaluate<unknown>(expr); } catch (e) { value = { RENDERER_FEHLER: e instanceof Error ? e.message : String(e) }; }
+    try { value = await cdp.evaluate<unknown>(expr); } catch (e) { value = { RENDERER_FEHLER: errorMessage(e) }; }
     out.push({ name, value });
     console.log(`\n## ${name}\n${JSON.stringify(value, null, 1)}`);
     return value;

@@ -2,6 +2,7 @@ import type { Confidence } from "../../vendor/kit/capabilities";
 import type { OcrProviderApi } from "../../vendor/kit/ocr-provider";
 import type { DescribeProviderApi } from "../../vendor/kit/describe-provider";
 import { describeErrorText, ocrErrorText } from "../../vendor/kit/provider-error-texts";
+import { errorMessage } from "../../vendor/kit/error-message";
 
 /** Formate, die Vision-Modelle und der OCR-Anbieter lesen. SVG fehlt mit Absicht: es ist Text,
  *  kein Rasterbild, und kein Vision-Endpunkt nimmt es als `image_url`. */
@@ -58,7 +59,7 @@ export async function ocrResult(api: Pick<OcrProviderApi, "extractText">, path: 
   try {
     r = await api.extractText(path);
   } catch (e) {
-    return { ok: false, error: `Texterkennung fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}` };
+    return { ok: false, error: `Texterkennung fehlgeschlagen: ${errorMessage(e)}` };
   }
   // Die Saetze kommen aus dem Kit (`ocrErrorText`). Deutsch, nicht nach UI-Sprache: der Rest dieses Ergebnisses und jeder andere
   // Werkzeug-Text Kodas ist deutsch, ein englischer Satz davor waere ein gemischtes Ergebnis fuer das Modell.
@@ -82,7 +83,7 @@ export async function describeResult(api: Pick<DescribeProviderApi, "describeIma
   try {
     r = await api.describeImage(path, { language: "de" });
   } catch (e) {
-    return { ok: false, error: `Bildbeschreibung fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}` };
+    return { ok: false, error: `Bildbeschreibung fehlgeschlagen: ${errorMessage(e)}` };
   }
   if ("error" in r) return { ok: false, error: describeErrorText(r, "de") };
   const from = r.model === undefined ? "" : `, ${r.model}`;

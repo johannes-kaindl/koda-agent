@@ -19,6 +19,7 @@ import {
 } from "../../vendor/kit/endpoint_diagnostics";
 import { withTimeout } from "../../vendor/kit/timeout";
 import type { ClockPort } from "../../vendor/kit-obsidian/clock";
+import { errorMessage } from "../../vendor/kit/error-message";
 
 export interface HttpProbe {
   /** Muss den echten Status zurückgeben statt bei 4xx/5xx zu werfen. Nur ein
@@ -53,7 +54,7 @@ export async function probeModels(
 
   const attempt = http.getJson(url, headers).then(
     (r): ProbeInput => ({ kind: "response", status: r.status, body: r.json }),
-    (e: unknown): ProbeInput => ({ kind: "error", message: e instanceof Error ? e.message : String(e) }),
+    (e: unknown): ProbeInput => ({ kind: "error", message: errorMessage(e) }),
   );
 
   const raced = await withTimeout(attempt, timeoutMs, clock);

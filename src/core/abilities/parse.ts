@@ -4,6 +4,7 @@ import {
   CONTEXT_LINK_DEPTH_MAX, CONTEXT_LINK_DEPTH_MIN,
 } from "../settings-types";
 import { SKILL_MODES, type Arbeit, type ArbeitKontext, type OnOff, type SkillMode } from "./types";
+import { isPlainObject } from "../../vendor/kit/settings_schema";
 
 const KNOWN_KEYS = ["koda", "skills", "übrige-skills", "werkzeuge", "anbieter", "kontext", "base"] as const;
 
@@ -17,9 +18,6 @@ export interface ParsedArbeit {
   invalid: string[];
 }
 
-function isMap(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
 
 /** Ganzzahl in den Grenzen; Zahl oder Ziffern-String (YAML liefert beides je nach Schreibweise). */
 function intIn(v: unknown, min: number, max: number): number | null {
@@ -30,7 +28,7 @@ function intIn(v: unknown, min: number, max: number): number | null {
 function readMap<T extends string>(raw: unknown, key: string, allowed: readonly T[], invalid: string[]): Record<string, T> {
   const out: Record<string, T> = {};
   if (raw === undefined || raw === null) return out;
-  if (!isMap(raw)) {
+  if (!isPlainObject(raw)) {
     invalid.push(key);
     return out;
   }
@@ -46,7 +44,7 @@ function readMap<T extends string>(raw: unknown, key: string, allowed: readonly 
  *  `null`, wenn die Notiz keine Arbeit ist (`koda: arbeit` fehlt). Ein ungültiger Eintrag kostet den
  *  Eintrag, nicht die Arbeit (Spec § 4). */
 export function parseArbeit(name: string, fm: unknown): ParsedArbeit | null {
-  if (!isMap(fm) || fm["koda"] !== "arbeit") return null;
+  if (!isPlainObject(fm) || fm["koda"] !== "arbeit") return null;
   const invalid: string[] = [];
   const skills = readMap<SkillMode>(fm["skills"], "skills", SKILL_MODES, invalid);
   let uebrigeSkills: Arbeit["uebrigeSkills"] = "grundeinstellung";
@@ -58,7 +56,7 @@ export function parseArbeit(name: string, fm: unknown): ParsedArbeit | null {
 
   const kontext: ArbeitKontext = {};
   const k = fm["kontext"];
-  if (isMap(k)) {
+  if (isPlainObject(k)) {
     if (k["modus"] !== undefined) {
       if (isContextMode(k["modus"])) kontext.modus = k["modus"];
       else invalid.push("kontext.modus");

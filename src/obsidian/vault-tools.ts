@@ -35,6 +35,7 @@ import type { OcrProviderApi } from "../vendor/kit/ocr-provider";
 import type { DescribeProviderApi } from "../vendor/kit/describe-provider";
 import type { ImageGenProviderApi, ImageGenProviderError } from "../vendor/kit/image-gen-provider";
 import { imageGenErrorText } from "../vendor/kit/provider-error-texts";
+import { errorMessage } from "../vendor/kit/error-message";
 
 export interface VaultPort {
   listMarkdownPaths(): string[];
@@ -355,7 +356,7 @@ export class VaultTools implements ToolRunner {
     try {
       r = await api.generateImage(text, { targetFolder: target });
     } catch (e) {
-      return { ok: false, error: `Bildgenerierung fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}` };
+      return { ok: false, error: `Bildgenerierung fehlgeschlagen: ${errorMessage(e)}` };
     }
     // Die Saetze kommen aus dem Kit; deutsch wie jeder Werkzeug-Text Kodas, nicht nach UI-Sprache (siehe `ocrResult`).
     if (typeof r !== "string") return { ok: false, error: imageGenErrorText(r, "de") };
